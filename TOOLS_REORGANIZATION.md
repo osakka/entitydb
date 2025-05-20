@@ -6,6 +6,7 @@ The EntityDB project has been reorganized to improve consistency, maintainabilit
 
 1. **Tests moved to src/tests**
    - All test files are now located in `/opt/entitydb/src/tests`
+   - The previous location (`share/tests`) has been removed
    - Test files are versioned alongside the source code
    - Clearer documentation and organization
 

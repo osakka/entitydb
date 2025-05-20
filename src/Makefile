@@ -83,10 +83,8 @@ simple-tests:
 	@$(ECHO) "$(YELLOW)Running API tests with the shell framework...$(NC)\n"
 	@if [ -d "$(TESTS_DIR)" ]; then \
 		echo -e "$(YELLOW)Found test framework in $(TESTS_DIR)$(NC)\n"; \
-		cd $(TESTS_DIR) && bash ./test_framework.sh --all || (echo -e "$(RED)API tests failed$(NC)\n"; exit 1); \
-		echo -e "$(GREEN)API tests passed$(NC)\n"; \
-		cd $(TESTS_DIR) && bash ./test_temporal_api.sh || (echo -e "$(RED)Temporal API tests failed$(NC)\n"; exit 1); \
-		echo -e "$(GREEN)Temporal API tests passed$(NC)\n"; \
+		cd $(TESTS_DIR) && bash ./run_tests.sh --all || (echo -e "$(RED)API tests failed$(NC)\n"; exit 1); \
+		echo -e "$(GREEN)All API tests passed$(NC)\n"; \
 	else \
 		echo -e "$(RED)Test framework not found in $(TESTS_DIR)$(NC)\n"; \
 		exit 1; \
