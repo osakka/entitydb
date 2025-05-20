@@ -1,6 +1,8 @@
 # EntityDB Git Workflow & State Tracking Guide
 
-This document outlines the Git best practices for the EntityDB project, focusing on state tracking, tagging, and commit message standardization to ensure clear communication across teams.
+> **IMPORTANT: This is the centralized reference document for all Git workflow practices in the EntityDB project. All developers must follow these guidelines.**
+
+This document outlines the Git best practices for the EntityDB project, focusing on state tracking, tagging, and commit message standardization to ensure clear communication across teams. It is referenced from all other documentation as the single source of truth for Git workflow practices.
 
 ## State Tracking with Git Describe
 
@@ -155,9 +157,29 @@ Progress: 100%
 EntityDB development follows a strict clean tabletop policy:
 
 1. Work directly in the main codebase, not in copies
-2. Delete obsolete code immediately after migrating functionality
+2. **Move obsolete code to the `/trash` directory** instead of deleting it
 3. Avoid temporary files with extensions like .bak or .old
 4. Maintain one source of truth at all times
+
+### Trash Directory Convention
+
+The `/trash` directory serves as a repository for code that is no longer used but may have reference value:
+
+1. **When to use the trash directory:**
+   - When replacing an implementation with a better one
+   - When removing features that are no longer needed
+   - When code is obsolete but may have reference value
+   - When restructuring the codebase
+
+2. **How to move code to trash:**
+   - Maintain the original directory structure where possible
+   - Add clear comments about when and why the code was moved to trash
+   - Add a descriptive commit message explaining what was moved and why
+
+3. **Never execute code from trash:**
+   - Code in the trash directory is for reference only
+   - Never import or execute code from the trash directory in production
+   - Code in trash may contain bugs, security issues, or incompatibilities
 
 ## Branching Strategy
 

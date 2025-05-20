@@ -172,12 +172,24 @@ The server automatically creates a default admin user if none exists:
 - RBAC permission caching could improve performance
 - Rate limiting not yet implemented
 
-## Git Repository
+## Git Workflow
 
-- URL: https://git.home.arpa/osakka/entitydb
+All development follows the standardized Git workflow described in [docs/development/git-workflow.md](./docs/development/git-workflow.md). This document defines:
+
+- Branch strategy (trunk-based development)
+- Commit message standards and format
+- Pull request protocol
+- Git hygiene rules
+- State tracking with Git describe
+- Tagging conventions
+
+## Repository Information
+
+- URL: https://git.home.arpa/itdlabs/entitydb.git
 - Branch: main
-- Latest tag: v2.7.1
+- Latest tag: v2.13.0
 
 ## Development Principles
 
-- Never recreate parallel implementations, always integrate and test your fixes directly in the main code.
+- Never recreate parallel implementations, always integrate and test your fixes directly in the main code
+- Always move unused, outdated, or deprecated code to the `/trash` directory instead of deleting it

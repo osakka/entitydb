@@ -65,100 +65,23 @@ This directory contains the source code for the EntityDB platform. This document
 
 ## Git Workflow and Protocol
 
-### Branch Strategy
+All developers must follow the EntityDB Git workflow guidelines. For detailed information on:
 
-We use a trunk-based development model:
+- Branch strategy
+- Commit message format and standards
+- Pull request protocol
+- Git hygiene rules
+- State tracking with Git describe
+- Tagging conventions
+- Daily workflow practices
 
-1. **Main Branch (`main`)**
-   - Always deployable
-   - Protected from direct pushes
-   - All features, fixes, and changes go through PRs
+Please refer to the comprehensive [Git Workflow Guide](/opt/entitydb/docs/development/git-workflow.md).
 
-2. **Feature Branches**
-   - Short-lived branches for specific features or fixes
-   - Format: `feature/short-description` or `fix/issue-description`
-   - Rebase frequently with main
-   - Delete after merging
+This document is the centralized source of truth for all Git-related practices in the EntityDB project.
 
-### Commit Guidelines
+> **Important:** Always move unused or outdated code to the `/trash` directory instead of deleting it (see the Git hygiene rules in the workflow guide).
 
-1. **Commit Frequency**
-   - Commit FREQUENTLY (multiple times per day)
-   - Small, focused commits are better than large, monolithic ones
-   - Each commit should compile and pass tests
-
-2. **Commit Message Format**
-   ```
-   type: Short summary (50 chars or less)
-
-   Detailed explanation if necessary. Wrap at 72 characters.
-   Explain what and why, not how (the code shows that).
-
-   Fixes #123
-   ```
-
-3. **Commit Types**
-   - `feat:` - New features
-   - `fix:` - Bug fixes
-   - `docs:` - Documentation changes
-   - `style:` - Formatting, missing semicolons, etc (no code change)
-   - `refactor:` - Code refactoring (no feature or bug fix)
-   - `perf:` - Performance improvements
-   - `test:` - Adding or fixing tests
-   - `chore:` - Build process or auxiliary tool changes
-
-4. **Sign Your Commits**
-   - All commits must be signed by default
-   - Use `git config --global commit.gpgsign true`
-   - Include the AI co-author line when generated with Claude:
-     ```
-     🤖 Generated with Claude Code
-
-     Co-Authored-By: Claude <noreply@anthropic.com>
-     ```
-
-### Pull Request Protocol
-
-1. **Before Creating a PR**
-   - Ensure all tests pass
-   - Rebase on latest main
-   - No unfinished work in the PR
-
-2. **PR Description Template**
-   ```
-   ## Summary
-   Brief explanation of the changes
-
-   ## Test Plan
-   How you tested the changes
-
-   ## Related Issues
-   Fixes #123
-   ```
-
-3. **PR Review Process**
-   - PRs require at least one review before merging
-   - Address ALL feedback before merging
-   - Use the "request changes" feature for blocking issues
-   - Respond to all comments
-
-4. **After PR Approval**
-   - Squash commits if necessary for a clean history
-   - Merge using "Merge commit" (not squash merge or rebase)
-   - Delete the branch after merging
-
-### Git Hygiene Rules
-
-1. **NEVER** rewrite public history (no force push to main)
-2. **NEVER** commit directly to main branch
-3. **NEVER** commit temporary or debug code
-4. **NEVER** commit large binary files (use Git LFS if necessary)
-5. **NEVER** commit sensitive information (tokens, passwords, keys)
-6. **ALWAYS** verify what you're committing before pushing
-7. **ALWAYS** keep commits focused on a single logical change
-8. **ALWAYS** write meaningful commit messages
-9. **ALWAYS** keep your local copy updated with remote
-10. **ALWAYS** move unused, outdated, or deprecated code to the `/trash` directory instead of deleting it
+For the complete list of Git hygiene rules, please refer to the comprehensive [Git Workflow Guide](/opt/entitydb/docs/development/git-workflow.md).
 
 ### Git Repository Configuration
 

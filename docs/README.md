@@ -121,7 +121,7 @@ Welcome to the EntityDB documentation. This directory contains comprehensive doc
 | Document | Description |
 |----------|-------------|
 | [development/contributing.md](./development/contributing.md) | Contributing guidelines |
-| [development/git-workflow.md](./development/git-workflow.md) | Git workflow guide |
+| [development/git-workflow.md](./development/git-workflow.md) | **[IMPORTANT]** Centralized Git workflow guide (all developers must follow) |
 | [development/production-notes.md](./development/production-notes.md) | Production deployment notes |
 | [development/security-implementation.md](./development/security-implementation.md) | Security implementation details |
 
