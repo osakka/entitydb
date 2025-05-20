@@ -5,10 +5,11 @@
 set -e # Exit on error
 
 # Configuration
-API_BASE_URL=${API_BASE_URL:-"http://localhost:8085/api/v1"}
+API_BASE_URL=${API_BASE_URL:-"https://localhost:8085/api/v1"}
 TEST_DIR=${TEST_DIR:-"/opt/entitydb/share/tests/test_cases"}
 TEMP_DIR=${TEMP_DIR:-"/tmp/entitydb_tests"}
 COLOR_OUTPUT=${COLOR_OUTPUT:-true}
+INSECURE=${INSECURE:-true}  # Allow self-signed certificates
 
 # Colors for output
 if [[ "$COLOR_OUTPUT" == "true" ]]; then
@@ -84,9 +85,15 @@ login() {
   echo -e "${YELLOW}Logging in as $username...${NC}"
   
   local response
-  response=$(curl -s -X POST "$API_BASE_URL/auth/login" \
-    -H "Content-Type: application/json" \
-    -d "{\"username\":\"$username\",\"password\":\"$password\"}")
+  if [[ "$INSECURE" == "true" ]]; then
+    response=$(curl -s -k -X POST "$API_BASE_URL/auth/login" \
+      -H "Content-Type: application/json" \
+      -d "{\"username\":\"$username\",\"password\":\"$password\"}")
+  else
+    response=$(curl -s -X POST "$API_BASE_URL/auth/login" \
+      -H "Content-Type: application/json" \
+      -d "{\"username\":\"$username\",\"password\":\"$password\"}")
+  fi
   
   # Extract token from response
   SESSION_TOKEN=$(echo "$response" | grep -o '"token":"[^"]*' | sed 's/"token":"//')
@@ -159,7 +166,8 @@ run_test() {
     curl_cmd="$curl_cmd -d '$DATA'"
   fi
   
-  # Execute request
+  # Build and execute curl command
+  local curl_cmd=$(build_curl_cmd "$METHOD" "$url" "$HEADERS" "$DATA")
   echo "Executing: $curl_cmd"
   local response
   response=$(eval $curl_cmd)
@@ -231,7 +239,8 @@ run_legacy_test() {
     curl_cmd="$curl_cmd -d '$DATA'"
   fi
   
-  # Execute request
+  # Build and execute curl command
+  local curl_cmd=$(build_curl_cmd "$METHOD" "$url" "$HEADERS" "$DATA")
   echo "Executing: $curl_cmd"
   local response
   response=$(eval $curl_cmd)
@@ -388,6 +397,28 @@ EOF
   return 0
 }
 
+# Helper for building curl commands with proper security options
+build_curl_cmd() {
+  local method="$1"
+  local url="$2"
+  local headers="$3"
+  local data="$4"
+  
+  local cmd="curl -s"
+  
+  # Add -k option for insecure mode if configured
+  if [[ "$INSECURE" == "true" ]]; then
+    cmd="$cmd -k"
+  fi
+  
+  cmd="$cmd -X $method \"$url\" $headers"
+  if [[ -n "$data" && "$method" != "GET" ]]; then
+    cmd="$cmd -d '$data'"
+  fi
+  
+  echo "$cmd"
+}
+
 # Get entity by ID helper function
 get_entity() {
   local entity_id="$1"
@@ -397,9 +428,10 @@ get_entity() {
     return 1
   fi
   
+  local curl_cmd=$(build_curl_cmd "GET" "$API_BASE_URL/entities/get?id=$entity_id" \
+    "-H \"Authorization: Bearer $SESSION_TOKEN\"" "")
   local response
-  response=$(curl -s -X GET "$API_BASE_URL/entities/get?id=$entity_id" \
-    -H "Authorization: Bearer $SESSION_TOKEN")
+  response=$(eval $curl_cmd)
   
   echo "$response"
 }
@@ -415,11 +447,11 @@ create_entity() {
   fi
   data="$data}"
   
+  local curl_cmd=$(build_curl_cmd "POST" "$API_BASE_URL/entities/create" \
+    "-H \"Content-Type: application/json\" -H \"Authorization: Bearer $SESSION_TOKEN\"" \
+    "$data")
   local response
-  response=$(curl -s -X POST "$API_BASE_URL/entities/create" \
-    -H "Content-Type: application/json" \
-    -H "Authorization: Bearer $SESSION_TOKEN" \
-    -d "$data")
+  response=$(eval $curl_cmd)
   
   echo "$response"
 }
