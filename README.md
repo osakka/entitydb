@@ -97,9 +97,9 @@ EntityDB is built on a pure entity-based architecture with layered components:
 cd /opt/entitydb/src
 make
 
-# Run all tests with the simple test framework
-cd ../share/tests/new_framework
-./run_tests.sh --clean --login --all
+# Run all tests with timing metrics
+cd ../share/tests
+./run_tests.sh --clean --login --all --timing
 
 # Start server in development mode
 cd ..
@@ -141,12 +141,12 @@ large datasets.
 
 ## Testing
 
-EntityDB uses a simple shell-based test framework for API testing:
+EntityDB uses a simple shell-based test framework for API testing with performance metrics:
 
 ```bash
-# Run all tests
-cd /opt/entitydb/share/tests/new_framework
-./run_tests.sh --clean --login --all
+# Run all tests with timing
+cd /opt/entitydb/share/tests
+./run_tests.sh --clean --login --all --timing
 
 # Run a specific test
 ./run_tests.sh --login create_entity
