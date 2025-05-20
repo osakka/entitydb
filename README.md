@@ -2,8 +2,7 @@
   <img src="share/resources/logo_white.svg" alt="EntityDB Logo" width="400">
 </p>
 
-<h1 align="center">EntityDB</h1>
-<p align="center">High-Performance Temporal Database with Pure Entity Architecture</p>
+<p align="center">High-Performance Temporal Entity Database Architecture</p>
 
 <p align="center">
   <strong>100x Faster Queries</strong> • 
