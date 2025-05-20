@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg width="400" height="120" viewBox="0 0 400 120" xmlns="http://www.w3.org/2000/svg">
+  <!-- Modern Gradient Background -->
+  <defs>
+    <linearGradient id="background" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f2027"/>
+      <stop offset="50%" stop-color="#203a43"/>
+      <stop offset="100%" stop-color="#2c5364"/>
+    </linearGradient>
+  </defs>
+  
+  <rect x="0" y="0" width="400" height="120" rx="6" ry="6" fill="url(#background)" />
+  
+  <!-- Logo Typography Group -->
+  <g transform="translate(50, 30)">
+    <!-- "entity" in White with Extra Light Weight -->
+    <text x="0" y="40" font-family="'Roboto', 'Segoe UI', sans-serif" font-weight="100" font-size="58" letter-spacing="-1" fill="#ffffff">entity</text>
+    
+    <!-- Red Circle with Subtle Outer Glow -->
+    <circle cx="16" cy="28" r="4" fill="#e74c3c" />
+    <circle cx="16" cy="28" r="6" fill="#e74c3c" fill-opacity="0.3" />
+    <circle cx="16" cy="28" r="8" fill="#e74c3c" fill-opacity="0.1" />
+    
+    <!-- "DB" in Vibrant Blue with Black Weight -->
+    <text x="170" y="40" font-family="'Roboto', 'Segoe UI', sans-serif" font-weight="900" font-size="58" letter-spacing="-1" fill="#3498db">DB</text>
+    
+    <!-- "TEMPORAL DATABASE" in Thin Capitals with Extra Tracking -->
+    <text x="3" y="65" font-family="'Roboto', 'Segoe UI', sans-serif" font-weight="100" font-size="16" letter-spacing="4" fill="#ecf0f1">TEMPORAL DATABASE</text>
+    
+    <!-- Subtle Time Indicator Dots -->
+    <circle cx="3" cy="72" r="1" fill="#3498db" />
+    <circle cx="10" cy="72" r="1" fill="#3498db" />
+    <circle cx="17" cy="72" r="1" fill="#3498db" />
+    <circle cx="24" cy="72" r="1" fill="#3498db" />
+    <circle cx="31" cy="72" r="1" fill="#3498db" />
+  </g>
+</svg>
