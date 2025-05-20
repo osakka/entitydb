@@ -126,15 +126,17 @@ Key configuration options:
 
 ## Performance
 
-With the temporal storage engine, EntityDB achieves breakthrough performance:
+EntityDB is designed for efficient operation with large datasets:
 
-| Dataset Size | Query Time | Throughput    |
-|--------------|------------|--------------|
-| 1M entities  | 0.5ms      | 2000 op/sec  |
-| 5M entities  | 1.5ms      | 670 op/sec   |
-| 10M entities | 3ms        | 333 op/sec   |
+| Dataset Size | Average Query Time | Estimated Throughput |
+|--------------|-------------------|---------------------|
+| 10K entities | 5-15ms            | 150-300 op/sec     |
+| 100K entities | 15-30ms          | 75-150 op/sec      |
+| 1M entities   | 30-100ms         | 30-75 op/sec       |
 
-Memory usage remains minimal due to memory-mapped files with OS-level caching.
+Actual performance varies based on hardware, query complexity, and entity relationships.
+The memory-mapped file architecture helps maintain reasonable memory usage even with
+large datasets.
 
 ## Documentation
 
@@ -150,7 +152,7 @@ Detailed documentation is available in the [docs](./docs) directory:
 - **v2.13.1** - Content format standardization and API testing framework
 - **v2.13.0** - Configuration system overhaul and content encoding fixes
 - **v2.12.0** - Unified Entity model with autochunking
-- **v2.11.0** - Temporal repository with 100x performance
+- **v2.11.0** - Temporal repository implementation
 - **v2.10.0** - Binary format with SSL-only mode
 - **v2.9.0** - RBAC system implementation
 - **v2.8.0** - Feature flag system
