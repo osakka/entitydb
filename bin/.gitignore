@@ -1,0 +1,11 @@
+# Ignore compiled binaries
+entitydb
+
+# Ignore all executable files without extension
+*
+!*/
+!*.*
+!.gitignore
+
+# But keep shell scripts
+!*.sh

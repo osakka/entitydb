@@ -1,0 +1,55 @@
+# Binaries for programs and plugins
+/bin/entitydb
+
+# Database files
+/var/*.ebf
+/var/*.db
+/var/*.sqlite
+/var/*.sqlite3
+
+# Log files
+/var/*.log
+
+# PID files
+/var/*.pid
+
+# Environment files
+/var/*.env
+
+# Write-ahead log files
+/var/*.wal
+
+# Temporary files
+*.tmp
+*.temp
+.DS_Store
+*~
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Dependency directories
+vendor/
+node_modules/
+
+# Build directories
+build/
+dist/
+
+# Testing
+*.test
+*.out
+coverage.txt
+
+# Go specific
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+go.work
