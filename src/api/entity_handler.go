@@ -217,8 +217,24 @@ func (h *EntityHandler) GetEntity(w http.ResponseWriter, r *http.Request) {
 	if includeContent && entity.IsChunked() {
 		reassembledContent, err := h.HandleChunkedContent(id, includeContent)
 		if err == nil && len(reassembledContent) > 0 {
+			// Direct binary content assignment to prevent JSON serialization issues
 			entity.Content = reassembledContent
 			logger.Info("Using reassembled content for entity %s: %d bytes", entity.ID, len(entity.Content))
+			
+			// Ensure that the content type tag is set correctly for binary data
+			// Find content type tag
+			hasContentTypeTag := false
+			for _, tag := range entity.Tags {
+				if strings.HasSuffix(tag, "content:type:application/octet-stream") {
+					hasContentTypeTag = true
+					break
+				}
+			}
+			
+			// Add content type tag if not present
+			if !hasContentTypeTag {
+				entity.AddTag("content:type:application/octet-stream")
+			}
 		}
 	}
 
