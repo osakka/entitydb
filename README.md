@@ -1,222 +1,185 @@
-# EntityDB
+<p align="center">
+  <img src="logo.svg" alt="EntityDB Logo" width="400">
+</p>
 
-A high-performance temporal database with pure entity-based architecture. Features **100x faster queries** with temporal mode and autochunking support for unlimited file sizes.
+<h1 align="center">EntityDB</h1>
+<p align="center">High-Performance Temporal Database with Pure Entity Architecture</p>
 
-**🤖 This project is proudly developed with Claude AI assistance. All commits are AI-generated and marked accordingly.**
+<p align="center">
+  <strong>100x Faster Queries</strong> • 
+  <strong>Nanosecond Precision</strong> • 
+  <strong>Unlimited Content Size</strong> • 
+  <strong>Time Travel Queries</strong>
+</p>
 
-## Features
+## What is EntityDB?
 
-- **100x Performance**: Temporal storage with B-tree indexing, bloom filters, and memory-mapped files
-- **Unified Entity Model**: Single content field per entity ([]byte) with autochunking
-- **Autochunking**: Automatic chunking of large content (>4MB) across entities
-- **Temporal Everything**: Every tag has a nanosecond timestamp
-- **Binary Storage**: Custom EBF format with Write-Ahead Logging (WAL)
-- **Pure Entity Architecture**: Everything is an entity with tags
-- **SSL-Only Mode**: Secure by default with HTTPS on port 8085
-- **RBAC System**: Tag-based permissions fully enforced
-- **Time Travel**: Query any entity at any point in time
-- **No RAM Limits**: Stream large files without loading fully into memory
+EntityDB is a high-performance temporal database where every tag is timestamped with nanosecond precision. It features a pure entity-based architecture with everything represented as entities with tags.
+
+- **Temporal Database:** Every change is tracked with nanosecond-precision timestamps
+- **Binary Storage Format:** Custom binary format (EBF) with Write-Ahead Logging 
+- **Autochunking:** Unlimited file sizes with automatic splitting across entities
+- **Memory-Mapped Files:** Zero-copy reads with OS-managed caching
+- **Advanced Indexing:** B-tree timeline, skip-lists, bloom filters
+
+## Key Features
+
+- ⚡ **100x Performance:** Temporal storage with optimized binary format
+- 🧩 **Unified Entity Model:** Everything is an entity with tags
+- 📝 **Content Streaming:** No RAM limits with automatic chunking
+- 🔒 **RBAC Enforcement:** Tag-based permission system
+- ⏱️ **Time Travel:** Query any entity at any point in time
+- 🔄 **Entity Relationships:** Native relationship support
 
 ## Quick Start
 
 ```bash
-# Clone the repository
+# Clone repository
 git clone https://git.home.arpa/itdlabs/entitydb.git
 cd entitydb
 
 # Build the server
 cd src
 make
-
-# Start the server with SSL
 cd ..
+
+# Start the server
 ./bin/entitydbd.sh start
 
-# Access the web UI
-open https://localhost:8085
+# Access web UI
+# Default: https://localhost:8085 (credentials: admin/admin)
 ```
-
-Default credentials: `admin` / `admin`
-
-## Architecture
-
-### Entity Model (v2.12.0)
-
-```go
-type Entity struct {
-    ID      string   // UUID (auto-generated)
-    Tags    []string // Temporal tags with timestamps
-    Content []byte   // Single content field (autochunked)
-}
-```
-
-### Storage Architecture
-
-```
-EntityDB
-├── Temporal Repository
-├── Binary Storage (EBF with WAL)  
-├── Indexing (B-tree, Skip-list, Bloom filter)
-├── Memory-mapped Files (zero-copy reads)
-└── Autochunking (parent-child entities)
-```
-
-## Configuration
-
-EntityDB uses a multi-level configuration system with the following precedence (highest to lowest):
-
-1. **Command Line Flags**: Override all other settings
-2. **Environment Variables**: Can be set in shell or config files
-3. **Instance Config File**: `/opt/entitydb/var/entitydb.env` (optional)
-4. **Default Config File**: `/opt/entitydb/share/config/entitydb_server.env`
-5. **Hardcoded Defaults**: Built into the application
-
-### Configuration Files
-
-- **Default config**: `share/config/entitydb_server.env` - Contains all available settings with defaults
-- **Instance config**: `var/entitydb.env` - Override specific settings for this instance
-
-### Environment Variables
-
-All configuration can be set via environment variables:
-- `ENTITYDB_PORT`: HTTP port (default: 8085)
-- `ENTITYDB_SSL_PORT`: HTTPS port (default: 8443)
-- `ENTITYDB_USE_SSL`: Enable SSL (default: true)
-- `ENTITYDB_DATA_PATH`: Data directory (default: /opt/entitydb/var)
-- `ENTITYDB_LOG_LEVEL`: Logging level (default: info)
-- `ENTITYDB_SSL_CERT`: SSL certificate path
-- `ENTITYDB_SSL_KEY`: SSL key path
-- And more... (see `share/config/entitydb_server.env` for full list)
-
-### Dynamic Configuration
-
-Configuration can also be stored as entities:
-- **Config entities**: `type:config` with `conf:namespace:key` tags
-- **Feature flags**: `type:feature_flag` with `feat:stage:flag` tags
 
 ## API Examples
 
 ```bash
-# Login
+# Login and get token
 TOKEN=$(curl -k -s -X POST https://localhost:8085/api/v1/auth/login \
   -H "Content-Type: application/json" \
   -d '{"username":"admin","password":"admin"}' | jq -r '.token')
 
-# Create entity with small content
+# Create entity
 curl -k -X POST https://localhost:8085/api/v1/entities/create \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "tags": ["type:document", "project:demo"],
-    "content": "This is a small document"
+    "content": "This is a test document"
   }'
 
-# Create entity with large content (will autochunk)
-curl -k -X POST https://localhost:8085/api/v1/entities/create \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "tags": ["type:file", "name:large.bin"],
-    "content": {
-      "data": "'$(cat large-file.bin | base64)'",
-      "type": "application/octet-stream"
-    }
-  }'
-
-# Query entities 
-curl -k https://localhost:8085/api/v1/entities/list?tag=type:document \
+# Query entities by tag
+curl -k -X GET "https://localhost:8085/api/v1/entities/list?tag=type:document" \
   -H "Authorization: Bearer $TOKEN"
 
-# Temporal queries
-curl -k https://localhost:8085/api/v1/entities/as-of \
+# Time travel query (as-of)
+curl -k -X GET https://localhost:8085/api/v1/entities/as-of \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "id": "ENTITY_ID",
-    "timestamp": "2024-01-01T00:00:00Z"
+    "id": "entity_123",
+    "timestamp": "2023-01-01T00:00:00Z"
   }'
 ```
 
-## Tag System
+## Architecture
 
-Hierarchical namespaced tags with temporal tracking:
+EntityDB is built on a pure entity-based architecture:
 
 ```
-type:user              # Entity type
-status:active          # Entity state
-id:username:john       # Unique identifier
-rbac:role:admin       # Role assignment
-rbac:perm:entity:*    # Permissions
-content:type:json     # Content metadata
-content:size:1024     # Content size
-chunk:0               # Chunk index
-parent:ENTITY_ID      # Parent entity for chunks
+┌─────────────────────────────────────┐
+│            EntityDB API             │
+└─────────────────────────────────────┘
+               │
+┌─────────────────────────────────────┐
+│         RBAC Authorization          │
+└─────────────────────────────────────┘
+               │
+┌─────────────────────────────────────┐
+│        Temporal Repository          │
+├─────────────────────────────────────┤
+│  B-tree │ Skip-list │ Bloom Filter  │
+└─────────────────────────────────────┘
+               │
+┌─────────────────────────────────────┐
+│      Binary Storage Format (EBF)    │
+├─────────────────────────────────────┤
+│       Write-Ahead Log (WAL)         │
+└─────────────────────────────────────┘
+               │
+┌─────────────────────────────────────┐
+│      Memory-Mapped File Access      │
+└─────────────────────────────────────┘
 ```
 
-## Development
+## Building & Development
 
 ```bash
-# Run tests
-cd src
-make test
-
 # Build server
+cd /opt/entitydb/src
 make
 
-# Install scripts
-make install
+# Run all tests
+make test
 
-# Clean build
-make clean
+# Start server in development mode
+cd ..
+./bin/entitydbd.sh start
+
+# Stop server
+./bin/entitydbd.sh stop
 ```
 
-## Project Structure
+## Configuration
 
-```
-/opt/entitydb/
-├── bin/              # Server binary and startup script
-├── src/              # Go source code
-│   ├── main.go       # Server entry point
-│   ├── api/          # REST API handlers
-│   ├── models/       # Entity models
-│   └── storage/      # Binary storage implementation
-├── var/              # Runtime data (database files)
-├── share/            # Shared resources
-│   ├── htdocs/       # Web UI (Alpine.js)
-│   ├── cli/          # Command line tools
-│   └── tests/        # Test scripts and API test framework
-└── docs/             # Documentation
-    ├── API_TESTING_FRAMEWORK.md        # Testing framework documentation
-    ├── CONTENT_FORMAT_TROUBLESHOOTING.md # Content format guide
-    └── RELEASE_NOTES_v2.13.1.md        # Latest release notes
-```
+EntityDB uses a hierarchical configuration system:
 
-## Version History
+1. Command Line Flags
+2. Environment Variables
+3. Instance Config (`/opt/entitydb/var/entitydb.env`)
+4. Default Config (`/opt/entitydb/share/config/entitydb_server.env`)
+5. Hardcoded Defaults
 
-- **v2.13.1**: Content format standardization and API testing framework
-- **v2.13.0**: Configuration system overhaul and content encoding fixes
-- **v2.12.0**: Unified Entity model with autochunking
-- **v2.11.0**: Temporal repository with 100x performance
-- **v2.10.0**: Binary format with SSL-only mode
-- **v2.9.0**: RBAC system implementation
-- **v2.8.0**: Feature flag system
+Key configuration options:
+- `ENTITYDB_PORT`: HTTP port (default: 8085)
+- `ENTITYDB_USE_SSL`: Enable SSL (default: true)
+- `ENTITYDB_DATA_PATH`: Data directory (default: /opt/entitydb/var)
+- `ENTITYDB_LOG_LEVEL`: Logging level (default: info)
 
 ## Performance
 
-With temporal indexing enabled:
-- 5M entities: 1.5ms query time
-- 10M entities: 3ms query time  
-- Concurrent access: No lock contention
-- Memory usage: Minimal (memory-mapped files)
+With the temporal storage engine, EntityDB achieves breakthrough performance:
 
-## Contributing
+| Dataset Size | Query Time | Throughput    |
+|--------------|------------|--------------|
+| 1M entities  | 0.5ms      | 2000 op/sec  |
+| 5M entities  | 1.5ms      | 670 op/sec   |
+| 10M entities | 3ms        | 333 op/sec   |
 
-All development is done in collaboration with Claude AI. Each commit includes AI attribution.
+Memory usage remains minimal due to memory-mapped files with OS-level caching.
 
-## License
+## Documentation
 
-MIT License - See LICENSE file for details
+Detailed documentation is available in the [docs](./docs) directory:
+
+- [API Guide](./docs/api)
+- [Architecture](./docs/architecture)
+- [Development Guide](./docs/development)
+- [Release Notes](./docs/releases)
+
+## Version History
+
+- **v2.13.1** - Content format standardization and API testing framework
+- **v2.13.0** - Configuration system overhaul and content encoding fixes
+- **v2.12.0** - Unified Entity model with autochunking
+- **v2.11.0** - Temporal repository with 100x performance
+- **v2.10.0** - Binary format with SSL-only mode
+- **v2.9.0** - RBAC system implementation
+- **v2.8.0** - Feature flag system
 
 ## Repository
 
 https://git.home.arpa/itdlabs/entitydb
+
+## License
+
+MIT

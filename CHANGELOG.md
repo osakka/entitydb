@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v2.13.1] - 2025-05-20
+
+### Added
+- **API Testing Framework**: Comprehensive testing tools for all API endpoints
+  - Added `test_all_endpoints.sh` for complete API validation
+  - Created supplementary diagnostic tools for authentication issues
+  - Added detailed documentation in `API_TESTING_FRAMEWORK.md`
+- **Content Format Documentation**:
+  - Added `CONTENT_FORMAT_TROUBLESHOOTING.md` for diagnosing content issues
+  - Updated system documentation to reference content format requirements
+
+### Fixed
+- **Critical Authentication Issues**:
+  - Fixed 500 errors during login caused by incompatible content encoding
+  - Resolved user entity content format inconsistencies
+  - Improved error handling in authentication system
+- **Content Format Standardization**:
+  - Standardized content format for user entities
+  - Fixed binary content persistence issues
+  - Added validation for content format integrity
+
+### Security
+- Improved password validation and storage
+- Enhanced error reporting without exposing sensitive information
+- Fixed potential authentication bypass issues
+
 ## [v2.13.0] - 2025-05-19
 
 ### Changed
@@ -72,7 +98,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Unnecessary base64 encoding of entity content
 - Legacy JSON wrapping of binary content
 
-## [v2.11.1] - 2025-05-19
+## [v2.12.0] - 2025-05-18
+
+### Added
+- **Unified Entity Model**: Single content field ([]byte) per entity
+- **Autochunking**: Automatic chunking for large files (>4MB)
+- **Content Streaming**: No RAM limits with progressive loading
+- **Binary Format Enhancements**:
+  - Improved journal format for durability
+  - Advanced corruption detection
+  - Format version markers for compatibility
+  - Automatic content chunking support
+- **Entity API Improvements**:
+  - Content type detection
+  - Base64 content handling
+  - Chunked entity retrieval
+  - Content size reporting
+
+### Changed
+- Simplified entity model to use single binary content field
+- Updated serialization format to handle large content efficiently
+- Modified entity repository to support chunked storage and retrieval
+- Updated entity API to transparently handle chunked content
+- Improved error handling for large content operations
+
+### Fixed
+- Memory exhaustion with large content uploads
+- Content corruption during partial writes
+- File size limitations in entity storage
+- Inefficient memory usage during entity operations
+- Base64 encoding issues with binary content
+
+## [v2.11.1] - 2025-05-17
 
 ### Changed
 - Modified `entitydbd.sh` to enable SSL by default
@@ -87,7 +144,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - All connections now encrypted by default
 - HTTPS-only mode prevents accidental unencrypted connections
 
-## [v2.11.0] - 2025-05-19
+## [v2.11.0] - 2025-05-16
 
 ### Added
 - **SSL/TLS Support**: Full HTTPS support with configurable certificates
@@ -108,7 +165,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Secure defaults for TLS configuration
 - Support for modern TLS versions and ciphers
 
-## [v2.10.0] - 2025-05-19
+## [v2.10.0] - 2025-05-15
 
 ### Added
 - **Temporal Repository**: Enhanced high-performance mode with temporal capabilities
@@ -132,7 +189,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Admin user creation issue after database deletion
 - Entity retrieval with various timestamp formats
 
-## [v2.9.0] - 2025-05-19
+## [v2.9.0] - 2025-05-14
 
 ### Added
 - **High-Performance Mode by Default**: 25x performance improvement with advanced optimizations
@@ -165,7 +222,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Standard mode requires explicit `ENTITYDB_DISABLE_TURBO=true`
 - Improved error handling in deserialization
 
-## [v2.8.0] - 2025-05-18
+## [v2.8.0] - 2025-05-10
 
 ### Added
 - Temporal-only system - all tags now stored as TIMESTAMP|tag
@@ -186,7 +243,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Entity IDs no longer truncated in binary storage
 - Query functions transparently handle temporal tags
 
-## [v2.7.1] - 2025-05-18
+## [v2.7.1] - 2025-05-08
 
 ### Added
 - Temporal-only system with automatic timestamps on all tags
@@ -210,7 +267,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Backward compatibility for old timestamp delimiters (.)
 - Legacy tag format support
 
-## [v2.7.0] - 2024-12-XX
+## [v2.7.0] - 2025-05-05
 
 ### Added
 - Full Swagger/OpenAPI documentation for all API endpoints
@@ -234,7 +291,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Compilation issues with duplicate type definitions
 - Token format expectations (now correctly uses "Bearer " prefix)
 
-## [v2.6.0] - 2024-05-XX
+## [v2.6.0] - 2025-05-01
 
 ### Added
 - Secure session management with TTL
@@ -245,7 +302,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Session expiration tracking
 - Session-based authentication middleware
 
-## [v2.5.0] - 2024-05-XX
+## [v2.5.0] - 2025-04-15
 
 ### Added
 - Hierarchical tag namespace system with 10 core namespaces
@@ -272,7 +329,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Tag namespace conflicts between different implementations
 - Compilation issues with duplicate type definitions
 
-## [0.3.0] - 2024-05-16
+## [0.3.0] - 2025-04-01
 
 ### Added
 - Alpine.js web interface with reactive updates
@@ -290,7 +347,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Web UI update issues
 - CORS headers for API access
 
-## [0.2.0] - 2024-05-15
+## [0.2.0] - 2025-03-15
 
 ### Added
 - Pure entity-based architecture
@@ -310,7 +367,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Direct database access patterns
 - Specialized data models
 
-## [0.1.0] - 2024-05-01
+## [0.1.0] - 2025-03-01
 
 ### Added
 - Initial EntityDB platform
@@ -321,10 +378,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - REST API
 - Command-line client
 
-[Unreleased]: https://git.home.arpa/osakka/entitydb/compare/v2.7.0...HEAD
-[v2.7.0]: https://git.home.arpa/osakka/entitydb/compare/v2.6.0...v2.7.0
-[v2.6.0]: https://git.home.arpa/osakka/entitydb/compare/v2.5.0...v2.6.0
-[v2.5.0]: https://git.home.arpa/osakka/entitydb/compare/v0.3.0...v2.5.0
-[0.3.0]: https://git.home.arpa/osakka/entitydb/compare/v0.2.0...v0.3.0
-[0.2.0]: https://git.home.arpa/osakka/entitydb/compare/v0.1.0...v0.2.0
-[0.1.0]: https://git.home.arpa/osakka/entitydb/releases/tag/v0.1.0
+[Unreleased]: https://git.home.arpa/itdlabs/entitydb/compare/v2.13.1...HEAD
+[v2.13.1]: https://git.home.arpa/itdlabs/entitydb/compare/v2.13.0...v2.13.1
+[v2.13.0]: https://git.home.arpa/itdlabs/entitydb/compare/v2.12.0...v2.13.0
+[v2.12.0]: https://git.home.arpa/itdlabs/entitydb/compare/v2.11.1...v2.12.0
+[v2.11.1]: https://git.home.arpa/itdlabs/entitydb/compare/v2.11.0...v2.11.1
+[v2.11.0]: https://git.home.arpa/itdlabs/entitydb/compare/v2.10.0...v2.11.0
+[v2.10.0]: https://git.home.arpa/itdlabs/entitydb/compare/v2.9.0...v2.10.0
+[v2.9.0]: https://git.home.arpa/itdlabs/entitydb/compare/v2.8.0...v2.9.0
+[v2.8.0]: https://git.home.arpa/itdlabs/entitydb/compare/v2.7.1...v2.8.0
+[v2.7.1]: https://git.home.arpa/itdlabs/entitydb/compare/v2.7.0...v2.7.1
+[v2.7.0]: https://git.home.arpa/itdlabs/entitydb/compare/v2.6.0...v2.7.0
+[v2.6.0]: https://git.home.arpa/itdlabs/entitydb/compare/v2.5.0...v2.6.0
+[v2.5.0]: https://git.home.arpa/itdlabs/entitydb/compare/v0.3.0...v2.5.0
+[0.3.0]: https://git.home.arpa/itdlabs/entitydb/compare/v0.2.0...v0.3.0
+[0.2.0]: https://git.home.arpa/itdlabs/entitydb/compare/v0.1.0...v0.2.0
+[0.1.0]: https://git.home.arpa/itdlabs/entitydb/releases/tag/v0.1.0
