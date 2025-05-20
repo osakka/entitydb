@@ -97,8 +97,9 @@ EntityDB is built on a pure entity-based architecture with layered components:
 cd /opt/entitydb/src
 make
 
-# Run all tests
-make test
+# Run all tests with the simple test framework
+cd ../share/tests/new_framework
+./run_tests.sh --clean --login --all
 
 # Start server in development mode
 cd ..
@@ -138,6 +139,30 @@ Actual performance varies based on hardware, query complexity, and entity relati
 The memory-mapped file architecture helps maintain reasonable memory usage even with
 large datasets.
 
+## Testing
+
+EntityDB uses a simple shell-based test framework for API testing:
+
+```bash
+# Run all tests
+cd /opt/entitydb/share/tests/new_framework
+./run_tests.sh --clean --login --all
+
+# Run a specific test
+./run_tests.sh --login create_entity
+
+# Run a test sequence
+./run_test_sequence.sh
+```
+
+The test framework is based on request/response pairs:
+- Each test has a `*_request` file defining the API call 
+- Each test has a `*_response` file defining validation criteria
+- Tests can be chained together for complex scenarios
+- No external dependencies required - pure shell implementation
+
+For more details, see the [Testing Framework Documentation](/share/tests/new_framework/README.md).
+
 ## Documentation
 
 Detailed documentation is available in the [docs](./docs) directory:
@@ -145,6 +170,7 @@ Detailed documentation is available in the [docs](./docs) directory:
 - [API Guide](./docs/api)
 - [Architecture](./docs/architecture)
 - [Development Guide](./docs/development)
+- [Testing Framework](/share/tests/new_framework/README.md)
 - [Release Notes](./docs/releases)
 
 ## Version History

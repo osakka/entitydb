@@ -1,0 +1,17 @@
+# Response validation for entity_history test
+SUCCESS_MARKER="\"history\":"
+
+# Custom validation function
+validate_response() {
+  local resp="$1"
+  
+  # Note: This is a basic validation that just checks for the existence of history
+  # A more comprehensive test would update an entity and then verify the history
+  # shows both the original and updated values
+  
+  if [[ "$resp" == *"\"history\":"* && "$resp" == *"\"id\":"* ]]; then
+    return 0
+  fi
+  
+  return 1
+}

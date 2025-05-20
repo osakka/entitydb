@@ -37,7 +37,7 @@ endif
 # Echo command - use printf for better compatibility
 ECHO := printf
 
-.PHONY: all server clean install dev test tools entity-tools unit-tests api-tests entity-tests test-utils help security-tests master-tests
+.PHONY: all server clean install dev test tools entity-tools unit-tests api-tests entity-tests simple-tests test-utils help security-tests master-tests
 
 all: server install
 
@@ -69,16 +69,27 @@ dev:
 	@$(ECHO) "$(YELLOW)Starting development server...$(NC)\n"
 	go run $(BUILD_TAGS) $(SERVER_SRC) --port 8086
 
-test: unit-tests api-tests
+test: unit-tests simple-tests
 
 unit-tests:
 	@$(ECHO) "$(YELLOW)Running Go unit tests (excluding deprecated code, scripts, and utility test files)...$(NC)\n"
 	@$(ECHO) "$(YELLOW)Testing packages: $(PACKAGES_FOR_TESTING)$(NC)\n"
 	go test $(BUILD_TAGS) $(PACKAGES_FOR_TESTING) -v
 
-api-tests: entity-tests
+api-tests: simple-tests
 
-# Deprecated test targets removed - see entity-tests for current API testing
+simple-tests:
+	@$(ECHO) "$(YELLOW)Running Simple API tests with the new shell framework...$(NC)\n"
+	@if [ -d "$(SHARE_DIR)/tests/new_framework" ]; then \
+		echo -e "$(YELLOW)Found Simple API test framework in $(SHARE_DIR)/tests/new_framework$(NC)\n"; \
+		cd $(SHARE_DIR)/tests/new_framework && bash ./run_tests.sh --all || (echo -e "$(RED)Simple API tests failed$(NC)\n"; exit 1); \
+		echo -e "$(GREEN)Simple API tests passed$(NC)\n"; \
+	else \
+		echo -e "$(RED)Simple API test framework not found in $(SHARE_DIR)/tests/new_framework$(NC)\n"; \
+		exit 1; \
+	fi
+
+# Legacy test targets - deprecated but kept for backward compatibility
 
 entity-tests:
 	@$(ECHO) "$(YELLOW)Running Entity API tests...$(NC)\n"
@@ -123,7 +134,12 @@ master-tests:
 
 	@$(ECHO) "$(YELLOW)----------------------------------------$(NC)\n"
 
-	@$(ECHO) "$(YELLOW)Running Entity API tests...$(NC)\n"
+	@$(ECHO) "$(YELLOW)Running Simple API tests...$(NC)\n"
+	@$(MAKE) simple-tests || true
+	
+	@$(ECHO) "$(YELLOW)----------------------------------------$(NC)\n"
+
+	@$(ECHO) "$(YELLOW)Running Legacy Entity API tests...$(NC)\n"
 	@$(MAKE) entity-tests || true
 
 	@$(ECHO) "$(YELLOW)----------------------------------------$(NC)\n"
@@ -184,10 +200,11 @@ help:
 	@echo "  dev           : Start development server on port 8086"
 	@echo "  tools         : Build all tools (user management and entity tools)"
 	@echo "  entity-tools  : Build only entity management tools"
-	@echo "  test          : Run all tests (unit tests and API tests)"
+	@echo "  test          : Run all tests (unit tests and simple API tests)"
 	@echo "  unit-tests    : Run Go unit tests"
-	@echo "  api-tests     : Run entity API tests"
-	@echo "  entity-tests  : Run entity-model API tests"
+	@echo "  simple-tests  : Run tests using the new shell framework"
+	@echo "  api-tests     : Alias for simple-tests"
+	@echo "  entity-tests  : Run legacy entity-model API tests (deprecated)"
 	@echo "  security-tests: Run security implementation tests"
 	@echo "  master-tests  : Run all tests with consolidated reporting"
 	@echo "  test-utils    : Show available test utilities"

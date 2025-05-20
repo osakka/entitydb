@@ -1,0 +1,5 @@
+# Description: Test login with admin credentials
+METHOD="POST"
+ENDPOINT="auth/login"
+HEADERS="-H \"Content-Type: application/json\""
+DATA="{\"username\":\"admin\",\"password\":\"admin\"}"

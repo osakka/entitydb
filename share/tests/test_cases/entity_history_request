@@ -1,0 +1,8 @@
+# Description: Test entity history retrieval
+METHOD="GET"
+ENDPOINT="entities/history"
+QUERY="id=ENTITY_ID&limit=100"
+
+# Note: This test requires a valid entity ID to be set
+# Either update ENTITY_ID manually or use a pre-test script that creates an entity
+# and updates the QUERY variable

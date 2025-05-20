@@ -1,0 +1,20 @@
+# Response validation for create_entity test
+SUCCESS_MARKER="\"id\":"
+
+# Custom validation function
+validate_response() {
+  local resp="$1"
+  
+  # Check if response contains an ID
+  if [[ "$resp" == *"\"id\":"* ]]; then
+    # Check if the tags were created correctly
+    if [[ "$resp" == *"\"tags\":"* && 
+          "$resp" == *"\"type:test\""* && 
+          "$resp" == *"\"status:active\""* && 
+          "$resp" == *"\"test:basic\""* ]]; then
+      return 0
+    fi
+  fi
+  
+  return 1
+}
