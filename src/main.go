@@ -271,6 +271,10 @@ func main() {
 	apiRouter.HandleFunc("/entities/update", entityHandlerRBAC.UpdateEntityWithRBAC()).Methods("PUT")
 	apiRouter.HandleFunc("/entities/query", entityHandlerRBAC.QueryEntitiesWithRBAC()).Methods("GET")
 	
+	// Chunked content API routes
+	apiRouter.HandleFunc("/entities/stream", server.entityHandler.StreamEntity).Methods("GET")
+	apiRouter.HandleFunc("/entities/download", server.entityHandler.StreamEntity).Methods("GET")
+	
 	// Temporal API routes with RBAC
 	apiRouter.HandleFunc("/entities/as-of", entityHandlerRBAC.GetEntityAsOfWithRBAC()).Methods("GET")
 	apiRouter.HandleFunc("/entities/history", entityHandlerRBAC.GetEntityHistoryWithRBAC()).Methods("GET")
