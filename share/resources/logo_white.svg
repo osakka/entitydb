@@ -30,6 +30,6 @@
     <text x="140" y="35" font-family="'SF Pro Display', 'Helvetica Neue', sans-serif" font-weight="700" font-size="54" letter-spacing="-0.8" fill="#3498db">db</text>
     
     <!-- "TEMPORAL DATABASE" in capitals, thinner and smaller, right aligned with the end of "db" -->
-    <text x="194" y="58" font-family="'SF Pro Display', 'Helvetica Neue', sans-serif" font-weight="200" font-size="10" letter-spacing="1.5" fill="#dddddd" text-anchor="end">TEMPORAL DATABASE</text>
+    <text x="201" y="58" font-family="'SF Pro Display', 'Helvetica Neue', sans-serif" font-weight="200" font-size="10" letter-spacing="1.5" fill="#dddddd" text-anchor="end">TEMPORAL DATABASE</text>
   </g>
 </svg>
