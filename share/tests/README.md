@@ -1,73 +1,42 @@
 # EntityDB Test Suite
 
-This directory contains testing scripts for the EntityDB system.
+This directory contains the testing framework and test cases for EntityDB.
 
-## Overview
+## Test Framework
 
-The test suite includes tools for:
-- API endpoint testing
-- Authentication testing
-- Entity creation and manipulation
-- Content format testing
-- System validation
+The EntityDB test framework is a simple, shell-based system for testing the API. It's designed to be:
+
+- **Simple**: Pure shell implementation with no external dependencies
+- **Maintainable**: Clear separation of request and response validation
+- **Extensible**: Easy to add new test cases and custom validation logic
+
+## Directory Structure
+
+- `new_framework/` - The core test framework implementation
+  - `test_framework.sh` - The main framework library
+  - `run_tests.sh` - The primary test runner
+  - `run_test_sequence.sh` - Example of dependent test execution
+  - `migrate_legacy_tests.sh` - Tool to convert old tests to the new format
+  
+- `test_cases/` - Individual test case definitions
+  - `*_request` - API request definition files
+  - `*_response` - Response validation files
 
 ## Quick Start
 
-To verify all API endpoints are working:
-
 ```bash
-./test_all_endpoints.sh
+# Run all tests
+cd /opt/entitydb/share/tests/new_framework
+./run_tests.sh --clean --login --all
+
+# Run a specific test
+./run_tests.sh --login create_entity
 ```
 
-## Available Test Scripts
+## Creating Tests
 
-### Core Tests
+1. Create a request file (`test_name_request`) defining the API call
+2. Create a response file (`test_name_response`) defining validation criteria
+3. Run the test using the test runner
 
-- **test_all_endpoints.sh**: Tests all documented API endpoints
-- **test_all.sh**: Runs all available tests
-
-### Authentication Tests
-
-- **create_test_admin.sh**: Creates a test admin user
-- **debug_login_500.sh**: Diagnoses login issues that result in 500 errors
-- **try_multiple_passwords.sh**: Tests multiple password combinations
-- **reset_admin_password.sh**: Resets admin password
-
-### Entity Tests
-
-- **test_simple_entity.sh**: Tests basic entity creation and retrieval
-- **test_entity_json_content.sh**: Tests JSON content in entities
-- **test_entity_relationships.sh**: Tests entity relationships
-
-### Advanced Tests
-
-- **test_temporal_features.sh**: Tests temporal features (as-of, history, diff)
-- **test_high_performance_correct.sh**: Tests high-performance mode correctness
-- **test_ssl.sh**: Tests SSL functionality
-
-## Content Format Tests
-
-- **create_simple_format_admin.sh**: Creates an admin user with simplified content format
-- **create_unified_admin.sh**: Creates an admin user with unified entity model
-
-## Usage Notes
-
-- Most scripts require the EntityDB server to be running
-- Some scripts require admin credentials
-- For SSL tests, ensure SSL is properly configured
-- For relationship tests, ensure entity relationships are enabled
-
-## Troubleshooting
-
-If tests fail:
-
-1. Check server status (`/opt/entitydb/bin/entitydbd.sh status`)
-2. Verify database exists and is accessible
-3. Check logs at `/opt/entitydb/var/entitydb.log`
-4. Try rebuilding the server (`cd /opt/entitydb/src && make`)
-
-## Documentation
-
-For detailed information on the testing framework, see:
-- [API_TESTING_FRAMEWORK.md](/opt/entitydb/docs/API_TESTING_FRAMEWORK.md)
-- [CONTENT_FORMAT_TROUBLESHOOTING.md](/opt/entitydb/docs/CONTENT_FORMAT_TROUBLESHOOTING.md)
+For detailed documentation, see the [Test Framework README](/opt/entitydb/share/tests/new_framework/README.md).
