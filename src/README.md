@@ -6,6 +6,16 @@ This directory contains the source code for the EntityDB platform. This document
 
 ```
 /src/
+├── tests/                    # Test files
+│   ├── cases/                # Test case definitions
+│   │   ├── entity_as_of.test # Temporal as-of test
+│   │   ├── entity_changes.test # Temporal changes test
+│   │   ├── entity_diff.test  # Temporal diff test
+│   │   └── entity_history.test # Entity history test
+│   ├── test_framework.sh     # Test framework implementation
+│   ├── test_temporal_api.sh  # Temporal API test script
+│   ├── run_tests.sh          # Test runner
+│   └── README.md             # Test documentation
 ├── api/                      # API handlers and routing
 │   ├── entity_handler.go     # Entity API implementation
 │   ├── entity_handler_rbac.go # RBAC wrapper for entity API
@@ -39,9 +49,22 @@ This directory contains the source code for the EntityDB platform. This document
 │   └── query_cache.go        # Query result caching
 ├── logger/                   # Logging system
 │   └── logger.go             # Structured logging
-├── tools/                    # Development tools
-│   ├── fix_index.go          # Index repair utility
-│   └── check_admin_user.go   # Admin user verification
+├── tools/                    # Command-line tools
+│   ├── users/                # User management tools
+│   │   ├── add_user.go       # Add user to the system
+│   │   ├── create_users.go   # Create multiple users
+│   │   └── generate_hash.go  # Password hash generation
+│   ├── entities/             # Entity management tools
+│   │   ├── add_entity.go     # Create new entities
+│   │   ├── list_entities.go  # List entities with filtering
+│   │   ├── dump_entity.go    # Export entity data
+│   │   └── add_entity_relationship.go # Create entity relationships
+│   ├── maintenance/          # System maintenance tools
+│   │   ├── fix_index.go      # Index repair utility
+│   │   ├── check_admin_user.go # Admin user verification
+│   │   └── scan_entity_data.go # Scan entity data
+│   ├── README.md             # Tool documentation
+│   └── IMPLEMENTATION.md     # Tool implementation guide
 ├── main.go                   # Server entry point
 └── Makefile                  # Build system
 ```
@@ -62,6 +85,11 @@ This directory contains the source code for the EntityDB platform. This document
    - Define interfaces before implementations
    - Program to interfaces, not concrete types
    - Keep interfaces focused and minimal
+
+4. **Tests and Tools Organization**
+   - Tests are stored in `/src/tests` to ensure versioning alongside source code
+   - Command-line tools are organized by category in `/src/tools`
+   - All compiled tools use the `entitydb_` prefix
 
 ## Git Workflow and Protocol
 
@@ -127,7 +155,28 @@ make api-tests
 
 # Build and install
 make install
+
+# Build all command-line tools
+make tools
+
+# Build specific tool categories
+make user-tools
+make entity-tools
+make maintenance-tools
+
+# List available tools and usage examples
+make test-utils
 ```
+
+## Tool Naming Convention
+
+All compiled tools follow the `entitydb_` prefix naming convention, for example:
+
+- `entitydb_add_user`
+- `entitydb_list_entities`
+- `entitydb_dump`
+
+This convention ensures tools are easily identifiable and prevents naming conflicts. All tools are installed in the `/opt/entitydb/bin` directory.
 
 ## Architecture Policy
 
