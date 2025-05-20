@@ -1,6 +1,6 @@
 #!/bin/bash
 # EntityDB Simple Test Framework
-# A minimalist test framework for API testing with request/response pairs
+# A minimalist test framework for API testing with unified test files
 
 set -e # Exit on error
 
@@ -39,7 +39,7 @@ TESTS_FAILED=0
 # Print header
 print_header() {
   echo -e "\n${BLUE}=======================================${NC}"
-  echo -e "${BLUE}   EntityDB API Test Framework v1.0    ${NC}"
+  echo -e "${BLUE}   EntityDB API Test Framework v2.0    ${NC}"
   echo -e "${BLUE}=======================================${NC}\n"
 }
 
@@ -100,31 +100,108 @@ login() {
   fi
 }
 
-# Run a single test using request/response files
+# Run a single test
 run_test() {
   local test_name="$1"
-  local test_description="${2:-$test_name}"
+  local test_file
   
-  echo -e "\n${YELLOW}Running test: ${test_description}${NC}"
+  # Check if test file exists with .test extension
+  if [[ -f "$TEST_DIR/${test_name}.test" ]]; then
+    test_file="$TEST_DIR/${test_name}.test"
+  # Backward compatibility: check for legacy split files
+  elif [[ -f "$TEST_DIR/${test_name}_request" && -f "$TEST_DIR/${test_name}_response" ]]; then
+    echo -e "${YELLOW}Using legacy split test files for $test_name${NC}"
+    run_legacy_test "$test_name"
+    return $?
+  else
+    echo -e "${RED}Test file not found: $TEST_DIR/${test_name}.test${NC}"
+    TESTS_FAILED=$((TESTS_FAILED + 1))
+    return 1
+  fi
   
   TESTS_TOTAL=$((TESTS_TOTAL + 1))
   
-  # Check if request file exists
-  if [[ ! -f "$TEST_DIR/${test_name}_request" ]]; then
-    echo -e "${RED}Test request file not found: $TEST_DIR/${test_name}_request${NC}"
+  # Reset variables to avoid leakage between tests
+  unset METHOD ENDPOINT HEADERS DATA QUERY DESCRIPTION validate_response
+  
+  # Load test file
+  source "$test_file"
+  
+  # Get test description
+  local test_description="${DESCRIPTION:-$test_name}"
+  echo -e "\n${YELLOW}Running test: ${test_description}${NC}"
+  
+  # Set default values if not provided
+  METHOD=${METHOD:-"GET"}
+  ENDPOINT=${ENDPOINT:-""}
+  HEADERS=${HEADERS:-""}
+  DATA=${DATA:-""}
+  QUERY=${QUERY:-""}
+  
+  # Add authorization header if logged in
+  if [[ -n "$SESSION_TOKEN" && -z $(echo "$HEADERS" | grep "Authorization") ]]; then
+    if [[ -n "$HEADERS" ]]; then
+      HEADERS="$HEADERS -H \"Authorization: Bearer $SESSION_TOKEN\""
+    else
+      HEADERS="-H \"Authorization: Bearer $SESSION_TOKEN\""
+    fi
+  fi
+  
+  # Build URL with query parameters
+  local url="$API_BASE_URL/$ENDPOINT"
+  if [[ -n "$QUERY" ]]; then
+    url="${url}?${QUERY}"
+  fi
+  
+  # Build curl command
+  local curl_cmd="curl -s -X $METHOD \"$url\" $HEADERS"
+  if [[ -n "$DATA" && "$METHOD" != "GET" ]]; then
+    curl_cmd="$curl_cmd -d '$DATA'"
+  fi
+  
+  # Execute request
+  echo "Executing: $curl_cmd"
+  local response
+  response=$(eval $curl_cmd)
+  
+  # Save response to temp file
+  local resp_file="$TEMP_DIR/${test_name}_actual_response.json"
+  echo "$response" > "$resp_file"
+  
+  # Check if validate_response function exists
+  if [[ "$(type -t validate_response)" != "function" ]]; then
+    echo -e "${RED}No validation function found in test file${NC}"
     TESTS_FAILED=$((TESTS_FAILED + 1))
     return 1
   fi
   
-  # Check if response criteria file exists
-  if [[ ! -f "$TEST_DIR/${test_name}_response" ]]; then
-    echo -e "${RED}Test response criteria file not found: $TEST_DIR/${test_name}_response${NC}"
+  # Validate the response
+  if validate_response "$response"; then
+    echo -e "${GREEN}✓ Test passed: $test_description${NC}"
+    TESTS_PASSED=$((TESTS_PASSED + 1))
+    return 0
+  else
+    echo -e "${RED}✗ Test failed: $test_description${NC}"
+    echo -e "${RED}Response: $response${NC}"
     TESTS_FAILED=$((TESTS_FAILED + 1))
     return 1
   fi
+}
+
+# Run a legacy test with separate request/response files (for backward compatibility)
+run_legacy_test() {
+  local test_name="$1"
   
   # Load test request details
   source "$TEST_DIR/${test_name}_request"
+  
+  local test_description
+  test_description=$(grep "# Description:" "$TEST_DIR/${test_name}_request" | sed 's/# Description: //')
+  test_description=${test_description:-$test_name}
+  
+  echo -e "\n${YELLOW}Running legacy test: ${test_description}${NC}"
+  
+  TESTS_TOTAL=$((TESTS_TOTAL + 1))
   
   # Set default values if not provided
   METHOD=${METHOD:-"GET"}
@@ -209,19 +286,29 @@ run_all_tests() {
   
   echo -e "${YELLOW}Running all tests in $test_dir...${NC}"
   
-  # Find all test request files
-  local test_files=$(find "$test_dir" -name "*_request" -type f | sort)
+  # Find all test files (both unified and legacy format)
+  local unified_test_files=$(find "$test_dir" -name "*.test" -type f | sort)
+  local legacy_test_files=$(find "$test_dir" -name "*_request" -type f | sort)
   
   # Check if we found any tests
-  if [[ -z "$test_files" ]]; then
+  if [[ -z "$unified_test_files" && -z "$legacy_test_files" ]]; then
     echo -e "${RED}No test files found in $test_dir${NC}"
     return 1
   fi
   
-  # Run each test
-  for test_file in $test_files; do
+  # Run unified test files
+  for test_file in $unified_test_files; do
+    local test_name=$(basename "$test_file" .test)
+    run_test "$test_name"
+  done
+  
+  # Run legacy test files (that don't have a unified equivalent)
+  for test_file in $legacy_test_files; do
     local test_name=$(basename "$test_file" _request)
-    run_test "$test_name" "$(grep "# Description:" "$test_file" | sed 's/# Description: //')"
+    # Skip if a unified test file exists
+    if [[ ! -f "$test_dir/${test_name}.test" ]]; then
+      run_legacy_test "$test_name"
+    fi
   done
   
   # Print results
@@ -233,6 +320,72 @@ run_all_tests() {
   else
     return 0
   fi
+}
+
+# Create a new unified test file
+create_test_file() {
+  local test_name="$1"
+  local method="${2:-GET}"
+  local endpoint="$3"
+  local description="$4"
+  
+  if [[ -z "$test_name" || -z "$endpoint" ]]; then
+    echo -e "${RED}Error: test_name and endpoint are required${NC}"
+    return 1
+  fi
+  
+  if [[ -z "$description" ]]; then
+    description="Test $endpoint endpoint"
+  fi
+  
+  local test_file="$TEST_DIR/${test_name}.test"
+  
+  if [[ -f "$test_file" ]]; then
+    echo -e "${YELLOW}Warning: Test file already exists: $test_file${NC}"
+    read -p "Overwrite? (y/n) " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+      echo -e "${RED}Cancelled.${NC}"
+      return 1
+    fi
+  fi
+  
+  # Create a template test file
+  cat > "$test_file" << EOF
+#!/bin/bash
+# Test case: $description
+
+# Test description
+DESCRIPTION="$description"
+
+# Request definition
+METHOD="$method"
+ENDPOINT="$endpoint"
+HEADERS="-H \"Content-Type: application/json\""
+DATA=""
+QUERY=""
+
+# Response validation
+validate_response() {
+  local resp="\$1"
+  
+  # TODO: Add appropriate validation logic here
+  # Examples:
+  # if [[ "\$resp" == *"\"id\":"* ]]; then
+  #   return 0
+  # fi
+  
+  # Default: assume success if not an error
+  if [[ "\$resp" != *"\"error\":"* ]]; then
+    return 0
+  fi
+  
+  return 1
+}
+EOF
+
+  echo -e "${GREEN}Created new test file: $test_file${NC}"
+  return 0
 }
 
 # Get entity by ID helper function
@@ -273,7 +426,7 @@ create_entity() {
 
 # Usage information
 show_usage() {
-  echo "EntityDB Test Framework"
+  echo "EntityDB Test Framework v2.0"
   echo ""
   echo "Usage: $0 [options] [test_name]"
   echo ""
@@ -283,10 +436,12 @@ show_usage() {
   echo "  -a, --all         Run all tests"
   echo "  -d, --dir DIR     Specify test directory (default: $TEST_DIR)"
   echo "  -l, --login       Perform login before tests"
+  echo "  -n, --new NAME    Create a new test file"
   echo ""
   echo "Examples:"
-  echo "  $0 --clean --all               Clean DB and run all tests"
-  echo "  $0 --login test_entity_create  Login and run specific test"
+  echo "  $0 --clean --all                 Clean DB and run all tests"
+  echo "  $0 --login create_entity         Login and run specific test"
+  echo "  $0 --new user_create get users   Create a new test template"
 }
 
 # Main function
@@ -316,6 +471,33 @@ main() {
       -l|--login)
         login
         shift
+        ;;
+      -n|--new)
+        shift
+        if [[ -n "$1" ]]; then
+          NEW_TEST_NAME="$1"
+          shift
+          if [[ -n "$1" && "$1" != -* ]]; then
+            NEW_TEST_METHOD="$1"
+            shift
+          else
+            NEW_TEST_METHOD="GET"
+          fi
+          if [[ -n "$1" && "$1" != -* ]]; then
+            NEW_TEST_ENDPOINT="$1"
+            shift
+          fi
+          if [[ -n "$1" && "$1" != -* ]]; then
+            NEW_TEST_DESCRIPTION="$1"
+            shift
+          fi
+          create_test_file "$NEW_TEST_NAME" "$NEW_TEST_METHOD" "$NEW_TEST_ENDPOINT" "$NEW_TEST_DESCRIPTION"
+          exit $?
+        else
+          echo "Error: --new requires a test name"
+          show_usage
+          exit 1
+        fi
         ;;
       *)
         if [[ $1 == -* ]]; then

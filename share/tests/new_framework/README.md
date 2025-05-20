@@ -4,20 +4,19 @@ A lightweight, shell-based test framework for EntityDB API testing.
 
 ## Overview
 
-This framework provides a simple way to test the EntityDB API using request/response pairs. Each test consists of two files:
-- `test_name_request` - Defines the API request details
-- `test_name_response` - Defines the response validation criteria
+This framework provides a simple way to test the EntityDB API using single unified test files. Each test consists of a single `.test` file that contains both the request definition and response validation logic.
 
 The framework automatically handles authentication, test execution, and result reporting.
 
 ## Features
 
 - Simple shell-based implementation with no external dependencies
-- Clear separation of request and response validation
+- Clean, unified test files for better organization
 - Support for test sequences and dependencies
 - Automatic authentication handling
 - Color-coded test results
 - Extensible validation functions
+- Backward compatibility with legacy test formats
 
 ## Directory Structure
 
@@ -29,10 +28,8 @@ The framework automatically handles authentication, test execution, and result r
 │   └── run_test_sequence.sh  # Example of test sequence
 │
 └── test_cases/               # Test case definitions
-    ├── login_admin_request   # Request definition
-    ├── login_admin_response  # Response validation
-    ├── create_entity_request
-    ├── create_entity_response
+    ├── login_admin.test      # Unified test file
+    ├── create_entity.test    # Unified test file
     └── ...
 ```
 
@@ -48,54 +45,65 @@ cd /opt/entitydb/share/tests/new_framework
 To run a specific test:
 
 ```bash
-./run_tests.sh --login list_entities
+./run_tests.sh --login create_entity
+```
+
+To create a new test:
+
+```bash
+./run_tests.sh --new user_create POST users/create "Create new user test"
 ```
 
 ## Creating Tests
 
-### 1. Create a Request File
-
-Create a file named `your_test_name_request` in the test_cases directory:
+A test file is a shell script with a `.test` extension that defines both the request and response validation:
 
 ```bash
-# Description: Test entity creation
+#!/bin/bash
+# Test case: Test user creation
+
+# Test description
+DESCRIPTION="Test creating a new user"
+
+# Request definition
 METHOD="POST"
-ENDPOINT="entities/create"
+ENDPOINT="users/create"
 HEADERS="-H \"Content-Type: application/json\""
-DATA="{\"tags\":[\"type:test\"],\"content\":{\"test\":\"value\"}}"
-```
+DATA="{\"username\":\"testuser\",\"password\":\"testpassword\",\"roles\":[\"user\"]}"
 
-### 2. Create a Response File
-
-Create a file named `your_test_name_response` in the test_cases directory:
-
-```bash
-# Simple validation using markers
-SUCCESS_MARKER="\"id\":"
-
-# Optional: Custom validation function
+# Response validation
 validate_response() {
   local resp="$1"
   
-  if [[ "$resp" == *"\"id\":"* && "$resp" == *"\"tags\":"* ]]; then
-    return 0  # Success
+  # Check if response contains expected fields
+  if [[ "$resp" == *"\"id\":"* && "$resp" == *"\"username\":\"testuser\""* ]]; then
+    return 0
   fi
   
-  return 1  # Failure
+  return 1
 }
 ```
 
-## Validation Options
+### Required Elements
 
-You can validate responses in multiple ways:
+Each test file must include:
 
-1. **Success Marker**: Define `SUCCESS_MARKER` to check for the presence of a string
-2. **Error Marker**: Define `ERROR_MARKER` to ensure a string is NOT present
-3. **Custom Validation**: Define a `validate_response()` function for complex logic
+1. **DESCRIPTION**: A human-readable description of the test
+2. **METHOD**: The HTTP method (GET, POST, PUT, DELETE)
+3. **ENDPOINT**: The API endpoint path (without the base URL)
+4. **validate_response()**: A function that takes the response as input and returns 0 for success, 1 for failure
+
+### Optional Elements
+
+The following elements are optional:
+
+- **HEADERS**: HTTP headers for the request
+- **DATA**: The request body (for POST/PUT requests)
+- **QUERY**: Query string parameters
 
 ## Test Sequences
 
-For tests that depend on each other, use the `run_test_sequence.sh` script as a template:
+For tests that depend on each other, use `run_test_sequence.sh` as a template:
 
 ```bash
 #!/bin/bash
@@ -108,17 +116,34 @@ login
 response=$(create_entity "[\"type:test\"]" "{}")
 entity_id=$(echo "$response" | grep -o '"id":"[^"]*' | sed 's/"id":"//')
 
-# Run a test that uses that ID
-# [...]
+# Update a test file to use the entity ID
+sed -i "s/ENTITY_ID/$entity_id/" "$TEST_DIR/entity_history.test"
+
+# Run tests that depend on that ID
+run_test "entity_history"
 ```
 
-## Help and Options
+## Command Line Options
 
-To see all available options:
-
-```bash
-./run_tests.sh --help
 ```
+Usage: ./run_tests.sh [options] [test_name]
+
+Options:
+  -h, --help        Show this help message
+  -c, --clean       Clean database before testing
+  -a, --all         Run all tests
+  -d, --dir DIR     Specify test directory
+  -l, --login       Perform login before tests
+  -n, --new NAME    Create a new test file
+```
+
+## Helper Functions
+
+The framework provides several helper functions for common operations:
+
+- **login()**: Authenticates with the API and stores the session token
+- **get_entity()**: Retrieves an entity by ID
+- **create_entity()**: Creates a new entity
 
 ## Troubleshooting
 
@@ -126,4 +151,8 @@ If tests are failing:
 
 1. Check the server logs: `tail -f /opt/entitydb/var/entitydb.log`
 2. Run with clean database: `./run_tests.sh --clean --login --all`
-3. Verify the API endpoint details in the request files
+3. Verify the API endpoint details in the test files
+
+## Legacy Format Support
+
+For backward compatibility, the framework also supports the old split file format with separate `*_request` and `*_response` files. However, the unified `.test` format is recommended for all new tests.

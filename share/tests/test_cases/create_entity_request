@@ -1,5 +1,0 @@
-# Description: Create a new entity with tags and content
-METHOD="POST"
-ENDPOINT="entities/create"
-HEADERS="-H \"Content-Type: application/json\""
-DATA="{\"tags\":[\"type:test\",\"status:active\",\"test:basic\"],\"content\":{\"description\":\"Test entity\",\"created_by\":\"test_framework\"}}"

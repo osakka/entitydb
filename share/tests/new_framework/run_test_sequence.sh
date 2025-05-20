@@ -25,19 +25,22 @@ fi
 
 echo -e "${GREEN}Created entity with ID: $ENTITY_ID${NC}"
 
-# Update the history test request file to use our entity ID
-HISTORY_REQUEST_FILE="$TEST_DIR/entity_history_request"
-if [[ -f "$HISTORY_REQUEST_FILE" ]]; then
-  sed -i "s/ENTITY_ID=.*/ENTITY_ID=$ENTITY_ID/" "$HISTORY_REQUEST_FILE" || \
-  sed -i "" "s/ENTITY_ID=.*/ENTITY_ID=$ENTITY_ID/" "$HISTORY_REQUEST_FILE" || \
-  sed -i "s/id=ENTITY_ID/id=$ENTITY_ID/" "$HISTORY_REQUEST_FILE"
+# Update the history test file to use our entity ID
+HISTORY_TEST_FILE="$TEST_DIR/entity_history.test"
+if [[ -f "$HISTORY_TEST_FILE" ]]; then
+  # Create a temporary file
+  TEMP_FILE="$(mktemp)"
+  # Update the QUERY line with our entity ID
+  cat "$HISTORY_TEST_FILE" | sed "s/QUERY=\"id=ENTITY_ID/QUERY=\"id=$ENTITY_ID/" > "$TEMP_FILE"
+  # Replace the original file
+  mv "$TEMP_FILE" "$HISTORY_TEST_FILE"
   
   echo -e "${YELLOW}Updated history test to use entity ID: $ENTITY_ID${NC}"
 fi
 
 # Now run the tests in sequence
-run_test "list_entities" "List entities after creation"
-run_test "entity_history" "Get history for newly created entity"
+run_test "list_entities" 
+run_test "entity_history"
 
 # Additional tests could be run here...
 
