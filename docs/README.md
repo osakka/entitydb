@@ -19,6 +19,7 @@ Welcome to the EntityDB documentation. This directory contains comprehensive doc
 | [spikes/](./spikes/) | Technical spikes and investigations |
 | [releases/](./releases/) | Release notes |
 | [archive/](./archive/) | Legacy documentation |
+| [resources/](./resources/) | Documentation resources (images, etc.) |
 
 ## Core Documentation
 
@@ -28,6 +29,22 @@ Welcome to the EntityDB documentation. This directory contains comprehensive doc
 | [core/SPECIFICATIONS.md](./core/SPECIFICATIONS.md) | Technical specifications of the EntityDB platform |
 | [../CHANGELOG.md](../CHANGELOG.md) | Complete version history and detailed change logs |
 | [core/current_state_summary.md](./core/current_state_summary.md) | Summary of current system state |
+| [core/query_implementation_summary.md](./core/query_implementation_summary.md) | Query implementation summary |
+| [core/RENAMING_SUMMARY.md](./core/RENAMING_SUMMARY.md) | System renaming summary |
+
+## Contributing Guidelines
+
+| Document | Description |
+|----------|-------------|
+| [core/contributing/CONTRIBUTING.md](./core/contributing/CONTRIBUTING.md) | Contributing guidelines |
+| [core/contributing/COLLABORATION.md](./core/contributing/COLLABORATION.md) | Collaboration guidelines |
+| [core/contributing/WORKFLOW.md](./core/contributing/WORKFLOW.md) | Development workflow |
+
+## Security Documentation
+
+| Document | Description |
+|----------|-------------|
+| [core/security/SECURITY.md](./core/security/SECURITY.md) | Security policy and guidelines |
 
 ## Feature Documentation
 
@@ -113,6 +130,7 @@ Welcome to the EntityDB documentation. This directory contains comprehensive doc
 | [guides/deployment.md](./guides/deployment.md) | Deployment guide |
 | [guides/migration.md](./guides/migration.md) | Migration guide |
 | [guides/admin-interface.md](./guides/admin-interface.md) | Admin interface guide |
+| [guides/SETUP_ADMIN.md](./guides/SETUP_ADMIN.md) | Admin setup guide |
 
 ## Examples and Use Cases
 
@@ -136,3 +154,9 @@ Welcome to the EntityDB documentation. This directory contains comprehensive doc
 | [releases/RELEASE_NOTES_v2.13.1.md](./releases/RELEASE_NOTES_v2.13.1.md) | v2.13.1 release notes |
 | [releases/RELEASE_NOTES_v2.13.0.md](./releases/RELEASE_NOTES_v2.13.0.md) | v2.13.0 release notes |
 | [releases/RELEASE_NOTES_v2.12.0.md](./releases/RELEASE_NOTES_v2.12.0.md) | v2.12.0 release notes |
+
+## Resources
+
+| Resource | Description |
+|----------|-------------|
+| [resources/logo.svg](./resources/logo.svg) | EntityDB logo (SVG format) |

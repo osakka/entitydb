@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="logo.svg" alt="EntityDB Logo" width="400">
+  <img src="docs/resources/logo.svg" alt="EntityDB Logo" width="400">
 </p>
 
 <h1 align="center">EntityDB</h1>
