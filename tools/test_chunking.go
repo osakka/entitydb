@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"crypto/rand"
+	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -22,7 +23,7 @@ type Entity struct {
 
 func main() {
 	// Disable SSL verification for testing
-	http.DefaultTransport.(*http.Transport).TLSClientConfig.InsecureSkipVerify = true
+	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 
 	// Create test data (5MB to force chunking)
 	fmt.Println("Creating test data (5MB)...")
