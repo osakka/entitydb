@@ -5,10 +5,11 @@
 <p align="center">High-Performance Temporal Entity Database Architecture</p>
 
 <p align="center">
-  <strong>100x Faster Queries</strong> • 
-  <strong>Nanosecond Precision</strong> • 
-  <strong>Unlimited Content Size</strong> • 
-  <strong>Time Travel Queries</strong>
+  <strong>RESTful API</strong> • 
+  <strong>Temporal Database</strong> • 
+  <strong>Entity Relationship Model</strong> • 
+  <strong>Chunked Content Handler</strong> • 
+  <strong>Transactional Operations</strong>
 </p>
 
 ## What is EntityDB?
@@ -23,12 +24,13 @@ EntityDB is a high-performance temporal database where every tag is timestamped 
 
 ## Key Features
 
-- ⚡ **100x Performance:** Temporal storage with optimized binary format
-- 🧩 **Unified Entity Model:** Everything is an entity with tags
-- 📝 **Content Streaming:** No RAM limits with automatic chunking
-- 🔒 **RBAC Enforcement:** Tag-based permission system
-- ⏱️ **Time Travel:** Query any entity at any point in time
-- 🔄 **Entity Relationships:** Native relationship support
+- 🔄 **RESTful API:** Complete HTTP API with JSON request/response format
+- ⏱️ **Temporal Storage:** Nanosecond precision timestamps on all entity tags
+- 🧩 **Entity Relationship Model:** Pure entity architecture with native relationship support
+- 📝 **Chunked Content Handling:** Unlimited content size with automatic chunking
+- 💾 **Transactional Operations:** ACID compliance via Write-Ahead Logging
+- 🔒 **RBAC Enforcement:** Tag-based permission system with fine-grained access control
+- 🔍 **Time Travel Queries:** View entity state at any point in history
 
 ## Quick Start
 
