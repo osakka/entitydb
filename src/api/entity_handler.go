@@ -210,6 +210,18 @@ func (h *EntityHandler) GetEntity(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check if content should be included
+	includeContent := r.URL.Query().Get("include_content") == "true"
+	
+	// Use our fixed implementation in entity_handler_fix.go
+	if includeContent && entity.IsChunked() {
+		reassembledContent, err := h.HandleChunkedContent(id, includeContent)
+		if err == nil && len(reassembledContent) > 0 {
+			entity.Content = reassembledContent
+			logger.Info("Using reassembled content for entity %s: %d bytes", entity.ID, len(entity.Content))
+		}
+	}
+
 	// Return entity
 	response := h.stripTimestampsFromEntity(entity, includeTimestamps)
 	// Log content details for debugging
