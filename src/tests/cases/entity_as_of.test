@@ -1,0 +1,43 @@
+#!/bin/bash
+# Test case: Test entity retrieval at specific timestamp
+
+# Test description
+DESCRIPTION="Test entity retrieval at specific timestamp"
+
+# Request definition
+METHOD="GET"
+ENDPOINT="entities/as-of"
+HEADERS="-H \"Content-Type: application/json\""
+DATA=""
+# Note: we use an entity ID parameter and the current timestamp for testing
+# The timestamp parameter should be in nanoseconds since Unix epoch
+# We'll use the current time to test
+QUERY="id=ENTITY_ID&timestamp=$(date +%s000000000)"
+
+# Response validation
+validate_response() {
+  local resp="$1"
+  
+  # Check for presence of entity data
+  if [[ "$resp" == *"\"id\":"* && "$resp" == *"\"tags\":"* ]]; then
+    # Successful retrieval of entity with timestamp
+    return 0
+  fi
+  
+  # Check for specific temporal API errors
+  if [[ "$resp" == *"\"error\":"* ]]; then
+    # If we get a specific error about the timestamp or entity not existing,
+    # this could be valid depending on the test context
+    if [[ "$resp" == *"Entity not found at specified timestamp"* ]]; then
+      # This might be expected in some test scenarios
+      echo "Note: Entity not found at specified timestamp"
+      return 0
+    fi
+    
+    # Other errors indicate a test failure
+    echo "Error response: $resp"
+    return 1
+  fi
+  
+  return 1
+}

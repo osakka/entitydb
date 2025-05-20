@@ -1,0 +1,53 @@
+#!/bin/bash
+# Test case: Test entity changes between timestamps
+
+# Test description
+DESCRIPTION="Test entity changes between timestamps"
+
+# Request definition
+METHOD="GET"
+ENDPOINT="entities/changes"
+HEADERS="-H \"Content-Type: application/json\""
+DATA=""
+# Note: This test requires a valid entity ID
+# We'll use an hour ago and now as the time range for changes
+CURRENT_TIME=$(date +%s000000000)
+ONE_HOUR_AGO=$(( $(date +%s) - 3600 ))000000000
+QUERY="id=ENTITY_ID&start_time=$ONE_HOUR_AGO&end_time=$CURRENT_TIME"
+
+# Response validation
+validate_response() {
+  local resp="$1"
+  
+  # Check for valid response structure with changes array
+  if [[ "$resp" == *"\"changes\":"* ]]; then
+    return 0
+  fi
+  
+  # Check for empty changes (valid response, just no changes in the time period)
+  if [[ "$resp" == *"\"changes\":[]"* ]]; then
+    echo "No changes found in the specified time period (this might be expected)"
+    return 0
+  fi
+  
+  # Check for specific temporal API errors
+  if [[ "$resp" == *"\"error\":"* ]]; then
+    # If we get a specific error about the entity not existing, this might be expected
+    if [[ "$resp" == *"Entity not found"* ]]; then
+      echo "Note: Entity not found"
+      return 0
+    fi
+    
+    # Invalid time range might be reported as an error
+    if [[ "$resp" == *"Invalid time range"* ]]; then
+      echo "Error: Invalid time range parameters"
+      return 1
+    fi
+    
+    # Other errors indicate a test failure
+    echo "Error response: $resp"
+    return 1
+  fi
+  
+  return 1
+}

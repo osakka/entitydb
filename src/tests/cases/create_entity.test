@@ -1,0 +1,29 @@
+#!/bin/bash
+# Test case: Create a new entity with tags and content
+
+# Test description
+DESCRIPTION="Create a new entity with tags and content"
+
+# Request definition
+METHOD="POST"
+ENDPOINT="entities/create"
+HEADERS="-H \"Content-Type: application/json\""
+DATA="{\"tags\":[\"type:test\",\"status:active\",\"test:basic\"],\"content\":{\"description\":\"Test entity\",\"created_by\":\"test_framework\"}}"
+
+# Response validation
+validate_response() {
+  local resp="$1"
+  
+  # Check if response contains an ID
+  if [[ "$resp" == *"\"id\":"* ]]; then
+    # Check if the tags were created correctly
+    if [[ "$resp" == *"\"tags\":"* && 
+          "$resp" == *"\"type:test\""* && 
+          "$resp" == *"\"status:active\""* && 
+          "$resp" == *"\"test:basic\""* ]]; then
+      return 0
+    fi
+  fi
+  
+  return 1
+}

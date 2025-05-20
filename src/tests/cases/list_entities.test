@@ -1,0 +1,24 @@
+#!/bin/bash
+# Test case: List entities with tag filter
+
+# Test description
+DESCRIPTION="List entities with tag filter"
+
+# Request definition
+METHOD="GET"
+ENDPOINT="entities/list"
+QUERY="tag=type:test&limit=10"
+
+# Response validation
+validate_response() {
+  local resp="$1"
+  
+  # Check if response is a valid JSON array (even if empty)
+  if [[ "$resp" == "[]" || 
+        ("$resp" == "["* && "$resp" == *"]" && 
+         ("$resp" == *"\"id\":"* && "$resp" == *"\"tags\":"*)) ]]; then
+    return 0
+  fi
+  
+  return 1
+}

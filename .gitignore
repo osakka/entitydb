@@ -44,7 +44,7 @@ dist/
 *.out
 coverage.txt
 # Exception for our test case files
-!share/tests/test_cases/*.test
+!src/tests/cases/*.test
 
 # Go specific
 *.exe

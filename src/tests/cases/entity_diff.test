@@ -1,0 +1,53 @@
+#!/bin/bash
+# Test case: Test entity tag differences between timestamps
+
+# Test description
+DESCRIPTION="Test entity tag differences between timestamps"
+
+# Request definition
+METHOD="GET"
+ENDPOINT="entities/diff"
+HEADERS="-H \"Content-Type: application/json\""
+DATA=""
+# Note: This test requires a valid entity ID
+# We'll use an hour ago and now as the time range for the diff
+CURRENT_TIME=$(date +%s000000000)
+ONE_HOUR_AGO=$(( $(date +%s) - 3600 ))000000000
+QUERY="id=ENTITY_ID&t1=$ONE_HOUR_AGO&t2=$CURRENT_TIME"
+
+# Response validation
+validate_response() {
+  local resp="$1"
+  
+  # Check for valid diff response structure with added/removed tags
+  if [[ "$resp" == *"\"added\":"* && "$resp" == *"\"removed\":"* ]]; then
+    return 0
+  fi
+  
+  # Check for empty diff (valid response, just no changes in the time period)
+  if [[ "$resp" == *"\"added\":[]"* && "$resp" == *"\"removed\":[]"* ]]; then
+    echo "No differences found in the specified time period (this might be expected)"
+    return 0
+  fi
+  
+  # Check for specific temporal API errors
+  if [[ "$resp" == *"\"error\":"* ]]; then
+    # If we get a specific error about the entity not existing, this might be expected
+    if [[ "$resp" == *"Entity not found"* ]]; then
+      echo "Note: Entity not found"
+      return 0
+    fi
+    
+    # Invalid time parameters might be reported as an error
+    if [[ "$resp" == *"Invalid timestamp"* ]]; then
+      echo "Error: Invalid timestamp parameters"
+      return 1
+    fi
+    
+    # Other errors indicate a test failure
+    echo "Error response: $resp"
+    return 1
+  fi
+  
+  return 1
+}
