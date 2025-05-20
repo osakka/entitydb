@@ -43,6 +43,8 @@ dist/
 *.test
 *.out
 coverage.txt
+# Exception for our test case files
+!share/tests/test_cases/*.test
 
 # Go specific
 *.exe
@@ -50,6 +52,5 @@ coverage.txt
 *.dll
 *.so
 *.dylib
-*.test
 *.out
 go.work
