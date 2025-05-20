@@ -21,7 +21,7 @@
   </defs>
   
   <!-- Minimalist Logo (Black Text Version) -->
-  <g transform="translate(60, 35)">
+  <g transform="translate(80, 35)">
     <!-- 3D Red Sphere at 345 degrees, smaller and further out -->
     <circle cx="-10" cy="5" r="3.5" fill="url(#redSphereGlass)" filter="url(#ballShadowSoft)" />
     
