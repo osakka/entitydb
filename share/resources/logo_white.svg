@@ -29,7 +29,7 @@
     <text x="0" y="35" font-family="'SF Pro Display', 'Helvetica Neue', sans-serif" font-weight="700" font-size="54" letter-spacing="-0.8" fill="#ffffff">entity</text>
     <text x="140" y="35" font-family="'SF Pro Display', 'Helvetica Neue', sans-serif" font-weight="700" font-size="54" letter-spacing="-0.8" fill="#3498db">db</text>
     
-    <!-- "TEMPORAL DATABASE" in capitals, thinner and smaller, aligned with the "e" -->
-    <text x="0" y="55" font-family="'SF Pro Display', 'Helvetica Neue', sans-serif" font-weight="200" font-size="12" letter-spacing="2" fill="#dddddd">TEMPORAL DATABASE</text>
+    <!-- "TEMPORAL DATABASE" in capitals, thinner and smaller, right aligned -->
+    <text x="176" y="58" font-family="'SF Pro Display', 'Helvetica Neue', sans-serif" font-weight="200" font-size="10" letter-spacing="1.5" fill="#dddddd" text-anchor="end">TEMPORAL DATABASE</text>
   </g>
 </svg>
