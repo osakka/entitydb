@@ -41,6 +41,7 @@ Welcome to the EntityDB documentation. This directory contains documentation for
 
 | Document | Description |
 |----------|-------------|
+| [core/PROJECT_REQUIREMENTS.md](./core/PROJECT_REQUIREMENTS.md) | **[NEW]** Comprehensive list of project requirements that guided EntityDB development |
 | [core/REQUIREMENTS.md](./core/REQUIREMENTS.md) | System requirements, dependencies, and compatibility information |
 | [core/SPECIFICATIONS.md](./core/SPECIFICATIONS.md) | Technical specifications of the EntityDB platform |
 | [../CHANGELOG.md](../CHANGELOG.md) | Complete version history and detailed change logs |
