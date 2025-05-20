@@ -84,33 +84,11 @@ curl -k -X GET https://localhost:8085/api/v1/entities/as-of \
 
 ## Architecture
 
-EntityDB is built on a pure entity-based architecture:
+EntityDB is built on a pure entity-based architecture with layered components:
 
-```
-┌─────────────────────────────────────┐
-│            EntityDB API             │
-└─────────────────────────────────────┘
-               │
-┌─────────────────────────────────────┐
-│         RBAC Authorization          │
-└─────────────────────────────────────┘
-               │
-┌─────────────────────────────────────┐
-│        Temporal Repository          │
-├─────────────────────────────────────┤
-│  B-tree │ Skip-list │ Bloom Filter  │
-└─────────────────────────────────────┘
-               │
-┌─────────────────────────────────────┐
-│      Binary Storage Format (EBF)    │
-├─────────────────────────────────────┤
-│       Write-Ahead Log (WAL)         │
-└─────────────────────────────────────┘
-               │
-┌─────────────────────────────────────┐
-│      Memory-Mapped File Access      │
-└─────────────────────────────────────┘
-```
+<p align="center">
+  <img src="share/resources/architecture.svg" alt="EntityDB Architecture" width="500">
+</p>
 
 ## Building & Development
 
