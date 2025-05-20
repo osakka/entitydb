@@ -176,6 +176,20 @@ Detailed documentation is available in the [docs](./docs) directory:
 - **v2.9.0** - RBAC system implementation
 - **v2.8.0** - Feature flag system
 
+## Project Structure
+
+```
+/opt/entitydb/
+├── bin/         # Executable binaries and scripts
+├── docs/        # Documentation
+├── share/       # Shared resources and tools
+├── src/         # Source code
+├── trash/       # Retired code (keep for reference)
+└── var/         # Variable data (database, logs)
+```
+
+> **Development Convention:** Always move unused, outdated, or deprecated code to the `/trash` directory instead of deleting it. This preserves reference implementations while keeping the main codebase clean.
+
 ## Repository
 
 https://git.home.arpa/itdlabs/entitydb

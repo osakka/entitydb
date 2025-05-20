@@ -20,6 +20,9 @@ Welcome to the EntityDB documentation. This directory contains comprehensive doc
 | [releases/](./releases/) | Release notes |
 | [archive/](./archive/) | Legacy documentation |
 | [resources/](./resources/) | Documentation resources (images, etc.) |
+| [../trash/](../trash/) | Trash bin for unused/outdated code and files |
+
+> **Important Note:** Always move unused, outdated, or deprecated code to the `/trash` directory instead of deleting it. This makes it easy to reference old implementations if needed while keeping the main codebase clean.
 
 ## Core Documentation
 

@@ -158,6 +158,7 @@ We use a trunk-based development model:
 7. **ALWAYS** keep commits focused on a single logical change
 8. **ALWAYS** write meaningful commit messages
 9. **ALWAYS** keep your local copy updated with remote
+10. **ALWAYS** move unused, outdated, or deprecated code to the `/trash` directory instead of deleting it
 
 ### Git Repository Configuration
 
