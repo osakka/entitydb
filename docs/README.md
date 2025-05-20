@@ -19,7 +19,7 @@ Welcome to the EntityDB documentation. This directory contains comprehensive doc
 | [spikes/](./spikes/) | Technical spikes and investigations |
 | [releases/](./releases/) | Release notes |
 | [archive/](./archive/) | Legacy documentation |
-| [resources/](./resources/) | Documentation resources (images, etc.) |
+| [../share/resources/](../share/resources/) | Logo and design resources (moved from docs) |
 | [../trash/](../trash/) | Trash bin for unused/outdated code and files |
 
 > **Important Note:** Always move unused, outdated, or deprecated code to the `/trash` directory instead of deleting it. This makes it easy to reference old implementations if needed while keeping the main codebase clean.
@@ -160,6 +160,9 @@ Welcome to the EntityDB documentation. This directory contains comprehensive doc
 
 ## Resources
 
+Logo resources have been moved to `/share/resources/` directory.
+
 | Resource | Description |
 |----------|-------------|
-| [resources/logo.svg](./resources/logo.svg) | EntityDB logo (SVG format) |
+| [/share/resources/logo_white.svg](/share/resources/logo_white.svg) | EntityDB logo - white text version |
+| [/share/resources/logo_black.svg](/share/resources/logo_black.svg) | EntityDB logo - black text version |
