@@ -1,6 +1,19 @@
 # EntityDB Documentation
 
-Welcome to the EntityDB documentation. This directory contains comprehensive documentation for the EntityDB platform.
+> **⚠️ IMPORTANT DISCLAIMER**
+> 
+> **This documentation section is currently undergoing heavy reorganization and content cleanup.**
+> 
+> Some documentation files may contain outdated, incomplete, or partially relevant information. We are actively working to improve and update all documentation to reflect the current state of the EntityDB platform.
+>
+> For the most accurate and up-to-date information, please refer to:
+> - The main [README.md](../README.md) file in the project root
+> - Files in the [core/](./core/) directory
+> - The [architecture diagram](../share/resources/architecture.svg)
+>
+> We appreciate your patience as we continue to improve the documentation.
+
+Welcome to the EntityDB documentation. This directory contains documentation for the EntityDB platform.
 
 ## Documentation Structure
 
