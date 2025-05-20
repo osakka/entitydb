@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v2.14.0] - 2025-05-20
+
+### Changed
+- **Directory Structure Reorganization**:
+  - Removed obsolete directories (share/cli, share/utilities, share/scripts, share/tools)
+  - Updated documentation to use API calls instead of CLI tools
+  - Fixed references to removed tools in scripts
+  - Improved separation of concerns in project structure
+- **Testing Improvements**:
+  - Added test case files to git with updated .gitignore
+  - Ensured all tests are properly tracked in version control
+  - Fixed test framework path references
+- **Documentation Updates**:
+  - Improved README with more accurate feature descriptions
+  - Updated performance estimates to more realistic values
+  - Removed exaggerated performance claims
+
 ## [v2.13.1] - 2025-05-20
 
 ### Added

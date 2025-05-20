@@ -3,7 +3,7 @@
 > [!IMPORTANT]
 > EntityDB is a high-performance temporal database where every tag is timestamped with nanosecond precision. All data is stored in a custom binary format (EBF) with Write-Ahead Logging for durability and concurrent access support.
 
-## Current State (v2.13.0)
+## Current State (v2.14.0)
 
 EntityDB now features a unified Entity model with autochunking:
 - **Unified Entity Model**: Single content field ([]byte) per entity
