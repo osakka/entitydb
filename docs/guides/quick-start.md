@@ -37,29 +37,36 @@ The server automatically creates a default admin user on first start:
 - Username: `admin`
 - Password: `admin`
 
-## Using the CLI
+## Using the API
 
 1. Login with default credentials:
    ```bash
-   ./share/cli/entitydb-cli login admin admin
+   TOKEN=$(curl -k -s -X POST https://localhost:8085/api/v1/auth/login \
+     -H "Content-Type: application/json" \
+     -d '{"username":"admin","password":"admin"}' | jq -r '.token')
    ```
 
 2. Create an entity:
    ```bash
-   ./share/cli/entitydb-cli entity create \
-     --type=issue \
-     --title="My First Issue" \
-     --tags="priority:high,status:pending"
+   curl -k -X POST https://localhost:8085/api/v1/entities/create \
+     -H "Authorization: Bearer $TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "tags": ["type:issue", "status:pending", "priority:high"],
+       "content": "My First Issue"
+     }'
    ```
 
 3. List entities:
    ```bash
-   ./share/cli/entitydb-cli entity list --type=issue
+   curl -k -X GET "https://localhost:8085/api/v1/entities/list?tag=type:issue" \
+     -H "Authorization: Bearer $TOKEN"
    ```
 
 4. Get a specific entity:
    ```bash
-   ./share/cli/entitydb-cli entity get --id=entity_123
+   curl -k -X GET "https://localhost:8085/api/v1/entities/get?id=entity_123" \
+     -H "Authorization: Bearer $TOKEN"
    ```
 
 ## Web Interface

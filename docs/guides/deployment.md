@@ -134,9 +134,8 @@ If issues arise:
 ## Support & Maintenance
 
 - Configuration: `/opt/entitydb/CLAUDE.md`
-- API Documentation: `/opt/entitydb/share/cli/README.md`
-- Test Scripts: `/opt/entitydb/share/tests/`
+- API Documentation: `/opt/entitydb/docs/api/`
+- Test Scripts: `/opt/entitydb/src/tests/`
 - Log Location: `/opt/entitydb/var/log/entitydb.log`
 
-The system is ready for production deployment\!
-EOF < /dev/null
+The system is ready for production deployment!

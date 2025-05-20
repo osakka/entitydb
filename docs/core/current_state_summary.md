@@ -90,9 +90,12 @@ firefox http://localhost:8085
 Username: admin
 Password: admin
 
-# CLI access
-./share/cli/entitydb-cli login admin admin
-./share/cli/entitydb-cli entity list
+# API access
+TOKEN=$(curl -k -s -X POST https://localhost:8085/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"admin"}' | jq -r '.token')
+curl -k -X GET "https://localhost:8085/api/v1/entities/list" \
+  -H "Authorization: Bearer $TOKEN"
 ```
 
 ## Repository State

@@ -189,13 +189,13 @@ start_server() {
     if [ "$ENTITYDB_USE_SSL" = "true" ]; then
         if [ ! -f "$SSL_CERT" ]; then
             print_message "$RED" "SSL certificate not found: $SSL_CERT"
-            print_message "$YELLOW" "Please install certificate or run: sudo $EntityDB_DIR/share/tools/setup_ssl.sh"
+            print_message "$YELLOW" "Please install certificate or generate a self-signed one"
             return 1
         fi
         
         if [ ! -f "$SSL_KEY" ]; then
             print_message "$RED" "SSL private key not found: $SSL_KEY"
-            print_message "$YELLOW" "Please install private key or run: sudo $EntityDB_DIR/share/tools/setup_ssl.sh"
+            print_message "$YELLOW" "Please install private key or generate a self-signed one"
             return 1
         fi
     fi

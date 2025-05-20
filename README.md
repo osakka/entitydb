@@ -98,7 +98,7 @@ cd /opt/entitydb/src
 make
 
 # Run all tests with timing metrics
-cd ../share/tests
+cd ../src/tests
 ./run_tests.sh --clean --login --all --timing
 
 # Start server in development mode
@@ -145,7 +145,7 @@ EntityDB uses a simple shell-based test framework for API testing with performan
 
 ```bash
 # Run all tests with timing
-cd /opt/entitydb/share/tests
+cd /opt/entitydb/src/tests
 ./run_tests.sh --clean --login --all --timing
 
 # Create a new test
@@ -157,8 +157,8 @@ less cases/README.md
 # Run a specific test
 ./run_tests.sh --login create_entity
 
-# Run a test sequence
-./run_test_sequence.sh
+# Run temporal API tests
+./test_temporal_api.sh
 ```
 
 The test framework is based on request/response pairs:
@@ -167,7 +167,7 @@ The test framework is based on request/response pairs:
 - Tests can be chained together for complex scenarios
 - No external dependencies required - pure shell implementation
 
-For more details, see the [Testing Framework Documentation](/share/tests/new_framework/README.md).
+For more details, see the [Testing Framework Documentation](/src/tests/README.md).
 
 ## Documentation
 
@@ -176,7 +176,7 @@ Detailed documentation is available in the [docs](./docs) directory:
 - [API Guide](./docs/api)
 - [Architecture](./docs/architecture)
 - [Development Guide](./docs/development)
-- [Testing Framework](/share/tests/new_framework/README.md)
+- [Testing Framework](/src/tests/README.md)
 - [Release Notes](./docs/releases)
 
 ## Version History
@@ -195,13 +195,21 @@ Detailed documentation is available in the [docs](./docs) directory:
 /opt/entitydb/
 ├── bin/         # Executable binaries and scripts
 ├── docs/        # Documentation
-├── share/       # Shared resources and tools
+├── share/       # Shared resources (configs, web assets)
 ├── src/         # Source code
+│   ├── tools/   # Command-line tools
+│   │   ├── users/     # User management tools
+│   │   ├── entities/  # Entity management tools
+│   │   └── maintenance/ # System maintenance tools
+│   └── tests/   # Test framework and test cases
 ├── trash/       # Retired code (keep for reference)
 └── var/         # Variable data (database, logs)
 ```
 
-> **Development Convention:** Always move unused, outdated, or deprecated code to the `/trash` directory instead of deleting it. This preserves reference implementations while keeping the main codebase clean.
+> **Development Conventions:** 
+> 1. Always move unused or outdated code to the `/trash` directory instead of deleting it.
+> 2. Add new command-line tools to the appropriate category in `/src/tools/`.
+> 3. All command-line tools follow the `entitydb_` naming convention.
 
 ## Repository
 
