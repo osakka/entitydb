@@ -1,0 +1,708 @@
+#!/bin/bash
+#
+# EntityDB API CLI Tool
+# A sample implementation to demonstrate how to interact with the EntityDB API
+
+# Default settings
+SERVER="http://localhost:8085"
+TOKEN_FILE="${HOME}/.entitydb_token"
+FORMAT="table"
+DEBUG=0
+
+# Output formatting helpers
+red='\033[0;31m'
+green='\033[0;32m'
+yellow='\033[0;33m'
+blue='\033[0;34m'
+magenta='\033[0;35m'
+cyan='\033[0;36m'
+clear='\033[0m'
+
+# Display error message and exit
+error() {
+  echo -e "${red}ERROR: $1${clear}" >&2
+  exit 1
+}
+
+# Display warning message
+warn() {
+  echo -e "${yellow}WARNING: $1${clear}" >&2
+}
+
+# Display info message
+info() {
+  echo -e "${blue}INFO: $1${clear}"
+}
+
+# Display success message
+success() {
+  echo -e "${green}SUCCESS: $1${clear}"
+}
+
+# Display debug message if debug is enabled
+debug() {
+  [ $DEBUG -eq 1 ] && echo -e "${magenta}DEBUG: $1${clear}" >&2
+}
+
+# Parse command line arguments for global options
+parse_global_options() {
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --server=*)
+        SERVER="${1#*=}"
+        shift
+        ;;
+      --token-file=*)
+        TOKEN_FILE="${1#*=}"
+        shift
+        ;;
+      --format=*)
+        FORMAT="${1#*=}"
+        shift
+        ;;
+      --debug)
+        DEBUG=1
+        shift
+        ;;
+      *)
+        break
+        ;;
+    esac
+  done
+}
+
+# Authenticate and get a token
+authenticate() {
+  local username="$1"
+  local password="$2"
+
+  if [ -z "$username" ] || [ -z "$password" ]; then
+    error "Username and password required for authentication"
+  fi
+
+  debug "Authenticating user $username to $SERVER"
+  
+  local response
+  response=$(curl -s -X POST "$SERVER/api/v1/auth/login" \
+    -H "Content-Type: application/json" \
+    -d "{\"username\":\"$username\",\"password\":\"$password\"}")
+  
+  debug "Authentication response: $response"
+  
+  # Extract token from response
+  local token
+  token=$(echo "$response" | grep -o '"token":"[^"]*"' | cut -d'"' -f4)
+  
+  if [ -z "$token" ]; then
+    # Try extracting from data.token format
+    token=$(echo "$response" | grep -o '"data":{[^}]*"token":"[^"]*"' | grep -o '"token":"[^"]*"' | cut -d'"' -f4)
+  fi
+  
+  if [ -z "$token" ]; then
+    error "Failed to authenticate: $(echo "$response" | grep -o '"message":"[^"]*"' | cut -d'"' -f4)"
+  fi
+  
+  # Save token to file
+  echo "$token" > "$TOKEN_FILE"
+  success "Authentication successful, token saved to $TOKEN_FILE"
+}
+
+# Get the authentication token
+get_token() {
+  if [ ! -f "$TOKEN_FILE" ]; then
+    error "No authentication token found. Please login first."
+  fi
+  
+  cat "$TOKEN_FILE"
+}
+
+# Make an API request
+api_request() {
+  local method="$1"
+  local endpoint="$2"
+  local data="$3"
+  local token
+  
+  token=$(get_token)
+  
+  local curl_args=()
+  curl_args+=(-s -X "$method" "$SERVER$endpoint")
+  curl_args+=(-H "Authorization: Bearer $token")
+  
+  if [ "$method" != "GET" ] && [ -n "$data" ]; then
+    curl_args+=(-H "Content-Type: application/json")
+    curl_args+=(-d "$data")
+  fi
+  
+  debug "API request: curl ${curl_args[*]}"
+  
+  local response
+  response=$(curl "${curl_args[@]}")
+  
+  debug "API response: $response"
+  
+  if [ "$FORMAT" = "json" ]; then
+    echo "$response"
+  else
+    # Basic formatting for table output
+    format_response "$response"
+  fi
+}
+
+# Format API response for human readability
+format_response() {
+  local response="$1"
+  
+  # Extract and format data based on response structure
+  if echo "$response" | grep -q '"data"\s*:'; then
+    # Check if data is an array of entities
+    if echo "$response" | grep -q '"data"\s*:\s*\['; then
+      echo -e "${cyan}Entities:${clear}"
+      echo "$response" | grep -o '"data":\s*\[[^]]*\]' | grep -o '{[^}]*}' | 
+        while read -r entity; do
+          local id=$(echo "$entity" | grep -o '"id":"[^"]*"' | cut -d'"' -f4)
+          local title=$(echo "$entity" | grep -o '"title":"[^"]*"' | cut -d'"' -f4)
+          local type=$(echo "$entity" | grep -o '"type":"[^"]*"' | cut -d'"' -f4)
+          echo -e "${green}$id${clear} - $title ($type)"
+        done
+    else
+      # Extract message
+      local message=$(echo "$response" | grep -o '"message":"[^"]*"' | cut -d'"' -f4)
+      echo -e "${cyan}Message:${clear} $message"
+      
+      # Extract other fields
+      echo "$response" | grep -o '"[^"]*":"[^"]*"' | 
+        while read -r pair; do
+          local key=$(echo "$pair" | cut -d'"' -f2)
+          local value=$(echo "$pair" | cut -d'"' -f4)
+          if [ "$key" != "message" ] && [ "$key" != "status" ]; then
+            echo -e "${cyan}$key:${clear} $value"
+          fi
+        done
+    fi
+  else
+    echo "$response"
+  fi
+}
+
+# List entities
+list_entities() {
+  local type=""
+  local tag=""
+  local tags=""  # Deprecated, kept for backward compatibility
+  local wildcard=""
+  local search=""
+  local content_type=""
+  local namespace=""
+  local limit=10
+  local offset=0
+  
+  # Parse arguments
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --type=*)
+        type="${1#*=}"
+        shift
+        ;;
+      --tag=*)
+        tag="${1#*=}"
+        shift
+        ;;
+      --tags=*)
+        # For backward compatibility
+        tag="${1#*=}"
+        shift
+        ;;
+      --wildcard=*)
+        wildcard="${1#*=}"
+        shift
+        ;;
+      --search=*)
+        search="${1#*=}"
+        shift
+        ;;
+      --content-type=*)
+        content_type="${1#*=}"
+        shift
+        ;;
+      --namespace=*)
+        namespace="${1#*=}"
+        shift
+        ;;
+      --limit=*)
+        limit="${1#*=}"
+        shift
+        ;;
+      --offset=*)
+        offset="${1#*=}"
+        shift
+        ;;
+      *)
+        error "Unknown option: $1"
+        ;;
+    esac
+  done
+  
+  local endpoint="/api/v1/entities/list"
+  local params=""
+  
+  # Add parameters based on what's provided
+  [ -n "$type" ] && params="${params}&type=${type}"
+  [ -n "$tag" ] && params="${params}&tag=${tag}"
+  [ -n "$wildcard" ] && params="${params}&wildcard=${wildcard}"
+  [ -n "$search" ] && params="${params}&search=${search}"
+  [ -n "$content_type" ] && params="${params}&contentType=${content_type}"
+  [ -n "$namespace" ] && params="${params}&namespace=${namespace}"
+  [ -n "$limit" ] && params="${params}&limit=${limit}"
+  [ -n "$offset" ] && params="${params}&offset=${offset}"
+  
+  # Replace first & with ? if there are parameters
+  if [ -n "$params" ]; then
+    endpoint="${endpoint}?${params:1}"
+  fi
+  
+  api_request "GET" "$endpoint"
+}
+
+# Get a specific entity
+get_entity() {
+  local id=""
+  
+  # Parse arguments
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --id=*)
+        id="${1#*=}"
+        shift
+        ;;
+      *)
+        error "Unknown option: $1"
+        ;;
+    esac
+  done
+  
+  if [ -z "$id" ]; then
+    error "Entity ID is required"
+  fi
+  
+  api_request "GET" "/api/v1/entities/${id}"
+}
+
+# Create an entity
+create_entity() {
+  local type=""
+  local title=""
+  local description=""
+  local tags=""
+  local properties="{}"
+  
+  # Parse arguments
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --type=*)
+        type="${1#*=}"
+        shift
+        ;;
+      --title=*)
+        title="${1#*=}"
+        shift
+        ;;
+      --description=*)
+        description="${1#*=}"
+        shift
+        ;;
+      --tags=*)
+        tags="${1#*=}"
+        shift
+        ;;
+      --properties=*)
+        properties="${1#*=}"
+        shift
+        ;;
+      *)
+        error "Unknown option: $1"
+        ;;
+    esac
+  done
+  
+  if [ -z "$type" ] || [ -z "$title" ]; then
+    error "Type and title are required"
+  fi
+  
+  # Convert comma-separated tags to JSON array
+  local tags_json="[]"
+  if [ -n "$tags" ]; then
+    tags_json="["
+    IFS=',' read -ra TAG_ARRAY <<< "$tags"
+    for i in "${!TAG_ARRAY[@]}"; do
+      if [ $i -gt 0 ]; then
+        tags_json="$tags_json,"
+      fi
+      tags_json="$tags_json\"${TAG_ARRAY[$i]}\""
+    done
+    tags_json="$tags_json]"
+  fi
+  
+  # Create JSON payload
+  local data="{\"type\":\"$type\",\"title\":\"$title\""
+  [ -n "$description" ] && data="$data,\"description\":\"$description\""
+  data="$data,\"tags\":$tags_json"
+  data="$data,\"properties\":$properties"
+  data="$data}"
+  
+  api_request "POST" "/api/v1/entities" "$data"
+}
+
+# Update an entity
+update_entity() {
+  local id=""
+  local title=""
+  local description=""
+  local tags=""
+  local properties=""
+  
+  # Parse arguments
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --id=*)
+        id="${1#*=}"
+        shift
+        ;;
+      --title=*)
+        title="${1#*=}"
+        shift
+        ;;
+      --description=*)
+        description="${1#*=}"
+        shift
+        ;;
+      --tags=*)
+        tags="${1#*=}"
+        shift
+        ;;
+      --properties=*)
+        properties="${1#*=}"
+        shift
+        ;;
+      *)
+        error "Unknown option: $1"
+        ;;
+    esac
+  done
+  
+  if [ -z "$id" ]; then
+    error "Entity ID is required"
+  fi
+  
+  # Create JSON payload with only specified fields
+  local data="{"
+  local comma=""
+  
+  if [ -n "$title" ]; then
+    data="$data\"title\":\"$title\""
+    comma=","
+  fi
+  
+  if [ -n "$description" ]; then
+    data="$data$comma\"description\":\"$description\""
+    comma=","
+  fi
+  
+  if [ -n "$tags" ]; then
+    # Convert comma-separated tags to JSON array
+    local tags_json="["
+    IFS=',' read -ra TAG_ARRAY <<< "$tags"
+    for i in "${!TAG_ARRAY[@]}"; do
+      if [ $i -gt 0 ]; then
+        tags_json="$tags_json,"
+      fi
+      tags_json="$tags_json\"${TAG_ARRAY[$i]}\""
+    done
+    tags_json="$tags_json]"
+    
+    data="$data$comma\"tags\":$tags_json"
+    comma=","
+  fi
+  
+  if [ -n "$properties" ]; then
+    data="$data$comma\"properties\":$properties"
+  fi
+  
+  data="$data}"
+  
+  api_request "PUT" "/api/v1/entities/$id" "$data"
+}
+
+# List relationships
+list_relationships() {
+  local source=""
+  local target=""
+  local type=""
+  
+  # Parse arguments
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --source=*)
+        source="${1#*=}"
+        shift
+        ;;
+      --target=*)
+        target="${1#*=}"
+        shift
+        ;;
+      --type=*)
+        type="${1#*=}"
+        shift
+        ;;
+      *)
+        error "Unknown option: $1"
+        ;;
+    esac
+  done
+  
+  local endpoint="/api/v1/entity-relationships"
+  local params=""
+  
+  [ -n "$source" ] && params="${params}&source_id=${source}"
+  [ -n "$target" ] && params="${params}&target_id=${target}"
+  [ -n "$type" ] && params="${params}&relationship_type=${type}"
+  
+  # Replace first & with ? if there are parameters
+  if [ -n "$params" ]; then
+    endpoint="${endpoint}?${params:1}"
+  fi
+  
+  api_request "GET" "$endpoint"
+}
+
+# Create a relationship
+create_relationship() {
+  local source=""
+  local target=""
+  local type=""
+  local properties="{}"
+  
+  # Parse arguments
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --source=*)
+        source="${1#*=}"
+        shift
+        ;;
+      --target=*)
+        target="${1#*=}"
+        shift
+        ;;
+      --type=*)
+        type="${1#*=}"
+        shift
+        ;;
+      --properties=*)
+        properties="${1#*=}"
+        shift
+        ;;
+      *)
+        error "Unknown option: $1"
+        ;;
+    esac
+  done
+  
+  if [ -z "$source" ] || [ -z "$target" ] || [ -z "$type" ]; then
+    error "Source, target, and type are required"
+  fi
+  
+  # Create JSON payload
+  local data="{\"source_id\":\"$source\",\"target_id\":\"$target\",\"type\":\"$type\",\"properties\":$properties}"
+  
+  api_request "POST" "/api/v1/entity-relationships" "$data"
+}
+
+# Delete a relationship
+delete_relationship() {
+  local source=""
+  local target=""
+  local type=""
+  
+  # Parse arguments
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --source=*)
+        source="${1#*=}"
+        shift
+        ;;
+      --target=*)
+        target="${1#*=}"
+        shift
+        ;;
+      --type=*)
+        type="${1#*=}"
+        shift
+        ;;
+      *)
+        error "Unknown option: $1"
+        ;;
+    esac
+  done
+  
+  if [ -z "$source" ] || [ -z "$target" ]; then
+    error "Source and target are required"
+  fi
+  
+  local endpoint="/api/v1/entity-relationships?source_id=$source&target_id=$target"
+  [ -n "$type" ] && endpoint="${endpoint}&relationship_type=${type}"
+  
+  api_request "DELETE" "$endpoint"
+}
+
+# Display usage information
+show_usage() {
+  cat <<EOF
+EntityDB API CLI Tool
+
+Usage: $(basename "$0") [GLOBAL OPTIONS] COMMAND [COMMAND OPTIONS]
+
+GLOBAL OPTIONS:
+  --server=URL             Set the API server URL (default: http://localhost:8085)
+  --token-file=FILE        Set the token file location (default: ~/.entitydb_token)
+  --format=FORMAT          Set output format (table or json, default: table)
+  --debug                  Enable debug output
+
+COMMANDS:
+  login USERNAME PASSWORD  Authenticate and get a token
+  
+  entity list [OPTIONS]    List entities
+    --type=TYPE            Filter by entity type
+    --tag=TAG              Filter by specific tag
+    --wildcard=PATTERN     Filter by tag pattern (e.g. "type:*", "rbac:perm:*")
+    --search=TEXT          Search in entity content
+    --content-type=TYPE    Search in specific content type
+    --namespace=NS         Filter by tag namespace (e.g. "rbac", "type")
+    --limit=N              Limit results (default: 10)
+    --offset=N             Offset for pagination (default: 0)
+    
+  entity get [OPTIONS]     Get entity details
+    --id=ID                Entity ID
+    
+  entity create [OPTIONS]  Create a new entity
+    --type=TYPE            Entity type (required)
+    --title=TITLE          Entity title (required)
+    --description=DESC     Entity description
+    --tags=TAGS            Entity tags (comma-separated)
+    --properties=JSON      Entity properties as JSON
+    
+  entity update [OPTIONS]  Update an entity
+    --id=ID                Entity ID (required)
+    --title=TITLE          New entity title
+    --description=DESC     New entity description
+    --tags=TAGS            New entity tags (comma-separated)
+    --properties=JSON      New entity properties as JSON
+    
+  relationship list [OPTIONS]   List relationships
+    --source=ID            Filter by source entity ID
+    --target=ID            Filter by target entity ID
+    --type=TYPE            Filter by relationship type
+    
+  relationship create [OPTIONS] Create a relationship
+    --source=ID            Source entity ID (required)
+    --target=ID            Target entity ID (required)
+    --type=TYPE            Relationship type (required)
+    --properties=JSON      Relationship properties as JSON
+    
+  relationship delete [OPTIONS] Delete a relationship
+    --source=ID            Source entity ID (required)
+    --target=ID            Target entity ID (required)
+    --type=TYPE            Relationship type
+    
+  temporal as-of ID TIME   Get entity as of specific time
+  temporal history ID      Get entity history
+    --from=TIME            Start time (optional)
+    --to=TIME              End time (optional)
+  temporal changes         Get recent changes
+    --since=TIME           Changes since time (optional)
+  temporal diff ID T1 T2   Compare entity at two times
+    
+  help                     Show this help message
+
+Examples:
+  $(basename "$0") login admin password
+  $(basename "$0") entity list --type=issue --tags=priority:high
+  $(basename "$0") entity create --type=issue --title="New Issue" --tags=priority:high,status:pending
+  $(basename "$0") relationship create --source=entity_123 --target=entity_456 --type=parent
+
+EOF
+}
+
+# Main function
+main() {
+  # Parse global options
+  parse_global_options "$@"
+  shift $((OPTIND-1))
+  
+  if [ $# -eq 0 ]; then
+    show_usage
+    exit 0
+  fi
+  
+  # Process command
+  local command="$1"
+  shift
+  
+  case "$command" in
+    login)
+      authenticate "$1" "$2"
+      ;;
+    entity)
+      local subcommand="$1"
+      shift
+      case "$subcommand" in
+        list)
+          list_entities "$@"
+          ;;
+        get)
+          get_entity "$@"
+          ;;
+        create)
+          create_entity "$@"
+          ;;
+        update)
+          update_entity "$@"
+          ;;
+        *)
+          error "Unknown entity subcommand: $subcommand"
+          ;;
+      esac
+      ;;
+    temporal)
+      # Load temporal CLI if not already loaded
+      source "$(dirname "$0")/temporal_cli.sh"
+      temporal_main "$@"
+      ;;
+    relationship)
+      local subcommand="$1"
+      shift
+      case "$subcommand" in
+        list)
+          list_relationships "$@"
+          ;;
+        create)
+          create_relationship "$@"
+          ;;
+        delete)
+          delete_relationship "$@"
+          ;;
+        *)
+          error "Unknown relationship subcommand: $subcommand"
+          ;;
+      esac
+      ;;
+    help)
+      show_usage
+      ;;
+    *)
+      error "Unknown command: $command"
+      ;;
+  esac
+}
+
+# Run the main function with all arguments
+main "$@"

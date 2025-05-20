@@ -1,0 +1,107 @@
+# Runtime files
+var/*
+!var/.gitkeep
+!var/db
+var/db/*
+!var/db/.gitkeep
+!var/log
+var/log/*
+!var/log/.gitkeep
+
+# Backup and temporary files
+*.bak
+*.tmp
+*.new
+*.old
+*.backup
+*.swp
+*~
+
+# Binaries
+bin/aiwo
+bin/add_user
+bin/aiwo_secure
+bin/aiwo_server_secure
+src/aiwo_server_secure
+
+# Binary files
+/bin/entitydb
+/bin/add_entity
+/bin/add_entity_relationship
+/bin/list_entities
+/bin/list_entity_relationships
+/bin/create_users
+/bin/migrate_issues_to_entities
+/bin/migrate_to_pure_entities
+
+# Deprecated binaries  
+/deprecated/old_binaries/*
+!deprecated/old_binaries/README.md
+!deprecated/old_binaries/*.sh
+
+# Any binary without extension in bin (but keep scripts and docs)
+/bin/*
+!/bin/*.sh
+!/bin/*.md
+!/bin/commands/
+
+# Temporary and development scripts
+bin/aiwoc.sh.tag_based
+bin/*_bak
+testfix.patch
+*.patch
+
+# Ignore original schema files now that they're organized
+src/models/sqlite/fix_issues_table.sql
+src/models/sqlite/grant_admin_perms.sql
+src/models/sqlite/grant_all_permissions.sql
+src/models/sqlite/manual_schema.sql
+src/models/sqlite/minimal_schema.sql
+src/models/sqlite/schema_cleanup.sql
+src/models/sqlite/schema_fix_issue_history.sql
+src/models/sqlite/schema_update_test_compat.sql
+src/models/sqlite/setup_admin_perms.sql
+src/models/sqlite/update_issue.sql
+
+# Backup directories
+src/security_components_backup/
+/src/security_demo/
+/src/security_demo
+
+# Security documentation in progress
+# These will be cleaned up and properly organized in a future release
+docs/SECURITY.md
+docs/audit_logging_implementation.md
+docs/entity_api_fix_summary.md
+docs/entity_api_issues_report.md
+docs/entity_rbac_implementation.md
+docs/implementation_next_steps.md
+docs/input_validation_implementation.md
+docs/rbac_implementation_guide.md
+docs/rbac_test_report.md
+docs/secure_password_implementation.md
+docs/security_architecture.md
+docs/security_implementation_checklist.md
+docs/security_implementation_next_steps.md
+docs/security_implementation_notes.md
+docs/security_implementation_status.md
+docs/security_implementation_summary.md
+docs/security_improvements_summary.md
+docs/security_integration.md
+
+# Test files
+share/tests/entity/demo_password.go
+share/tests/entity/run_security_tests.sh
+share/tests/entity/test_audit_logging.sh
+share/tests/entity/test_input_validation.sh
+share/tests/entity/test_rbac.sh
+share/tests/entity/test_rbac_entity.sh
+share/tests/entity/test_rbac_simple.sh
+share/tests/entity/test_secure_password.sh
+share/tests/entity/test_user_management.sh
+
+# Tool files
+share/tools/comprehensive_security_test.sh
+share/tools/secure_entities.sh
+share/tools/security_test_entity_api.sh
+share/tools/test_enhanced_security.sh

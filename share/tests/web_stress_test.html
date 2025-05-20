@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>EntityDB Stress Test</title>
+</head>
+<body>
+    <h1>EntityDB Stress Test</h1>
+    <button onclick="runTest()">Run Test</button>
+    <button onclick="stopTest()">Stop Test</button>
+    
+    <div id="status">Ready</div>
+    <div id="results"></div>
+    
+    <script>
+    let stopFlag = false;
+    let token = null;
+    
+    async function login() {
+        const resp = await fetch('/api/v1/auth/login', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({username: 'admin', password: 'admin'})
+        });
+        const data = await resp.json();
+        token = data.token;
+        console.log('Logged in');
+    }
+    
+    async function createEntity(index) {
+        const tags = [
+            `type:${['server', 'app', 'db', 'network'][index % 4]}`,
+            `id:test_${index}`,
+            `env:${['prod', 'dev', 'test'][index % 3]}`,
+            `status:${['active', 'inactive'][index % 2]}`,
+            `batch:${Math.floor(index / 100)}`
+        ];
+        
+        const resp = await fetch('/api/v1/entities/create', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({tags})
+        });
+        
+        return resp.status === 201;
+    }
+    
+    async function runTest() {
+        await login();
+        document.getElementById('status').textContent = 'Running...';
+        stopFlag = false;
+        
+        const startTime = Date.now();
+        let count = 0;
+        let errors = 0;
+        
+        // Create entities in batches
+        for (let batch = 0; batch < 10 && !stopFlag; batch++) {
+            const promises = [];
+            
+            // Create 100 entities in parallel per batch
+            for (let i = 0; i < 100; i++) {
+                const index = batch * 100 + i;
+                promises.push(
+                    createEntity(index)
+                        .then(success => {
+                            if (success) count++;
+                            else errors++;
+                        })
+                        .catch(() => errors++)
+                );
+            }
+            
+            await Promise.all(promises);
+            
+            const elapsed = (Date.now() - startTime) / 1000;
+            const rate = count / elapsed;
+            
+            document.getElementById('status').textContent = 
+                `Batch ${batch + 1}/10: ${count} created, ${errors} errors (${rate.toFixed(1)} per sec)`;
+        }
+        
+        // Complex queries
+        document.getElementById('status').textContent = 'Testing queries...';
+        
+        const queries = [
+            'filter=type:server&filter=env:prod',
+            'filter=status:active&limit=10',
+            'filter=batch:0&sort=id&order=asc'
+        ];
+        
+        let queryResults = '';
+        for (const query of queries) {
+            const resp = await fetch(`/api/v1/entities/query?${query}`, {
+                headers: {'Authorization': `Bearer ${token}`}
+            });
+            const data = await resp.json();
+            queryResults += `Query: ${query} => ${data.entities?.length || 0} results<br>`;
+        }
+        
+        const totalTime = (Date.now() - startTime) / 1000;
+        
+        document.getElementById('results').innerHTML = `
+            <h2>Results</h2>
+            <p>Created: ${count} entities</p>
+            <p>Errors: ${errors}</p>
+            <p>Time: ${totalTime.toFixed(1)} seconds</p>
+            <p>Rate: ${(count / totalTime).toFixed(1)} entities/sec</p>
+            <h3>Query Results</h3>
+            ${queryResults}
+        `;
+        
+        document.getElementById('status').textContent = 'Complete';
+    }
+    
+    function stopTest() {
+        stopFlag = true;
+        document.getElementById('status').textContent = 'Stopped';
+    }
+    </script>
+</body>
+</html>

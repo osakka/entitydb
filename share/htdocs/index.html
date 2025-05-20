@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EntityDB - Dashboard</title>
+    <link href="css/style.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.12.3/dist/cdn.min.js" defer></script>
+    <style>
+        /* Debug styles to check rendering */
+        .loading-placeholder {
+            text-align: center;
+            padding: 40px;
+            font-size: 16px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <!-- Initial loading message before Alpine loads -->
+    <div class="loading-placeholder" id="initialLoadingMessage">
+        Loading EntityDB Dashboard...
+    </div>
+    
+    <div x-data="entityManager" x-cloak class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-left">
+                <h1>EntityDB Dashboard</h1>
+            </div>
+            <div class="header-actions">
+                <a href="/api-docs.html" class="btn btn-secondary">API Documentation</a>
+                <div x-show="user" class="user-info">
+                    <span x-text="user.username"></span>
+                    <button @click="showChangePasswordModal = true" class="btn btn-primary btn-sm">Change Password</button>
+                    <button @click="logout" class="btn btn-secondary">Logout</button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Login Form -->
+        <div x-show="!user" class="main-content">
+            <div class="login-form">
+                <h2>EntityDB Login</h2>
+                <p class="login-hint">Default credentials: admin / admin</p>
+                <form @submit.prevent="login">
+                    <div class="form-group">
+                        <label for="username">Username</label>
+                        <input type="text" id="username" x-model="loginForm.username" required autocomplete="username">
+                    </div>
+                    <div class="form-group">
+                        <label for="password">Password</label>
+                        <input type="password" id="password" x-model="loginForm.password" required autocomplete="current-password">
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-block">Login</button>
+                    <div x-show="error" class="error" x-text="error"></div>
+                    <div class="login-debug">
+                        <button type="button" @click="logAppState()" class="btn-debug">Debug Login</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <main x-show="user" class="main-content">
+            <!-- Navigation Tabs -->
+            <nav class="tabs-container">
+                <div class="tabs">
+                    <!-- Improved dropdown with better scope integration -->
+                    <div x-data="{ dropdownOpen: false }">
+                        <button @click="dropdownOpen = !dropdownOpen" class="tab dropdown-button active">
+                            <span x-text="getActiveTabTitle()"></span> <span x-text="dropdownOpen ? '▲' : '▼'"></span>
+                        </button>
+                        <div x-show="dropdownOpen" 
+                             @click.outside="dropdownOpen = false"
+                             style="position: absolute; background: white; border: 1px solid #ddd; padding: 10px; border-radius: 4px; width: 200px; z-index: 1000; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                            <!-- Always show All Entities option -->
+                            <div @click="changeTab('all'); dropdownOpen = false" 
+                                :style="activeTab === 'all' ? 'padding: 8px; cursor: pointer; margin-bottom: 5px; background: #e6f3fa; color: #3498db; font-weight: 500;' : 'padding: 8px; cursor: pointer; margin-bottom: 5px;'">
+                                All Entities
+                            </div>
+                            
+                            <!-- Show Users option if there are users -->
+                            <div x-show="hasEntitiesOfType('user')"
+                                 @click="changeTab('user'); dropdownOpen = false" 
+                                 :style="activeTab === 'user' ? 'padding: 8px; cursor: pointer; margin-bottom: 5px; background: #e6f3fa; color: #3498db; font-weight: 500;' : 'padding: 8px; cursor: pointer; margin-bottom: 5px;'">
+                                Users
+                            </div>
+                            
+                            <!-- Show Sessions option if there are sessions -->
+                            <div x-show="hasEntitiesOfType('session')"
+                                 @click="changeTab('session'); dropdownOpen = false" 
+                                 :style="activeTab === 'session' ? 'padding: 8px; cursor: pointer; margin-bottom: 5px; background: #e6f3fa; color: #3498db; font-weight: 500;' : 'padding: 8px; cursor: pointer; margin-bottom: 5px;'">
+                                Sessions
+                            </div>
+                            
+                            <!-- Dynamic options for other entity types -->
+                            <template x-for="type in availableTypes.filter(t => t !== 'user' && t !== 'session')" :key="type">
+                                <div @click="changeTab(type); dropdownOpen = false"
+                                     :style="activeTab === type ? 'padding: 8px; cursor: pointer; margin-bottom: 5px; background: #e6f3fa; color: #3498db; font-weight: 500;' : 'padding: 8px; cursor: pointer; margin-bottom: 5px;'">
+                                    <span x-text="capitalizeFirstLetter(type) + (type.endsWith('s') ? '' : 's')"></span>
+                                </div>
+                            </template>
+                            
+                            <!-- Debug option -->
+                            <div @click="logAppState(); dropdownOpen = false" 
+                                style="padding: 8px; cursor: pointer; margin-bottom: 5px; background: #ffe; color: #333; font-weight: bold; margin-top: 10px; border-top: 1px solid #eee; padding-top: 12px;">
+                                🐞 Debug Info
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </nav>
+
+            <div class="section">
+                <div class="section-header">
+                    <h2 x-text="getActiveTabTitle()"></h2>
+                    <div class="section-actions">
+                        <template x-if="activeTab === 'user' && userHasAdminRole()">
+                            <button @click="showCreateUserForm = true" class="btn btn-primary">
+                                Create User
+                            </button>
+                        </template>
+                        <template x-if="activeTab !== 'user' && activeTab !== 'session'">
+                            <button @click="showCreateForm = true" class="btn btn-primary">
+                                Create Entity
+                            </button>
+                        </template>
+                        <button @click="logAppState()" class="btn btn-secondary" title="Log state to debug console">
+                            <span class="icon">🐞</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Filter Controls -->
+                <div class="controls">
+                    <div class="filter-group">
+                        <input type="text"
+                               x-model="filters.search"
+                               placeholder="Search..."
+                               @input="filterEntities">
+                        
+                        <template x-if="activeTab === 'all'">
+                            <select x-model="filters.type" @change="filterEntities">
+                                <option value="">All Types</option>
+                                <template x-for="type in availableTypes" :key="type">
+                                    <option :value="type" x-text="type.charAt(0).toUpperCase() + type.slice(1)"></option>
+                                </template>
+                            </select>
+                        </template>
+                        
+                        <template x-if="activeTab === 'users'">
+                            <select x-model="filters.role" @change="filterEntities">
+                                <option value="">All Roles</option>
+                                <option value="admin">Admin</option>
+                                <option value="user">User</option>
+                            </select>
+                        </template>
+                        
+                        <!-- Sorting Controls -->
+                        <div class="sort-controls">
+                            <label for="sortBy">Sort by:</label>
+                            <select id="sortBy" x-model="sortConfig.field" @change="sortEntities" class="sort-select">
+                                <option value="updated_at">Last Updated</option>
+                                <option value="created_at">Creation Date</option>
+                                <option value="title">Title</option>
+                            </select>
+                            <button @click="toggleSortDirection" class="btn-icon" 
+                                    title="Toggle sort direction">
+                                <span class="icon" x-text="sortConfig.direction === 'desc' ? '↓' : '↑'"></span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="controls-right">
+                        <button @click="fetchEntities" class="btn btn-secondary">
+                            <span class="icon">↻</span> Refresh
+                        </button>
+                        
+                        <label class="checkbox">
+                            <input type="checkbox" x-model="autoRefresh" @change="autoRefresh ? startAutoRefresh() : stopAutoRefresh()">
+                            Auto-refresh
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Entity List -->
+                <div class="entity-list">
+                    <div x-show="loading" class="loading">Loading...</div>
+                    
+                    <div class="entity-grid" x-bind:class="{'list-view': activeTab === 'users' || activeTab === 'sessions'}">
+                        <template x-for="entity in filteredEntities" :key="entity.id">
+                            <div class="entity-card" @dblclick="startEdit(entity)" :data-entity-id="entity.id">
+                                <template x-if="editingEntity && editingEntity.id === entity.id">
+                                    <div class="entity-edit-mode">
+                                        <input type="text" 
+                                               x-model="editForm.title" 
+                                               class="edit-title"
+                                               @keydown.enter="saveEdit()"
+                                               @keydown.escape="cancelEdit()">
+                                        <textarea x-model="editForm.description" 
+                                                 class="edit-description"
+                                                 @keydown.escape="cancelEdit()"
+                                                 placeholder="Description"></textarea>
+                                        <div class="tag-editor">
+                                            <div class="selected-tags">
+                                                <template x-for="(tag, index) in editForm.parsedTags" :key="index">
+                                                    <span class="tag" @click="removeEditTag(index)">
+                                                        <span x-text="tag"></span>
+                                                        <span class="remove-tag">&times;</span>
+                                                    </span>
+                                                </template>
+                                            </div>
+                                            <input type="text" 
+                                                   x-model="editForm.currentTag"
+                                                   @keydown.enter.prevent="addEditTag"
+                                                   @keydown.comma.prevent="addEditTag"
+                                                   placeholder="Add tags..."
+                                                   class="tag-input">
+                                        </div>
+                                        <div class="edit-actions">
+                                            <button @click="saveEdit()" class="btn btn-success btn-sm">Save</button>
+                                            <button @click="cancelEdit()" class="btn btn-secondary btn-sm">Cancel</button>
+                                        </div>
+                                    </div>
+                                </template>
+                                
+                                <template x-if="!editingEntity || editingEntity.id !== entity.id">
+                                    <div class="entity-content">
+                                        <div class="entity-header">
+                                            <!-- Type and Content Indicators -->
+                                            <div class="entity-indicators">
+                                                <div class="entity-type-indicator" 
+                                                     :class="getEntityTypeClass(entity)"
+                                                     :title="'Entity Type: ' + capitalizeFirstLetter(getEntityType(entity))">
+                                                    <span class="type-icon" x-html="getEntityTypeIcon(entity)"></span>
+                                                </div>
+                                                <div x-show="hasContent(entity)" 
+                                                     class="entity-content-indicator"
+                                                     :class="'content-' + getContentType(entity)"
+                                                     :title="'Content Type: ' + capitalizeFirstLetter(getContentType(entity))">
+                                                    <span class="content-icon" x-html="getContentTypeIcon(entity)"></span>
+                                                </div>
+                                            </div>
+                                            <h3 x-text="getEntityTitle(entity)"></h3>
+                                            <div class="entity-actions">
+                                                <button @click.stop="startEdit(entity)" class="btn-icon" title="Edit"><span class="icon">✎</span></button>
+                                                <button x-show="activeTab === 'user' && userHasAdminRole()" 
+                                                        @click.stop="resetUserPassword(entity)" 
+                                                        class="btn-icon" title="Reset Password">
+                                                    <span class="icon">↺</span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <p class="entity-description" x-text="getEntityDescription(entity)" x-show="getEntityDescription(entity)"></p>
+                                        
+                                        <template x-if="activeTab === 'sessions'">
+                                            <div class="entity-attributes">
+                                                <div class="attribute">
+                                                    <span class="attribute-label">User:</span>
+                                                    <span class="attribute-value" x-text="entity.username || getEntityUsername(entity)"></span>
+                                                </div>
+                                                <div class="attribute">
+                                                    <span class="attribute-label">Expires:</span>
+                                                    <span class="attribute-value" x-text="formatDate(getEntityExpiresAt(entity))"></span>
+                                                </div>
+                                            </div>
+                                        </template>
+                                        
+                                        <template x-if="activeTab === 'users'">
+                                            <div class="entity-attributes">
+                                                <div class="attribute">
+                                                    <span class="attribute-label">Username:</span>
+                                                    <span class="attribute-value" x-text="getEntityUsername(entity)"></span>
+                                                </div>
+                                                <div class="attribute">
+                                                    <span class="attribute-label">Roles:</span>
+                                                    <span class="attribute-value" x-text="getEntityRoles(entity)"></span>
+                                                </div>
+                                            </div>
+                                        </template>
+                                        
+                                        <div class="entity-tags" x-show="entity.tags && Array.isArray(entity.tags) && entity.tags.length > 0">
+                                            <template x-for="(tag, index) in entity.tags" :key="index">
+                                                <span class="tag" :data-tag="tag" x-text="tag"
+                                                      @click.stop="addTagFilter(tag)"></span>
+                                            </template>
+                                        
+                                        <!-- Relationships -->
+                                        <template x-if="hasRelationships(entity)">
+                                            <div class="relationships">
+                                                <div class="relationships-title">Relationships:</div>
+                                                <div class="relationship-links">
+                                                    <template x-for="rel in getEntityRelationships(entity)" :key="rel.id">
+                                                        <div class="relationship-link" @click.stop="viewRelatedEntity(rel)">
+                                                            <template x-if="rel.is_incoming">
+                                                                <span class="relationship-direction">⬅️</span>
+                                                            </template>
+                                                            <template x-if="!rel.is_incoming">
+                                                                <span class="relationship-direction">➡️</span>
+                                                            </template>
+                                                            <span class="relationship-type" x-text="rel.relationship_type || rel.type || 'related'"></span>
+                                                            <span x-text="truncateId(rel.is_incoming ? rel.source_id : rel.target_id)"></span>
+                                                        </div>
+                                                    </template>
+                                                </div>
+                                            </div>
+                                        </template>
+                                        
+                                        <!-- Download button - positioned at bottom right -->
+                                        <button x-show="hasContent(entity)" 
+                                                @click.stop="downloadEntityContent(entity)" 
+                                                class="download-button" 
+                                                title="Download content">
+                                            <span class="download-icon">💾</span>
+                                        </button>
+                                        
+                                        <!-- Entity metadata - positioned at bottom left -->
+                                        <div class="entity-metadata">
+                                            <div class="entity-id-display">
+                                                <span class="id-label">ID:</span>
+                                                <span class="id-value" x-text="truncateId(entity.id)" @click.stop="copyToClipboard(entity.id)" title="Click to copy full ID"></span>
+                                            </div>
+                                            
+                                            <div class="entity-date-display" x-show="entity.created_at">
+                                                <span class="date-icon">📅</span>
+                                                <span class="date-value" x-text="formatDate(entity.created_at)"></span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                        </template>
+                    </div>
+
+                    <div x-show="!loading && filteredEntities.length === 0" class="empty-state">
+                        <p>No entities found.</p>
+                        <template x-if="activeTab !== 'users' && activeTab !== 'sessions'">
+                            <button @click="showCreateForm = true" class="btn btn-primary">
+                                Create New
+                            </button>
+                        </template>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Create Entity Form -->
+            <div x-show="showCreateForm" class="modal" @click.self="cancelCreate">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h2>Create New Entity</h2>
+                        <button @click="cancelCreate" class="close-btn">&times;</button>
+                    </div>
+                    <form @submit.prevent="createEntity">
+                        <div class="form-group">
+                            <label for="title">Title</label>
+                            <input type="text" id="title" x-model="createForm.title" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="description">Description</label>
+                            <textarea id="description" x-model="createForm.description"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Type</label>
+                            <select x-model="createForm.type" required>
+                                <option value="">Select Type</option>
+                                <template x-for="type in availableTypes" :key="type">
+                                    <option :value="type" x-text="type.charAt(0).toUpperCase() + type.slice(1)"></option>
+                                </template>
+                                <option value="custom">Custom Type...</option>
+                            </select>
+                            <div x-show="createForm.type === 'custom'" class="mt-2">
+                                <input type="text" x-model="createForm.customType" placeholder="Enter custom type">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Tags</label>
+                            <div class="tag-editor">
+                                <div class="selected-tags">
+                                    <template x-for="(tag, index) in createForm.parsedTags" :key="index">
+                                        <span class="tag" @click="removeTag(index)">
+                                            <span x-text="tag"></span>
+                                            <span class="remove-tag">&times;</span>
+                                        </span>
+                                    </template>
+                                </div>
+                                <div class="tag-input-wrapper">
+                                    <input type="text" 
+                                           x-model="createForm.currentTag"
+                                           @keydown.enter.prevent="addTag"
+                                           @keydown.comma.prevent="addTag"
+                                           @input="updateTagSuggestions"
+                                           placeholder="Type to add tags..."
+                                           class="tag-input">
+                                    <div x-show="tagSuggestions.length > 0" class="tag-suggestions">
+                                        <template x-for="suggestion in tagSuggestions" :key="suggestion">
+                                            <div @click="selectSuggestion(suggestion)" class="tag-suggestion" x-text="suggestion"></div>
+                                        </template>
+                                    </div>
+                                </div>
+                            </div>
+                            <small>Common tags: status:active, priority:high, category:feature</small>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" @click="cancelCreate" class="btn btn-secondary">Cancel</button>
+                            <button type="submit" class="btn btn-primary">Create</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Create User Form -->
+            <div x-show="showCreateUserForm" class="modal" @click.self="cancelCreateUser">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h2>Create New User</h2>
+                        <button @click="cancelCreateUser" class="close-btn">&times;</button>
+                    </div>
+                    <form @submit.prevent="createUser">
+                        <div class="form-group">
+                            <label for="username">Username</label>
+                            <input type="text" id="username" x-model="createUserForm.username" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="displayName">Display Name</label>
+                            <input type="text" id="displayName" x-model="createUserForm.display_name">
+                        </div>
+                        <div class="form-group">
+                            <label for="password">Password</label>
+                            <input type="password" id="password" x-model="createUserForm.password" @input="checkPasswordStrength()" required>
+                            <div class="password-strength-meter">
+                                <div class="strength-bar" :style="{ width: passwordStrength + '%', backgroundColor: getPasswordStrengthColor() }"></div>
+                            </div>
+                            <small x-text="getPasswordStrengthText()"></small>
+                        </div>
+                        <div class="form-group">
+                            <label>Roles</label>
+                            <div class="checkbox-group">
+                                <label class="checkbox">
+                                    <input type="checkbox" x-model="createUserForm.roles" value="user">
+                                    User
+                                </label>
+                                <label class="checkbox">
+                                    <input type="checkbox" x-model="createUserForm.roles" value="admin">
+                                    Administrator
+                                </label>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" @click="cancelCreateUser" class="btn btn-secondary">Cancel</button>
+                            <button type="submit" class="btn btn-primary">Create User</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <div>EntityDB v2.13.0</div>
+            <div>High-Performance Temporal Database</div>
+        </footer>
+
+        <!-- Change Password Modal -->
+        <div x-show="showChangePasswordModal" class="modal" @click.self="showChangePasswordModal = false">
+            <div class="modal-content" style="max-width: 400px;">
+                <div class="modal-header">
+                    <h2>Change Your Password</h2>
+                    <button @click="showChangePasswordModal = false" class="close-btn">&times;</button>
+                </div>
+                <form @submit.prevent="changeCurrentUserPassword">
+                    <div class="form-group">
+                        <label for="currentPassword">Current Password</label>
+                        <input type="password" id="currentPassword" x-model="changePasswordForm.currentPassword" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="newPassword">New Password</label>
+                        <input type="password" id="newPassword" x-model="changePasswordForm.newPassword" @input="checkChangePasswordStrength()" required>
+                        <div class="password-strength-meter">
+                            <div class="strength-bar" :style="{ width: passwordStrength + '%', backgroundColor: getPasswordStrengthColor() }"></div>
+                        </div>
+                        <small x-text="getPasswordStrengthText()"></small>
+                    </div>
+                    <div class="form-group">
+                        <label for="confirmPassword">Confirm Password</label>
+                        <input type="password" id="confirmPassword" x-model="changePasswordForm.confirmPassword" required>
+                    </div>
+                    <div x-show="passwordError" class="error" x-text="passwordError"></div>
+                    <div class="modal-footer">
+                        <button type="button" @click="showChangePasswordModal = false" class="btn btn-secondary">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Change Password</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Debug Console -->
+    <div x-data="debugConsole" class="debug-console" :class="{'expanded': isExpanded}">
+        <div class="debug-console-header" @click="toggleConsole">
+            Debug Console <span class="console-count" x-text="logs.length"></span>
+            <button class="console-clear" @click.stop="clearLogs">Clear</button>
+        </div>
+        <div class="debug-console-content">
+            <template x-for="(log, index) in logs" :key="index">
+                <div class="console-log" :class="log.type">
+                    <div class="log-time" x-text="log.time"></div>
+                    <div class="log-message" x-text="log.message"></div>
+                </div>
+            </template>
+        </div>
+    </div>
+
+    <script>
+    // Debug console component
+    function debugConsole() {
+        return {
+            logs: [],
+            isExpanded: false,
+            
+            init() {
+                // Capture console logs
+                const originalConsoleLog = console.log;
+                const originalConsoleError = console.error;
+                const originalConsoleWarn = console.warn;
+                const self = this;
+                
+                console.log = function() {
+                    originalConsoleLog.apply(console, arguments);
+                    self.addLog('log', Array.from(arguments).join(' '));
+                };
+                
+                console.error = function() {
+                    originalConsoleError.apply(console, arguments);
+                    self.addLog('error', Array.from(arguments).join(' '));
+                };
+                
+                console.warn = function() {
+                    originalConsoleWarn.apply(console, arguments);
+                    self.addLog('warning', Array.from(arguments).join(' '));
+                };
+                
+                // Initial log
+                this.addLog('info', 'Debug console initialized');
+                
+                // Log Alpine.js version
+                if (window.Alpine) {
+                    this.addLog('info', 'Alpine.js version: ' + window.Alpine.version);
+                }
+            },
+            
+            addLog(type, message) {
+                const now = new Date();
+                const time = now.toLocaleTimeString() + '.' + now.getMilliseconds().toString().padStart(3, '0');
+                this.logs.push({ type, message, time });
+                
+                // Auto-expand on errors
+                if (type === 'error') {
+                    this.isExpanded = true;
+                }
+                
+                // Limit logs to prevent memory issues
+                if (this.logs.length > 100) {
+                    this.logs.shift();
+                }
+            },
+            
+            toggleConsole() {
+                this.isExpanded = !this.isExpanded;
+            },
+            
+            clearLogs() {
+                this.logs = [];
+                this.addLog('info', 'Logs cleared');
+            }
+        };
+    }
+    </script>
+
+    <script src="js/app.js"></script>
+    
+    <script>
+    // Remove the loading message once Alpine.js is ready
+    document.addEventListener('alpine:initialized', () => {
+        const loadingMessage = document.getElementById('initialLoadingMessage');
+        if (loadingMessage) {
+            loadingMessage.style.display = 'none';
+        }
+        console.log('Alpine.js initialized, loading message removed');
+    });
+    </script>
+</body>
+</html>
