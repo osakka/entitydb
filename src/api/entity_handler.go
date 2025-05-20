@@ -192,6 +192,12 @@ func (h *EntityHandler) CreateEntity(w http.ResponseWriter, r *http.Request) {
 // @Success 200 {object} models.Entity
 // @Router /api/v1/entities/get [get]
 func (h *EntityHandler) GetEntity(w http.ResponseWriter, r *http.Request) {
+	// Use our improved implementation
+	h.GetEntityImproved(w, r)
+}
+
+// Original GetEntity implementation kept for reference
+func (h *EntityHandler) GetEntityOriginal(w http.ResponseWriter, r *http.Request) {
 	// Check if timestamps should be included in response
 	includeTimestamps := r.URL.Query().Get("include_timestamps") == "true"
 	
@@ -215,6 +221,15 @@ func (h *EntityHandler) GetEntity(w http.ResponseWriter, r *http.Request) {
 	
 	// Use our fixed implementation in entity_handler_fix.go
 	if includeContent && entity.IsChunked() {
+		// Check if the request prefers streaming (better for large files)
+		if r.URL.Query().Get("stream") == "true" {
+			// Stream content directly to the client
+			logger.Info("Streaming chunked content for entity %s", id)
+			h.StreamChunkedEntityContent(w, r)
+			return
+		}
+		
+		// Otherwise, use the standard reassembly approach
 		reassembledContent, err := h.HandleChunkedContent(id, includeContent)
 		if err == nil && len(reassembledContent) > 0 {
 			// Direct binary content assignment to prevent JSON serialization issues

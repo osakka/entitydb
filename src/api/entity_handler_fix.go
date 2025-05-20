@@ -33,6 +33,37 @@ func getContentTypeTags(entity *models.Entity) []string {
 	return contentTypeTags
 }
 
+// ChunkInfo contains details about a chunked entity
+type ChunkInfo struct {
+	ChunkCount int
+	ChunkSize  int64
+	TotalSize  int64
+}
+
+// GetChunkInfo extracts chunking information from entity tags
+func GetChunkInfo(entity *models.Entity) ChunkInfo {
+	info := ChunkInfo{}
+	
+	metadata := entity.GetContentMetadata()
+	
+	// Get chunk count
+	if chunkCount, ok := metadata["chunks"]; ok {
+		fmt.Sscanf(chunkCount, "%d", &info.ChunkCount)
+	}
+	
+	// Get chunk size
+	if chunkSize, ok := metadata["chunk-size"]; ok {
+		fmt.Sscanf(chunkSize, "%d", &info.ChunkSize)
+	}
+	
+	// Get total size
+	if totalSize, ok := metadata["size"]; ok {
+		fmt.Sscanf(totalSize, "%d", &info.TotalSize)
+	}
+	
+	return info
+}
+
 func (h *EntityHandler) HandleChunkedContent(entityID string, includeContent bool) ([]byte, error) {
 	// If we're not including content, just return nil
 	if !includeContent {
@@ -96,6 +127,10 @@ func (h *EntityHandler) HandleChunkedContent(entityID string, includeContent boo
 		reassembledContentStart = string(reassembledContent[:min(20, len(reassembledContent))])
 	}
 	logger.Debug("CHUNK_DEBUG: Reassembled content start: %s", reassembledContentStart)
+	
+	// Log chunk retrieval summary
+	logger.Info("Chunks retrieved: expected=%d, got=%d, totalSize=%d bytes", 
+		chunkCount, len(reassembledContent) / 1000000 + 1, len(reassembledContent))
 	
 	return reassembledContent, nil
 }
