@@ -148,6 +148,12 @@ EntityDB uses a simple shell-based test framework for API testing with performan
 cd /opt/entitydb/share/tests
 ./run_tests.sh --clean --login --all --timing
 
+# Create a new test
+./run_tests.sh --new my_test POST endpoint "Description"
+
+# See test creation guide
+less cases/README.md
+
 # Run a specific test
 ./run_tests.sh --login create_entity
 

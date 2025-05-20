@@ -16,8 +16,9 @@ The EntityDB test framework is a simple, shell-based system for testing the API.
 
 - `test_framework.sh` - The core framework implementation
 - `run_tests.sh` - The test runner (wrapper for test_framework.sh)
-- `test_cases/` - Individual test case definitions
+- `cases/` - Individual test case definitions
   - `*.test` - Unified test files (containing both request and validation)
+  - `README.md` - Detailed guide on creating test cases
 
 ## Quick Start
 

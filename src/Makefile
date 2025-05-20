@@ -6,8 +6,9 @@ VERSION := 0.1.0
 BUILD_DIR := ../bin
 BIN_DIR := $(shell realpath ../bin)
 SHARE_DIR := $(shell realpath ../share)
-TESTS_DIR := $(SHARE_DIR)/tests
+TESTS_DIR := ./tests
 TOOLS_DIR := ./tools
+TOOLS_PREFIX := entitydb_
 SERVER_SRC := .
 LDFLAGS := -ldflags "-X main.Version=$(VERSION) -X main.BuildDate=$(shell date -u +%Y-%m-%d)"
 GOFLAGS := -v
@@ -79,13 +80,15 @@ unit-tests:
 api-tests: simple-tests
 
 simple-tests:
-	@$(ECHO) "$(YELLOW)Running Simple API tests with the new shell framework...$(NC)\n"
-	@if [ -d "$(SHARE_DIR)/tests/new_framework" ]; then \
-		echo -e "$(YELLOW)Found Simple API test framework in $(SHARE_DIR)/tests/new_framework$(NC)\n"; \
-		cd $(SHARE_DIR)/tests/new_framework && bash ./run_tests.sh --all || (echo -e "$(RED)Simple API tests failed$(NC)\n"; exit 1); \
-		echo -e "$(GREEN)Simple API tests passed$(NC)\n"; \
+	@$(ECHO) "$(YELLOW)Running API tests with the shell framework...$(NC)\n"
+	@if [ -d "$(TESTS_DIR)" ]; then \
+		echo -e "$(YELLOW)Found test framework in $(TESTS_DIR)$(NC)\n"; \
+		cd $(TESTS_DIR) && bash ./test_framework.sh --all || (echo -e "$(RED)API tests failed$(NC)\n"; exit 1); \
+		echo -e "$(GREEN)API tests passed$(NC)\n"; \
+		cd $(TESTS_DIR) && bash ./test_temporal_api.sh || (echo -e "$(RED)Temporal API tests failed$(NC)\n"; exit 1); \
+		echo -e "$(GREEN)Temporal API tests passed$(NC)\n"; \
 	else \
-		echo -e "$(RED)Simple API test framework not found in $(SHARE_DIR)/tests/new_framework$(NC)\n"; \
+		echo -e "$(RED)Test framework not found in $(TESTS_DIR)$(NC)\n"; \
 		exit 1; \
 	fi
 
@@ -154,59 +157,96 @@ master-tests:
 	@$(ECHO) "$(BLUE)========================================$(NC)\n"
 	@$(ECHO) "$(GREEN)All tests executed. Check individual test results above.$(NC)\n"
 
-tools: entity-tools
-	@$(ECHO) "$(YELLOW)Building all tools...$(NC)\n"
-	@go build $(GOFLAGS) $(BUILD_TAGS) -o $(BUILD_DIR)/add_user $(TOOLS_DIR)/add_user.go
-	@go build $(GOFLAGS) $(BUILD_TAGS) -o $(BUILD_DIR)/create_users $(TOOLS_DIR)/create_users.go
-	@chmod +x $(BUILD_DIR)/add_user $(BUILD_DIR)/create_users
+tools: user-tools entity-tools maintenance-tools
+	@$(ECHO) "$(GREEN)All tools built successfully$(NC)\n"
+
+user-tools:
+	@$(ECHO) "$(YELLOW)Building user management tools...$(NC)\n"
+	@go build $(GOFLAGS) $(BUILD_TAGS) -o $(BUILD_DIR)/$(TOOLS_PREFIX)add_user $(TOOLS_DIR)/users/add_user.go
+	@go build $(GOFLAGS) $(BUILD_TAGS) -o $(BUILD_DIR)/$(TOOLS_PREFIX)create_users $(TOOLS_DIR)/users/create_users.go
+	@go build $(GOFLAGS) $(BUILD_TAGS) -o $(BUILD_DIR)/$(TOOLS_PREFIX)generate_hash $(TOOLS_DIR)/users/generate_hash.go
+	@chmod +x $(BUILD_DIR)/$(TOOLS_PREFIX)add_user $(BUILD_DIR)/$(TOOLS_PREFIX)create_users $(BUILD_DIR)/$(TOOLS_PREFIX)generate_hash
 	@$(ECHO) "$(GREEN)User management tools built successfully$(NC)\n"
 
 entity-tools:
 	@$(ECHO) "$(YELLOW)Building entity management tools...$(NC)\n"
-	@go build $(GOFLAGS) $(BUILD_TAGS) -o $(BUILD_DIR)/add_entity $(TOOLS_DIR)/add_entity.go
-	@go build $(GOFLAGS) $(BUILD_TAGS) -o $(BUILD_DIR)/list_entities $(TOOLS_DIR)/list_entities.go
-	@go build $(GOFLAGS) $(BUILD_TAGS) -o $(BUILD_DIR)/add_entity_relationship $(TOOLS_DIR)/add_entity_relationship.go
-	@go build $(GOFLAGS) $(BUILD_TAGS) -o $(BUILD_DIR)/list_entity_relationships $(TOOLS_DIR)/list_entity_relationships.go
-	@go build $(GOFLAGS) $(BUILD_TAGS) -o $(BUILD_DIR)/migrate_issues_to_entities $(TOOLS_DIR)/migrate_issues_to_entities.go
-	@chmod +x $(BUILD_DIR)/add_entity $(BUILD_DIR)/list_entities $(BUILD_DIR)/add_entity_relationship $(BUILD_DIR)/list_entity_relationships $(BUILD_DIR)/migrate_issues_to_entities
+	@go build $(GOFLAGS) $(BUILD_TAGS) -o $(BUILD_DIR)/$(TOOLS_PREFIX)add_entity $(TOOLS_DIR)/entities/add_entity.go
+	@go build $(GOFLAGS) $(BUILD_TAGS) -o $(BUILD_DIR)/$(TOOLS_PREFIX)list_entities $(TOOLS_DIR)/entities/list_entities.go
+	@go build $(GOFLAGS) $(BUILD_TAGS) -o $(BUILD_DIR)/$(TOOLS_PREFIX)add_relation $(TOOLS_DIR)/entities/add_entity_relationship.go
+	@go build $(GOFLAGS) $(BUILD_TAGS) -o $(BUILD_DIR)/$(TOOLS_PREFIX)list_relations $(TOOLS_DIR)/entities/list_entity_relationships.go
+	@go build $(GOFLAGS) $(BUILD_TAGS) -o $(BUILD_DIR)/$(TOOLS_PREFIX)migrate_issues $(TOOLS_DIR)/entities/migrate_issue_dependencies.go
+	@go build $(GOFLAGS) $(BUILD_TAGS) -o $(BUILD_DIR)/$(TOOLS_PREFIX)dump $(TOOLS_DIR)/entities/dump_entity.go
+	@chmod +x $(BUILD_DIR)/$(TOOLS_PREFIX)* 
 	@$(ECHO) "$(GREEN)Entity management tools built successfully$(NC)\n"
 
+maintenance-tools:
+	@$(ECHO) "$(YELLOW)Building maintenance tools...$(NC)\n"
+	@go build $(GOFLAGS) $(BUILD_TAGS) -o $(BUILD_DIR)/$(TOOLS_PREFIX)fix_index $(TOOLS_DIR)/maintenance/fix_index.go
+	@go build $(GOFLAGS) $(BUILD_TAGS) -o $(BUILD_DIR)/$(TOOLS_PREFIX)check_entities $(TOOLS_DIR)/maintenance/check_corrupted_entities.go
+	@go build $(GOFLAGS) $(BUILD_TAGS) -o $(BUILD_DIR)/$(TOOLS_PREFIX)clean_entities $(TOOLS_DIR)/maintenance/clean_corrupted_entries.go
+	@go build $(GOFLAGS) $(BUILD_TAGS) -o $(BUILD_DIR)/$(TOOLS_PREFIX)scan_data $(TOOLS_DIR)/maintenance/scan_entity_data.go
+	@go build $(GOFLAGS) $(BUILD_TAGS) -o $(BUILD_DIR)/$(TOOLS_PREFIX)check_admin $(TOOLS_DIR)/maintenance/check_admin_user.go
+	@chmod +x $(BUILD_DIR)/$(TOOLS_PREFIX)fix_index $(BUILD_DIR)/$(TOOLS_PREFIX)check_entities $(BUILD_DIR)/$(TOOLS_PREFIX)clean_entities $(BUILD_DIR)/$(TOOLS_PREFIX)scan_data $(BUILD_DIR)/$(TOOLS_PREFIX)check_admin
+	@$(ECHO) "$(GREEN)Maintenance tools built successfully$(NC)\n"
+
 test-utils:
-	@$(ECHO) "$(YELLOW)Available test utilities:$(NC)\n"
-	@echo "  - fix_auth_tokens.go: Fixes auth tokens in the database"
-	@echo "  - reset_admin.go: Resets admin credentials"
-	@echo "  - setup_admin.go: Sets up admin user"
-	@echo "  - add_user.go: Adds a new user to the system"
-	@echo "  - create_users.go: Creates multiple users"
+	@$(ECHO) "$(YELLOW)Available EntityDB tools$(NC)\n"
+	@$(ECHO) "$(BLUE)=======================================$(NC)\n"
+	
+	@$(ECHO) "$(YELLOW)User management tools:$(NC)\n"
+	@echo "  - $(TOOLS_PREFIX)add_user: Adds a new user to the system"
+	@echo "  - $(TOOLS_PREFIX)create_users: Creates multiple users"
+	@echo "  - $(TOOLS_PREFIX)generate_hash: Generates password hashes"
 	@echo ""
+	
 	@$(ECHO) "$(YELLOW)Entity management tools:$(NC)\n"
-	@echo "  - add_entity.go: Creates a new entity"
-	@echo "  - list_entities.go: Lists entities with filtering options"
-	@echo "  - add_entity_relationship.go: Creates a relationship between entities"
-	@echo "  - list_entity_relationships.go: Lists relationships with filtering"
-	@echo "  - migrate_issues_to_entities.go: Migrates legacy issues to entities"
+	@echo "  - $(TOOLS_PREFIX)add_entity: Creates a new entity"
+	@echo "  - $(TOOLS_PREFIX)list_entities: Lists entities with filtering options"
+	@echo "  - $(TOOLS_PREFIX)add_relation: Creates a relationship between entities"
+	@echo "  - $(TOOLS_PREFIX)list_relations: Lists relationships with filtering"
+	@echo "  - $(TOOLS_PREFIX)migrate_issues: Migrates legacy issues to entities"
+	@echo "  - $(TOOLS_PREFIX)dump: Dumps entity data in JSON/YAML format"
 	@echo ""
-	@$(ECHO) "$(YELLOW)To run a utility, use: go run $(BUILD_TAGS) tools/<utility_file>$(NC)\n"
+	
+	@$(ECHO) "$(YELLOW)Maintenance tools:$(NC)\n"
+	@echo "  - $(TOOLS_PREFIX)fix_index: Repairs the entity index"
+	@echo "  - $(TOOLS_PREFIX)check_entities: Checks for corrupted entities"
+	@echo "  - $(TOOLS_PREFIX)clean_entities: Removes corrupted entries"
+	@echo "  - $(TOOLS_PREFIX)scan_data: Scans entity data"
+	@echo "  - $(TOOLS_PREFIX)check_admin: Verifies admin user"
+	@echo ""
+	
+	@$(ECHO) "$(YELLOW)Usage examples:$(NC)\n"
+	@echo "  $(BUILD_DIR)/$(TOOLS_PREFIX)add_user -username admin -password securepass"
+	@echo "  $(BUILD_DIR)/$(TOOLS_PREFIX)list_entities -type user"
+	@echo "  $(BUILD_DIR)/$(TOOLS_PREFIX)dump -id abc123 -format pretty"
+	@echo ""
+	
 	@$(ECHO) "$(YELLOW)To build all tools: make tools$(NC)\n"
+	@$(ECHO) "$(YELLOW)To build specific category: make user-tools, make entity-tools, or make maintenance-tools$(NC)\n"
+	@$(ECHO) "$(BLUE)=======================================$(NC)\n"
 
 help:
 	@$(ECHO) "$(BLUE)EntityDB Makefile Help$(NC)\n"
 	@$(ECHO) "$(BLUE)========================================$(NC)\n"
 	@$(ECHO) "$(GREEN)Available targets:$(NC)\n"
-	@echo "  all           : Build server, install, and run unit tests"
-	@echo "  server        : Build the consolidated server binary with integrated static file support"
-	@echo "  install       : Install scripts and make them executable"
-	@echo "  clean         : Clean build artifacts"
-	@echo "  dev           : Start development server on port 8086"
-	@echo "  tools         : Build all tools (user management and entity tools)"
-	@echo "  entity-tools  : Build only entity management tools"
-	@echo "  test          : Run all tests (unit tests and simple API tests)"
-	@echo "  unit-tests    : Run Go unit tests"
-	@echo "  simple-tests  : Run tests using the new shell framework"
-	@echo "  api-tests     : Alias for simple-tests"
-	@echo "  entity-tests  : Run legacy entity-model API tests (deprecated)"
-	@echo "  security-tests: Run security implementation tests"
-	@echo "  master-tests  : Run all tests with consolidated reporting"
-	@echo "  test-utils    : Show available test utilities"
-	@echo "  help          : Show this help message"
+	@echo "  all               : Build server, install, and run unit tests"
+	@echo "  server            : Build the consolidated server binary with integrated static file support"
+	@echo "  install           : Install scripts and make them executable"
+	@echo "  clean             : Clean build artifacts"
+	@echo "  dev               : Start development server on port 8086"
+	@echo "  tools             : Build all tools (user, entity, and maintenance tools)"
+	@echo "  user-tools        : Build only user management tools"
+	@echo "  entity-tools      : Build only entity management tools"
+	@echo "  maintenance-tools : Build only maintenance tools"
+	@echo "  test              : Run all tests (unit tests and API tests)"
+	@echo "  unit-tests        : Run Go unit tests"
+	@echo "  api-tests         : Run API tests with the test framework"
+	@echo "  entity-tests      : Run legacy entity-model API tests (deprecated)"
+	@echo "  security-tests    : Run security implementation tests"
+	@echo "  master-tests      : Run all tests with consolidated reporting"
+	@echo "  test-utils        : Show available tools and usage examples"
+	@echo "  help              : Show this help message"
+	@echo ""
+	@$(ECHO) "$(YELLOW)All compiled tools are prefixed with '$(TOOLS_PREFIX)' and installed in $(BUILD_DIR)/$(NC)\n"
 	@$(ECHO) "$(BLUE)========================================$(NC)\n"
