@@ -6,9 +6,11 @@ package api
 
 import (
 	"bytes"
+	"encoding/base64"
 	"entitydb/models"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"strconv"
 	"strings"
@@ -874,76 +876,136 @@ func removeTagsByPrefix(tags []string, prefix string) []string {
 // @Success 200 {object} models.Entity
 // @Router /api/v1/entities/update [put]
 func (h *EntityHandler) UpdateEntity(w http.ResponseWriter, r *http.Request) {
+	logger.Debug("UpdateEntity called")
+
 	// Parse request body
-	var reqData map[string]interface{}
-	if err := json.NewDecoder(r.Body).Decode(&reqData); err != nil {
-		RespondError(w, http.StatusBadRequest, "Invalid request body")
-		return
-	}
-	
-	// Get entity ID from request body or query parameter
-	entityID := ""
-	if id, ok := reqData["id"].(string); ok {
-		entityID = id
-	} else if r.URL.Query().Get("id") != "" {
-		entityID = r.URL.Query().Get("id")
-	} else {
-		RespondError(w, http.StatusBadRequest, "Entity ID required")
-		return
-	}
-	
-	// Get the existing entity
-	existingEntity, err := h.repo.GetByID(entityID)
+	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
+		logger.Error("Failed to read request body: %v", err)
+		RespondError(w, http.StatusBadRequest, "Failed to read request body")
+		return
+	}
+	
+	logger.Debug("Request body: %s", string(body))
+	
+	// Parse the request
+	var req struct {
+		ID      string      `json:"id"`
+		Tags    []string    `json:"tags,omitempty"`
+		Content interface{} `json:"content,omitempty"`
+	}
+
+	if err := json.Unmarshal(body, &req); err != nil {
+		logger.Error("Failed to parse request body: %v", err)
+		RespondError(w, http.StatusBadRequest, "Invalid request format")
+		return
+	}
+
+	// Get entity ID from request body or query parameter
+	entityID := req.ID
+	if entityID == "" {
+		entityID = r.URL.Query().Get("id")
+	}
+	
+	if entityID == "" {
+		RespondError(w, http.StatusBadRequest, "Entity ID is required")
+		return
+	}
+
+	// Get the existing entity
+	entity, err := h.repo.GetByID(entityID)
+	if err != nil {
+		logger.Error("Failed to get entity %s: %v", entityID, err)
 		RespondError(w, http.StatusNotFound, "Entity not found")
 		return
 	}
-	
-	// Update fields - title and description are stored as content
-	var contentData map[string]interface{}
-	if len(existingEntity.Content) > 0 {
-		// Unmarshal existing content
-		json.Unmarshal(existingEntity.Content, &contentData)
-	} else {
-		contentData = make(map[string]interface{})
+
+	logger.Debug("Found existing entity %s", entityID)
+
+	// Update tags if provided
+	if req.Tags != nil {
+		logger.Debug("Updating entity tags: %v", req.Tags)
+		entity.Tags = req.Tags
 	}
-	
-	if title, ok := reqData["title"].(string); ok {
-		contentData["title"] = title
-	}
-	
-	if description, ok := reqData["description"].(string); ok {
-		contentData["description"] = description
-	}
-	
-	if len(contentData) > 0 {
-		jsonData, _ := json.Marshal(contentData)
-		existingEntity.Content = jsonData
-		existingEntity.AddTag("content:type:json")
-	}
-	
-	// Update tags - replace all tags
-	if tags, ok := reqData["tags"].([]interface{}); ok {
-		existingEntity.Tags = []string{} // Clear existing tags
-		for _, tag := range tags {
-			if tagStr, ok := tag.(string); ok {
-				existingEntity.AddTag(tagStr)
+
+	// Update content if provided
+	if req.Content != nil {
+		logger.Debug("Content update requested, type: %T", req.Content)
+		
+		// Detect content type from request
+		contentType := "application/octet-stream"
+		for _, tag := range entity.Tags {
+			if strings.HasPrefix(tag, "content:type:") {
+				contentTypeTag := strings.SplitN(tag, "content:type:", 2)
+				if len(contentTypeTag) > 1 {
+					contentType = contentTypeTag[1]
+				}
+				break
 			}
 		}
+		
+		// Process content based on its type
+		switch v := req.Content.(type) {
+		case string:
+			logger.Debug("Content is string, length: %d", len(v))
+			entity.Content = []byte(v)
+		case map[string]interface{}:
+			logger.Debug("Content is JSON object")
+			jsonBytes, _ := json.Marshal(v)
+			entity.Content = jsonBytes
+		default:
+			// Try to convert to string and use as base64
+			contentStr := fmt.Sprintf("%v", req.Content)
+			if strings.HasPrefix(contentStr, "{") || strings.HasPrefix(contentStr, "[") {
+				// Looks like JSON but came as string
+				entity.Content = []byte(contentStr)
+			} else {
+				// Try to decode as base64
+				decoded, err := base64.StdEncoding.DecodeString(contentStr)
+				if err == nil {
+					entity.Content = decoded
+				} else {
+					entity.Content = []byte(contentStr)
+				}
+			}
+		}
+		
+		// Ensure content type tag is present
+		hasContentType := false
+		for i, tag := range entity.Tags {
+			if strings.HasPrefix(tag, "content:type:") {
+				entity.Tags[i] = "content:type:" + contentType
+				hasContentType = true
+				break
+			}
+		}
+		
+		if !hasContentType {
+			entity.Tags = append(entity.Tags, "content:type:"+contentType)
+		}
 	}
+
+	// Update the entity
+	logger.Debug("Updating entity with %d tags and %d bytes of content", 
+		len(entity.Tags), len(entity.Content))
 	
-	// Type is now handled as a tag (e.g., type:user)
-	
-	// Update the entity in the repository
-	err = h.repo.Update(existingEntity)
+	err = h.repo.Update(entity)
 	if err != nil {
-		logger.Debug("Error updating entity %s: %v", entityID, err)
+		logger.Error("Failed to update entity: %v", err)
 		RespondError(w, http.StatusInternalServerError, "Failed to update entity")
 		return
 	}
-	
+
+	// Re-fetch the entity to ensure we have the latest version
+	updated, err := h.repo.GetByID(entityID)
+	if err != nil {
+		logger.Error("Failed to get updated entity: %v", err)
+		RespondError(w, http.StatusInternalServerError, "Failed to retrieve updated entity")
+		return
+	}
+
 	// Return the updated entity
-	RespondJSON(w, http.StatusOK, existingEntity)
+	RespondJSON(w, http.StatusOK, updated)
 }
 
 // GetEntityAsOf returns an entity as it existed at a specific point in time
