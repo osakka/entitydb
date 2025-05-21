@@ -179,9 +179,12 @@ func (r *EntityRepository) buildIndexes() error {
 
 // updateIndexes updates in-memory indexes for a new or updated entity
 func (r *EntityRepository) updateIndexes(entity *models.Entity) {
+	logger.Debug("Updating indexes for entity %s with %d tags", entity.ID, len(entity.Tags))
+	
 	// Update tag index
 	for _, tag := range entity.Tags {
 		// Always index the full tag (with timestamp)
+		logger.Debug("Indexing tag: '%s' for entity %s", tag, entity.ID)
 		r.tagIndex[tag] = append(r.tagIndex[tag], entity.ID)
 		
 		// Also index the non-timestamped version for easier searching
@@ -191,10 +194,16 @@ func (r *EntityRepository) updateIndexes(entity *models.Entity) {
 				// Try to parse timestamp
 				if timestamp, err := time.Parse(time.RFC3339Nano, parts[0]); err == nil {
 					r.temporalIndex.AddEntry(entity.ID, tag, timestamp)
+					logger.Debug("Added to temporal index: entity %s, tag %s, timestamp %v", 
+						entity.ID, tag, timestamp)
+				} else {
+					logger.Debug("Failed to parse timestamp in tag '%s': %v", tag, err)
 				}
 				
 				// Index the actual tag part too
 				actualTag := parts[1]
+				logger.Debug("Also indexing non-timestamped version: '%s' for entity %s", 
+					actualTag, entity.ID)
 				r.tagIndex[actualTag] = append(r.tagIndex[actualTag], entity.ID)
 			}
 		}
@@ -207,6 +216,18 @@ func (r *EntityRepository) updateIndexes(entity *models.Entity) {
 	if len(entity.Content) > 0 {
 		contentStr := string(entity.Content)
 		r.contentIndex[contentStr] = append(r.contentIndex[contentStr], entity.ID)
+		logger.Debug("Indexed %d bytes of content for entity %s", len(contentStr), entity.ID)
+	}
+	
+	// Dump tag index for debugging
+	logger.Debug("Entity %s now indexed with following tags:", entity.ID)
+	for indexedTag, ids := range r.tagIndex {
+		for _, id := range ids {
+			if id == entity.ID {
+				logger.Debug("  - %s", indexedTag)
+				break
+			}
+		}
 	}
 }
 
@@ -582,19 +603,30 @@ func (r *EntityRepository) ListByTag(tag string) ([]*models.Entity, error) {
 	// Check cache first
 	cacheKey := fmt.Sprintf("tag:%s", tag)
 	if cached, found := r.cache.Get(cacheKey); found {
+		logger.Debug("ListByTag cache hit for tag: %s", tag)
 		return cached.([]*models.Entity), nil
 	}
 	
+	logger.Debug("ListByTag cache miss for tag: %s", tag)
+	
 	r.mu.RLock()
+	logger.Debug("ListByTag acquired read lock for tag index")
 	
 	// For non-temporal searches, we need to find tags that match the requested tag
 	// regardless of the timestamp prefix
 	matchingEntityIDs := make([]string, 0)
 	uniqueEntityIDs := make(map[string]bool)
 	
+	// Dump all tags in the index (for debugging)
+	logger.Debug("===== Tag Index Contents =====")
+	for indexedTag, ids := range r.tagIndex {
+		logger.Debug("Tag: '%s' => %d entities", indexedTag, len(ids))
+	}
+	logger.Debug("=============================")
+	
 	// First check for exact tag match
 	if entityIDs, exists := r.tagIndex[tag]; exists {
-		logger.Debug("Found exact tag match for '%s'", tag)
+		logger.Debug("Found exact tag match for '%s' with %d entities", tag, len(entityIDs))
 		for _, entityID := range entityIDs {
 			if !uniqueEntityIDs[entityID] {
 				uniqueEntityIDs[entityID] = true
@@ -602,9 +634,13 @@ func (r *EntityRepository) ListByTag(tag string) ([]*models.Entity, error) {
 				logger.Debug("Added entity %s from exact match", entityID)
 			}
 		}
+	} else {
+		logger.Debug("No exact match found for tag '%s' in index", tag)
 	}
 	
 	// Then check for temporal tags with timestamp prefix
+	logger.Debug("Checking for temporal tag matches for '%s'", tag)
+	matchCount := 0
 	for indexedTag, entityIDs := range r.tagIndex {
 		// Skip if this is exactly the tag we already processed
 		if indexedTag == tag {
@@ -615,10 +651,13 @@ func (r *EntityRepository) ListByTag(tag string) ([]*models.Entity, error) {
 		tagParts := strings.SplitN(indexedTag, "|", 2)
 		if len(tagParts) == 2 {
 			actualTag := tagParts[1]
+			logger.Debug("Checking temporal tag: '%s' (actual part: '%s')", indexedTag, actualTag)
 			
 			// Check if the actual tag matches our search tag
 			if actualTag == tag {
-				logger.Debug("Found temporal tag match '%s' in '%s'", tag, indexedTag)
+				logger.Debug("Found temporal tag match '%s' in '%s' with %d entities", 
+					tag, indexedTag, len(entityIDs))
+				matchCount++
 				for _, entityID := range entityIDs {
 					if !uniqueEntityIDs[entityID] {
 						uniqueEntityIDs[entityID] = true
@@ -629,12 +668,16 @@ func (r *EntityRepository) ListByTag(tag string) ([]*models.Entity, error) {
 			}
 		}
 	}
+	logger.Debug("Found %d temporal tag matches for '%s'", matchCount, tag)
 	
 	r.mu.RUnlock()
+	logger.Debug("ListByTag released read lock")
 	
-	logger.Debug("ListByTag for '%s' found %d matching entities", tag, len(matchingEntityIDs))
+	logger.Debug("ListByTag for '%s' found %d matching entities: %v", 
+		tag, len(matchingEntityIDs), matchingEntityIDs)
 	
 	if len(matchingEntityIDs) == 0 {
+		logger.Debug("ListByTag returning empty result for tag: %s", tag)
 		return []*models.Entity{}, nil
 	}
 	
@@ -647,22 +690,30 @@ func (r *EntityRepository) ListByTag(tag string) ([]*models.Entity, error) {
 	// Get a reader from the pool
 	readerInterface := r.readerPool.Get()
 	if readerInterface == nil {
+		logger.Debug("Creating new reader for entities")
 		reader, err := NewReader(r.getDataFile())
 		if err != nil {
+			logger.Error("Failed to create reader: %v", err)
 			return nil, err
 		}
 		defer reader.Close()
 		return r.fetchEntitiesWithReader(reader, matchingEntityIDs)
 	}
 	
+	logger.Debug("Using reader from pool")
 	reader := readerInterface.(*Reader)
 	defer r.readerPool.Put(reader)
 	
 	entities, err := r.fetchEntitiesWithReader(reader, matchingEntityIDs)
-	if err == nil {
-		// Cache the result
-		r.cache.Set(cacheKey, entities)
+	if err != nil {
+		logger.Error("Failed to fetch entities: %v", err)
+		return nil, err
 	}
+	
+	logger.Debug("Successfully fetched %d entities", len(entities))
+	
+	// Cache the result
+	r.cache.Set(cacheKey, entities)
 	return entities, err
 }
 
