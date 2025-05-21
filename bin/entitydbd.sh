@@ -211,6 +211,7 @@ start_server() {
     [ -n "$ENTITYDB_PORT" ] && CMD_ARGS="$CMD_ARGS -port $ENTITYDB_PORT"
     [ -n "$ENTITYDB_LOG_LEVEL" ] && CMD_ARGS="$CMD_ARGS -log-level $ENTITYDB_LOG_LEVEL"
     [ -n "$ENTITYDB_TOKEN_SECRET" ] && CMD_ARGS="$CMD_ARGS -token-secret $ENTITYDB_TOKEN_SECRET"
+    [ -n "$ENTITYDB_HIGH_PERFORMANCE" ] && [ "$ENTITYDB_HIGH_PERFORMANCE" = "true" ] && CMD_ARGS="$CMD_ARGS --high-performance"
     
     # Start the server
     "$ACTIVE_SERVER" $CMD_ARGS > "$LOG_FILE" 2>&1 &
