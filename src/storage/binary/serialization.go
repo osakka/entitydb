@@ -66,8 +66,8 @@ func SerializeEntity(entity *models.Entity) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// DeserializeEntity deserializes an entity from binary format
-func DeserializeEntity(data []byte, id string) (*models.Entity, error) {
+// DeserializeEntityLegacy deserializes an entity from binary format (legacy version)
+func DeserializeEntityLegacy(data []byte, id string) (*models.Entity, error) {
 	buf := bytes.NewReader(data)
 	entity := &models.Entity{ID: id}
 	
