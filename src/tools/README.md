@@ -7,6 +7,9 @@ This directory contains all command-line tools for the EntityDB platform. Tools 
 - `users/`: User management tools (add/create users)
 - `entities/`: Entity management tools (add/list entities, relationships)
 - `maintenance/`: System maintenance tools (fix indexes, diagnostics)
+- `diagnostics/`: Performance analysis and debugging tools
+- `content/`: Content handling and chunking tools
+- `temporal/`: Temporal data management tools
 
 ## Building Tools
 
@@ -29,6 +32,51 @@ For example:
 ## Installation
 
 Compiled tools are placed in the `/opt/entitydb/bin` directory during the build process.
+
+## Tool Categories
+
+### User Management
+
+Tools in the `users/` directory handle user administration:
+- Creating users
+- Setting passwords
+- Managing roles
+
+### Entity Management
+
+Tools in the `entities/` directory handle entity operations:
+- Creating entities
+- Listing entities
+- Managing relationships
+- Dumping entity content
+
+### Maintenance
+
+Tools in the `maintenance/` directory handle system maintenance:
+- Checking for corrupted entities
+- Fixing indexes
+- Database integrity checks
+
+### Diagnostics
+
+Tools in the `diagnostics/` directory provide debugging capabilities:
+- Binary file analysis
+- Performance metrics
+- Corruption detection
+
+### Content Management
+
+Tools in the `content/` directory handle content operations:
+- Large file chunking
+- Content validation
+- Streaming data handling
+
+### Temporal Tools
+
+Tools in the `temporal/` directory handle temporal data:
+- Fixing temporal tags
+- Timeline management
+- Historical data operations
 
 ## Usage
 
