@@ -80,8 +80,8 @@ func (r *JournalReader) GetEntity(id string) (*models.Entity, error) {
 		return nil, err
 	}
 	
-	// Deserialize entity
-	return DeserializeEntity(data, id)
+	// Deserialize entity using legacy method since this is journal format
+	return DeserializeEntityLegacy(data, id)
 }
 
 // GetAllEntities retrieves all entities
