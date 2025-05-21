@@ -3,7 +3,6 @@ package api
 import (
 	"entitydb/logger"
 	"net/http"
-	"strings"
 )
 
 // GetEntityImproved is an enhanced version of GetEntity that properly handles chunked content
@@ -31,55 +30,18 @@ func (h *EntityHandler) GetEntityImproved(w http.ResponseWriter, r *http.Request
 	
 	// Check if this is a chunked entity and if we need to reassemble chunks
 	if includeContent && entity.IsChunked() {
-		// Check if the request prefers streaming (better for large files)
-		if r.URL.Query().Get("stream") == "true" {
-			// Stream content directly to the client
-			logger.Info("Streaming chunked content for entity %s", id)
-			h.StreamChunkedEntityContent(w, r)
-			return
-		}
+		logger.Info("Entity %s is chunked, using improved chunk handler", id)
 		
-		// New approach: direct chunk retrieval and binary response
-		if r.URL.Query().Get("raw") == "true" {
-			logger.Info("Raw chunk retrieval for entity %s", id)
-			h.HandleChunkedEntityRetrieval(w, r)
-			return
-		}
-		
-		// Otherwise, use the standard reassembly approach with enhanced error handling
-		reassembledContent, err := h.HandleChunkedContent(id, includeContent)
-		if err == nil && len(reassembledContent) > 0 {
-			// Direct binary content assignment to prevent JSON serialization issues
-			entity.Content = reassembledContent
-			logger.Info("Using reassembled content for entity %s: %d bytes", entity.ID, len(entity.Content))
-			
-			// Ensure that the content type tag is set correctly for binary data
-			hasContentTypeTag := false
-			for _, tag := range entity.Tags {
-				if strings.HasSuffix(tag, "content:type:application/octet-stream") {
-					hasContentTypeTag = true
-					break
-				}
-			}
-			
-			// Add content type tag if not present
-			if !hasContentTypeTag {
-				entity.AddTag("content:type:application/octet-stream")
-			}
-		} else {
-			logger.Warn("Failed to reassemble content for entity %s: err=%v, contentLen=%d", 
-				id, err, len(reassembledContent))
-			
-			// Set an empty content field instead of nil to prevent JSON encoding issues
-			entity.Content = []byte{}
-		}
+		// Use our improved chunk handler for all chunked entity retrievals
+		h.ImprovedChunkHandler(w, r)
+		return
 	}
 
-	// Return entity
+	// For non-chunked entities, just return the entity as is
 	response := h.stripTimestampsFromEntity(entity, includeTimestamps)
 	
 	// Log content details for debugging
-	logger.Debug("Retrieved entity %s with %d bytes of content and %d tags", 
+	logger.Debug("Retrieved non-chunked entity %s with %d bytes of content and %d tags", 
 		entity.ID, len(entity.Content), len(entity.Tags))
 	
 	// No need to manually base64 encode - JSON marshaling handles []byte automatically

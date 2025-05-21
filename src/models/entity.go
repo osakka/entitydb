@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -226,9 +227,18 @@ func CreateChunkEntity(parentID string, chunkIndex int, data []byte) *Entity {
 
 // IsChunked returns true if this entity has chunked content
 func (e *Entity) IsChunked() bool {
-	for _, tag := range e.Tags {
-		if tag == "content:chunks:" || startsWith(tag, "content:chunks:") {
-			return true
+	// First, strip timestamps to get clean tags
+	tags := e.GetTagsWithoutTimestamp()
+	for _, tag := range tags {
+		if startsWith(tag, "content:chunks:") {
+			// Additional validation - check if the chunk count is a valid number > 0
+			parts := strings.SplitN(tag, ":", 3)
+			if len(parts) == 3 {
+				chunksStr := parts[2]
+				if chunks, err := strconv.Atoi(chunksStr); err == nil && chunks > 0 {
+					return true
+				}
+			}
 		}
 	}
 	return false
