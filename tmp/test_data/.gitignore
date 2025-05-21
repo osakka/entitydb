@@ -1,0 +1,4 @@
+# Ignore all test data files
+*
+# Except this file
+!.gitignore

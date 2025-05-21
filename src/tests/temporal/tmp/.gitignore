@@ -1,0 +1,4 @@
+# Ignore all temporary test data
+*
+# Except this file
+!.gitignore
