@@ -48,19 +48,19 @@ cd ..
 ./bin/entitydbd.sh start
 
 # Access web UI
-# Default: https://localhost:8085 (credentials: admin/admin)
+# Default: https://localhost:8443 (credentials: admin/admin)
 ```
 
 ## API Examples
 
 ```bash
 # Login and get token
-TOKEN=$(curl -k -s -X POST https://localhost:8085/api/v1/auth/login \
+TOKEN=$(curl -k -s -X POST https://localhost:8443/api/v1/auth/login \
   -H "Content-Type: application/json" \
   -d '{"username":"admin","password":"admin"}' | jq -r '.token')
 
 # Create entity
-curl -k -X POST https://localhost:8085/api/v1/entities/create \
+curl -k -X POST https://localhost:8443/api/v1/entities/create \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -69,11 +69,11 @@ curl -k -X POST https://localhost:8085/api/v1/entities/create \
   }'
 
 # Query entities by tag
-curl -k -X GET "https://localhost:8085/api/v1/entities/list?tag=type:document" \
+curl -k -X GET "https://localhost:8443/api/v1/entities/list?tag=type:document" \
   -H "Authorization: Bearer $TOKEN"
 
 # Time travel query (as-of)
-curl -k -X GET https://localhost:8085/api/v1/entities/as-of \
+curl -k -X GET https://localhost:8443/api/v1/entities/as-of \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -181,6 +181,7 @@ Detailed documentation is available in the [docs](./docs) directory:
 
 ## Version History
 
+- **v2.14.0** - High-performance mode and enhanced autochunking capabilities
 - **v2.13.1** - Content format standardization and API testing framework
 - **v2.13.0** - Configuration system overhaul and content encoding fixes
 - **v2.12.0** - Unified Entity model with autochunking
@@ -200,7 +201,10 @@ Detailed documentation is available in the [docs](./docs) directory:
 │   ├── tools/   # Command-line tools
 │   │   ├── users/     # User management tools
 │   │   ├── entities/  # Entity management tools
-│   │   └── maintenance/ # System maintenance tools
+│   │   ├── maintenance/ # System maintenance tools
+│   │   ├── diagnostics/ # Debugging and performance tools
+│   │   ├── content/     # Content handling tools
+│   │   └── temporal/    # Temporal data management tools
 │   └── tests/   # Test framework and test cases
 ├── trash/       # Retired code (keep for reference)
 └── var/         # Variable data (database, logs)
