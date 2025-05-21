@@ -200,6 +200,8 @@ func (r *TemporalRepository) GetByID(id string) (*models.Entity, error) {
 
 // GetEntityAsOf implements temporal query interface
 func (r *TemporalRepository) GetEntityAsOf(entityID string, asOf time.Time) (*models.Entity, error) {
+	logger.Debug("GetEntityAsOf: Finding entity %s as of %v", entityID, asOf)
+	
 	// Track stats
 	queryStart := time.Now()
 	atomic.AddUint64(&r.temporalStats.asOfQueries, 1)
@@ -216,36 +218,53 @@ func (r *TemporalRepository) GetEntityAsOf(entityID string, asOf time.Time) (*mo
 	if cached, ok := r.temporalCache.asOfCache[cacheKey]; ok {
 		r.temporalCache.mu.RUnlock()
 		atomic.AddUint64(&r.temporalStats.cacheHits, 1)
+		logger.Debug("GetEntityAsOf: Cache hit for %s at %v", entityID, asOf)
 		return cached, nil
 	}
 	r.temporalCache.mu.RUnlock()
 	
 	atomic.AddUint64(&r.temporalStats.cacheMisses, 1)
+	logger.Debug("GetEntityAsOf: Cache miss for %s at %v", entityID, asOf)
+	
+	// First get current entity to get the content (which isn't temporal)
+	currentEntity, err := r.GetByID(entityID)
+	if err != nil {
+		logger.Error("GetEntityAsOf: Failed to get current entity: %v", err)
+		return nil, fmt.Errorf("entity not found: %s", entityID)
+	}
 	
 	// Get entity timeline
 	timeline, ok := r.entityTimelines[entityID]
 	if !ok {
-		return nil, fmt.Errorf("entity not found: %s", entityID)
+		logger.Error("GetEntityAsOf: No timeline found for entity %s", entityID)
+		return nil, fmt.Errorf("entity timeline not found: %s", entityID)
 	}
 	
 	timeline.mu.RLock()
 	defer timeline.mu.RUnlock()
+	
+	logger.Debug("GetEntityAsOf: Found timeline with %d timestamps for entity %s", 
+		len(timeline.timestamps), entityID)
 	
 	// Binary search for the right timestamp
 	idx := sort.Search(len(timeline.timestamps), func(i int) bool {
 		return timeline.timestamps[i] > asOfNanos
 	})
 	
-	if idx == 0 {
-		// No data before this time
+	if idx == 0 && len(timeline.timestamps) > 0 {
+		// No data before this time, but entity exists
+		logger.Debug("GetEntityAsOf: No data for entity %s before %v, earliest timestamp is %v", 
+			entityID, asOf, time.Unix(0, timeline.timestamps[0]))
 		return nil, fmt.Errorf("entity did not exist at %v", asOf)
 	}
 	
 	// Reconstruct entity at this time
 	result := &models.Entity{
-		ID:   entityID,
-		Tags: make([]string, 0),
-		Content: []byte{},
+		ID:        entityID,
+		Tags:      make([]string, 0),
+		Content:   currentEntity.Content, // Content isn't temporal, use current content
+		CreatedAt: currentEntity.CreatedAt,
+		UpdatedAt: currentEntity.UpdatedAt,
 	}
 	
 	// Collect all tags up to asOf time
@@ -255,13 +274,18 @@ func (r *TemporalRepository) GetEntityAsOf(entityID string, asOf time.Time) (*mo
 			// Format with timestamp for full temporal tag
 			temporalTag := FormatTagWithTimestamp(tag, timestamp)
 			result.Tags = append(result.Tags, temporalTag)
+			logger.Debug("GetEntityAsOf: Added tag %s from timestamp %v", 
+				tag, time.Unix(0, timestamp))
 		}
 	}
+	
+	logger.Debug("GetEntityAsOf: Constructed historical entity with %d tags", len(result.Tags))
 	
 	// Cache result
 	r.temporalCache.mu.Lock()
 	if len(r.temporalCache.asOfCache) < r.temporalCache.maxSize {
 		r.temporalCache.asOfCache[cacheKey] = result
+		logger.Debug("GetEntityAsOf: Cached result for future use")
 	}
 	r.temporalCache.mu.Unlock()
 	
@@ -325,13 +349,27 @@ func (r *TemporalRepository) FindEntitiesInRange(start, end time.Time) ([]*model
 
 // GetEntityHistory implements the interface for getting entity history
 func (r *TemporalRepository) GetEntityHistory(entityID string, limit int) ([]*models.EntityChange, error) {
+	logger.Debug("GetEntityHistory: Getting history for entity %s with limit %d", entityID, limit)
+	
+	// First verify entity exists
+	entity, err := r.GetByID(entityID)
+	if err != nil {
+		logger.Error("GetEntityHistory: Entity %s not found: %v", entityID, err)
+		return nil, fmt.Errorf("entity not found: %s", entityID)
+	}
+	
+	logger.Debug("GetEntityHistory: Found entity %s with %d tags", entityID, len(entity.Tags))
+	
 	timeline, ok := r.entityTimelines[entityID]
 	if !ok {
-		return nil, fmt.Errorf("entity not found: %s", entityID)
+		logger.Error("GetEntityHistory: No timeline found for entity %s", entityID)
+		return nil, fmt.Errorf("entity timeline not found: %s", entityID)
 	}
 	
 	timeline.mu.RLock()
 	defer timeline.mu.RUnlock()
+	
+	logger.Debug("GetEntityHistory: Found timeline with %d timestamps", len(timeline.timestamps))
 	
 	changes := make([]*models.EntityChange, 0)
 	
@@ -341,17 +379,23 @@ func (r *TemporalRepository) GetEntityHistory(entityID string, limit int) ([]*mo
 		timestamp := timeline.timestamps[i]
 		tags := timeline.tags[timestamp]
 		
+		changeTime := time.Unix(0, timestamp)
+		logger.Debug("GetEntityHistory: Processing changes at %v", changeTime)
+		
 		for _, tag := range tags {
 			change := &models.EntityChange{
 				Type:      "tag_added",
-				Timestamp: time.Unix(0, timestamp),
+				Timestamp: changeTime,
 				NewValue:  tag,
+				EntityID:  entityID, // Include entity ID for reference
 			}
 			changes = append(changes, change)
+			logger.Debug("GetEntityHistory: Added change: tag '%s' at %v", tag, changeTime)
 		}
 		count++
 	}
 	
+	logger.Debug("GetEntityHistory: Returning %d changes for entity %s", len(changes), entityID)
 	return changes, nil
 }
 
@@ -404,26 +448,135 @@ func (r *TemporalRepository) OptimizeForTimeRange(start, end time.Time) {
 
 // GetRecentChanges returns recent changes to entities
 func (r *TemporalRepository) GetRecentChanges(limit int) ([]*models.EntityChange, error) {
-	// Delegate to wrapped repository
-	return r.HighPerformanceRepository.GetRecentChanges(limit)
+	logger.Debug("GetRecentChanges: Finding recent changes with limit %d", limit)
+	
+	// Collect all recent timestamps across all timelines
+	type TimestampedChange struct {
+		EntityID   string
+		Timestamp  int64
+		Tags       []string
+	}
+	
+	allChanges := make([]TimestampedChange, 0)
+	
+	// Scan all timelines
+	for entityID, timeline := range r.entityTimelines {
+		timeline.mu.RLock()
+		
+		// Only look at the most recent few timestamps for efficiency
+		count := 10 // Arbitrary number of recent timestamps to check per entity
+		if count > len(timeline.timestamps) {
+			count = len(timeline.timestamps)
+		}
+		
+		for i := len(timeline.timestamps) - 1; i >= len(timeline.timestamps) - count && i >= 0; i-- {
+			timestamp := timeline.timestamps[i]
+			tags := timeline.tags[timestamp]
+			
+			allChanges = append(allChanges, TimestampedChange{
+				EntityID:   entityID,
+				Timestamp:  timestamp,
+				Tags:       tags,
+			})
+		}
+		
+		timeline.mu.RUnlock()
+	}
+	
+	// Sort changes by timestamp (newest first)
+	sort.Slice(allChanges, func(i, j int) bool {
+		return allChanges[i].Timestamp > allChanges[j].Timestamp
+	})
+	
+	// Convert to EntityChange objects
+	changes := make([]*models.EntityChange, 0)
+	for i := 0; i < len(allChanges) && (limit <= 0 || i < limit); i++ {
+		change := allChanges[i]
+		
+		for _, tag := range change.Tags {
+			changes = append(changes, &models.EntityChange{
+				Type:      "tag_added",
+				Timestamp: time.Unix(0, change.Timestamp),
+				NewValue:  tag,
+				EntityID:  change.EntityID,
+			})
+			
+			if limit > 0 && len(changes) >= limit {
+				break
+			}
+		}
+	}
+	
+	logger.Debug("GetRecentChanges: Found %d recent changes", len(changes))
+	return changes, nil
 }
 
 // GetEntityDiff returns changes between two time points
 func (r *TemporalRepository) GetEntityDiff(entityID string, t1, t2 time.Time) (*models.Entity, *models.Entity, error) {
+	logger.Debug("GetEntityDiff: Comparing entity %s between %v and %v", entityID, t1, t2)
+	
 	// Get entity at both times
 	entity1, err1 := r.GetEntityAsOf(entityID, t1)
 	entity2, err2 := r.GetEntityAsOf(entityID, t2)
 	
+	// Log the results of the lookups
+	if err1 != nil {
+		logger.Debug("GetEntityDiff: Entity %s not found at %v: %v", entityID, t1, err1)
+	} else {
+		logger.Debug("GetEntityDiff: Entity %s at %v has %d tags", 
+			entityID, t1, len(entity1.Tags))
+	}
+	
+	if err2 != nil {
+		logger.Debug("GetEntityDiff: Entity %s not found at %v: %v", entityID, t2, err2)
+	} else {
+		logger.Debug("GetEntityDiff: Entity %s at %v has %d tags", 
+			entityID, t2, len(entity2.Tags))
+	}
+	
 	// Handle cases where entity doesn't exist at one time
 	if err1 != nil && err2 == nil {
 		// Entity created between t1 and t2
+		logger.Debug("GetEntityDiff: Entity %s was created between %v and %v", 
+			entityID, t1, t2)
 		return nil, entity2, nil
 	} else if err1 == nil && err2 != nil {
 		// Entity deleted between t1 and t2
+		logger.Debug("GetEntityDiff: Entity %s was deleted between %v and %v", 
+			entityID, t1, t2)
 		return entity1, nil, nil
 	} else if err1 != nil && err2 != nil {
+		logger.Error("GetEntityDiff: Entity %s not found at either time point", entityID)
 		return nil, nil, fmt.Errorf("entity not found at either time")
 	}
+	
+	// Compute tag differences for logging
+	tagsAdded := 0
+	tagsRemoved := 0
+	
+	// Create maps of tags without timestamps
+	tagsAt1 := make(map[string]bool)
+	tagsAt2 := make(map[string]bool)
+	
+	for _, tag := range entity1.GetTagsWithoutTimestamp() {
+		tagsAt1[tag] = true
+	}
+	
+	for _, tag := range entity2.GetTagsWithoutTimestamp() {
+		tagsAt2[tag] = true
+		if !tagsAt1[tag] {
+			tagsAdded++
+		}
+	}
+	
+	for tag := range tagsAt1 {
+		if !tagsAt2[tag] {
+			tagsRemoved++
+		}
+	}
+	
+	logger.Debug("GetEntityDiff: Found %d tags added and %d tags removed", 
+		tagsAdded, tagsRemoved)
 	
 	return entity1, entity2, nil
 }

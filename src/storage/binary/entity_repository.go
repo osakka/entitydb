@@ -181,9 +181,10 @@ func (r *EntityRepository) buildIndexes() error {
 func (r *EntityRepository) updateIndexes(entity *models.Entity) {
 	// Update tag index
 	for _, tag := range entity.Tags {
+		// Always index the full tag (with timestamp)
 		r.tagIndex[tag] = append(r.tagIndex[tag], entity.ID)
 		
-		// Add to temporal index if it's a temporal tag
+		// Also index the non-timestamped version for easier searching
 		if strings.Contains(tag, "|") {
 			parts := strings.SplitN(tag, "|", 2)
 			if len(parts) == 2 {
@@ -191,6 +192,10 @@ func (r *EntityRepository) updateIndexes(entity *models.Entity) {
 				if timestamp, err := time.Parse(time.RFC3339Nano, parts[0]); err == nil {
 					r.temporalIndex.AddEntry(entity.ID, tag, timestamp)
 				}
+				
+				// Index the actual tag part too
+				actualTag := parts[1]
+				r.tagIndex[actualTag] = append(r.tagIndex[actualTag], entity.ID)
 			}
 		}
 		
@@ -572,6 +577,8 @@ func (r *EntityRepository) List() ([]*models.Entity, error) {
 
 // ListByTag lists entities with a specific tag
 func (r *EntityRepository) ListByTag(tag string) ([]*models.Entity, error) {
+	logger.Debug("ListByTag called with tag: %s", tag)
+	
 	// Check cache first
 	cacheKey := fmt.Sprintf("tag:%s", tag)
 	if cached, found := r.cache.Get(cacheKey); found {
@@ -580,25 +587,52 @@ func (r *EntityRepository) ListByTag(tag string) ([]*models.Entity, error) {
 	
 	r.mu.RLock()
 	
-	// For non-temporal searches, we need to find tags that end with the requested tag
-	// because all tags are now stored as TIMESTAMP|tag
+	// For non-temporal searches, we need to find tags that match the requested tag
+	// regardless of the timestamp prefix
 	matchingEntityIDs := make([]string, 0)
 	uniqueEntityIDs := make(map[string]bool)
 	
+	// First check for exact tag match
+	if entityIDs, exists := r.tagIndex[tag]; exists {
+		logger.Debug("Found exact tag match for '%s'", tag)
+		for _, entityID := range entityIDs {
+			if !uniqueEntityIDs[entityID] {
+				uniqueEntityIDs[entityID] = true
+				matchingEntityIDs = append(matchingEntityIDs, entityID)
+				logger.Debug("Added entity %s from exact match", entityID)
+			}
+		}
+	}
+	
+	// Then check for temporal tags with timestamp prefix
 	for indexedTag, entityIDs := range r.tagIndex {
-		// Check if this indexed tag ends with our search tag
-		// e.g., "2025-05-18T22:38:48.807532034+01:00|type:user" ends with "type:user"
-		if strings.HasSuffix(indexedTag, "|"+tag) {
-			for _, entityID := range entityIDs {
-				if !uniqueEntityIDs[entityID] {
-					uniqueEntityIDs[entityID] = true
-					matchingEntityIDs = append(matchingEntityIDs, entityID)
+		// Skip if this is exactly the tag we already processed
+		if indexedTag == tag {
+			continue
+		}
+		
+		// Extract the actual tag part (after the timestamp)
+		tagParts := strings.SplitN(indexedTag, "|", 2)
+		if len(tagParts) == 2 {
+			actualTag := tagParts[1]
+			
+			// Check if the actual tag matches our search tag
+			if actualTag == tag {
+				logger.Debug("Found temporal tag match '%s' in '%s'", tag, indexedTag)
+				for _, entityID := range entityIDs {
+					if !uniqueEntityIDs[entityID] {
+						uniqueEntityIDs[entityID] = true
+						matchingEntityIDs = append(matchingEntityIDs, entityID)
+						logger.Debug("Added entity %s from temporal match", entityID)
+					}
 				}
 			}
 		}
 	}
 	
 	r.mu.RUnlock()
+	
+	logger.Debug("ListByTag for '%s' found %d matching entities", tag, len(matchingEntityIDs))
 	
 	if len(matchingEntityIDs) == 0 {
 		return []*models.Entity{}, nil

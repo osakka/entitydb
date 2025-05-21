@@ -83,6 +83,7 @@ type EntityChange struct {
 	Timestamp time.Time `json:"timestamp"`
 	OldValue  string    `json:"old_value,omitempty"`
 	NewValue  string    `json:"new_value,omitempty"`
+	EntityID  string    `json:"entity_id,omitempty"`  // Reference to the entity this change belongs to
 }
 
 // ChunkConfig configures autochunking behavior
