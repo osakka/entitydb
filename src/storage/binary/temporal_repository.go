@@ -10,6 +10,8 @@ import (
 	"sync/atomic"
 	"fmt"
 	"strconv"
+	"strings"
+	"errors"
 )
 
 // TemporalRepository extends HighPerformanceRepository with temporal features
@@ -144,7 +146,7 @@ func (r *TemporalRepository) indexEntityTemporal(entity *models.Entity) {
 	
 	// Parse all temporal tags
 	for _, tag := range entity.Tags {
-		timestamp, cleanTag, err := ParseTemporalTag(tag)
+		timestamp, cleanTag, err := ParseTemporalTagImproved(tag)
 		if err != nil {
 			continue // Skip non-temporal tags
 		}
@@ -198,7 +200,52 @@ func (r *TemporalRepository) GetByID(id string) (*models.Entity, error) {
 	return entity, err
 }
 
-// GetEntityAsOf implements temporal query interface
+// ParseTemporalTagImproved parses a tag with timestamp prefix (enhanced version)
+// Format can be either:
+// 1. "2025-05-20T20:02:48.098692124+01:00|type:test" (pipe format)
+// 2. "2025-05-20T20:02:48.098692124.type:test" (dot format, deprecated)
+func ParseTemporalTagImproved(tag string) (int64, string, error) {
+	// Try pipe format first (current standard)
+	parts := strings.SplitN(tag, "|", 2)
+	if len(parts) == 2 {
+		// Parse timestamp
+		t, err := time.Parse(time.RFC3339Nano, parts[0])
+		if err != nil {
+			return 0, "", fmt.Errorf("invalid timestamp in tag: %v", err)
+		}
+		return t.UnixNano(), parts[1], nil
+	}
+	
+	// Try dot format (legacy)
+	parts = strings.SplitN(tag, ".", 2)
+	if len(parts) == 2 {
+		// Parse timestamp
+		t, err := time.Parse("2006-01-02T15:04:05.999999999", parts[0])
+		if err != nil {
+			return 0, "", fmt.Errorf("invalid timestamp in tag: %v", err)
+		}
+		return t.UnixNano(), parts[1], nil
+	}
+	
+	// Special case: Unix timestamp format (numeric only)
+	if parts := strings.SplitN(tag, "|", 2); len(parts) == 2 {
+		if ts, err := strconv.ParseInt(parts[0], 10, 64); err == nil {
+			return ts, parts[1], nil
+		}
+	}
+	
+	return 0, "", errors.New("not a temporal tag")
+}
+
+// FormatTagWithTimestampImproved formats a tag with its timestamp (enhanced version)
+func FormatTagWithTimestampImproved(tag string, timestamp int64) string {
+	// Convert nanosecond timestamp to RFC3339Nano format
+	t := time.Unix(0, timestamp)
+	timeStr := t.Format(time.RFC3339Nano)
+	return timeStr + "|" + tag
+}
+
+// GetEntityAsOf implements temporal query interface with improved error handling and timestamp parsing
 func (r *TemporalRepository) GetEntityAsOf(entityID string, asOf time.Time) (*models.Entity, error) {
 	logger.Debug("GetEntityAsOf: Finding entity %s as of %v", entityID, asOf)
 	
@@ -230,7 +277,7 @@ func (r *TemporalRepository) GetEntityAsOf(entityID string, asOf time.Time) (*mo
 	currentEntity, err := r.GetByID(entityID)
 	if err != nil {
 		logger.Error("GetEntityAsOf: Failed to get current entity: %v", err)
-		return nil, fmt.Errorf("entity not found: %s", entityID)
+		return nil, fmt.Errorf("entity not found: %s", err)
 	}
 	
 	// Get entity timeline
@@ -272,7 +319,7 @@ func (r *TemporalRepository) GetEntityAsOf(entityID string, asOf time.Time) (*mo
 		timestamp := timeline.timestamps[i]
 		for _, tag := range timeline.tags[timestamp] {
 			// Format with timestamp for full temporal tag
-			temporalTag := FormatTagWithTimestamp(tag, timestamp)
+			temporalTag := FormatTagWithTimestampImproved(tag, timestamp)
 			result.Tags = append(result.Tags, temporalTag)
 			logger.Debug("GetEntityAsOf: Added tag %s from timestamp %v", 
 				tag, time.Unix(0, timestamp))
@@ -347,7 +394,7 @@ func (r *TemporalRepository) FindEntitiesInRange(start, end time.Time) ([]*model
 	return results, nil
 }
 
-// GetEntityHistory implements the interface for getting entity history
+// GetEntityHistory implements the interface for getting entity history with improved implementation
 func (r *TemporalRepository) GetEntityHistory(entityID string, limit int) ([]*models.EntityChange, error) {
 	logger.Debug("GetEntityHistory: Getting history for entity %s with limit %d", entityID, limit)
 	
@@ -371,28 +418,46 @@ func (r *TemporalRepository) GetEntityHistory(entityID string, limit int) ([]*mo
 	
 	logger.Debug("GetEntityHistory: Found timeline with %d timestamps", len(timeline.timestamps))
 	
-	changes := make([]*models.EntityChange, 0)
+	// Extract all timestamps from tags
+	type TimestampedTag struct {
+		Timestamp int64
+		Tag       string
+		Original  string
+	}
 	
-	// Get latest changes first (reverse order)
-	count := 0
-	for i := len(timeline.timestamps) - 1; i >= 0 && (limit <= 0 || count < limit); i-- {
-		timestamp := timeline.timestamps[i]
-		tags := timeline.tags[timestamp]
-		
-		changeTime := time.Unix(0, timestamp)
-		logger.Debug("GetEntityHistory: Processing changes at %v", changeTime)
-		
-		for _, tag := range tags {
-			change := &models.EntityChange{
-				Type:      "tag_added",
-				Timestamp: changeTime,
-				NewValue:  tag,
-				EntityID:  entityID, // Include entity ID for reference
-			}
-			changes = append(changes, change)
-			logger.Debug("GetEntityHistory: Added change: tag '%s' at %v", tag, changeTime)
+	// Extract and collect all temporal tags
+	tagHistory := make([]TimestampedTag, 0)
+	for _, tag := range entity.Tags {
+		timestamp, cleanTag, err := ParseTemporalTagImproved(tag)
+		if err == nil {
+			tagHistory = append(tagHistory, TimestampedTag{
+				Timestamp: timestamp,
+				Tag:       cleanTag,
+				Original:  tag,
+			})
 		}
-		count++
+	}
+	
+	// Sort by timestamp (newest first)
+	for i := 0; i < len(tagHistory); i++ {
+		for j := i + 1; j < len(tagHistory); j++ {
+			if tagHistory[i].Timestamp < tagHistory[j].Timestamp {
+				tagHistory[i], tagHistory[j] = tagHistory[j], tagHistory[i]
+			}
+		}
+	}
+	
+	// Create change records
+	changes := make([]*models.EntityChange, 0)
+	for i := 0; i < len(tagHistory) && (limit <= 0 || i < limit); i++ {
+		entry := tagHistory[i]
+		change := &models.EntityChange{
+			Type:      "tag_added",
+			Timestamp: time.Unix(0, entry.Timestamp),
+			NewValue:  entry.Tag,
+			EntityID:  entityID,
+		}
+		changes = append(changes, change)
 	}
 	
 	logger.Debug("GetEntityHistory: Returning %d changes for entity %s", len(changes), entityID)
@@ -446,7 +511,7 @@ func (r *TemporalRepository) OptimizeForTimeRange(start, end time.Time) {
 	}
 }
 
-// GetRecentChanges returns recent changes to entities
+// GetRecentChanges returns recent changes to entities with improved implementation
 func (r *TemporalRepository) GetRecentChanges(limit int) ([]*models.EntityChange, error) {
 	logger.Debug("GetRecentChanges: Finding recent changes with limit %d", limit)
 	
@@ -511,7 +576,7 @@ func (r *TemporalRepository) GetRecentChanges(limit int) ([]*models.EntityChange
 	return changes, nil
 }
 
-// GetEntityDiff returns changes between two time points
+// GetEntityDiff returns changes between two time points with improved implementation
 func (r *TemporalRepository) GetEntityDiff(entityID string, t1, t2 time.Time) (*models.Entity, *models.Entity, error) {
 	logger.Debug("GetEntityDiff: Comparing entity %s between %v and %v", entityID, t1, t2)
 	

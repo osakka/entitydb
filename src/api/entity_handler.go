@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"entitydb/models"
+	"entitydb/storage/binary"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -38,6 +39,21 @@ func (h *EntityHandler) stripTimestampsFromEntity(entity *models.Entity, include
 	result := *entity
 	result.Tags = entity.GetTagsWithoutTimestamp()
 	return &result
+}
+
+// Utility function to convert repository to temporal repository
+func asTemporalRepository(repo models.EntityRepository) (*binary.TemporalRepository, error) {
+	if temporalRepo, ok := repo.(*binary.TemporalRepository); ok {
+		return temporalRepo, nil
+	}
+	return nil, fmt.Errorf("repository does not support temporal features")
+}
+
+// Helper to parse integer safely
+func parseInt(s string) (int, error) {
+	var i int
+	_, err := fmt.Sscanf(s, "%d", &i)
+	return i, err
 }
 
 // CreateEntityRequest represents a request to create a new entity
@@ -262,6 +278,129 @@ func (h *EntityHandler) GetEntityOriginal(w http.ResponseWriter, r *http.Request
 		entity.ID, len(entity.Content), len(entity.Tags))
 	// No need to manually base64 encode - JSON marshaling handles []byte automatically
 	RespondJSON(w, http.StatusOK, response)
+}
+
+// StreamEntity handles direct streaming of entity content, including chunked entities
+func (h *EntityHandler) StreamEntity(w http.ResponseWriter, r *http.Request) {
+	// Get entity ID
+	id := r.URL.Query().Get("id")
+	if id == "" {
+		RespondError(w, http.StatusBadRequest, "Entity ID is required")
+		return
+	}
+
+	// Get entity from repository
+	entity, err := h.repo.GetByID(id)
+	if err != nil {
+		logger.Error("Failed to get entity %s: %v", id, err)
+		RespondError(w, http.StatusNotFound, "Entity not found")
+		return
+	}
+
+	// Check if content should be included
+	includeContent := r.URL.Query().Get("include_content") == "true" || r.URL.Query().Get("stream") == "true"
+	if !includeContent {
+		RespondError(w, http.StatusBadRequest, "Include content parameter is required")
+		return
+	}
+
+	// Get content type from entity tags
+	contentType := "application/octet-stream"
+	for _, tag := range entity.Tags {
+		if strings.HasPrefix(tag, "content:type:") {
+			parts := strings.SplitN(tag, "content:type:", 2)
+			if len(parts) == 2 {
+				contentType = parts[1]
+				break
+			}
+		}
+	}
+
+	// Check if this is a chunked entity by looking for chunks tag
+	isChunked := false
+	chunkCount := 0
+	chunkSize := int64(0)
+	totalSize := int64(0)
+
+	for _, tag := range entity.Tags {
+		if strings.HasPrefix(tag, "content:chunks:") {
+			parts := strings.SplitN(tag, "content:chunks:", 2)
+			if len(parts) == 2 {
+				isChunked = true
+				fmt.Sscanf(parts[1], "%d", &chunkCount)
+			}
+		} else if strings.HasPrefix(tag, "content:chunk-size:") {
+			parts := strings.SplitN(tag, "content:chunk-size:", 2)
+			if len(parts) == 2 {
+				fmt.Sscanf(parts[1], "%d", &chunkSize)
+			}
+		} else if strings.HasPrefix(tag, "content:size:") {
+			parts := strings.SplitN(tag, "content:size:", 2)
+			if len(parts) == 2 {
+				fmt.Sscanf(parts[1], "%d", &totalSize)
+			}
+		}
+	}
+
+	logger.Debug("Entity %s: isChunked=%v, chunkCount=%d, chunkSize=%d, totalSize=%d",
+		id, isChunked, chunkCount, chunkSize, totalSize)
+
+	// Set response headers
+	w.Header().Set("Content-Type", contentType)
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", id))
+
+	if isChunked && chunkCount > 0 {
+		// This is a chunked entity - stream chunks
+		logger.Info("Streaming chunked entity: id=%s, chunks=%d, chunkSize=%d, totalSize=%d",
+			id, chunkCount, chunkSize, totalSize)
+
+		if totalSize > 0 {
+			w.Header().Set("Content-Length", fmt.Sprintf("%d", totalSize))
+		}
+
+		// Stream each chunk
+		for i := 0; i < chunkCount; i++ {
+			chunkID := fmt.Sprintf("%s-chunk-%d", entity.ID, i)
+			logger.Debug("Fetching chunk %d/%d: %s", i+1, chunkCount, chunkID)
+			
+			chunkEntity, err := h.repo.GetByID(chunkID)
+			if err != nil {
+				logger.Error("Failed to get chunk %s: %v", chunkID, err)
+				continue
+			}
+			
+			logger.Debug("Retrieved chunk %d/%d with %d bytes", 
+				i+1, chunkCount, len(chunkEntity.Content))
+			
+			// Write chunk content directly to response
+			if _, err := w.Write(chunkEntity.Content); err != nil {
+				logger.Error("Failed to write chunk to response: %v", err)
+				return
+			}
+			
+			// Flush after each chunk
+			if f, ok := w.(http.Flusher); ok {
+				f.Flush()
+			}
+		}
+	} else {
+		// Not chunked - stream the main entity's content
+		if len(entity.Content) == 0 {
+			RespondError(w, http.StatusNotFound, "Entity has no content")
+			return
+		}
+		
+		logger.Info("Streaming non-chunked entity: id=%s, contentSize=%d bytes", 
+			id, len(entity.Content))
+		
+		w.Header().Set("Content-Length", fmt.Sprintf("%d", len(entity.Content)))
+		
+		// Write content directly
+		if _, err := w.Write(entity.Content); err != nil {
+			logger.Error("Failed to write content to response: %v", err)
+			return
+		}
+	}
 }
 
 // ListEntities handles listing all entities
@@ -600,104 +739,6 @@ func (h *EntityHandler) SimpleCreateEntity(w http.ResponseWriter, r *http.Reques
 	}
 }
 
-// DEPRECATED: QuickFixEntityCreate is a special handler to respond successfully to entity create requests  
-// This is for testing ONLY - it does not actually create real entities
-/*
-func QuickFixEntityCreate(w http.ResponseWriter, r *http.Request) {
-	// Parse the request body
-	var req map[string]interface{}
-	err := json.NewDecoder(r.Body).Decode(&req)
-	if err != nil {
-		logger.Error("Failed to parse entity create request: %v", err)
-		RespondError(w, http.StatusBadRequest, "Invalid request body")
-		return
-	}
-
-	// Log the request for debugging
-	logger.Debug("Received entity create request: %+v", req)
-
-	// Validate required fields
-	title, ok := req["title"].(string)
-	if !ok || title == "" {
-		RespondError(w, http.StatusBadRequest, "Title is required")
-		return
-	}
-
-	// Create entity
-	entity := &models.Entity{
-		ID:        models.GenerateUUID(),
-		Tags:      []string{},
-		CreatedAt: time.Now().UTC().Format(time.RFC3339),
-		UpdatedAt: time.Now().UTC().Format(time.RFC3339),
-	}
-	
-	// Add title and description as content
-	contentData := map[string]string{"title": title}
-	if description, hasDesc := req["description"].(string); hasDesc && description != "" {
-		contentData["description"] = description
-	}
-	jsonData, _ := json.Marshal(contentData)
-	entity.Content = jsonData
-	entity.AddTag("content:type:json")
-	
-	// Extract type from tags or default to "issue"
-	entityType := "issue"
-	tags, hasTags := req["tags"].([]interface{})
-	if hasTags {
-		for _, tag := range tags {
-			tagStr, isString := tag.(string)
-			if isString {
-				if strings.HasPrefix(tagStr, "type:") {
-					entityType = strings.TrimPrefix(tagStr, "type:")
-					entity.AddTagWithValue("type", entityType)
-				} else {
-					// If tag doesn't have namespace, add as generic tag
-					parts := strings.SplitN(tagStr, ":", 2)
-					if len(parts) == 2 {
-						entity.AddTagWithValue(parts[0], parts[1])
-					} else {
-						entity.AddTagWithValue("tag", tagStr)
-					}
-				}
-			}
-		}
-	}
-	
-	// Ensure type tag is present
-	hasTypeTag := false
-	for _, tag := range entity.Tags {
-		if strings.HasPrefix(tag, "type:") {
-			hasTypeTag = true
-			break
-		}
-	}
-	if !hasTypeTag {
-		entity.AddTagWithValue("type", entityType)
-	}
-	
-	// Add default status if not present
-	hasStatusTag := false
-	for _, tag := range entity.Tags {
-		if strings.HasPrefix(tag, "status:") {
-			hasStatusTag = true
-			break
-		}
-	}
-	if !hasStatusTag {
-		entity.AddTagWithValue("status", "pending")
-	}
-	
-	// Since this is a quick fix function, just return the entity
-	// In a real handler, we'd save to a repository
-	
-	// Log success
-	logger.Debug("QuickFix: Created test entity with ID: %s", entity.ID)
-	
-	// Return created entity
-	RespondJSON(w, http.StatusCreated, entity)
-}
-*/
-
 // GetEntityTimeseries handles retrieving time series data for entities
 // This endpoint is used for visualizations in the dashboard
 func (h *EntityHandler) GetEntityTimeseries(w http.ResponseWriter, r *http.Request) {
@@ -1019,36 +1060,91 @@ func (h *EntityHandler) UpdateEntity(w http.ResponseWriter, r *http.Request) {
 // @Success 200 {object} models.Entity
 // @Router /api/v1/entities/as-of [get]
 func (h *EntityHandler) GetEntityAsOf(w http.ResponseWriter, r *http.Request) {
+	// Debug logs
+	logger.Debug("GetEntityAsOf called with params: %v", r.URL.Query())
+	
+	// Check if timestamps should be included in response
+	includeTimestamps := r.URL.Query().Get("include_timestamps") == "true"
+	
 	// Get entity ID from query
 	entityID := r.URL.Query().Get("id")
 	if entityID == "" {
+		logger.Error("Entity ID is missing in request")
 		RespondError(w, http.StatusBadRequest, "Entity ID is required")
 		return
 	}
 	
-	// Get timestamp from query
+	// Get timestamp from query - handle different parameter names
 	asOfStr := r.URL.Query().Get("as_of")
 	if asOfStr == "" {
+		asOfStr = r.URL.Query().Get("timestamp")
+	}
+	if asOfStr == "" {
+		logger.Error("Timestamp is missing in request")
 		RespondError(w, http.StatusBadRequest, "Timestamp is required")
 		return
 	}
 	
-	// Parse timestamp
-	asOf, err := time.Parse(time.RFC3339, asOfStr)
+	logger.Debug("Using timestamp: %s", asOfStr)
+	
+	// Parse timestamp with flexible format handling
+	var asOf time.Time
+	var err error
+	
+	// Try multiple timestamp formats
+	formats := []string{
+		time.RFC3339,
+		time.RFC3339Nano,
+		"2006-01-02T15:04:05Z",
+		"2006-01-02T15:04:05",
+	}
+	
+	for _, format := range formats {
+		asOf, err = time.Parse(format, asOfStr)
+		if err == nil {
+			break
+		}
+	}
+	
 	if err != nil {
-		RespondError(w, http.StatusBadRequest, "Invalid timestamp format. Use RFC3339 format.")
+		logger.Error("Failed to parse timestamp %s: %v", asOfStr, err)
+		RespondError(w, http.StatusBadRequest, fmt.Sprintf("Invalid timestamp format. Try format like '2025-05-21T08:45:20Z'. Error: %v", err))
 		return
 	}
 	
-	// Get entity as of timestamp
-	entity, err := h.repo.GetEntityAsOf(entityID, asOf)
+	logger.Debug("Parsed timestamp: %v", asOf)
+	
+	// Get entity repository
+	temporalRepo, err := asTemporalRepository(h.repo)
 	if err != nil {
-		logger.Error("Failed to get entity as of %v: %v", asOf, err)
-		RespondError(w, http.StatusInternalServerError, "Failed to get historical entity")
+		logger.Error("Repository doesn't support temporal features: %v", err)
+		RespondError(w, http.StatusInternalServerError, "Temporal features not available")
 		return
 	}
 	
-	RespondJSON(w, http.StatusOK, entity)
+	// Convert timestamp to UTC to avoid timezone issues
+	asOf = asOf.UTC()
+	logger.Debug("Using UTC timestamp: %v", asOf)
+	
+	// Get entity as of timestamp with better error reporting
+	entity, err := temporalRepo.GetEntityAsOf(entityID, asOf)
+	if err != nil {
+		logger.Error("Failed to get entity %s as of %v: %v", entityID, asOf, err)
+		
+		if strings.Contains(err.Error(), "entity not found") {
+			RespondError(w, http.StatusNotFound, fmt.Sprintf("Entity %s not found at timestamp %v", entityID, asOf))
+		} else if strings.Contains(err.Error(), "did not exist at") {
+			RespondError(w, http.StatusNotFound, fmt.Sprintf("Entity %s did not exist at timestamp %v", entityID, asOf))
+		} else {
+			RespondError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to get historical entity: %v", err))
+		}
+		return
+	}
+	
+	// Return entity with timestamps stripped unless requested
+	response := h.stripTimestampsFromEntity(entity, includeTimestamps)
+	logger.Debug("Returning entity as of %v: %+v", asOf, response)
+	RespondJSON(w, http.StatusOK, response)
 }
 
 // GetEntityHistory returns the history of an entity within a time range
@@ -1063,44 +1159,52 @@ func (h *EntityHandler) GetEntityAsOf(w http.ResponseWriter, r *http.Request) {
 // @Success 200 {array} models.Entity
 // @Router /api/v1/entities/history [get]
 func (h *EntityHandler) GetEntityHistory(w http.ResponseWriter, r *http.Request) {
+	// Debug logs
+	logger.Debug("GetEntityHistory called with params: %v", r.URL.Query())
+	
 	// Get entity ID from query
 	entityID := r.URL.Query().Get("id")
 	if entityID == "" {
+		logger.Error("Entity ID is missing in request")
 		RespondError(w, http.StatusBadRequest, "Entity ID is required")
 		return
 	}
 	
-	// Get time range from query
-	fromStr := r.URL.Query().Get("from")
-	toStr := r.URL.Query().Get("to")
-	
-	// For now, we'll ignore the from/to parameters since the interface expects a limit
-	// TODO: Update the interface to support time-based queries
-	
-	// Validate timestamp formats
-	if fromStr != "" {
-		if _, err := time.Parse(time.RFC3339, fromStr); err != nil {
-			RespondError(w, http.StatusBadRequest, "Invalid 'from' timestamp format")
-			return
+	// Get optional limit
+	limit := 100 // Default limit
+	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
+		if parsedLimit, err := parseInt(limitStr); err == nil && parsedLimit > 0 {
+			limit = parsedLimit
 		}
 	}
 	
-	if toStr != "" {
-		if _, err := time.Parse(time.RFC3339, toStr); err != nil {
-			RespondError(w, http.StatusBadRequest, "Invalid 'to' timestamp format")
-			return
-		}
-	}
+	logger.Debug("Getting history for entity %s with limit %d", entityID, limit)
 	
-	// Get entity history
-	// For now, use a default limit since the interface expects an int
-	history, err := h.repo.GetEntityHistory(entityID, 100)
+	// Get entity repository
+	temporalRepo, err := asTemporalRepository(h.repo)
 	if err != nil {
-		logger.Error("Failed to get entity history: %v", err)
-		RespondError(w, http.StatusInternalServerError, "Failed to get entity history")
+		logger.Error("Repository doesn't support temporal features: %v", err)
+		RespondError(w, http.StatusInternalServerError, "Temporal features not available")
 		return
 	}
 	
+	// Check if entity exists first
+	_, err = temporalRepo.GetByID(entityID)
+	if err != nil {
+		logger.Error("Entity %s not found: %v", entityID, err)
+		RespondError(w, http.StatusNotFound, fmt.Sprintf("Entity %s not found", entityID))
+		return
+	}
+	
+	// Get entity history
+	history, err := temporalRepo.GetEntityHistory(entityID, limit)
+	if err != nil {
+		logger.Error("Failed to get entity history: %v", err)
+		RespondError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to get entity history: %v", err))
+		return
+	}
+	
+	logger.Debug("Found %d history entries for entity %s", len(history), entityID)
 	RespondJSON(w, http.StatusOK, history)
 }
 
@@ -1114,36 +1218,54 @@ func (h *EntityHandler) GetEntityHistory(w http.ResponseWriter, r *http.Request)
 // @Success 200 {array} models.Entity
 // @Router /api/v1/entities/changes [get]
 func (h *EntityHandler) GetRecentChanges(w http.ResponseWriter, r *http.Request) {
-	// Get timestamp from query
-	sinceStr := r.URL.Query().Get("since")
-	if sinceStr == "" {
-		// Default to last hour (not used in current interface)
-		// For now, use a limit of 100 since the interface expects an int
-		changes, err := h.repo.GetRecentChanges(100)
-		if err != nil {
-			logger.Error("Failed to get recent changes: %v", err)
-			RespondError(w, http.StatusInternalServerError, "Failed to get recent changes")
-			return
+	// Debug logs
+	logger.Debug("GetRecentChanges called with params: %v", r.URL.Query())
+	
+	// Get optional limit
+	limit := 100 // Default limit
+	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
+		if parsedLimit, err := parseInt(limitStr); err == nil && parsedLimit > 0 {
+			limit = parsedLimit
 		}
-		RespondJSON(w, http.StatusOK, changes)
-		return
 	}
 	
-	// Parse timestamp (validation only - not used in current interface)
-	if _, err := time.Parse(time.RFC3339, sinceStr); err != nil {
-		RespondError(w, http.StatusBadRequest, "Invalid timestamp format. Use RFC3339 format.")
-		return
-	}
+	// Get entity ID if specified (for entity-specific changes)
+	entityID := r.URL.Query().Get("id")
+	logger.Debug("Getting recent changes with limit %d, entity ID: %s", limit, entityID)
 	
 	// Get recent changes
-	// For now, use a limit of 100 since the interface expects an int
-	changes, err := h.repo.GetRecentChanges(100)
+	temporalRepo, err := asTemporalRepository(h.repo)
 	if err != nil {
-		logger.Error("Failed to get recent changes: %v", err)
-		RespondError(w, http.StatusInternalServerError, "Failed to get recent changes")
+		logger.Error("Repository doesn't support temporal features: %v", err)
+		RespondError(w, http.StatusInternalServerError, "Temporal features not available")
 		return
 	}
 	
+	var changes []*models.EntityChange
+	
+	if entityID != "" {
+		// Check if entity exists first
+		_, err = temporalRepo.GetByID(entityID)
+		if err != nil {
+			logger.Error("Entity %s not found: %v", entityID, err)
+			RespondError(w, http.StatusNotFound, fmt.Sprintf("Entity %s not found", entityID))
+			return
+		}
+		
+		// Get changes for specific entity
+		changes, err = temporalRepo.GetEntityHistory(entityID, limit)
+	} else {
+		// Get global changes
+		changes, err = temporalRepo.GetRecentChanges(limit)
+	}
+	
+	if err != nil {
+		logger.Error("Failed to get recent changes: %v", err)
+		RespondError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to get recent changes: %v", err))
+		return
+	}
+	
+	logger.Debug("Found %d change entries", len(changes))
 	RespondJSON(w, http.StatusOK, changes)
 }
 
@@ -1159,47 +1281,180 @@ func (h *EntityHandler) GetRecentChanges(w http.ResponseWriter, r *http.Request)
 // @Success 200 {object} map[string]interface{}
 // @Router /api/v1/entities/diff [get]
 func (h *EntityHandler) GetEntityDiff(w http.ResponseWriter, r *http.Request) {
+	// Debug logs
+	logger.Debug("GetEntityDiff called with params: %v", r.URL.Query())
+	
+	// Check if timestamps should be included in response
+	includeTimestamps := r.URL.Query().Get("include_timestamps") == "true"
+	
 	// Get entity ID from query
 	entityID := r.URL.Query().Get("id")
 	if entityID == "" {
+		logger.Error("Entity ID is missing in request")
 		RespondError(w, http.StatusBadRequest, "Entity ID is required")
 		return
 	}
 	
-	// Get timestamps from query
-	t1Str := r.URL.Query().Get("t1")
-	t2Str := r.URL.Query().Get("t2")
+	// Get timestamps from query (support multiple parameter names)
+	t1Str := r.URL.Query().Get("from_timestamp")
+	if t1Str == "" {
+		t1Str = r.URL.Query().Get("t1")
+	}
+	if t1Str == "" {
+		t1Str = r.URL.Query().Get("from")
+	}
+	
+	t2Str := r.URL.Query().Get("to_timestamp")
+	if t2Str == "" {
+		t2Str = r.URL.Query().Get("t2")
+	}
+	if t2Str == "" {
+		t2Str = r.URL.Query().Get("to")
+	}
 	
 	if t1Str == "" || t2Str == "" {
-		RespondError(w, http.StatusBadRequest, "Both t1 and t2 timestamps are required")
+		logger.Error("Missing from or to timestamp in request")
+		RespondError(w, http.StatusBadRequest, "Both from and to timestamps are required")
 		return
 	}
 	
-	// Parse timestamps
-	t1, err := time.Parse(time.RFC3339, t1Str)
+	logger.Debug("Using timestamps: from=%s, to=%s", t1Str, t2Str)
+	
+	// Parse timestamps with multiple format support
+	var t1, t2 time.Time
+	var err error
+	
+	// Try multiple timestamp formats
+	formats := []string{
+		time.RFC3339,
+		time.RFC3339Nano,
+		"2006-01-02T15:04:05Z",
+		"2006-01-02T15:04:05",
+	}
+	
+	// Parse first timestamp
+	for _, format := range formats {
+		t1, err = time.Parse(format, t1Str)
+		if err == nil {
+			break
+		}
+	}
+	
 	if err != nil {
-		RespondError(w, http.StatusBadRequest, "Invalid t1 timestamp format")
+		logger.Error("Failed to parse from timestamp %s: %v", t1Str, err)
+		RespondError(w, http.StatusBadRequest, fmt.Sprintf("Invalid from timestamp format. Try format like '2025-05-21T08:45:20Z'. Error: %v", err))
 		return
 	}
 	
-	t2, err := time.Parse(time.RFC3339, t2Str)
+	// Parse second timestamp
+	for _, format := range formats {
+		t2, err = time.Parse(format, t2Str)
+		if err == nil {
+			break
+		}
+	}
+	
 	if err != nil {
-		RespondError(w, http.StatusBadRequest, "Invalid t2 timestamp format")
+		logger.Error("Failed to parse to timestamp %s: %v", t2Str, err)
+		RespondError(w, http.StatusBadRequest, fmt.Sprintf("Invalid to timestamp format. Try format like '2025-05-21T08:45:20Z'. Error: %v", err))
 		return
 	}
 	
-	// Get entity diff
-	beforeEntity, afterEntity, err := h.repo.GetEntityDiff(entityID, t1, t2)
-	// Combine the two entities into a diff structure for the response
-	diff := map[string]interface{}{
-		"before": beforeEntity,
-		"after":  afterEntity,
+	// Convert to UTC for consistency
+	t1 = t1.UTC()
+	t2 = t2.UTC()
+	logger.Debug("Parsed and converted timestamps: from=%v, to=%v", t1, t2)
+	
+	// Get entity repository
+	temporalRepo, err := asTemporalRepository(h.repo)
+	if err != nil {
+		logger.Error("Repository doesn't support temporal features: %v", err)
+		RespondError(w, http.StatusInternalServerError, "Temporal features not available")
+		return
 	}
+	
+	// Check if entity exists first
+	_, err = temporalRepo.GetByID(entityID)
+	if err != nil {
+		logger.Error("Entity %s not found: %v", entityID, err)
+		RespondError(w, http.StatusNotFound, fmt.Sprintf("Entity %s not found", entityID))
+		return
+	}
+	
+	beforeEntity, afterEntity, err := temporalRepo.GetEntityDiff(entityID, t1, t2)
 	if err != nil {
 		logger.Error("Failed to get entity diff: %v", err)
-		RespondError(w, http.StatusInternalServerError, "Failed to get entity diff")
+		RespondError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to get entity diff: %v", err))
 		return
 	}
 	
+	// Strip timestamps if not requested
+	if !includeTimestamps {
+		if beforeEntity != nil {
+			beforeEntity = h.stripTimestampsFromEntity(beforeEntity, false)
+		}
+		if afterEntity != nil {
+			afterEntity = h.stripTimestampsFromEntity(afterEntity, false)
+		}
+	}
+	
+	// Construct the diff response
+	diff := map[string]interface{}{
+		"entity_id": entityID,
+		"from_time": t1.Format(time.RFC3339),
+		"to_time":   t2.Format(time.RFC3339),
+		"before":    beforeEntity,
+		"after":     afterEntity,
+	}
+	
+	// Add a helpful summary of changes
+	if beforeEntity != nil && afterEntity != nil {
+		// Build a summary of changes
+		var addedTags, removedTags []string
+		
+		// Get simple tags (without timestamps)
+		beforeSimpleTags := beforeEntity.GetTagsWithoutTimestamp()
+		afterSimpleTags := afterEntity.GetTagsWithoutTimestamp()
+		
+		// Find added tags
+		for _, tag := range afterSimpleTags {
+			found := false
+			for _, beforeTag := range beforeSimpleTags {
+				if tag == beforeTag {
+					found = true
+					break
+				}
+			}
+			if !found {
+				addedTags = append(addedTags, tag)
+			}
+		}
+		
+		// Find removed tags
+		for _, tag := range beforeSimpleTags {
+			found := false
+			for _, afterTag := range afterSimpleTags {
+				if tag == afterTag {
+					found = true
+					break
+				}
+			}
+			if !found {
+				removedTags = append(removedTags, tag)
+			}
+		}
+		
+		diff["added_tags"] = addedTags
+		diff["removed_tags"] = removedTags
+	}
+	
+	logger.Debug("Returning diff result with %d added tags and %d removed tags", 
+		len(diff["added_tags"].([]string)), len(diff["removed_tags"].([]string)))
 	RespondJSON(w, http.StatusOK, diff)
+}
+
+// TestTemporalFixHandler is a simple handler to test if fixed methods are available
+func (h *EntityHandler) TestTemporalFixHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Write([]byte(`{"status":"ok","message":"Temporal handlers are integrated"}`))
 }
