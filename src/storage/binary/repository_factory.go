@@ -13,11 +13,24 @@ type RepositoryFactory struct{}
 func (f *RepositoryFactory) CreateRepository(dataPath string) (models.EntityRepository, error) {
 	// Check environment variables
 	disableHighPerf := os.Getenv("ENTITYDB_DISABLE_HIGH_PERFORMANCE") == "true"
+	enableHighPerf := os.Getenv("ENTITYDB_HIGH_PERFORMANCE") == "true"
 	enableTemporal := os.Getenv("ENTITYDB_TEMPORAL") != "false" // Temporal by default
 	
+	// Explicit disable overrides enable
 	if disableHighPerf {
 		logger.Info("Creating standard EntityRepository (high-performance disabled)")
 		return NewEntityRepository(dataPath)
+	}
+	
+	// If high performance mode is explicitly requested, use it regardless of temporal setting
+	if enableHighPerf {
+		logger.Info("Creating HighPerformanceRepository (explicitly enabled)")
+		highPerfRepo, err := NewHighPerformanceRepository(dataPath)
+		if err != nil {
+			logger.Error("Failed to create high-performance repository: %v, falling back to standard", err)
+			return NewEntityRepository(dataPath)
+		}
+		return highPerfRepo, nil
 	}
 	
 	if enableTemporal {

@@ -80,16 +80,17 @@ var (
 
 // Command line flags
 var (
-	port        int
-	sslPort     int
-	useSSL      bool
-	sslCert     string
-	sslKey      string
-	logLevel    string
-	dataPath    string
-	tokenSecret string
-	staticDir   string
-	showVersion bool
+	port             int
+	sslPort          int
+	useSSL           bool
+	sslCert          string
+	sslKey           string
+	logLevel         string
+	dataPath         string
+	tokenSecret      string
+	staticDir        string
+	showVersion      bool
+	highPerformance  bool
 )
 
 // Config for server settings
@@ -149,6 +150,7 @@ func init() {
 	flag.StringVar(&tokenSecret, "token-secret", getEnv("ENTITYDB_TOKEN_SECRET", "entitydb-secret-key"), "Secret key for JWT tokens")
 	flag.StringVar(&staticDir, "static-dir", getEnv("ENTITYDB_STATIC_DIR", "/opt/entitydb/share/htdocs"), "Static files directory")
 	flag.BoolVar(&showVersion, "version", false, "Show version information")
+	flag.BoolVar(&highPerformance, "high-performance", getEnvBool("ENTITYDB_HIGH_PERFORMANCE", false), "Enable high-performance memory-mapped indexing")
 }
 
 func main() {
@@ -167,8 +169,15 @@ func main() {
 	logger.Info("Starting EntityDB with log level: %s", logger.GetLogLevel())
 
 	// Initialize binary repositories
-	// Use factory to create appropriate repository (high-performance by default)
+	// Use factory to create appropriate repository based on settings
 	factory := &binary.RepositoryFactory{}
+	
+	// Set environment variable for high performance mode based on flag
+	if highPerformance {
+		logger.Info("High performance mode enabled via command line flag")
+		os.Setenv("ENTITYDB_HIGH_PERFORMANCE", "true")
+	}
+	
 	entityRepo, err := factory.CreateRepository(dataPath)
 	if err != nil {
 		logger.Fatalf("Failed to create entity repository: %v", err)
@@ -263,6 +272,11 @@ func main() {
 	apiRouter.HandleFunc("/test/entities/changes", testHandlers.TestGetRecentChanges).Methods("GET")
 	apiRouter.HandleFunc("/test/entities/diff", testHandlers.TestGetEntityDiff).Methods("GET")
 	
+	// Temporal fix test endpoints
+	apiRouter.HandleFunc("/test/temporal/as-of-test", server.entityHandler.TestTemporalFixHandler).Methods("GET")
+	apiRouter.HandleFunc("/test/temporal/history-test", server.entityHandler.TestTemporalFixHandler).Methods("GET")
+	apiRouter.HandleFunc("/test/temporal/changes-test", server.entityHandler.TestTemporalFixHandler).Methods("GET")
+	apiRouter.HandleFunc("/test/temporal/diff-test", server.entityHandler.TestTemporalFixHandler).Methods("GET")
 	// Entity API routes with RBAC
 	apiRouter.HandleFunc("/entities", server.handleEntities).Methods("GET", "POST")
 	apiRouter.HandleFunc("/entities/list", entityHandlerRBAC.ListEntitiesWithRBAC()).Methods("GET")
@@ -276,10 +290,19 @@ func main() {
 	apiRouter.HandleFunc("/entities/download", server.entityHandler.StreamEntity).Methods("GET")
 	
 	// Temporal API routes with RBAC
+// Patched temporal endpoints with fixed implementations
+	// Original temporal endpoints commented out
+	/*
 	apiRouter.HandleFunc("/entities/as-of", entityHandlerRBAC.GetEntityAsOfWithRBAC()).Methods("GET")
 	apiRouter.HandleFunc("/entities/history", entityHandlerRBAC.GetEntityHistoryWithRBAC()).Methods("GET")
 	apiRouter.HandleFunc("/entities/changes", entityHandlerRBAC.GetRecentChangesWithRBAC()).Methods("GET")
 	apiRouter.HandleFunc("/entities/diff", entityHandlerRBAC.GetEntityDiffWithRBAC()).Methods("GET")
+	*/
+	// Fixed temporal endpoints
+	apiRouter.HandleFunc("/entities/as-of", entityHandlerRBAC.GetEntityAsOfWithRBACFixed()).Methods("GET")
+	apiRouter.HandleFunc("/entities/history", entityHandlerRBAC.GetEntityHistoryWithRBACFixed()).Methods("GET")
+	apiRouter.HandleFunc("/entities/changes", entityHandlerRBAC.GetRecentChangesWithRBACFixed()).Methods("GET")
+	apiRouter.HandleFunc("/entities/diff", entityHandlerRBAC.GetEntityDiffWithRBACFixed()).Methods("GET")
 	
 	// Entity relationship routes
 	apiRouter.HandleFunc("/entity-relationships", server.handleEntityRelationships).Methods("GET", "POST")
