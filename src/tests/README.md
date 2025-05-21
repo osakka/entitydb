@@ -12,6 +12,12 @@ This directory contains all tests for the EntityDB platform. Tests are now locat
 - `test_framework.sh`: The main test framework for API testing
 - `test_temporal_api.sh`: Tests for the temporal API functionality
 - `cases/`: Contains individual test case files
+- `temporal/`: Tests for temporal features and timestamp handling 
+- `chunking/`: Tests for large file handling and autochunking
+- `performance/`: Performance and stress tests
+- `integrity/`: Data integrity and basic functionality tests
+- `run_all_tests.sh`: Comprehensive test suite runner
+- `run_extended_tests.sh`: Extended tests for specific features
 
 ## Running Tests
 
@@ -29,7 +35,47 @@ Or run a specific test directly:
 ```bash
 cd /opt/entitydb/src/tests
 ./test_temporal_api.sh
+./run_all_tests.sh 
+./run_extended_tests.sh
 ```
+
+## Test Categories
+
+### Core API Tests
+
+The tests in `cases/` directory verify the basic API functionality:
+- Entity creation, retrieval, update, and deletion
+- Authentication and authorization
+- Relationship management
+- Configuration management
+
+### Temporal Tests
+
+Tests in the `temporal/` directory focus on:
+- Temporal tag handling
+- Time-based queries (as-of, history, diff)
+- Timestamp storage and retrieval
+
+### Chunking Tests
+
+Tests in the `chunking/` directory focus on:
+- Large file handling
+- Automatic content chunking
+- Streaming uploads and downloads
+
+### Performance Tests
+
+Tests in the `performance/` directory focus on:
+- Stress testing
+- Concurrency handling
+- Large dataset performance
+
+### Integrity Tests
+
+Tests in the `integrity/` directory focus on:
+- Data consistency
+- Error handling and recovery
+- Edge cases and boundary conditions
 
 ## Temporal API Testing
 
