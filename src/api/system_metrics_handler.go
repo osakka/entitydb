@@ -26,25 +26,27 @@ func NewSystemMetricsHandler(entityRepo models.EntityRepository) *SystemMetricsH
 
 // SystemMetricsResponse represents comprehensive system metrics
 type SystemMetricsResponse struct {
-	System         SystemInfo         `json:"system"`
-	Database       DatabaseMetrics    `json:"database"`
-	Performance    PerformanceMetrics `json:"performance"`
-	Memory         MemoryMetrics      `json:"memory"`
-	Storage        StorageMetrics     `json:"storage"`
-	Temporal       TemporalMetrics    `json:"temporal"`
-	EntityStats    EntityStats        `json:"entity_stats"`
-	ActivityStats  ActivityStats      `json:"activity_stats"`
+	System         SystemInfo             `json:"system"`
+	Database       DatabaseMetrics        `json:"database"`
+	Performance    PerformanceMetrics     `json:"performance"`
+	Memory         DetailedMemoryMetrics  `json:"memory"`
+	Storage        StorageMetrics         `json:"storage"`
+	Temporal       TemporalMetrics        `json:"temporal"`
+	EntityStats    EntityStats            `json:"entity_stats"`
+	ActivityStats  ActivityStats          `json:"activity_stats"`
 }
 
+// SystemInfo contains basic system information  
+// @Description System information and runtime details
 type SystemInfo struct {
-	Version       string        `json:"version"`
-	GoVersion     string        `json:"go_version"`
-	Uptime        time.Duration `json:"uptime"`
-	UptimeSeconds float64       `json:"uptime_seconds"`
-	StartTime     time.Time     `json:"start_time"`
-	CurrentTime   time.Time     `json:"current_time"`
-	NumCPU        int           `json:"num_cpu"`
-	NumGoroutines int           `json:"num_goroutines"`
+	Version       string    `json:"version" example:"2.14.0+"`
+	GoVersion     string    `json:"go_version" example:"go1.24.2"`
+	Uptime        int64     `json:"uptime" example:"132651279965"`
+	UptimeSeconds float64   `json:"uptime_seconds" example:"132.651279965"`
+	StartTime     time.Time `json:"start_time" example:"2025-05-22T14:25:18.060290081+01:00"`
+	CurrentTime   time.Time `json:"current_time" example:"2025-05-22T14:27:30.71157084+01:00"`
+	NumCPU        int       `json:"num_cpu" example:"8"`
+	NumGoroutines int       `json:"num_goroutines" example:"24"`
 }
 
 type DatabaseMetrics struct {
@@ -56,24 +58,28 @@ type DatabaseMetrics struct {
 	AvgTagsPerEntity float64               `json:"avg_tags_per_entity"`
 }
 
+// PerformanceMetrics contains performance statistics
+// @Description Performance and runtime metrics
 type PerformanceMetrics struct {
-	GCRuns          uint32        `json:"gc_runs"`
-	LastGCPause     time.Duration `json:"last_gc_pause_ns"`
-	TotalGCPause    time.Duration `json:"total_gc_pause_ns"`
-	QueryCacheHits  int           `json:"query_cache_hits"`
-	QueryCacheMiss  int           `json:"query_cache_miss"`
-	IndexLookups    int64         `json:"index_lookups"`
+	GCRuns          uint32 `json:"gc_runs" example:"3"`
+	LastGCPause     int64  `json:"last_gc_pause_ns" example:"140707"`
+	TotalGCPause    int64  `json:"total_gc_pause_ns" example:"236206"`
+	QueryCacheHits  int    `json:"query_cache_hits" example:"0"`
+	QueryCacheMiss  int    `json:"query_cache_miss" example:"0"`
+	IndexLookups    int64  `json:"index_lookups" example:"0"`
 }
 
-type MemoryMetrics struct {
-	AllocBytes      uint64 `json:"alloc_bytes"`
-	TotalAllocBytes uint64 `json:"total_alloc_bytes"`
-	SysBytes        uint64 `json:"sys_bytes"`
-	HeapAllocBytes  uint64 `json:"heap_alloc_bytes"`
-	HeapSysBytes    uint64 `json:"heap_sys_bytes"`
-	HeapIdleBytes   uint64 `json:"heap_idle_bytes"`
-	HeapInUseBytes  uint64 `json:"heap_in_use_bytes"`
-	StackInUseBytes uint64 `json:"stack_in_use_bytes"`
+// DetailedMemoryMetrics contains comprehensive memory usage information
+// @Description Detailed memory usage statistics
+type DetailedMemoryMetrics struct {
+	AllocBytes      uint64 `json:"alloc_bytes" example:"10031960"`
+	TotalAllocBytes uint64 `json:"total_alloc_bytes" example:"10685192"`
+	SysBytes        uint64 `json:"sys_bytes" example:"21453840"`
+	HeapAllocBytes  uint64 `json:"heap_alloc_bytes" example:"10031960"`
+	HeapSysBytes    uint64 `json:"heap_sys_bytes" example:"16121856"`
+	HeapIdleBytes   uint64 `json:"heap_idle_bytes" example:"4472832"`
+	HeapInUseBytes  uint64 `json:"heap_in_use_bytes" example:"11649024"`
+	StackInUseBytes uint64 `json:"stack_in_use_bytes" example:"655360"`
 }
 
 type StorageMetrics struct {
@@ -149,7 +155,7 @@ func (h *SystemMetricsHandler) SystemMetrics(w http.ResponseWriter, r *http.Requ
 	systemInfo := SystemInfo{
 		Version:       "2.14.0+",
 		GoVersion:     runtime.Version(),
-		Uptime:        uptime,
+		Uptime:        uptime.Nanoseconds(),
 		UptimeSeconds: uptime.Seconds(),
 		StartTime:     h.startTime,
 		CurrentTime:   time.Now(),
@@ -166,8 +172,8 @@ func (h *SystemMetricsHandler) SystemMetrics(w http.ResponseWriter, r *http.Requ
 	
 	perfMetrics := PerformanceMetrics{
 		GCRuns:       memStats.NumGC,
-		LastGCPause:  time.Duration(memStats.PauseNs[(memStats.NumGC+255)%256]),
-		TotalGCPause: time.Duration(memStats.PauseTotalNs),
+		LastGCPause:  int64(memStats.PauseNs[(memStats.NumGC+255)%256]),
+		TotalGCPause: int64(memStats.PauseTotalNs),
 		// Note: Query cache metrics would need to be implemented in the repository
 		QueryCacheHits: 0, // Placeholder
 		QueryCacheMiss: 0, // Placeholder
@@ -175,7 +181,7 @@ func (h *SystemMetricsHandler) SystemMetrics(w http.ResponseWriter, r *http.Requ
 	}
 	
 	// Memory metrics
-	memoryMetrics := MemoryMetrics{
+	memoryMetrics := DetailedMemoryMetrics{
 		AllocBytes:      memStats.Alloc,
 		TotalAllocBytes: memStats.TotalAlloc,
 		SysBytes:        memStats.Sys,

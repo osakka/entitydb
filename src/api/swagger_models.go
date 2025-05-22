@@ -108,6 +108,13 @@ type RelationshipResponse struct {
 	CreatedAt        time.Time `json:"created_at" example:"2025-01-01T10:00:00Z"`
 }
 
+// RelationshipListResponse represents a list of relationships
+// @Description List of entity relationships
+type RelationshipListResponse struct {
+	Relationships []RelationshipResponse `json:"relationships"`
+	Count         int                    `json:"count" example:"5"`
+}
+
 // TimeRangeQuery represents a time range query
 // @Description Time range for temporal queries
 type TimeRangeQuery struct {
@@ -154,6 +161,13 @@ type APIStatusResponse struct {
 	Status  string    `json:"status" example:"ok"`
 	Version string    `json:"version" example:"2.6.0"`
 	Time    time.Time `json:"time" example:"2025-01-01T12:00:00Z"`
+}
+
+// SuccessResponse represents a generic success response
+// @Description Generic success response
+type SuccessResponse struct {
+	Success bool   `json:"success" example:"true"`
+	Message string `json:"message,omitempty" example:"Operation completed successfully"`
 }
 
 // ConfigSetRequest represents a configuration update request

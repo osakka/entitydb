@@ -29,7 +29,12 @@
                 <h1>EntityDB Dashboard</h1>
             </div>
             <div class="header-actions">
-                <a href="/api-docs.html" class="btn btn-secondary">API Documentation</a>
+                <div x-show="user" class="nav-links">
+                    <a href="/metrics.html" class="btn btn-secondary btn-sm">📊 Metrics</a>
+                    <a href="/sessions.html" class="btn btn-secondary btn-sm">👥 Sessions</a>
+                    <a href="/admin.html" x-show="userHasAdminRole()" class="btn btn-secondary btn-sm">⚙️ Admin</a>
+                    <a href="/api-docs.html" class="btn btn-secondary btn-sm">📚 API Docs</a>
+                </div>
                 <div x-show="user" class="user-info">
                     <span x-text="user.username"></span>
                     <button @click="showChangePasswordModal = true" class="btn btn-primary btn-sm">Change Password</button>

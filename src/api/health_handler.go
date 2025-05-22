@@ -33,12 +33,23 @@ type HealthResponse struct {
 	Metrics     HealthMetrics     `json:"metrics"`
 }
 
+// HealthMetrics contains system health metrics
+// @Description System health and performance metrics
 type HealthMetrics struct {
-	EntityCount    int               `json:"entity_count"`
-	UserCount      int               `json:"user_count"`
-	DatabaseSize   int64             `json:"database_size_bytes"`
-	MemoryUsage    runtime.MemStats  `json:"memory_usage"`
-	GoRoutines     int               `json:"goroutines"`
+	EntityCount    int           `json:"entity_count" example:"100"`
+	UserCount      int           `json:"user_count" example:"5"`
+	DatabaseSize   int64         `json:"database_size_bytes" example:"1048576"`
+	MemoryUsage    MemoryMetrics `json:"memory_usage"`
+	GoRoutines     int           `json:"goroutines" example:"25"`
+}
+
+// MemoryMetrics contains memory usage information
+// @Description Memory usage statistics
+type MemoryMetrics struct {
+	Alloc      uint64 `json:"alloc_bytes" example:"10485760"`
+	TotalAlloc uint64 `json:"total_alloc_bytes" example:"20971520"`
+	Sys        uint64 `json:"sys_bytes" example:"73400320"`
+	NumGC      uint32 `json:"num_gc" example:"5"`
 }
 
 // Health returns the health status of the system
@@ -103,7 +114,12 @@ func (h *HealthHandler) Health(w http.ResponseWriter, r *http.Request) {
 			EntityCount:  entityCount,
 			UserCount:    userCount,
 			DatabaseSize: dbSize,
-			MemoryUsage:  memStats,
+			MemoryUsage: MemoryMetrics{
+				Alloc:      memStats.Alloc,
+				TotalAlloc: memStats.TotalAlloc,
+				Sys:        memStats.Sys,
+				NumGC:      memStats.NumGC,
+			},
 			GoRoutines:   runtime.NumGoroutine(),
 		},
 	}

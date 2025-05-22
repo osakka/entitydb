@@ -38,11 +38,16 @@ endif
 # Echo command - use printf for better compatibility
 ECHO := printf
 
-.PHONY: all server clean install dev test tools entity-tools unit-tests api-tests entity-tests simple-tests test-utils help security-tests master-tests
+.PHONY: all server clean install dev test tools entity-tools unit-tests api-tests entity-tests simple-tests test-utils help security-tests master-tests docs
 
 all: server install
 
-server:
+docs:
+	@$(ECHO) "$(YELLOW)Generating API documentation...$(NC)\n"
+	@./generate_docs.sh
+	@$(ECHO) "$(GREEN)API documentation generated successfully$(NC)\n"
+
+server: docs
 	@$(ECHO) "$(YELLOW)Building server binary: $(NAME)...$(NC)\n"
 	@mkdir -p $(BUILD_DIR)
 	@$(ECHO) "$(YELLOW)Excluding deprecated code from build...$(NC)\n"
@@ -230,6 +235,7 @@ help:
 	@$(ECHO) "$(GREEN)Available targets:$(NC)\n"
 	@echo "  all               : Build server, install, and run unit tests"
 	@echo "  server            : Build the consolidated server binary with integrated static file support"
+	@echo "  docs              : Generate Swagger/OpenAPI documentation from code annotations"
 	@echo "  install           : Install scripts and make them executable"
 	@echo "  clean             : Clean build artifacts"
 	@echo "  dev               : Start development server on port 8086"

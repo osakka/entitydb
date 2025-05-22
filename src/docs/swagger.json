@@ -1,1019 +1,1885 @@
 {
-  "swagger": "2.0",
-  "info": {
-    "title": "EntityDB API",
-    "description": "A temporal database with pure entity-based architecture",
-    "version": "2.8.0",
-    "contact": {
-      "name": "EntityDB Support",
-      "email": "support@entitydb.io"
+    "swagger": "2.0",
+    "info": {
+        "description": "A temporal database with pure entity-based architecture",
+        "title": "EntityDB API",
+        "termsOfService": "https://github.com/osakka/entitydb",
+        "contact": {
+            "name": "EntityDB Support",
+            "email": "support@entitydb.io"
+        },
+        "license": {
+            "name": "MIT",
+            "url": "https://github.com/osakka/entitydb/blob/main/LICENSE"
+        },
+        "version": "2.12.0"
     },
-    "license": {
-      "name": "MIT",
-      "url": "https://github.com/osakka/entitydb/blob/main/LICENSE"
-    }
-  },
-  "host": "localhost:8085",
-  "basePath": "/api/v1",
-  "schemes": ["http"],
-  "tags": [
-    {
-      "name": "auth",
-      "description": "Authentication operations"
-    },
-    {
-      "name": "entities",
-      "description": "Entity CRUD operations"
-    },
-    {
-      "name": "temporal",
-      "description": "Temporal query operations"
-    },
-    {
-      "name": "relationships",
-      "description": "Entity relationship operations"
-    },
-    {
-      "name": "users",
-      "description": "User management operations"
-    },
-    {
-      "name": "dashboard",
-      "description": "Dashboard and analytics"
-    },
-    {
-      "name": "configuration",
-      "description": "System configuration and feature flags"
-    },
-    {
-      "name": "system",
-      "description": "System status and health checks"
-    }
-  ],
-  "securityDefinitions": {
-    "BearerAuth": {
-      "type": "apiKey",
-      "name": "Authorization",
-      "in": "header",
-      "description": "Bearer token authentication. Example: 'Bearer <token>'"
-    }
-  },
-  "definitions": {
-    "LoginRequest": {
-      "type": "object",
-      "required": ["username", "password"],
-      "properties": {
-        "username": {
-          "type": "string",
-          "example": "john_doe"
-        },
-        "password": {
-          "type": "string",
-          "example": "secretpassword"
-        }
-      }
-    },
-    "LoginResponse": {
-      "type": "object",
-      "properties": {
-        "token": {
-          "type": "string"
-        },
-        "expires_at": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "user": {
-          "$ref": "#/definitions/UserInfo"
-        }
-      }
-    },
-    "UserInfo": {
-      "type": "object",
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "username": {
-          "type": "string"
-        },
-        "roles": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        }
-      }
-    },
-    "Entity": {
-      "type": "object",
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "tags": {
-          "type": "array",
-          "description": "Tags associated with the entity. Internally stored with nanosecond timestamps but returned without timestamps by default. Use include_timestamps parameter to see full temporal data.",
-          "items": {
-            "type": "string",
-            "description": "Tag without timestamp (e.g., 'type:user'). With include_timestamps=true: 'timestamp|tag' format"
-          }
-        },
-        "content": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/ContentItem"
-          }
-        },
-        "created_at": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "updated_at": {
-          "type": "string",
-          "format": "date-time"
-        }
-      }
-    },
-    "ContentItem": {
-      "type": "object",
-      "properties": {
-        "type": {
-          "type": "string"
-        },
-        "value": {
-          "type": "string"
-        }
-      }
-    },
-    "CreateEntityRequest": {
-      "type": "object",
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "tags": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "content": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/ContentItem"
-          }
-        }
-      }
-    },
-    "CreateUserRequest": {
-      "type": "object",
-      "required": ["username", "password"],
-      "properties": {
-        "username": {
-          "type": "string"
-        },
-        "password": {
-          "type": "string"
-        },
-        "email": {
-          "type": "string"
-        },
-        "full_name": {
-          "type": "string"
-        },
-        "role": {
-          "type": "string"
-        }
-      }
-    },
-    "RelationshipRequest": {
-      "type": "object",
-      "required": ["source_id", "relationship_type", "target_id"],
-      "properties": {
-        "source_id": {
-          "type": "string"
-        },
-        "relationship_type": {
-          "type": "string"
-        },
-        "target_id": {
-          "type": "string"
-        },
-        "metadata": {
-          "type": "object",
-          "additionalProperties": true
-        }
-      }
-    },
-    "ErrorResponse": {
-      "type": "object",
-      "properties": {
-        "error": {
-          "type": "string"
-        }
-      }
-    },
-    "QueryEntityResponse": {
-      "type": "object",
-      "properties": {
-        "entities": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/Entity"
-          }
-        },
-        "total": {
-          "type": "integer",
-          "description": "Total number of entities matching the query"
-        },
-        "offset": {
-          "type": "integer",
-          "description": "Offset of the results"
-        },
-        "limit": {
-          "type": "integer",
-          "description": "Limit of results per page"
-        }
-      }
-    }
-  },
-  "paths": {
-    "/auth/login": {
-      "post": {
-        "tags": ["auth"],
-        "summary": "Login",
-        "description": "Authenticate user and receive session token",
-        "consumes": ["application/json"],
-        "produces": ["application/json"],
-        "parameters": [
-          {
-            "in": "body",
-            "name": "body",
-            "description": "Login credentials",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/LoginRequest"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful login",
-            "schema": {
-              "$ref": "#/definitions/LoginResponse"
-            }
-          },
-          "401": {
-            "description": "Invalid credentials",
-            "schema": {
-              "$ref": "#/definitions/ErrorResponse"
-            }
-          }
-        }
-      }
-    },
-    "/auth/logout": {
-      "post": {
-        "tags": ["auth"],
-        "summary": "Logout",
-        "description": "Invalidate the current session",
-        "security": [{"BearerAuth": []}],
-        "responses": {
-          "200": {
-            "description": "Successful logout",
-            "schema": {
-              "type": "object",
-              "properties": {
-                "status": {
-                  "type": "string",
-                  "example": "ok"
+    "host": "localhost:8085",
+    "basePath": "/api/v1",
+    "paths": {
+        "/api/v1/config": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retrieve current system configuration",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "configuration"
+                ],
+                "summary": "Get configuration",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Configuration namespace",
+                        "name": "namespace",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Configuration key",
+                        "name": "key",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/models.Entity"
+                            }
+                        }
+                    }
                 }
-              }
             }
-          }
+        },
+        "/api/v1/config/set": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Update system configuration values",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "configuration"
+                ],
+                "summary": "Set configuration",
+                "parameters": [
+                    {
+                        "description": "Configuration data",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.ConfigSetRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.SuccessResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/dashboard/stats": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get dashboard statistics and metrics",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "dashboard"
+                ],
+                "summary": "Dashboard statistics",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.DashboardStatsResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/entities/as-of": {
+            "get": {
+                "description": "Retrieve an entity as it existed at a specific point in time",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "temporal"
+                ],
+                "summary": "Get entity as of timestamp",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Entity ID",
+                        "name": "id",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Timestamp in RFC3339 format",
+                        "name": "as_of",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.Entity"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/entities/changes": {
+            "get": {
+                "description": "Retrieve entities that have changed since a given timestamp",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "temporal"
+                ],
+                "summary": "Get recent changes",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Timestamp in RFC3339 format (default: 1 hour ago)",
+                        "name": "since",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/models.Entity"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/entities/create": {
+            "post": {
+                "description": "Create a new entity with tags and content",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "entities"
+                ],
+                "summary": "Create a new entity",
+                "parameters": [
+                    {
+                        "description": "Entity to create",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.CreateEntityRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/models.Entity"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/entities/diff": {
+            "get": {
+                "description": "Compare an entity at two different points in time",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "temporal"
+                ],
+                "summary": "Get entity diff",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Entity ID",
+                        "name": "id",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "First timestamp in RFC3339 format",
+                        "name": "t1",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Second timestamp in RFC3339 format",
+                        "name": "t2",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/entities/get": {
+            "get": {
+                "description": "Retrieve a single entity by its ID",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "entities"
+                ],
+                "summary": "Get entity by ID",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Entity ID",
+                        "name": "id",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.Entity"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/entities/history": {
+            "get": {
+                "description": "Retrieve the history of an entity within a time range",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "temporal"
+                ],
+                "summary": "Get entity history",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Entity ID",
+                        "name": "id",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Start timestamp in RFC3339 format (default: 24 hours ago)",
+                        "name": "from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "End timestamp in RFC3339 format (default: now)",
+                        "name": "to",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/models.Entity"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/entities/list": {
+            "get": {
+                "description": "List all entities or filter by various criteria",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "entities"
+                ],
+                "summary": "List entities",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Filter by tag (e.g., type:user)",
+                        "name": "tag",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by wildcard pattern",
+                        "name": "wildcard",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Search content",
+                        "name": "search",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Content type for search",
+                        "name": "contentType",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by namespace",
+                        "name": "namespace",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/models.Entity"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/entities/query": {
+            "get": {
+                "description": "Query entities with advanced sorting, filtering, and pagination",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "entities"
+                ],
+                "summary": "Query entities with advanced filters",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Filter field (e.g., created_at, tag:type)",
+                        "name": "filter",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter operator (eq, ne, gt, lt, gte, lte, like, in)",
+                        "name": "operator",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter value",
+                        "name": "value",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Sort field (created_at, updated_at, id, tag_count)",
+                        "name": "sort",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Sort order (asc, desc)",
+                        "name": "order",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Limit results",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Offset results",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.QueryEntityResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/entities/update": {
+            "put": {
+                "description": "Update an existing entity's tags and content",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "entities"
+                ],
+                "summary": "Update an entity",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Entity ID (can also be in body)",
+                        "name": "id",
+                        "in": "query"
+                    },
+                    {
+                        "description": "Entity update data",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.Entity"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/entity-relationships": {
+            "get": {
+                "description": "Get a specific relationship between two entities",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "relationships"
+                ],
+                "summary": "Get relationship",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Source entity ID",
+                        "name": "source_id",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Type of relationship",
+                        "name": "relationship_type",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Target entity ID",
+                        "name": "target_id",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.RelationshipResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "Create a new relationship between two entities",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "relationships"
+                ],
+                "summary": "Create relationship",
+                "parameters": [
+                    {
+                        "description": "Relationship data",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.RelationshipRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/api.RelationshipResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "description": "Delete an existing relationship between two entities",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "relationships"
+                ],
+                "summary": "Delete relationship",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Source entity ID",
+                        "name": "source_id",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Type of relationship",
+                        "name": "relationship_type",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Target entity ID",
+                        "name": "target_id",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.SuccessResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/entity-relationships/by-source": {
+            "get": {
+                "description": "List all relationships where the specified entity is the source",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "relationships"
+                ],
+                "summary": "List relationships by source",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Source entity ID",
+                        "name": "source_id",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by relationship type",
+                        "name": "relationship_type",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.RelationshipListResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/entity-relationships/by-target": {
+            "get": {
+                "description": "List all relationships where the specified entity is the target",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "relationships"
+                ],
+                "summary": "List relationships by target",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Target entity ID",
+                        "name": "target_id",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by relationship type",
+                        "name": "relationship_type",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.RelationshipListResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/entity-relationships/by-type": {
+            "get": {
+                "description": "List all relationships of a specific type",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "relationships"
+                ],
+                "summary": "List relationships by type",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Type of relationship",
+                        "name": "relationship_type",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.RelationshipListResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/feature-flags": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retrieve all feature flags",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "configuration"
+                ],
+                "summary": "Get feature flags",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Stage filter (alpha, beta, stable)",
+                        "name": "stage",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/models.Entity"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/feature-flags/set": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Update a feature flag value",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "configuration"
+                ],
+                "summary": "Set feature flag",
+                "parameters": [
+                    {
+                        "description": "Feature flag data",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.FeatureFlagRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.Entity"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/system/metrics": {
+            "get": {
+                "description": "Get comprehensive system metrics specific to EntityDB",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "metrics"
+                ],
+                "summary": "EntityDB system metrics",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.SystemMetricsResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/users/change-password": {
+            "post": {
+                "description": "Change the current user's password",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "Change user's own password",
+                "parameters": [
+                    {
+                        "description": "Password change data",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.ChangePasswordRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.StatusResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/users/create": {
+            "post": {
+                "description": "Create a new user entity with authentication credentials",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "Create a new user",
+                "parameters": [
+                    {
+                        "description": "User data",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.CreateUserRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/models.Entity"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/users/reset-password": {
+            "post": {
+                "description": "Reset a user's password (requires admin permission)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "Reset user password (admin only)",
+                "parameters": [
+                    {
+                        "description": "Password reset data",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.ResetPasswordRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.StatusResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/login": {
+            "post": {
+                "description": "Authenticate user and receive session token",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Login",
+                "parameters": [
+                    {
+                        "description": "Login credentials",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.LoginRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.LoginResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/api.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/logout": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Invalidate the current session",
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Logout",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.StatusResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/refresh": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Refresh the session token expiration",
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Refresh Token",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.RefreshResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/api.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/status": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Check authentication status and session validity",
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Auth Status",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.AuthStatusResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/api.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/health": {
+            "get": {
+                "description": "Get system health status and basic metrics",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "health"
+                ],
+                "summary": "Health check",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.HealthResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/metrics": {
+            "get": {
+                "description": "Get system metrics in Prometheus format",
+                "produces": [
+                    "text/plain"
+                ],
+                "tags": [
+                    "metrics"
+                ],
+                "summary": "Prometheus metrics",
+                "responses": {
+                    "200": {
+                        "description": "Prometheus metrics",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
         }
-      }
     },
-    "/entities/list": {
-      "get": {
-        "tags": ["entities"],
-        "summary": "List entities",
-        "description": "List all entities or filter by various criteria",
-        "produces": ["application/json"],
-        "parameters": [
-          {
-            "name": "tag",
-            "in": "query",
-            "description": "Filter by tag (e.g., type:user)",
-            "type": "string"
-          },
-          {
-            "name": "wildcard",
-            "in": "query",
-            "description": "Filter by wildcard pattern",
-            "type": "string"
-          },
-          {
-            "name": "search",
-            "in": "query",
-            "description": "Search content",
-            "type": "string"
-          },
-          {
-            "name": "contentType",
-            "in": "query",
-            "description": "Content type for search",
-            "type": "string"
-          },
-          {
-            "name": "namespace",
-            "in": "query",
-            "description": "Filter by namespace",
-            "type": "string"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "List of entities",
-            "schema": {
-              "type": "array",
-              "items": {
-                "$ref": "#/definitions/Entity"
-              }
-            }
-          }
-        }
-      }
-    },
-    "/entities/create": {
-      "post": {
-        "tags": ["entities"],
-        "summary": "Create a new entity",
-        "description": "Create a new entity with tags and content",
-        "consumes": ["application/json"],
-        "produces": ["application/json"],
-        "parameters": [
-          {
-            "in": "body",
-            "name": "body",
-            "description": "Entity to create",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/CreateEntityRequest"
-            }
-          }
-        ],
-        "responses": {
-          "201": {
-            "description": "Entity created successfully",
-            "schema": {
-              "$ref": "#/definitions/Entity"
-            }
-          }
-        }
-      }
-    },
-    "/entities/get": {
-      "get": {
-        "tags": ["entities"],
-        "summary": "Get entity by ID",
-        "description": "Retrieve a single entity by its ID",
-        "produces": ["application/json"],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "query",
-            "description": "Entity ID",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "include_timestamps",
-            "in": "query",
-            "description": "Include timestamps with tags (temporal data)",
-            "type": "boolean",
-            "default": false
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Entity details",
-            "schema": {
-              "$ref": "#/definitions/Entity"
-            }
-          },
-          "404": {
-            "description": "Entity not found"
-          }
-        }
-      }
-    },
-    "/entities/as-of": {
-      "get": {
-        "tags": ["temporal"],
-        "summary": "Get entity as of timestamp",
-        "description": "Retrieve an entity as it existed at a specific point in time",
-        "produces": ["application/json"],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "query",
-            "description": "Entity ID",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "as_of",
-            "in": "query",
-            "description": "Timestamp in RFC3339 format",
-            "required": true,
-            "type": "string"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Entity at specified timestamp",
-            "schema": {
-              "$ref": "#/definitions/Entity"
-            }
-          }
-        }
-      }
-    },
-    "/entities/history": {
-      "get": {
-        "tags": ["temporal"],
-        "summary": "Get entity history",
-        "description": "Retrieve the history of an entity within a time range",
-        "produces": ["application/json"],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "query",
-            "description": "Entity ID",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "from",
-            "in": "query",
-            "description": "Start timestamp in RFC3339 format (default: 24 hours ago)",
-            "type": "string"
-          },
-          {
-            "name": "to",
-            "in": "query",
-            "description": "End timestamp in RFC3339 format (default: now)",
-            "type": "string"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Entity history",
-            "schema": {
-              "type": "array",
-              "items": {
-                "$ref": "#/definitions/Entity"
-              }
-            }
-          }
-        }
-      }
-    },
-    "/users/create": {
-      "post": {
-        "tags": ["users"],
-        "summary": "Create a new user",
-        "description": "Create a new user entity with authentication credentials",
-        "consumes": ["application/json"],
-        "produces": ["application/json"],
-        "parameters": [
-          {
-            "in": "body",
-            "name": "body",
-            "description": "User data",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/CreateUserRequest"
-            }
-          }
-        ],
-        "responses": {
-          "201": {
-            "description": "User created successfully",
-            "schema": {
-              "$ref": "#/definitions/Entity"
-            }
-          }
-        }
-      }
-    },
-    "/entities/update": {
-      "put": {
-        "tags": ["entities"],
-        "summary": "Update entity",
-        "description": "Update an existing entity",
-        "consumes": ["application/json"],
-        "produces": ["application/json"],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "query",
-            "description": "Entity ID (can also be in body)",
-            "type": "string"
-          },
-          {
-            "in": "body",
-            "name": "body",
-            "description": "Entity update data",
-            "required": true,
-            "schema": {
-              "type": "object",
-              "additionalProperties": true
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Entity updated successfully",
-            "schema": {
-              "$ref": "#/definitions/Entity"
-            }
-          }
-        }
-      }
-    },
-    "/entities/query": {
-      "get": {
-        "tags": ["entities"],
-        "summary": "Query entities with advanced filters",
-        "description": "Query entities with advanced sorting, filtering, and pagination",
-        "produces": ["application/json"],
-        "parameters": [
-          {
-            "name": "filter",
-            "in": "query",
-            "description": "Filter field (e.g., created_at, tag:type)",
-            "type": "string"
-          },
-          {
-            "name": "operator",
-            "in": "query",
-            "description": "Filter operator (eq, ne, gt, lt, gte, lte, like, in)",
-            "type": "string"
-          },
-          {
-            "name": "value",
-            "in": "query",
-            "description": "Filter value",
-            "type": "string"
-          },
-          {
-            "name": "sort",
-            "in": "query",
-            "description": "Sort field (created_at, updated_at, id, tag_count)",
-            "type": "string"
-          },
-          {
-            "name": "order",
-            "in": "query",
-            "description": "Sort order (asc, desc)",
-            "type": "string"
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "description": "Limit results",
-            "type": "integer"
-          },
-          {
-            "name": "offset",
-            "in": "query",
-            "description": "Offset results",
-            "type": "integer"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Query results with metadata",
-            "schema": {
-              "$ref": "#/definitions/QueryEntityResponse"
-            }
-          }
-        }
-      }
-    },
-    "/entities/changes": {
-      "get": {
-        "tags": ["temporal"],
-        "summary": "Get recent changes",
-        "description": "Retrieve entities that have changed since a given timestamp",
-        "produces": ["application/json"],
-        "parameters": [
-          {
-            "name": "since",
-            "in": "query",
-            "description": "Timestamp in RFC3339 format (default: 1 hour ago)",
-            "type": "string"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Recent changes",
-            "schema": {
-              "type": "array",
-              "items": {
-                "$ref": "#/definitions/Entity"
-              }
-            }
-          }
-        }
-      }
-    },
-    "/entities/diff": {
-      "get": {
-        "tags": ["temporal"],
-        "summary": "Get entity diff",
-        "description": "Compare an entity at two different points in time",
-        "produces": ["application/json"],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "query",
-            "description": "Entity ID",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "t1",
-            "in": "query",
-            "description": "First timestamp in RFC3339 format",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "t2",
-            "in": "query",
-            "description": "Second timestamp in RFC3339 format",
-            "required": true,
-            "type": "string"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Entity diff",
-            "schema": {
-              "type": "object",
-              "additionalProperties": true
-            }
-          }
-        }
-      }
-    },
-    "/auth/refresh": {
-      "post": {
-        "tags": ["auth"],
-        "summary": "Refresh token",
-        "description": "Refresh the session token expiration",
-        "security": [{"BearerAuth": []}],
-        "responses": {
-          "200": {
-            "description": "Token refreshed successfully",
-            "schema": {
-              "type": "object",
-              "properties": {
-                "token": {
-                  "type": "string"
+    "definitions": {
+        "api.ActivityItem": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string"
                 },
-                "expires_at": {
-                  "type": "string",
-                  "format": "date-time"
+                "timestamp": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
                 }
-              }
             }
-          },
-          "401": {
-            "description": "Invalid or expired token",
-            "schema": {
-              "$ref": "#/definitions/ErrorResponse"
+        },
+        "api.ActivityStats": {
+            "type": "object",
+            "properties": {
+                "average_response_time_ms": {
+                    "type": "number"
+                },
+                "error_rate": {
+                    "type": "number"
+                },
+                "operations_per_hour": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "integer"
+                    }
+                },
+                "recent_operations": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.OperationStat"
+                    }
+                }
             }
-          }
-        }
-      }
-    },
-    "/auth/status": {
-      "get": {
-        "tags": ["auth"],
-        "summary": "Auth status",
-        "description": "Check authentication status and session validity",
-        "security": [{"BearerAuth": []}],
-        "responses": {
-          "200": {
-            "description": "Authentication status",
-            "schema": {
-              "type": "object",
-              "properties": {
+        },
+        "api.AgentStats": {
+            "type": "object",
+            "properties": {
+                "active": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "api.AuthStatusResponse": {
+            "description": "Current authentication status",
+            "type": "object",
+            "properties": {
                 "authenticated": {
-                  "type": "boolean"
+                    "type": "boolean",
+                    "example": true
                 },
                 "expires_at": {
-                  "type": "string",
-                  "format": "date-time"
+                    "type": "string",
+                    "example": "2025-01-01T12:00:00Z"
                 },
                 "user": {
-                  "$ref": "#/definitions/UserInfo"
+                    "$ref": "#/definitions/api.UserInfo"
                 }
-              }
             }
-          },
-          "401": {
-            "description": "No token or invalid token",
-            "schema": {
-              "$ref": "#/definitions/ErrorResponse"
-            }
-          }
-        }
-      }
-    },
-    "/dashboard/stats": {
-      "get": {
-        "tags": ["dashboard"],
-        "summary": "Dashboard statistics",
-        "description": "Get dashboard statistics and metrics",
-        "security": [{"BearerAuth": []}],
-        "produces": ["application/json"],
-        "responses": {
-          "200": {
-            "description": "Dashboard statistics",
-            "schema": {
-              "type": "object",
-              "properties": {
-                "total_entities": {
-                  "type": "integer"
+        },
+        "api.ChangePasswordRequest": {
+            "type": "object",
+            "properties": {
+                "current_password": {
+                    "type": "string"
                 },
-                "entity_breakdown": {
-                  "type": "object",
-                  "additionalProperties": {
-                    "type": "integer"
-                  }
+                "new_password": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.ConfigSetRequest": {
+            "type": "object",
+            "properties": {
+                "key": {
+                    "type": "string"
+                },
+                "namespace": {
+                    "type": "string"
+                },
+                "value": {}
+            }
+        },
+        "api.CreateEntityRequest": {
+            "type": "object",
+            "properties": {
+                "content": {
+                    "description": "Can be string, map, or byte array (base64 encoded)"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "api.CreateUserRequest": {
+            "type": "object",
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "full_name": {
+                    "type": "string"
+                },
+                "password": {
+                    "type": "string"
+                },
+                "role": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.DashboardStatsResponse": {
+            "type": "object",
+            "properties": {
+                "agent_stats": {
+                    "$ref": "#/definitions/api.AgentStats"
+                },
+                "issue_stats": {
+                    "$ref": "#/definitions/api.IssueStats"
                 },
                 "recent_activity": {
-                  "type": "array",
-                  "items": {
-                    "type": "object"
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/config": {
-      "get": {
-        "tags": ["configuration"],
-        "summary": "Get configuration",
-        "description": "Retrieve current system configuration",
-        "security": [{"BearerAuth": []}],
-        "produces": ["application/json"],
-        "responses": {
-          "200": {
-            "description": "Current configuration",
-            "schema": {
-              "type": "object",
-              "additionalProperties": true
-            }
-          }
-        }
-      }
-    },
-    "/config/set": {
-      "post": {
-        "tags": ["configuration"],
-        "summary": "Set configuration",
-        "description": "Update system configuration values",
-        "security": [{"BearerAuth": []}],
-        "consumes": ["application/json"],
-        "produces": ["application/json"],
-        "parameters": [
-          {
-            "in": "body",
-            "name": "body",
-            "description": "Configuration data",
-            "required": true,
-            "schema": {
-              "type": "object",
-              "properties": {
-                "key": {
-                  "type": "string"
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.ActivityItem"
+                    }
                 },
-                "value": {
-                  "type": "string"
-                }
-              }
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Configuration updated",
-            "schema": {
-              "type": "object",
-              "properties": {
-                "success": {
-                  "type": "boolean"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/feature-flags": {
-      "get": {
-        "tags": ["configuration"],
-        "summary": "Get feature flags",
-        "description": "Retrieve all feature flags",
-        "security": [{"BearerAuth": []}],
-        "produces": ["application/json"],
-        "responses": {
-          "200": {
-            "description": "Feature flags",
-            "schema": {
-              "type": "object",
-              "additionalProperties": {
-                "type": "boolean"
-              }
-            }
-          }
-        }
-      }
-    },
-    "/feature-flags/set": {
-      "post": {
-        "tags": ["configuration"],
-        "summary": "Set feature flag",
-        "description": "Update a feature flag value",
-        "security": [{"BearerAuth": []}],
-        "consumes": ["application/json"],
-        "produces": ["application/json"],
-        "parameters": [
-          {
-            "in": "body",
-            "name": "body",
-            "description": "Feature flag data",
-            "required": true,
-            "schema": {
-              "type": "object",
-              "properties": {
-                "flag": {
-                  "type": "string"
+                "user_count": {
+                    "type": "integer"
                 },
+                "workspace_count": {
+                    "type": "integer"
+                }
+            }
+        },
+        "api.DatabaseMetrics": {
+            "type": "object",
+            "properties": {
+                "avg_tags_per_entity": {
+                    "type": "number"
+                },
+                "entities_by_status": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "integer"
+                    }
+                },
+                "entities_by_type": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "integer"
+                    }
+                },
+                "tags_total": {
+                    "type": "integer"
+                },
+                "tags_unique": {
+                    "type": "integer"
+                },
+                "total_entities": {
+                    "type": "integer"
+                }
+            }
+        },
+        "api.DetailedMemoryMetrics": {
+            "description": "Detailed memory usage statistics",
+            "type": "object",
+            "properties": {
+                "alloc_bytes": {
+                    "type": "integer",
+                    "example": 10031960
+                },
+                "heap_alloc_bytes": {
+                    "type": "integer",
+                    "example": 10031960
+                },
+                "heap_idle_bytes": {
+                    "type": "integer",
+                    "example": 4472832
+                },
+                "heap_in_use_bytes": {
+                    "type": "integer",
+                    "example": 11649024
+                },
+                "heap_sys_bytes": {
+                    "type": "integer",
+                    "example": 16121856
+                },
+                "stack_in_use_bytes": {
+                    "type": "integer",
+                    "example": 655360
+                },
+                "sys_bytes": {
+                    "type": "integer",
+                    "example": 21453840
+                },
+                "total_alloc_bytes": {
+                    "type": "integer",
+                    "example": 10685192
+                }
+            }
+        },
+        "api.EntitySizeInfo": {
+            "type": "object",
+            "properties": {
+                "entity_type": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "size_bytes": {
+                    "type": "integer"
+                },
+                "tag_count": {
+                    "type": "integer"
+                }
+            }
+        },
+        "api.EntityStats": {
+            "type": "object",
+            "properties": {
+                "created_this_month": {
+                    "type": "integer"
+                },
+                "created_this_week": {
+                    "type": "integer"
+                },
+                "created_today": {
+                    "type": "integer"
+                },
+                "largest_entity": {
+                    "$ref": "#/definitions/api.EntitySizeInfo"
+                },
+                "smallest_entity": {
+                    "$ref": "#/definitions/api.EntitySizeInfo"
+                },
+                "updated_today": {
+                    "type": "integer"
+                }
+            }
+        },
+        "api.ErrorResponse": {
+            "description": "Error information",
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string",
+                    "example": "Invalid request"
+                }
+            }
+        },
+        "api.FeatureFlagRequest": {
+            "description": "Feature flag update request",
+            "type": "object",
+            "properties": {
                 "enabled": {
-                  "type": "boolean"
+                    "type": "boolean",
+                    "example": true
+                },
+                "flag": {
+                    "type": "string",
+                    "example": "new_ui"
                 }
-              }
             }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Feature flag updated",
-            "schema": {
-              "type": "object",
-              "properties": {
-                "success": {
-                  "type": "boolean"
+        },
+        "api.HealthMetrics": {
+            "description": "System health and performance metrics",
+            "type": "object",
+            "properties": {
+                "database_size_bytes": {
+                    "type": "integer",
+                    "example": 1048576
+                },
+                "entity_count": {
+                    "type": "integer",
+                    "example": 100
+                },
+                "goroutines": {
+                    "type": "integer",
+                    "example": 25
+                },
+                "memory_usage": {
+                    "$ref": "#/definitions/api.MemoryMetrics"
+                },
+                "user_count": {
+                    "type": "integer",
+                    "example": 5
                 }
-              }
             }
-          }
-        }
-      }
-    },
-    "/status": {
-      "get": {
-        "tags": ["system"],
-        "summary": "API status",
-        "description": "Check API status and version",
-        "produces": ["application/json"],
-        "responses": {
-          "200": {
-            "description": "API status",
-            "schema": {
-              "type": "object",
-              "properties": {
+        },
+        "api.HealthResponse": {
+            "type": "object",
+            "properties": {
+                "checks": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "metrics": {
+                    "$ref": "#/definitions/api.HealthMetrics"
+                },
                 "status": {
-                  "type": "string",
-                  "example": "ok"
+                    "type": "string"
+                },
+                "timestamp": {
+                    "type": "string"
+                },
+                "uptime": {
+                    "type": "string"
                 },
                 "version": {
-                  "type": "string",
-                  "example": "2.6.0"
-                },
-                "time": {
-                  "type": "string",
-                  "format": "date-time"
+                    "type": "string"
                 }
-              }
             }
-          }
+        },
+        "api.IssueStats": {
+            "type": "object",
+            "properties": {
+                "by_priority": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "integer"
+                    }
+                },
+                "by_status": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "integer"
+                    }
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "api.LoginRequest": {
+            "description": "Login credentials",
+            "type": "object",
+            "properties": {
+                "password": {
+                    "type": "string",
+                    "example": "password123"
+                },
+                "username": {
+                    "type": "string",
+                    "example": "admin"
+                }
+            }
+        },
+        "api.LoginResponse": {
+            "description": "Authentication response with session token",
+            "type": "object",
+            "properties": {
+                "expires_at": {
+                    "type": "string",
+                    "example": "2025-01-01T12:00:00Z"
+                },
+                "token": {
+                    "type": "string",
+                    "example": "token_abc123..."
+                },
+                "user": {
+                    "$ref": "#/definitions/api.UserInfo"
+                }
+            }
+        },
+        "api.MemoryMetrics": {
+            "description": "Memory usage statistics",
+            "type": "object",
+            "properties": {
+                "alloc_bytes": {
+                    "type": "integer",
+                    "example": 10485760
+                },
+                "num_gc": {
+                    "type": "integer",
+                    "example": 5
+                },
+                "sys_bytes": {
+                    "type": "integer",
+                    "example": 73400320
+                },
+                "total_alloc_bytes": {
+                    "type": "integer",
+                    "example": 20971520
+                }
+            }
+        },
+        "api.OperationStat": {
+            "type": "object",
+            "properties": {
+                "duration_ms": {
+                    "type": "number"
+                },
+                "entity_id": {
+                    "type": "string"
+                },
+                "entity_type": {
+                    "type": "string"
+                },
+                "operation": {
+                    "type": "string"
+                },
+                "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.PerformanceMetrics": {
+            "description": "Performance and runtime metrics",
+            "type": "object",
+            "properties": {
+                "gc_runs": {
+                    "type": "integer",
+                    "example": 3
+                },
+                "index_lookups": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "last_gc_pause_ns": {
+                    "type": "integer",
+                    "example": 140707
+                },
+                "query_cache_hits": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "query_cache_miss": {
+                    "type": "integer",
+                    "example": 0
+                },
+                "total_gc_pause_ns": {
+                    "type": "integer",
+                    "example": 236206
+                }
+            }
+        },
+        "api.QueryEntityResponse": {
+            "type": "object",
+            "properties": {
+                "entities": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.Entity"
+                    }
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "offset": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "api.RefreshResponse": {
+            "description": "Refreshed session information",
+            "type": "object",
+            "properties": {
+                "expires_at": {
+                    "type": "string",
+                    "example": "2025-01-01T14:00:00Z"
+                },
+                "token": {
+                    "type": "string",
+                    "example": "token_xyz789..."
+                }
+            }
+        },
+        "api.RelationshipListResponse": {
+            "description": "List of entity relationships",
+            "type": "object",
+            "properties": {
+                "count": {
+                    "type": "integer",
+                    "example": 5
+                },
+                "relationships": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.RelationshipResponse"
+                    }
+                }
+            }
+        },
+        "api.RelationshipRequest": {
+            "description": "Relationship creation data",
+            "type": "object",
+            "properties": {
+                "relationship_type": {
+                    "type": "string",
+                    "example": "contains"
+                },
+                "source_id": {
+                    "type": "string",
+                    "example": "entity_123"
+                },
+                "target_id": {
+                    "type": "string",
+                    "example": "entity_456"
+                }
+            }
+        },
+        "api.RelationshipResponse": {
+            "description": "Entity relationship",
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string",
+                    "example": "2025-01-01T10:00:00Z"
+                },
+                "id": {
+                    "type": "string",
+                    "example": "rel_789"
+                },
+                "relationship_type": {
+                    "type": "string",
+                    "example": "contains"
+                },
+                "source_id": {
+                    "type": "string",
+                    "example": "entity_123"
+                },
+                "target_id": {
+                    "type": "string",
+                    "example": "entity_456"
+                }
+            }
+        },
+        "api.ResetPasswordRequest": {
+            "type": "object",
+            "properties": {
+                "password": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.StatusResponse": {
+            "description": "Status message",
+            "type": "object",
+            "properties": {
+                "status": {
+                    "type": "string",
+                    "example": "ok"
+                }
+            }
+        },
+        "api.StorageMetrics": {
+            "type": "object",
+            "properties": {
+                "compression_ratio": {
+                    "type": "number"
+                },
+                "database_size_bytes": {
+                    "type": "integer"
+                },
+                "index_size_bytes": {
+                    "type": "integer"
+                },
+                "total_storage_bytes": {
+                    "type": "integer"
+                },
+                "wal_size_bytes": {
+                    "type": "integer"
+                }
+            }
+        },
+        "api.SuccessResponse": {
+            "description": "Generic success response",
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string",
+                    "example": "Operation completed successfully"
+                },
+                "success": {
+                    "type": "boolean",
+                    "example": true
+                }
+            }
+        },
+        "api.SystemInfo": {
+            "description": "System information and runtime details",
+            "type": "object",
+            "properties": {
+                "current_time": {
+                    "type": "string",
+                    "example": "2025-05-22T14:27:30.71157084+01:00"
+                },
+                "go_version": {
+                    "type": "string",
+                    "example": "go1.24.2"
+                },
+                "num_cpu": {
+                    "type": "integer",
+                    "example": 8
+                },
+                "num_goroutines": {
+                    "type": "integer",
+                    "example": 24
+                },
+                "start_time": {
+                    "type": "string",
+                    "example": "2025-05-22T14:25:18.060290081+01:00"
+                },
+                "uptime": {
+                    "type": "integer",
+                    "example": 132651279965
+                },
+                "uptime_seconds": {
+                    "type": "number",
+                    "example": 132.651279965
+                },
+                "version": {
+                    "type": "string",
+                    "example": "2.14.0+"
+                }
+            }
+        },
+        "api.SystemMetricsResponse": {
+            "type": "object",
+            "properties": {
+                "activity_stats": {
+                    "$ref": "#/definitions/api.ActivityStats"
+                },
+                "database": {
+                    "$ref": "#/definitions/api.DatabaseMetrics"
+                },
+                "entity_stats": {
+                    "$ref": "#/definitions/api.EntityStats"
+                },
+                "memory": {
+                    "$ref": "#/definitions/api.DetailedMemoryMetrics"
+                },
+                "performance": {
+                    "$ref": "#/definitions/api.PerformanceMetrics"
+                },
+                "storage": {
+                    "$ref": "#/definitions/api.StorageMetrics"
+                },
+                "system": {
+                    "$ref": "#/definitions/api.SystemInfo"
+                },
+                "temporal": {
+                    "$ref": "#/definitions/api.TemporalMetrics"
+                }
+            }
+        },
+        "api.TemporalMetrics": {
+            "type": "object",
+            "properties": {
+                "average_timestamp_age_hours": {
+                    "type": "number"
+                },
+                "non_temporal_tags_count": {
+                    "type": "integer"
+                },
+                "temporal_tags_count": {
+                    "type": "integer"
+                },
+                "temporal_tags_ratio": {
+                    "type": "number"
+                },
+                "time_range_end": {
+                    "type": "string"
+                },
+                "time_range_start": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.UserInfo": {
+            "description": "User details",
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string",
+                    "example": "entity_user_admin"
+                },
+                "roles": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "admin",
+                        "user"
+                    ]
+                },
+                "username": {
+                    "type": "string",
+                    "example": "admin"
+                }
+            }
+        },
+        "models.Entity": {
+            "type": "object",
+            "properties": {
+                "content": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "created_at": {
+                    "description": "Timestamps for compatibility (we'll store these in tags)",
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
         }
-      }
     },
-    "/entity-relationships": {
-      "post": {
-        "tags": ["relationships"],
-        "summary": "Create relationship",
-        "description": "Create a new relationship between two entities",
-        "consumes": ["application/json"],
-        "produces": ["application/json"],
-        "parameters": [
-          {
-            "in": "body",
-            "name": "body",
-            "description": "Relationship data",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/RelationshipRequest"
-            }
-          }
-        ],
-        "responses": {
-          "201": {
-            "description": "Relationship created successfully"
-          }
+    "securityDefinitions": {
+        "BearerAuth": {
+            "description": "Bearer token authentication. Example: \"Bearer \u003ctoken\u003e\"",
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
         }
-      },
-      "get": {
-        "tags": ["relationships"],
-        "summary": "Get relationship",
-        "description": "Get a specific relationship between two entities",
-        "produces": ["application/json"],
-        "parameters": [
-          {
-            "name": "source_id",
-            "in": "query",
-            "description": "Source entity ID",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "relationship_type",
-            "in": "query",
-            "description": "Type of relationship",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "target_id",
-            "in": "query",
-            "description": "Target entity ID",
-            "required": true,
-            "type": "string"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Relationship details"
-          }
-        }
-      },
-      "delete": {
-        "tags": ["relationships"],
-        "summary": "Delete relationship",
-        "description": "Delete an existing relationship between two entities",
-        "produces": ["application/json"],
-        "parameters": [
-          {
-            "name": "source_id",
-            "in": "query",
-            "description": "Source entity ID",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "relationship_type",
-            "in": "query",
-            "description": "Type of relationship",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "target_id",
-            "in": "query",
-            "description": "Target entity ID",
-            "required": true,
-            "type": "string"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Relationship deleted successfully"
-          }
-        }
-      }
     }
-  }
 }

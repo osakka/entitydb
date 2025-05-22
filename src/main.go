@@ -282,6 +282,18 @@ func main() {
 	apiRouter.HandleFunc("/entities/create", entityHandlerRBAC.CreateEntityWithRBAC()).Methods("POST")
 	apiRouter.HandleFunc("/entities/update", entityHandlerRBAC.UpdateEntityWithRBAC()).Methods("PUT")
 	apiRouter.HandleFunc("/entities/query", entityHandlerRBAC.QueryEntitiesWithRBAC()).Methods("GET")
+
+	// Hub-aware Entity API routes with RBAC and Hub validation
+	hubEntityHandler := api.NewHubEntityHandlerRBAC(server.entityHandler, server.entityRepo, server.sessionManager)
+	apiRouter.HandleFunc("/hubs/entities/create", hubEntityHandler.CreateHubEntityWithRBAC()).Methods("POST")
+	apiRouter.HandleFunc("/hubs/entities/query", hubEntityHandler.QueryHubEntitiesWithRBAC()).Methods("GET")
+	
+	// Hub management routes with RBAC
+	hubManagementHandler := api.NewHubManagementHandler(server.entityRepo)
+	hubManagementHandlerRBAC := api.NewHubManagementHandlerRBAC(hubManagementHandler, server.entityRepo, server.sessionManager)
+	apiRouter.HandleFunc("/hubs/create", hubManagementHandlerRBAC.CreateHubWithRBAC()).Methods("POST")
+	apiRouter.HandleFunc("/hubs/list", hubManagementHandlerRBAC.ListHubsWithRBAC()).Methods("GET")
+	apiRouter.HandleFunc("/hubs/delete", hubManagementHandlerRBAC.DeleteHubWithRBAC()).Methods("DELETE")
 	
 	// Chunked content API routes
 	apiRouter.HandleFunc("/entities/stream", server.entityHandler.StreamEntity).Methods("GET")
