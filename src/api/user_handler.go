@@ -381,7 +381,16 @@ func (h *UserHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 func parseUserData(content []byte) (map[string]string, error) {
 	userData := make(map[string]string)
 	
-	// Try direct parsing first
+	// First, try to unwrap content if it's wrapped
+	unwrapper := NewContentUnwrapper()
+	unwrappedContent, wrappingLevel, _ := unwrapper.UnwrapContent(content)
+	
+	if wrappingLevel > 0 {
+		logger.Debug("Unwrapped user data content %d levels deep", wrappingLevel)
+		content = unwrappedContent
+	}
+	
+	// Try direct parsing first with unwrapped content
 	if err := json.Unmarshal(content, &userData); err == nil {
 		return userData, nil
 	}
@@ -389,15 +398,10 @@ func parseUserData(content []byte) (map[string]string, error) {
 	// Try as interface map second - handles various content types
 	var dataMap map[string]interface{}
 	if err := json.Unmarshal(content, &dataMap); err == nil {
-		// Check for wrapped content
-		if innerContent, ok := dataMap["application/octet-stream"]; ok && innerContent != nil {
-			innerContentStr, ok := innerContent.(string)
-			if ok {
-				// Try to parse inner content as user data
-				if err := json.Unmarshal([]byte(innerContentStr), &userData); err == nil {
-					return userData, nil
-				}
-			}
+		// Check if we have any nested JSON objects that need further unwrapping
+		if unwrappedMap, levels := unwrapper.UnwrapUserData(dataMap); levels > 0 {
+			dataMap = unwrappedMap
+			logger.Debug("Unwrapped nested data %d more levels deep", levels)
 		}
 		
 		// Convert interface map to string map
@@ -414,6 +418,63 @@ func parseUserData(content []byte) (map[string]string, error) {
 		
 		if len(userData) > 0 {
 			return userData, nil
+		}
+	}
+	
+	// Last resort - try all other formats
+	logger.Debug("Trying various parsing methods for user content")
+	
+	// Try unwrapping multiple times with string conversion
+	strContent := string(content)
+	for i := 0; i < 3; i++ {
+		// Try to find password_hash in the content string directly
+		if strings.Contains(strContent, "password_hash") {
+			// Try to extract JSON that might be embedded in a string
+			jsonStart := strings.Index(strContent, "{")
+			jsonEnd := strings.LastIndex(strContent, "}")
+			
+			if jsonStart >= 0 && jsonEnd > jsonStart {
+				potentialJSON := strContent[jsonStart:jsonEnd+1]
+				if err := json.Unmarshal([]byte(potentialJSON), &userData); err == nil {
+					logger.Debug("Found user data in embedded JSON string")
+					return userData, nil
+				}
+			}
+		}
+		
+		// Try to unwrap one more level by finding application/octet-stream
+		marker := "application/octet-stream"
+		if idx := strings.Index(strContent, marker); idx >= 0 {
+			// Look for JSON after the marker
+			after := strContent[idx+len(marker):]
+			jsonStart := strings.Index(after, "{")
+			
+			if jsonStart >= 0 {
+				after = after[jsonStart:]
+				if err := json.Unmarshal([]byte(after), &userData); err == nil {
+					logger.Debug("Extracted user data after application/octet-stream marker")
+					return userData, nil
+				}
+				
+				// Try quoted JSON
+				quoteStart := strings.Index(after, "\"")
+				quoteEnd := strings.LastIndex(after, "\"")
+				if quoteStart >= 0 && quoteEnd > quoteStart {
+					quotedJSON := after[quoteStart+1:quoteEnd]
+					if err := json.Unmarshal([]byte(quotedJSON), &userData); err == nil {
+						logger.Debug("Extracted user data from quoted JSON")
+						return userData, nil
+					}
+				}
+			}
+		}
+		
+		// Convert the content to JSON from potential string escaping
+		var tempMap map[string]interface{}
+		if err := json.Unmarshal(content, &tempMap); err == nil {
+			// Try to convert to JSON string
+			bytes, _ := json.Marshal(tempMap)
+			strContent = string(bytes)
 		}
 	}
 	

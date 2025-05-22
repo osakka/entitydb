@@ -16,6 +16,9 @@
 # PID files
 *.pid
 
+# BIN files
+*.bin
+
 # Environment files with potential secrets
 *.env
 

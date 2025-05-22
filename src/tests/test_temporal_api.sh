@@ -85,7 +85,7 @@ response=$(eval $curl_cmd)
 
 # Validate the response
 echo "$response" > "$TEMP_DIR/entity_history_response.json"
-if [[ "$response" != *"\"error\":"* ]]; then
+if [[ "$response" == *"\"timestamp\":"* ]]; then
   echo -e "${GREEN}✓ Test passed: $DESCRIPTION${NC}"
   TESTS_PASSED=$((TESTS_PASSED + 1))
 else
@@ -101,7 +101,7 @@ METHOD="GET"
 ENDPOINT="entities/as-of"
 HEADERS="-H \"Content-Type: application/json\""
 DATA=""
-# Use a timestamp from 2 seconds after our entity creation
+# Use the current time as the as-of timestamp which should always return the latest version
 sleep 2
 TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 QUERY="id=$ENTITY_ID&as_of=$TIMESTAMP"

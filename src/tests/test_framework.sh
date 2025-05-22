@@ -6,7 +6,7 @@ set -e # Exit on error
 
 # Configuration
 API_BASE_URL=${API_BASE_URL:-"https://localhost:8085/api/v1"}
-TEST_DIR=${TEST_DIR:-"/opt/entitydb/share/tests/cases"}
+TEST_DIR=${TEST_DIR:-"/opt/entitydb/src/tests/cases"}
 TEMP_DIR=${TEMP_DIR:-"/tmp/entitydb_tests"}
 COLOR_OUTPUT=${COLOR_OUTPUT:-true}
 INSECURE=${INSECURE:-true}  # Allow self-signed certificates

@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"entitydb/models"
 	"os"
+	"strings"
 	"sync"
 	"time"
 	"entitydb/logger"
@@ -102,14 +103,37 @@ func (w *Writer) WriteEntity(entity *models.Entity) error {
 	
 	// Write content as a single item
 	if len(entity.Content) > 0 {
-		// Type: application/octet-stream for raw bytes
-		contentType := "application/octet-stream"
-		binary.Write(w.buffer, binary.LittleEndian, uint16(len(contentType)))
-		w.buffer.WriteString(contentType)
+		// Determine content type from entity tags or default to application/octet-stream
+		contentType := "application/octet-stream" // Default
+		for _, tag := range entity.Tags {
+			if strings.HasPrefix(tag, "content:type:") {
+				// Extract content type from tag (remove timestamp if present)
+				parts := strings.SplitN(tag, "|", 2)
+				tagPart := tag
+				if len(parts) == 2 {
+					tagPart = parts[1] // Use the part after timestamp
+				}
+				if strings.HasPrefix(tagPart, "content:type:") {
+					contentType = strings.TrimPrefix(tagPart, "content:type:")
+					break
+				}
+			}
+		}
 		
-		// Value: the actual content
-		binary.Write(w.buffer, binary.LittleEndian, uint32(len(entity.Content)))
-		w.buffer.Write(entity.Content)
+		// For JSON content, store it directly without additional wrapping
+		if contentType == "application/json" {
+			// Content is already JSON, store it as-is
+			binary.Write(w.buffer, binary.LittleEndian, uint16(len(contentType)))
+			w.buffer.WriteString(contentType)
+			binary.Write(w.buffer, binary.LittleEndian, uint32(len(entity.Content)))
+			w.buffer.Write(entity.Content)
+		} else {
+			// For other content types, use application/octet-stream wrapper
+			binary.Write(w.buffer, binary.LittleEndian, uint16(len("application/octet-stream")))
+			w.buffer.WriteString("application/octet-stream")
+			binary.Write(w.buffer, binary.LittleEndian, uint32(len(entity.Content)))
+			w.buffer.Write(entity.Content)
+		}
 		
 		// Timestamp: current time
 		binary.Write(w.buffer, binary.LittleEndian, time.Now().UnixNano())

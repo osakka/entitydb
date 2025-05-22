@@ -1,6 +1,6 @@
 # EntityDB Content Format Troubleshooting
 
-This document addresses content format issues in EntityDB and provides guidance on diagnosing and resolving them.
+This document addresses content format issues in EntityDB and provides guidance on diagnosing and resolving them, including the recently discovered content wrapping issue.
 
 ## Background
 
@@ -12,6 +12,46 @@ EntityDB v2.13.0 uses a custom binary format (EBF) with a unified Entity model w
 The content field's encoding is critical for proper functionality, especially for user entities that need to be processed by the authentication system.
 
 ## Known Issues
+
+### Content Wrapping Issue (v2.14.0)
+
+In EntityDB version 2.14.0, we've identified an issue where entity content can become wrapped in multiple layers of `application/octet-stream` JSON objects, particularly affecting user authentication. The problem creates a nested structure like:
+
+```json
+{
+  "application/octet-stream": "{\"application/octet-stream\":\"{\\\"username\\\":\\\"admin\\\",\\\"password_hash\\\":\\\"$2a$10$...\\\"}\"}"
+}
+```
+
+This multi-level wrapping causes failed logins, with server logs showing errors like `Password hash is empty for user <id>`.
+
+#### Root Causes:
+
+1. **Inconsistent Content Handling**: Different code paths handle content differently during create/update operations.
+2. **Multiple Content Encoding Layers**: Content gets wrapped in additional layers during some API operations.
+3. **Migration Scripts**: Some initialization scripts don't properly check current content format.
+4. **Mixed Client/Server Processing**: Both client and server may add wrapping layers to content.
+
+#### Resolution:
+
+A patch has been created that adds robust content unwrapping to the login handler. To apply this fix:
+
+1. Run the content unwrapping tool:
+   ```bash
+   cd /opt/entitydb/src
+   go run ./tools/fixes/patch_login_handler.go -verbose
+   ```
+
+2. For specific admin user fixes, run:
+   ```bash
+   cd /opt/entitydb/src
+   go run ./tools/fixes/fix_user_content.go -verbose
+   ```
+
+3. Restart the server to apply the patch:
+   ```bash
+   ./bin/entitydbd.sh restart
+   ```
 
 ### Authentication Failures (500 Error)
 

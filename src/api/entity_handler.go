@@ -1448,8 +1448,24 @@ func (h *EntityHandler) GetEntityDiff(w http.ResponseWriter, r *http.Request) {
 		diff["removed_tags"] = removedTags
 	}
 	
+	// Safely log tag counts with nil checks
+	addedTagCount := 0
+	removedTagCount := 0
+	
+	if addedTags, ok := diff["added_tags"]; ok && addedTags != nil {
+		if tags, ok := addedTags.([]string); ok {
+			addedTagCount = len(tags)
+		}
+	}
+	
+	if removedTags, ok := diff["removed_tags"]; ok && removedTags != nil {
+		if tags, ok := removedTags.([]string); ok {
+			removedTagCount = len(tags)
+		}
+	}
+	
 	logger.Debug("Returning diff result with %d added tags and %d removed tags", 
-		len(diff["added_tags"].([]string)), len(diff["removed_tags"].([]string)))
+		addedTagCount, removedTagCount)
 	RespondJSON(w, http.StatusOK, diff)
 }
 

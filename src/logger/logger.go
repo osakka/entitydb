@@ -11,7 +11,8 @@ import (
 type LogLevel int
 
 const (
-	DEBUG LogLevel = iota
+	TRACE LogLevel = iota // Most detailed level for tracing data flow
+	DEBUG
 	INFO
 	WARN
 	ERROR
@@ -20,12 +21,14 @@ const (
 var (
 	currentLevel LogLevel = INFO
 	levelNames = map[LogLevel]string{
+		TRACE: "TRACE",
 		DEBUG: "DEBUG",
 		INFO:  "INFO",
 		WARN:  "WARN",
 		ERROR: "ERROR",
 	}
 	levelPrefixes = map[LogLevel]string{
+		TRACE: "[EntityDB] TRACE: ",
 		DEBUG: "[EntityDB] DEBUG: ",
 		INFO:  "[EntityDB] INFO: ",
 		WARN:  "[EntityDB] WARN: ",
@@ -43,6 +46,8 @@ func init() {
 // SetLogLevel sets the minimum log level
 func SetLogLevel(level string) error {
 	switch strings.ToLower(level) {
+	case "trace":
+		currentLevel = TRACE
 	case "debug":
 		currentLevel = DEBUG
 	case "info":
@@ -70,6 +75,11 @@ func logf(level LogLevel, format string, args ...interface{}) {
 	}
 }
 
+// Trace logs a trace-level message for detailed data flow tracing
+func Trace(format string, args ...interface{}) {
+	logf(TRACE, format, args...)
+}
+
 // Debug logs a debug message
 func Debug(format string, args ...interface{}) {
 	logf(DEBUG, format, args...)
@@ -88,6 +98,11 @@ func Warn(format string, args ...interface{}) {
 // Error logs an error message
 func Error(format string, args ...interface{}) {
 	logf(ERROR, format, args...)
+}
+
+// Tracef is an alias for Trace
+func Tracef(format string, args ...interface{}) {
+	Trace(format, args...)
 }
 
 // Debugf is an alias for Debug

@@ -507,6 +507,7 @@ func (s *EntityDBServer) initializeEntities() {
 		}
 		contentJSON, _ := json.Marshal(userData)
 		adminUser.Content = contentJSON
+		adminUser.AddTag("content:type:application/json")
 		
 		err = s.entityRepo.Create(adminUser)
 		if err != nil {
@@ -722,22 +723,17 @@ func (s *EntityDBServer) handleLogin(w http.ResponseWriter, r *http.Request) {
 	// Get password hash from entity content
 	var passwordHash string
 	if len(userEntity.Content) > 0 {
-		// First, check if it's the double-encoded format
-		var wrapper map[string]string
-		if err := json.Unmarshal(userEntity.Content, &wrapper); err == nil {
-			// Check if the content is wrapped in application/octet-stream
-			if innerContent, ok := wrapper["application/octet-stream"]; ok {
-				// Parse the inner JSON
-				var userData map[string]string
-				if err := json.Unmarshal([]byte(innerContent), &userData); err == nil {
-					passwordHash = userData["password_hash"]
-				}
+		// With root cause fixed, content should be clean JSON
+		var userData map[string]string
+		if err := json.Unmarshal(userEntity.Content, &userData); err == nil {
+			passwordHash = userData["password_hash"]
+		} else {
+			// Fallback to enhanced unwrapping for existing wrapped content
+			userData, err := extractUserDataWithMultiLevelUnwrap(userEntity.Content)
+			if err == nil {
+				passwordHash = userData["password_hash"]
 			} else {
-				// Try direct parsing (new format)
-				var userData map[string]string
-				if err := json.Unmarshal(userEntity.Content, &userData); err == nil {
-					passwordHash = userData["password_hash"]
-				}
+				logger.Error("Failed to extract user data: %v", err)
 			}
 		}
 	}
@@ -768,22 +764,17 @@ func (s *EntityDBServer) handleLogin(w http.ResponseWriter, r *http.Request) {
 	var roles []string
 	
 	if len(userEntity.Content) > 0 {
-		// First, check if it's the double-encoded format
-		var wrapper map[string]string
-		if err := json.Unmarshal(userEntity.Content, &wrapper); err == nil {
-			// Check if the content is wrapped in application/octet-stream
-			if innerContent, ok := wrapper["application/octet-stream"]; ok {
-				// Parse the inner JSON
-				var userData map[string]string
-				if err := json.Unmarshal([]byte(innerContent), &userData); err == nil {
-					username = userData["username"]
-				}
+		// With root cause fixed, content should be clean JSON
+		var userData map[string]string
+		if err := json.Unmarshal(userEntity.Content, &userData); err == nil {
+			username = userData["username"]
+		} else {
+			// Fallback to enhanced unwrapping for existing wrapped content
+			userData, err := extractUserDataWithMultiLevelUnwrap(userEntity.Content)
+			if err == nil {
+				username = userData["username"]
 			} else {
-				// Try direct parsing (new format)
-				var userData map[string]string
-				if err := json.Unmarshal(userEntity.Content, &userData); err == nil {
-					username = userData["username"]
-				}
+				logger.Debug("Failed to extract username from user data: %v", err)
 			}
 		}
 	}
@@ -975,4 +966,27 @@ func (s *EntityDBServer) serveStaticFile(w http.ResponseWriter, r *http.Request)
 	}
 	
 	http.ServeFile(w, r, fullPath)
+}
+
+// extractUserDataWithMultiLevelUnwrap provides fallback for existing wrapped content
+// This is kept for backward compatibility with existing wrapped entities
+func extractUserDataWithMultiLevelUnwrap(content []byte) (map[string]string, error) {
+	if len(content) == 0 {
+		return nil, fmt.Errorf("empty content")
+	}
+
+	// Try simple unwrapping for existing wrapped content
+	var wrapper map[string]interface{}
+	if err := json.Unmarshal(content, &wrapper); err == nil {
+		if innerContent, ok := wrapper["application/octet-stream"]; ok {
+			if innerStr, ok := innerContent.(string); ok {
+				var userData map[string]string
+				if err := json.Unmarshal([]byte(innerStr), &userData); err == nil {
+					return userData, nil
+				}
+			}
+		}
+	}
+	
+	return nil, fmt.Errorf("failed to extract user data")
 }

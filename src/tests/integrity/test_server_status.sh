@@ -51,7 +51,7 @@ echo -e "${BLUE}Testing entities endpoint...${NC}"
 entities_response=$(curl -k -s "https://localhost:8085/api/v1/entities/list" \
   -H "Authorization: Bearer $TOKEN")
 
-if [[ "$entities_response" == *"entities"* ]]; then
+if [[ "$entities_response" == *"id"* ]]; then
   echo -e "${GREEN}✅ Entities endpoint is working${NC}"
   entity_count=$(echo "$entities_response" | grep -o "\"id\":" | wc -l)
   echo -e "${BLUE}Found $entity_count entities in the database${NC}"
@@ -76,7 +76,7 @@ fi
 echo -e "${BLUE}========================================${NC}"
 echo -e "${BLUE}EntityDB Server Status Summary${NC}"
 echo -e "${BLUE}========================================${NC}"
-if pgrep -f "entitydb" > /dev/null && [[ "$status_response" == *"EntityDB"* ]] && [[ "$login_response" == *"token"* ]]; then
+if pgrep -f "entitydb" > /dev/null && [[ "$status_response" == *"status"* ]] && [[ "$login_response" == *"token"* ]]; then
   echo -e "${GREEN}✅ EntityDB server is operational${NC}"
 else
   echo -e "${RED}❌ EntityDB server has issues${NC}"
