@@ -105,20 +105,28 @@ func (w *Writer) WriteEntity(entity *models.Entity) error {
 	if len(entity.Content) > 0 {
 		// Determine content type from entity tags or default to application/octet-stream
 		contentType := "application/octet-stream" // Default
+		logger.Debug("Entity %s has %d tags, checking for content type", entity.ID, len(entity.Tags))
 		for _, tag := range entity.Tags {
+			logger.Debug("Checking tag: %s", tag)
 			if strings.HasPrefix(tag, "content:type:") {
-				// Extract content type from tag (remove timestamp if present)
+				// Direct match (non-timestamped)
+				contentType = strings.TrimPrefix(tag, "content:type:")
+				logger.Debug("Found direct content type: %s", contentType)
+				break
+			} else if strings.Contains(tag, "|content:type:") {
+				// Timestamped tag
 				parts := strings.SplitN(tag, "|", 2)
-				tagPart := tag
 				if len(parts) == 2 {
-					tagPart = parts[1] // Use the part after timestamp
-				}
-				if strings.HasPrefix(tagPart, "content:type:") {
-					contentType = strings.TrimPrefix(tagPart, "content:type:")
-					break
+					tagPart := parts[1] // Use the part after timestamp
+					if strings.HasPrefix(tagPart, "content:type:") {
+						contentType = strings.TrimPrefix(tagPart, "content:type:")
+						logger.Debug("Found timestamped content type: %s", contentType)
+						break
+					}
 				}
 			}
 		}
+		logger.Debug("Final content type for entity %s: %s", entity.ID, contentType)
 		
 		// For JSON content, store it directly without additional wrapping
 		if contentType == "application/json" {

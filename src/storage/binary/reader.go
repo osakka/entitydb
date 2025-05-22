@@ -3,12 +3,12 @@ package binary
 import (
 	"bytes"
 	"encoding/binary"
-	"encoding/json"
 	"entitydb/models"
 	"entitydb/logger"
 	"errors"
 	"io"
 	"os"
+	"strings"
 )
 
 var (
@@ -230,10 +230,9 @@ func (r *Reader) parseEntity(data []byte, id string) (*models.Entity, error) {
 		entity.Tags[i] = r.tagDict.GetTag(tagID)
 	}
 	
-	// Read content (old format - convert to new format)
-	contentData := make(map[string]string)
-	for i := uint16(0); i < header.ContentCount; i++ {
-		// Type
+	// Read content (new unified format)
+	if header.ContentCount > 0 {
+		// Content type
 		var typeLen uint16
 		if err := binary.Read(buf, binary.LittleEndian, &typeLen); err != nil {
 			return nil, err
@@ -242,14 +241,15 @@ func (r *Reader) parseEntity(data []byte, id string) (*models.Entity, error) {
 		if _, err := buf.Read(typeBytes); err != nil {
 			return nil, err
 		}
+		contentType := string(typeBytes)
 		
-		// Value
-		var valueLen uint32
-		if err := binary.Read(buf, binary.LittleEndian, &valueLen); err != nil {
+		// Content data
+		var contentLen uint32
+		if err := binary.Read(buf, binary.LittleEndian, &contentLen); err != nil {
 			return nil, err
 		}
-		valueBytes := make([]byte, valueLen)
-		if _, err := buf.Read(valueBytes); err != nil {
+		contentBytes := make([]byte, contentLen)
+		if _, err := buf.Read(contentBytes); err != nil {
 			return nil, err
 		}
 		
@@ -259,15 +259,20 @@ func (r *Reader) parseEntity(data []byte, id string) (*models.Entity, error) {
 			return nil, err
 		}
 		
-		// Add to content data map
-		contentData[string(typeBytes)] = string(valueBytes)
-		entity.AddTag("content:type:" + string(typeBytes))
-	}
-	
-	// Convert content data to JSON
-	if len(contentData) > 0 {
-		jsonData, _ := json.Marshal(contentData)
-		entity.Content = jsonData
+		// Store content directly (no conversion needed for JSON)
+		entity.Content = contentBytes
+		
+		// Add content type tag if not already present
+		hasContentTypeTag := false
+		for _, tag := range entity.Tags {
+			if strings.Contains(tag, "content:type:") {
+				hasContentTypeTag = true
+				break
+			}
+		}
+		if !hasContentTypeTag {
+			entity.AddTag("content:type:" + contentType)
+		}
 	}
 	
 	return entity, nil
