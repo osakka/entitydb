@@ -449,11 +449,13 @@ class WorcaAPI {
                 return false;
             }
             
-            // Check for both standard format and hub format
+            // Check for both standard format and hub format (worcha legacy + worca current)
             const matches = entity.tags.some(tag => 
                 tag === `type:${type}` || 
                 tag === `worcha:self:type:${type}` ||
-                (tag.startsWith('hub:worcha') && entity.tags.some(t => t === `worcha:self:type:${type}`))
+                tag === `worca:self:type:${type}` ||
+                (tag.startsWith('hub:worcha') && entity.tags.some(t => t === `worcha:self:type:${type}`)) ||
+                (tag.startsWith('hub:worca') && entity.tags.some(t => t === `worca:self:type:${type}`))
             );
             
             if (matches) {
@@ -478,13 +480,21 @@ class WorcaAPI {
         };
 
         // Extract common properties from tags (handle both standard and hub formats)
-        transformed.type = this.getTagValue(entity.tags, 'type') || this.getTagValue(entity.tags, 'worcha:self:type');
-        transformed.status = this.getTagValue(entity.tags, 'status') || this.getTagValue(entity.tags, 'worcha:self:status');
-        transformed.name = this.getTagValue(entity.tags, 'name') || this.getTagValue(entity.tags, 'worcha:self:name');
-        transformed.title = this.getTagValue(entity.tags, 'title') || this.getTagValue(entity.tags, 'worcha:self:title');
-        transformed.username = this.getTagValue(entity.tags, 'username') || this.getTagValue(entity.tags, 'worcha:self:username');
-        transformed.assignee = this.getTagValue(entity.tags, 'assignee') || this.getTagValue(entity.tags, 'worcha:self:assignee');
-        transformed.priority = this.getTagValue(entity.tags, 'priority') || this.getTagValue(entity.tags, 'worcha:self:priority') || 'medium';
+        transformed.type = this.getTagValue(entity.tags, 'type') || this.getTagValue(entity.tags, 'worca:self:type');
+        transformed.status = this.getTagValue(entity.tags, 'status') || this.getTagValue(entity.tags, 'worca:self:status');
+        transformed.name = this.getTagValue(entity.tags, 'name') || this.getTagValue(entity.tags, 'worca:self:name');
+        transformed.title = this.getTagValue(entity.tags, 'title') || this.getTagValue(entity.tags, 'worca:self:title');
+        transformed.username = this.getTagValue(entity.tags, 'username') || this.getTagValue(entity.tags, 'worca:self:username');
+        transformed.displayName = this.getTagValue(entity.tags, 'displayName') || this.getTagValue(entity.tags, 'worca:self:displayName');
+        transformed.assignee = this.getTagValue(entity.tags, 'assignee') || this.getTagValue(entity.tags, 'worca:self:assignee');
+        transformed.priority = this.getTagValue(entity.tags, 'priority') || this.getTagValue(entity.tags, 'worca:self:priority') || 'medium';
+        transformed.role = this.getTagValue(entity.tags, 'role') || this.getTagValue(entity.tags, 'worca:self:role');
+        transformed.email = this.getTagValue(entity.tags, 'email') || this.getTagValue(entity.tags, 'worca:self:email');
+        
+        // For users, use displayName as name if name is not set
+        if (transformed.type === 'user' && !transformed.name && transformed.displayName) {
+            transformed.name = transformed.displayName;
+        }
 
         // Extract description from content (handle base64 encoded content)
         if (entity.content) {

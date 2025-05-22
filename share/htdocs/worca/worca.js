@@ -835,10 +835,16 @@ function worca() {
         // View Management
         setView(view) {
             this.currentView = view;
-            if (view === 'reports') {
-                // Delay chart initialization to ensure DOM is ready
-                setTimeout(() => this.updateCharts(), 100);
-            }
+            
+            // Re-initialize specific functionality when switching views
+            this.$nextTick(() => {
+                if (view === 'kanban') {
+                    this.initializeKanbanDragDrop();
+                } else if (view === 'reports') {
+                    // Multiple attempts to ensure charts load
+                    this.initializeChartsWithRetry();
+                }
+            });
         },
 
         getViewTitle() {
@@ -867,17 +873,12 @@ function worca() {
             return descriptions[this.currentView] || '';
         },
 
-        setView(view) {
-            this.currentView = view;
-            
-            // Re-initialize specific functionality when switching views
-            this.$nextTick(() => {
-                if (view === 'kanban') {
-                    this.initializeKanbanDragDrop();
-                } else if (view === 'reports') {
-                    this.updateCharts();
-                }
-            });
+
+        // Settings functions
+        refreshSessionData() {
+            console.log('🔄 Refreshing session data...');
+            // In a real implementation, this would fetch from an API
+            console.log('✅ Session data refreshed');
         },
 
         // Data Queries
@@ -932,6 +933,31 @@ function worca() {
         updateCharts() {
             this.updateStatusChart();
             this.updateWorkloadChart();
+        },
+
+        async initializeChartsWithRetry(maxAttempts = 3) {
+            console.log('📊 Initializing charts for reports view...');
+            
+            for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+                console.log(`📊 Chart initialization attempt ${attempt}/${maxAttempts}`);
+                
+                // Wait for DOM to be fully ready
+                await new Promise(resolve => setTimeout(resolve, 150 * attempt));
+                
+                const statusCanvas = document.getElementById('statusChart');
+                const workloadCanvas = document.getElementById('workloadChart');
+                
+                if (statusCanvas && workloadCanvas) {
+                    console.log('✅ Chart canvases found, initializing charts...');
+                    this.updateCharts();
+                    return;
+                } else {
+                    console.warn(`❌ Chart canvases not found on attempt ${attempt}`);
+                    if (attempt === maxAttempts) {
+                        console.error('❌ Failed to find chart canvases after all attempts');
+                    }
+                }
+            }
         },
 
         updateStatusChart() {

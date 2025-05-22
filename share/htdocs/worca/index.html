@@ -660,11 +660,13 @@
         <div x-show="!isAuthenticated" class="login-screen">
             <div class="login-container">
                 <div class="login-header">
-                    <div class="logo">
-                        <i class="fas fa-users-cog"></i>
-                        Worcha
+                    <div class="logo" style="display: flex; flex-direction: column; align-items: center; gap: 15px;">
+                        <img src="worca-artistic-logo.svg" width="140" height="90" alt="Worca" style="filter: drop-shadow(0 4px 8px rgba(6, 182, 212, 0.3));">
+                        <div style="text-align: center;">
+                            <h1 style="font-size: 32px; margin: 0; background: linear-gradient(135deg, #0891b2, #06b6d4); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">Worca</h1>
+                            <p style="margin: 5px 0 0 0; color: #0891b2; font-weight: 500;">Workforce Orchestrator</p>
+                        </div>
                     </div>
-                    <p>Workforce Orchestrator</p>
                 </div>
                 
                 <form @submit.prevent="manualLogin()" class="login-form">
@@ -705,39 +707,45 @@
                 <span class="logo-text">Worca</span>
             </div>
 
-            <nav>
-                <div class="nav-item" :class="{'active': currentView === 'dashboard'}" @click="setView('dashboard')">
-                    <i class="fas fa-tachometer-alt nav-icon"></i>
-                    <span class="nav-text">Dashboard</span>
-                </div>
-                <div class="nav-item" :class="{'active': currentView === 'kanban'}" @click="setView('kanban')">
-                    <i class="fas fa-columns nav-icon"></i>
-                    <span class="nav-text">Kanban Board</span>
-                </div>
-                <div class="nav-item" :class="{'active': currentView === 'projects'}" @click="setView('projects')">
-                    <i class="fas fa-folder-open nav-icon"></i>
-                    <span class="nav-text">Projects</span>
-                </div>
-                <div class="nav-item" :class="{'active': currentView === 'team'}" @click="setView('team')">
-                    <i class="fas fa-users nav-icon"></i>
-                    <span class="nav-text">Team</span>
-                </div>
-                <div class="nav-item" :class="{'active': currentView === 'reports'}" @click="setView('reports')">
-                    <i class="fas fa-chart-bar nav-icon"></i>
-                    <span class="nav-text">Reports</span>
-                </div>
-                <div class="nav-item" :class="{'active': currentView === 'sprints'}" @click="setView('sprints')">
-                    <i class="fas fa-running nav-icon"></i>
-                    <span class="nav-text">Sprints</span>
-                </div>
-                <div class="nav-item" :class="{'active': currentView === 'settings'}" @click="setView('settings')">
-                    <i class="fas fa-cog nav-icon"></i>
-                    <span class="nav-text">Settings</span>
+            <nav style="display: flex; flex-direction: column; height: calc(100vh - 120px);">
+                <!-- Main Navigation Items -->
+                <div class="nav-main">
+                    <div class="nav-item" :class="{'active': currentView === 'dashboard'}" @click="setView('dashboard')">
+                        <i class="fas fa-tachometer-alt nav-icon"></i>
+                        <span class="nav-text">Dashboard</span>
+                    </div>
+                    <div class="nav-item" :class="{'active': currentView === 'kanban'}" @click="setView('kanban')">
+                        <i class="fas fa-columns nav-icon"></i>
+                        <span class="nav-text">Kanban Board</span>
+                    </div>
+                    <div class="nav-item" :class="{'active': currentView === 'projects'}" @click="setView('projects')">
+                        <i class="fas fa-folder-open nav-icon"></i>
+                        <span class="nav-text">Projects</span>
+                    </div>
+                    <div class="nav-item" :class="{'active': currentView === 'team'}" @click="setView('team')">
+                        <i class="fas fa-users nav-icon"></i>
+                        <span class="nav-text">Team</span>
+                    </div>
+                    <div class="nav-item" :class="{'active': currentView === 'reports'}" @click="setView('reports')">
+                        <i class="fas fa-chart-bar nav-icon"></i>
+                        <span class="nav-text">Reports</span>
+                    </div>
+                    <div class="nav-item" :class="{'active': currentView === 'sprints'}" @click="setView('sprints')">
+                        <i class="fas fa-running nav-icon"></i>
+                        <span class="nav-text">Sprints</span>
+                    </div>
                 </div>
                 
-                <div class="nav-item logout-btn" @click="logout()" style="margin-top: 20px; border-top: 1px solid var(--border-color); padding-top: 20px;">
-                    <i class="fas fa-sign-out-alt nav-icon"></i>
-                    <span class="nav-text">Logout</span>
+                <!-- Bottom Navigation Items -->
+                <div class="nav-bottom" style="margin-top: auto; border-top: 2px solid var(--border-color); padding-top: 15px;">
+                    <div class="nav-item" :class="{'active': currentView === 'settings'}" @click="setView('settings')">
+                        <i class="fas fa-cog nav-icon"></i>
+                        <span class="nav-text">Settings</span>
+                    </div>
+                    <div class="nav-item logout-btn" @click="logout()" style="margin-top: 8px;">
+                        <i class="fas fa-sign-out-alt nav-icon"></i>
+                        <span class="nav-text">Logout</span>
+                    </div>
                 </div>
             </nav>
         </div>
@@ -1001,9 +1009,186 @@
 
                 <!-- Settings View -->
                 <div x-show="currentView === 'settings'" class="settings-view">
+                    <!-- General Settings -->
                     <div class="hierarchy-item">
-                        <h3>Worcha Settings</h3>
-                        <p style="color: #6b7280; margin-top: 8px;">Configure your workforce orchestrator</p>
+                        <h3>🐋 Worca Settings</h3>
+                        <p style="color: var(--text-secondary); margin-top: 8px;">Configure your workforce orchestrator</p>
+                        
+                        <div style="margin-top: 20px; display: grid; gap: 15px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; padding: 15px; background: var(--card-bg); border-radius: 8px; border: 1px solid var(--border-color);">
+                                <div>
+                                    <strong>Theme Mode</strong>
+                                    <p style="color: var(--text-secondary); font-size: 14px; margin-top: 2px;">Switch between light and dark themes</p>
+                                </div>
+                                <button @click="toggleTheme()" class="btn btn-secondary" style="padding: 8px 16px;">
+                                    <i class="fas" :class="darkMode ? 'fa-sun' : 'fa-moon'"></i>
+                                    <span x-text="darkMode ? 'Light Mode' : 'Dark Mode'"></span>
+                                </button>
+                            </div>
+                            
+                            <div style="display: flex; justify-content: space-between; align-items: center; padding: 15px; background: var(--card-bg); border-radius: 8px; border: 1px solid var(--border-color);">
+                                <div>
+                                    <strong>Sidebar Layout</strong>
+                                    <p style="color: var(--text-secondary); font-size: 14px; margin-top: 2px;">Collapse sidebar to save space</p>
+                                </div>
+                                <button @click="toggleSidebar()" class="btn btn-secondary" style="padding: 8px 16px;">
+                                    <i class="fas" :class="sidebarCollapsed ? 'fa-expand' : 'fa-compress'"></i>
+                                    <span x-text="sidebarCollapsed ? 'Expand' : 'Collapse'"></span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- User Management -->
+                    <div class="hierarchy-item">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                            <div>
+                                <h3>👥 User Management</h3>
+                                <p style="color: var(--text-secondary); margin-top: 4px;">Manage team members and their roles</p>
+                            </div>
+                            <button class="btn" @click="showCreateUserModal = true">
+                                <i class="fas fa-user-plus"></i>
+                                Add User
+                            </button>
+                        </div>
+                        
+                        <div style="overflow-x: auto;">
+                            <table style="width: 100%; border-collapse: collapse;">
+                                <thead>
+                                    <tr style="background: var(--hover-bg); border-bottom: 2px solid var(--border-color);">
+                                        <th style="text-align: left; padding: 12px; font-weight: 600;">Name</th>
+                                        <th style="text-align: left; padding: 12px; font-weight: 600;">Role</th>
+                                        <th style="text-align: left; padding: 12px; font-weight: 600;">Email</th>
+                                        <th style="text-align: left; padding: 12px; font-weight: 600;">Status</th>
+                                        <th style="text-align: center; padding: 12px; font-weight: 600;">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <template x-for="user in teamMembers" :key="user.id">
+                                        <tr style="border-bottom: 1px solid var(--border-color);">
+                                            <td style="padding: 12px;">
+                                                <div style="display: flex; align-items: center; gap: 10px;">
+                                                    <div style="width: 32px; height: 32px; background: var(--primary-color); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 14px;" x-text="user.name ? user.name.charAt(0).toUpperCase() : '?'"></div>
+                                                    <span x-text="user.name || 'Unnamed User'"></span>
+                                                </div>
+                                            </td>
+                                            <td style="padding: 12px;">
+                                                <span class="task-assignee" x-text="user.role || 'No Role'"></span>
+                                            </td>
+                                            <td style="padding: 12px; color: var(--text-secondary);" x-text="user.email || 'No Email'"></td>
+                                            <td style="padding: 12px;">
+                                                <span style="padding: 4px 8px; border-radius: 12px; font-size: 11px; background: #d1fae5; color: #065f46;">Active</span>
+                                            </td>
+                                            <td style="padding: 12px; text-align: center;">
+                                                <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px; margin-right: 5px;">
+                                                    <i class="fas fa-edit"></i>
+                                                </button>
+                                                <button class="btn" style="padding: 4px 8px; font-size: 12px; background: #ef4444;">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Session Management -->
+                    <div class="hierarchy-item">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                            <div>
+                                <h3>🔐 Active Sessions</h3>
+                                <p style="color: var(--text-secondary); margin-top: 4px;">Monitor user sessions and activity</p>
+                            </div>
+                            <button class="btn btn-secondary" @click="refreshSessionData()">
+                                <i class="fas fa-sync"></i>
+                                Refresh
+                            </button>
+                        </div>
+                        
+                        <div style="display: grid; gap: 12px;">
+                            <!-- Current Session -->
+                            <div style="padding: 15px; background: var(--card-bg); border-radius: 8px; border: 2px solid var(--primary-color); position: relative;">
+                                <div style="position: absolute; top: 8px; right: 8px; padding: 2px 8px; background: var(--primary-color); color: white; border-radius: 12px; font-size: 10px; font-weight: bold;">CURRENT</div>
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <div>
+                                        <strong style="display: flex; align-items: center; gap: 8px;">
+                                            <i class="fas fa-desktop" style="color: var(--primary-color);"></i>
+                                            Your Session
+                                        </strong>
+                                        <p style="color: var(--text-secondary); font-size: 14px; margin-top: 4px;">
+                                            Started: <span x-text="new Date().toLocaleString()"></span>
+                                        </p>
+                                        <p style="color: var(--text-secondary); font-size: 14px;">
+                                            IP: 127.0.0.1 • Browser: Chrome
+                                        </p>
+                                    </div>
+                                    <div style="text-align: right;">
+                                        <div style="padding: 4px 8px; background: #d1fae5; color: #065f46; border-radius: 12px; font-size: 11px; font-weight: bold;">ACTIVE</div>
+                                        <p style="color: var(--text-secondary); font-size: 12px; margin-top: 4px;">2h 34m active</p>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Demo inactive session -->
+                            <div style="padding: 15px; background: var(--card-bg); border-radius: 8px; border: 1px solid var(--border-color); opacity: 0.7;">
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <div>
+                                        <strong style="display: flex; align-items: center; gap: 8px;">
+                                            <i class="fas fa-mobile-alt" style="color: var(--text-secondary);"></i>
+                                            Mobile Session
+                                        </strong>
+                                        <p style="color: var(--text-secondary); font-size: 14px; margin-top: 4px;">
+                                            Last seen: 1 hour ago
+                                        </p>
+                                        <p style="color: var(--text-secondary); font-size: 14px;">
+                                            IP: 192.168.1.45 • Safari Mobile
+                                        </p>
+                                    </div>
+                                    <div style="text-align: right;">
+                                        <div style="padding: 4px 8px; background: #fef3c7; color: #92400e; border-radius: 12px; font-size: 11px; font-weight: bold;">EXPIRED</div>
+                                        <button class="btn" style="padding: 4px 8px; font-size: 12px; margin-top: 8px; background: #ef4444;">
+                                            <i class="fas fa-ban"></i>
+                                            Revoke
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- System Information -->
+                    <div class="hierarchy-item">
+                        <h3>ℹ️ System Information</h3>
+                        <div style="margin-top: 15px; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                            <div style="padding: 15px; background: var(--card-bg); border-radius: 8px; border: 1px solid var(--border-color);">
+                                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+                                    <i class="fas fa-database" style="color: var(--primary-color);"></i>
+                                    <strong>EntityDB</strong>
+                                </div>
+                                <p style="color: var(--text-secondary); font-size: 14px;">Connected & Healthy</p>
+                                <p style="color: var(--text-secondary); font-size: 12px; margin-top: 4px;">Version 2.14.0</p>
+                            </div>
+                            
+                            <div style="padding: 15px; background: var(--card-bg); border-radius: 8px; border: 1px solid var(--border-color);">
+                                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+                                    <i class="fas fa-server" style="color: var(--primary-color);"></i>
+                                    <strong>Server</strong>
+                                </div>
+                                <p style="color: var(--text-secondary); font-size: 14px;">Running Smoothly</p>
+                                <p style="color: var(--text-secondary); font-size: 12px; margin-top: 4px;">Uptime: 5h 23m</p>
+                            </div>
+                            
+                            <div style="padding: 15px; background: var(--card-bg); border-radius: 8px; border: 1px solid var(--border-color);">
+                                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+                                    <i class="fas fa-chart-line" style="color: var(--primary-color);"></i>
+                                    <strong>Performance</strong>
+                                </div>
+                                <p style="color: var(--text-secondary); font-size: 14px;">Excellent</p>
+                                <p style="color: var(--text-secondary); font-size: 12px; margin-top: 4px;">Response: 45ms avg</p>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
