@@ -58,10 +58,5 @@ func FixTemporalTagIndex(handler *EntityHandler) error {
 	}
 	
 	// Fix the tag index
-	if repo.ReindexTags != nil {
-		return repo.ReindexTags()
-	}
-	
-	logger.Warn("Repository doesn't support ReindexTags method")
-	return nil
+	return repo.ReindexTags()
 }

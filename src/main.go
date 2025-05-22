@@ -299,6 +299,27 @@ func main() {
 	apiRouter.HandleFunc("/entities/changes-fixed", entityHandlerRBAC.GetRecentChangesWithRBAC()).Methods("GET")
 	apiRouter.HandleFunc("/entities/diff-fixed", entityHandlerRBAC.GetEntityDiffWithRBAC()).Methods("GET")
 	
+	// Tag index fix endpoint
+	apiRouter.HandleFunc("/patches/reindex-tags", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			w.Write([]byte(`{"error":"Method not allowed"}`))
+			return
+		}
+		
+		// Apply the tag fix
+		err := api.FixTemporalTagIndex(server.entityHandler)
+		if err != nil {
+			logger.Error("Failed to fix temporal tag index: %v", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte(`{"error":"Failed to fix temporal tag index"}`))
+			return
+		}
+		
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"status":"success","message":"Temporal tag index has been fixed"}`))
+	}).Methods("POST")
+	
 	// Entity relationship routes
 	apiRouter.HandleFunc("/entity-relationships", server.handleEntityRelationships).Methods("GET", "POST")
 	

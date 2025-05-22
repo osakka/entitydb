@@ -1435,3 +1435,85 @@ func (r *EntityRepository) RepairIndex() error {
 	
 	return writer.RepairIndex()
 }
+
+// ReindexTags rebuilds all tag indexes from scratch
+func (r *EntityRepository) ReindexTags() error {
+	logger.Info("Starting tag reindexing...")
+	
+	// Acquire write lock to prevent concurrent access during reindexing
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	
+	// Clear existing indexes
+	r.tagIndex = make(map[string][]string)
+	r.contentIndex = make(map[string][]string)
+	r.temporalIndex = NewTemporalIndex()
+	r.namespaceIndex = NewNamespaceIndex()
+	r.entities = make(map[string]*models.Entity)
+	
+	logger.Debug("Cleared existing indexes")
+	
+	// Create a new reader to read all entities
+	reader, err := NewReader(r.getDataFile())
+	if err != nil {
+		logger.Error("Failed to create reader for reindexing: %v", err)
+		return fmt.Errorf("failed to create reader: %w", err)
+	}
+	defer reader.Close()
+	
+	// Read all entities from disk
+	entities, err := reader.GetAllEntities()
+	if err != nil {
+		logger.Error("Failed to read entities for reindexing: %v", err)
+		return fmt.Errorf("failed to read entities: %w", err)
+	}
+	
+	logger.Info("Read %d entities for reindexing", len(entities))
+	
+	// Rebuild indexes for each entity
+	for i, entity := range entities {
+		// Store entity in memory cache
+		r.entities[entity.ID] = entity
+		
+		// Update tag index
+		for _, tag := range entity.Tags {
+			// Always index the full tag (with timestamp)
+			r.tagIndex[tag] = append(r.tagIndex[tag], entity.ID)
+			
+			// Handle temporal tags
+			if strings.Contains(tag, "|") {
+				parts := strings.SplitN(tag, "|", 2)
+				if len(parts) == 2 {
+					// Try to parse timestamp for temporal index
+					if timestamp, err := time.Parse(time.RFC3339Nano, parts[0]); err == nil {
+						r.temporalIndex.AddEntry(entity.ID, tag, timestamp)
+					}
+					
+					// Index the actual tag part too (without timestamp)
+					actualTag := parts[1]
+					r.tagIndex[actualTag] = append(r.tagIndex[actualTag], entity.ID)
+				}
+			}
+			
+			// Add to namespace index
+			r.namespaceIndex.AddTag(entity.ID, tag)
+		}
+		
+		// Update content index
+		if len(entity.Content) > 0 {
+			contentStr := string(entity.Content)
+			r.contentIndex[contentStr] = append(r.contentIndex[contentStr], entity.ID)
+		}
+		
+		// Log progress for large datasets
+		if (i+1)%1000 == 0 {
+			logger.Debug("Reindexed %d/%d entities", i+1, len(entities))
+		}
+	}
+	
+	// Clear the query cache since indexes have changed
+	r.cache.Clear()
+	
+	logger.Info("Tag reindexing completed successfully. Indexed %d entities", len(entities))
+	return nil
+}

@@ -4,7 +4,7 @@
 
 set -e
 
-BASE_URL="http://localhost:8085"
+BASE_URL="https://localhost:8085"
 API_BASE="$BASE_URL/api/v1"
 
 echo "=== Testing Root Cause Fix ==="
@@ -13,7 +13,7 @@ echo
 
 # Test login first
 echo "Testing initial login..."
-response=$(curl -s -w "%{http_code}" -X POST "$API_BASE/auth/login" \
+response=$(curl -k -s -w "%{http_code}" -X POST "$API_BASE/auth/login" \
     -H "Content-Type: application/json" \
     -d '{"username": "admin", "password": "admin"}' -o /tmp/login_response.json)
 
@@ -38,7 +38,7 @@ entity_data=$(cat <<EOF
 EOF
 )
 
-response=$(curl -s -w "%{http_code}" -X POST "$API_BASE/entities/create" \
+response=$(curl -k -s -w "%{http_code}" -X POST "$API_BASE/entities/create" \
     -H "Content-Type: application/json" \
     -H "Authorization: Bearer $token" \
     -d "$entity_data" -o /tmp/create_response.json)
@@ -55,7 +55,7 @@ fi
 
 # Retrieve the entity and check content format
 echo "Retrieving entity to check content format..."
-response=$(curl -s -w "%{http_code}" -X GET "$API_BASE/entities/get?id=$entity_id" \
+response=$(curl -k -s -w "%{http_code}" -X GET "$API_BASE/entities/get?id=$entity_id" \
     -H "Authorization: Bearer $token" -o /tmp/get_response.json)
 
 http_code="${response: -3}"
