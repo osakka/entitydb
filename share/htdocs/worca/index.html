@@ -131,53 +131,6 @@
             padding: 20px 10px;
         }
 
-        .sidebar-toggle {
-            position: absolute;
-            top: 15px;
-            right: -15px;
-            width: 30px;
-            height: 30px;
-            background: var(--primary-color);
-            color: white;
-            border: none;
-            border-radius: 50%;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 2px 8px var(--shadow);
-            z-index: 10;
-            transition: all 0.3s ease;
-        }
-
-        .sidebar-toggle:hover {
-            background: #5a67d8;
-            transform: scale(1.1);
-        }
-
-        .theme-toggle {
-            position: absolute;
-            top: 55px;
-            right: -15px;
-            width: 30px;
-            height: 30px;
-            background: var(--primary-color);
-            color: white;
-            border: none;
-            border-radius: 50%;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 2px 8px var(--shadow);
-            z-index: 10;
-            transition: all 0.3s ease;
-        }
-
-        .theme-toggle:hover {
-            background: #5a67d8;
-            transform: scale(1.1);
-        }
 
         .logo {
             font-size: 28px;
@@ -751,16 +704,9 @@
         <div x-show="isAuthenticated" class="app-container">
         <!-- Sidebar -->
         <div class="sidebar" :class="{'open': sidebarOpen, 'collapsed': sidebarCollapsed}">
-            <!-- Toggle Buttons -->
-            <button class="sidebar-toggle" @click="toggleSidebar()" :title="sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'">
-                <i class="fas" :class="sidebarCollapsed ? 'fa-chevron-right' : 'fa-chevron-left'"></i>
-            </button>
-            <button class="theme-toggle" @click="toggleTheme()" :title="darkMode ? 'Switch to light mode' : 'Switch to dark mode'">
-                <i class="fas" :class="darkMode ? 'fa-sun' : 'fa-moon'"></i>
-            </button>
-            
-            <div class="logo">
-                <img src="worca-icon.svg" width="32" height="32" class="nav-icon" alt="Worca" style="border-radius: 50%; filter: drop-shadow(0 2px 4px var(--shadow));">
+            <!-- Logo with sidebar toggle functionality -->
+            <div class="logo" @click="toggleSidebar()" style="cursor: pointer;" :title="sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'">
+                <img :src="darkMode ? 'worca-logo-dark.svg' : 'worca-logo-light.svg'" width="32" height="32" class="nav-icon" alt="Worca" style="border-radius: 50%; filter: drop-shadow(0 2px 4px var(--shadow)); transition: transform 0.3s ease;" :style="sidebarCollapsed ? 'transform: scale(0.9)' : 'transform: scale(1)'">
                 <span class="logo-text">Worca</span>
             </div>
 
@@ -795,6 +741,12 @@
                 
                 <!-- Bottom Navigation Items -->
                 <div class="nav-bottom" style="margin-top: auto; border-top: 2px solid var(--border-color); padding-top: 15px;">
+                    <!-- Theme Toggle -->
+                    <div class="nav-item" @click="toggleTheme()" :title="darkMode ? 'Switch to light mode' : 'Switch to dark mode'" style="margin-bottom: 8px;">
+                        <i class="fas nav-icon" :class="darkMode ? 'fa-sun' : 'fa-moon'"></i>
+                        <span class="nav-text" x-text="darkMode ? 'Light Mode' : 'Dark Mode'"></span>
+                    </div>
+                    
                     <div class="nav-item" :class="{'active': currentView === 'settings'}" @click="setView('settings')">
                         <i class="fas fa-cog nav-icon"></i>
                         <span class="nav-text">Settings</span>
@@ -1289,6 +1241,16 @@
                     </div>
                 </form>
             </div>
+        </div>
+        
+        <!-- Bottom Right Corner Logo -->
+        <div style="position: fixed; bottom: 20px; right: 20px; z-index: 1000;">
+            <img :src="darkMode ? 'worca-logo-dark.svg' : 'worca-logo-light.svg'" 
+                 width="48" height="48" 
+                 alt="Worca" 
+                 style="opacity: 0.7; transition: all 0.3s ease; filter: drop-shadow(0 2px 4px var(--shadow));"
+                 @mouseover="$el.style.opacity = '1'; $el.style.transform = 'scale(1.1)'"
+                 @mouseleave="$el.style.opacity = '0.7'; $el.style.transform = 'scale(1)'">
         </div>
     </div>
 
