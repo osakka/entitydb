@@ -97,9 +97,23 @@ cd /opt/entitydb/src
 go run ./tools/fixes/fix_user_content.go -verbose
 ```
 
+## Additional Fix: Reader Format Compatibility
+
+After implementing the writer fix, it was discovered that the binary reader was still expecting the old multi-content format while the writer was now using the new unified content format. This caused a reader/writer format mismatch.
+
+**Fix Applied**: Updated `/opt/entitydb/src/storage/binary/reader.go` to handle the new unified content format:
+
+1. **Single Content Parsing**: Changed from multi-content loop to single content type + blob parsing
+2. **Format Alignment**: Reader now matches writer's format (content type → content data → timestamp)  
+3. **Direct Storage**: Content stored directly without unnecessary JSON conversion
+
+**Files Modified**:
+- `/opt/entitydb/src/storage/binary/reader.go` - Updated parseEntity method
+- Removed unused imports and added `strings` package
+
 ## Verification
 
-After applying the fix:
+After applying the complete fix:
 
 1. Test the admin login using default credentials:
    ```bash
@@ -108,19 +122,31 @@ After applying the fix:
      -d '{"username": "admin", "password": "admin"}'
    ```
 
-2. Check the server logs for successful login and absence of "Password hash is empty" errors.
+2. Verify successful response with JWT token
+3. Check server startup shows: `Default admin user already exists and is working.`
+4. Check server logs show no "Password hash is empty" errors
+
+## ReindexTags Method Added
+
+As part of this work, the missing `ReindexTags()` method was added to EntityRepository:
+
+- **Location**: `/opt/entitydb/src/storage/binary/entity_repository.go`
+- **Function**: Rebuilds all tag indexes from scratch with proper locking
+- **API Endpoint**: `POST /api/v1/patches/reindex-tags`
+- **Usage**: For fixing corrupted or inconsistent tag indexes
 
 ## Future Prevention
 
 To prevent content wrapping in future development:
 
-1. Use the `ExtractUserDataWithUnwrap` function when working with user data
-2. Normalize content before storing in the repository
-3. Always unwrap content in handlers before processing
-4. Add validation to detect and prevent content over-wrapping
-5. Consider adding automated tests to verify content format isn't being altered
+1. Ensure reader and writer formats stay synchronized
+2. Test binary format changes with integration tests
+3. Add validation to detect format mismatches
+4. Consider adding automated tests for content storage/retrieval
+5. Document binary format changes in commit messages
 
 ---
 
-Fix implemented: May 21, 2025  
-Fix version: 2.14.1
+Fix implemented: May 22, 2025  
+Complete fix version: 2.14.1+
+Commits: 6b19ebc, 82515da, 98ffbfb
