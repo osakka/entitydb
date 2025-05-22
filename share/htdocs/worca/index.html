@@ -717,15 +717,15 @@
         <div class="sidebar" :class="{'open': sidebarOpen, 'collapsed': sidebarCollapsed}">
             <!-- Logo with sidebar toggle functionality -->
             <div class="logo" @click="toggleSidebar()" style="cursor: pointer;" :title="sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'">
-                <div style="display: flex; flex-direction: column; align-items: flex-start;">
-                    <img :src="darkMode ? 'worca-logo-dark.svg' : 'worca-logo-light.svg'" 
+                <div style="display: flex; flex-direction: row; align-items: center; gap: 12px;">
+                    <img src="worca-logo-dark.svg" 
                          :width="sidebarCollapsed ? '32' : '64'" 
                          :height="sidebarCollapsed ? '32' : '64'" 
                          class="nav-icon" 
                          alt="Worca" 
                          style="filter: drop-shadow(0 2px 4px var(--shadow)); transition: all 0.3s ease;">
                     <span x-show="!sidebarCollapsed" 
-                          style="font-size: 11px; color: #000000; margin-top: 4px; line-height: 1.2; transition: all 0.3s ease;">
+                          style="font-size: 11px; color: #000000; font-weight: 300; line-height: 1.2; transition: all 0.3s ease;">
                         Orca Workforce<br>Orchestration
                     </span>
                 </div>
