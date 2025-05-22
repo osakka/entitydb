@@ -7,26 +7,28 @@ import (
 
 // UserHandlerRBAC wraps UserHandler with RBAC permission checks
 type UserHandlerRBAC struct {
-	handler *UserHandler
-	repo    models.EntityRepository
+	handler        *UserHandler
+	repo           models.EntityRepository
+	sessionManager *models.SessionManager
 }
 
 // NewUserHandlerRBAC creates a new RBAC-enabled user handler
-func NewUserHandlerRBAC(handler *UserHandler, repo models.EntityRepository) *UserHandlerRBAC {
+func NewUserHandlerRBAC(handler *UserHandler, repo models.EntityRepository, sessionManager *models.SessionManager) *UserHandlerRBAC {
 	return &UserHandlerRBAC{
-		handler: handler,
-		repo:    repo,
+		handler:        handler,
+		repo:           repo,
+		sessionManager: sessionManager,
 	}
 }
 
 // CreateUserWithRBAC wraps CreateUser with permission check
 func (h *UserHandlerRBAC) CreateUserWithRBAC() http.HandlerFunc {
-	return RBACMiddleware(h.repo, PermUserCreate)(h.handler.CreateUser)
+	return RBACMiddleware(h.repo, h.sessionManager, PermUserCreate)(h.handler.CreateUser)
 }
 
 // GetUserWithRBAC wraps GetUser with permission check - viewing user info requires permission
 func (h *UserHandlerRBAC) GetUserWithRBAC() http.HandlerFunc {
-	return RBACMiddleware(h.repo, PermUserView)(func(w http.ResponseWriter, r *http.Request) {
+	return RBACMiddleware(h.repo, h.sessionManager, PermUserView)(func(w http.ResponseWriter, r *http.Request) {
 		// For getting user info, we might want to allow users to see their own info
 		// but for now we'll require the general user:view permission
 		h.handler.CreateUser(w, r) // This seems to be the actual user get method based on the handler
@@ -45,11 +47,11 @@ func (h *UserHandlerRBAC) LoginWithoutRBAC() http.HandlerFunc {
 // No specific permission needed - users can change their own password if authenticated
 func (h *UserHandlerRBAC) ChangePasswordWithRBAC() http.HandlerFunc {
 	// We use a custom middleware that checks authentication but doesn't require specific permissions
-	return RBACMiddleware(h.repo, PermUserUpdate)(h.handler.ChangePassword)
+	return RBACMiddleware(h.repo, h.sessionManager, PermUserUpdate)(h.handler.ChangePassword)
 }
 
 // ResetPasswordWithRBAC wraps ResetPassword with admin permission check
 func (h *UserHandlerRBAC) ResetPasswordWithRBAC() http.HandlerFunc {
 	// This requires admin permission
-	return RBACMiddleware(h.repo, PermUserUpdate)(h.handler.ResetPassword)
+	return RBACMiddleware(h.repo, h.sessionManager, PermUserUpdate)(h.handler.ResetPassword)
 }

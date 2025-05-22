@@ -330,23 +330,35 @@ func main() {
 	apiRouter.HandleFunc("/auth/refresh", server.handleRefreshToken).Methods("POST")
 	
 	// User management routes with RBAC
-	userHandlerRBAC := api.NewUserHandlerRBAC(server.userHandler, server.entityRepo)
+	userHandlerRBAC := api.NewUserHandlerRBAC(server.userHandler, server.entityRepo, server.sessionManager)
 	apiRouter.HandleFunc("/users/create", userHandlerRBAC.CreateUserWithRBAC()).Methods("POST")
 		apiRouter.HandleFunc("/users/change-password", userHandlerRBAC.ChangePasswordWithRBAC()).Methods("POST")
 		apiRouter.HandleFunc("/users/reset-password", userHandlerRBAC.ResetPasswordWithRBAC()).Methods("POST")
 	
 	// Dashboard routes with RBAC
 	dashboardHandler := api.NewDashboardHandler(server.entityRepo)
-	dashboardHandlerRBAC := api.NewDashboardHandlerRBAC(dashboardHandler, server.entityRepo)
+	dashboardHandlerRBAC := api.NewDashboardHandlerRBAC(dashboardHandler, server.entityRepo, server.sessionManager)
 	apiRouter.HandleFunc("/dashboard/stats", dashboardHandlerRBAC.GetDashboardStatsWithRBAC()).Methods("GET")
 	
 	// Configuration routes with RBAC
 	configHandler := api.NewEntityConfigHandler(server.entityRepo)
-	configHandlerRBAC := api.NewEntityConfigHandlerRBAC(configHandler, server.entityRepo)
+	configHandlerRBAC := api.NewEntityConfigHandlerRBAC(configHandler, server.entityRepo, server.sessionManager)
 	apiRouter.HandleFunc("/config", configHandlerRBAC.GetConfigWithRBAC()).Methods("GET")
 	apiRouter.HandleFunc("/config/set", configHandlerRBAC.SetConfigWithRBAC()).Methods("POST")
 	apiRouter.HandleFunc("/feature-flags", configHandlerRBAC.GetFeatureFlagsWithRBAC()).Methods("GET")
 	apiRouter.HandleFunc("/feature-flags/set", configHandlerRBAC.SetFeatureFlagWithRBAC()).Methods("POST")
+	
+	// Health endpoint (no authentication required)
+	healthHandler := api.NewHealthHandler(server.entityRepo)
+	router.HandleFunc("/health", healthHandler.Health).Methods("GET")
+	
+	// Metrics endpoint (Prometheus format, no authentication required)
+	metricsHandler := api.NewMetricsHandler(server.entityRepo)
+	router.HandleFunc("/metrics", metricsHandler.PrometheusMetrics).Methods("GET")
+	
+	// System metrics endpoint (EntityDB-specific, no authentication required)
+	systemMetricsHandler := api.NewSystemMetricsHandler(server.entityRepo)
+	apiRouter.HandleFunc("/system/metrics", systemMetricsHandler.SystemMetrics).Methods("GET")
 	
 	// Add patch status endpoint for compatibility with tests
 	apiRouter.HandleFunc("/patches/status", func(w http.ResponseWriter, r *http.Request) {

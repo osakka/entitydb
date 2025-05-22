@@ -26,7 +26,7 @@ type RBACContext struct {
 type rbacContextKey struct{}
 
 // RBACMiddleware creates middleware that enforces permissions
-func RBACMiddleware(entityRepo models.EntityRepository, requiredPerm RBACPermission) MiddlewareFunc {
+func RBACMiddleware(entityRepo models.EntityRepository, sessionManager *models.SessionManager, requiredPerm RBACPermission) MiddlewareFunc {
 	return func(next http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
 			// Get token from Authorization header
@@ -44,51 +44,16 @@ func RBACMiddleware(entityRepo models.EntityRepository, requiredPerm RBACPermiss
 			}
 			token := parts[1]
 			
-			// Extract username from token
-			// Token format is either "token_username_nanos" or "user:username" for testing
-			var username string
-			if strings.HasPrefix(token, "token_") {
-				// Real token format: token_username_nanos
-				parts := strings.Split(token, "_")
-				if len(parts) < 3 {
-					RespondError(w, http.StatusUnauthorized, "Invalid token format")
-					return
-				}
-				username = parts[1]
-			} else if strings.HasPrefix(token, "user:") {
-				// Test token format: user:username
-				username = strings.TrimPrefix(token, "user:")
-			} else {
-				RespondError(w, http.StatusUnauthorized, "Invalid token")
+			// Validate token using session manager
+			session, exists := sessionManager.GetSession(token)
+			if !exists {
+				RespondError(w, http.StatusUnauthorized, "Invalid or expired token")
 				return
 			}
 			
-			// Find user entity using List method
-			usersAll, err := entityRepo.List()
-			if err != nil {
-				RespondError(w, http.StatusInternalServerError, "Failed to load users")
-				return
-			}
-			
-			// Filter to find the user
-			var user *models.Entity
-			for _, u := range usersAll {
-				var hasUserType, hasUsername bool
-				for _, tag := range u.Tags {
-					if tag == "type:user" {
-						hasUserType = true
-					}
-					if tag == fmt.Sprintf("id:username:%s", username) {
-						hasUsername = true
-					}
-				}
-				if hasUserType && hasUsername {
-					user = u
-					break
-				}
-			}
-			
-			if user == nil {
+			// Find user entity by user ID from session
+			user, err := entityRepo.GetByID(session.UserID)
+			if err != nil || user == nil {
 				RespondError(w, http.StatusUnauthorized, "User not found")
 				return
 			}
