@@ -9,6 +9,7 @@ function worca() {
         sidebarCollapsed: false,
         darkMode: false,
         showCreateModal: false,
+        showCreateUserModal: false,
         loading: false,
         isAuthenticated: false,
         dataLoading: false,
@@ -38,6 +39,13 @@ function worca() {
             description: '',
             assignee: '',
             parent: ''
+        },
+        
+        // User Form Data
+        createUserForm: {
+            username: '',
+            displayName: '',
+            role: 'user'
         },
         
         // Login Form Data
@@ -1169,6 +1177,49 @@ function worca() {
             } finally {
                 this.loading = false;
             }
+        },
+
+        async createUser() {
+            try {
+                this.loading = true;
+                
+                const newUser = await this.api.createUser(
+                    this.createUserForm.username,
+                    this.createUserForm.displayName,
+                    this.createUserForm.role
+                );
+                
+                // Add to team members
+                this.teamMembers.push(newUser);
+                
+                // Add to recent activity
+                this.recentActivity.unshift({
+                    id: this.generateId(),
+                    description: `Added new team member: "${this.createUserForm.displayName}"`,
+                    timestamp: new Date(),
+                    type: 'user_created'
+                });
+
+                this.showCreateUserModal = false;
+                this.resetCreateUserForm();
+                this.calculateStats();
+
+                console.log('✅ Created new user:', newUser.id);
+
+            } catch (error) {
+                console.error('Error creating user:', error);
+                alert(`Error creating user: ${error.message}`);
+            } finally {
+                this.loading = false;
+            }
+        },
+
+        resetCreateUserForm() {
+            this.createUserForm = {
+                username: '',
+                displayName: '',
+                role: 'user'
+            };
         },
 
         viewTask(task) {

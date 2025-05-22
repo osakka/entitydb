@@ -1266,6 +1266,40 @@
             </div>
         </div>
         
+        <!-- Create User Modal -->
+        <div x-show="showCreateUserModal" class="modal" @click.self="showCreateUserModal = false">
+            <div class="modal-content">
+                <h3 style="margin-bottom: 20px;">Add New Team Member</h3>
+                <form @submit.prevent="createUser()">
+                    <div class="form-group">
+                        <label class="form-label">Username</label>
+                        <input type="text" x-model="createUserForm.username" class="form-input" required placeholder="e.g., john.doe">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Display Name</label>
+                        <input type="text" x-model="createUserForm.displayName" class="form-input" required placeholder="e.g., John Doe">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Role</label>
+                        <select x-model="createUserForm.role" class="form-select">
+                            <option value="user">User</option>
+                            <option value="developer">Developer</option>
+                            <option value="designer">Designer</option>
+                            <option value="manager">Manager</option>
+                            <option value="admin">Admin</option>
+                        </select>
+                    </div>
+                    <div style="display: flex; gap: 12px; margin-top: 24px;">
+                        <button type="submit" class="btn" :disabled="loading">
+                            <span x-show="!loading">Add User</span>
+                            <span x-show="loading">Adding...</span>
+                        </button>
+                        <button type="button" class="btn btn-secondary" @click="showCreateUserModal = false">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
         <!-- Bottom Right Corner Logo -->
         <div style="position: fixed; bottom: 20px; right: 20px; z-index: 1000;">
             <img :src="darkMode ? 'worca-logo-dark.svg' : 'worca-logo-light.svg'" 
