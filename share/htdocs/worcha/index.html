@@ -10,6 +10,34 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
         /* Modern Workforce Orchestrator Styles */
+        :root {
+            /* Light theme variables */
+            --bg-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --sidebar-bg: rgba(255, 255, 255, 0.95);
+            --content-bg: rgba(255, 255, 255, 0.95);
+            --text-primary: #333;
+            --text-secondary: #666;
+            --border-color: rgba(255, 255, 255, 0.2);
+            --card-bg: white;
+            --shadow: rgba(0, 0, 0, 0.1);
+            --primary-color: #667eea;
+            --hover-bg: rgba(102, 126, 234, 0.1);
+        }
+
+        [data-theme="dark"] {
+            /* Dark theme variables */
+            --bg-gradient: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            --sidebar-bg: rgba(30, 30, 46, 0.95);
+            --content-bg: rgba(30, 30, 46, 0.95);
+            --text-primary: #e2e8f0;
+            --text-secondary: #a0aec0;
+            --border-color: rgba(255, 255, 255, 0.1);
+            --card-bg: #2d3748;
+            --shadow: rgba(0, 0, 0, 0.3);
+            --primary-color: #667eea;
+            --hover-bg: rgba(102, 126, 234, 0.2);
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -18,9 +46,10 @@
 
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: var(--bg-gradient);
             min-height: 100vh;
-            color: #333;
+            color: var(--text-primary);
+            transition: all 0.3s ease;
         }
 
         .app-container {
@@ -31,21 +60,88 @@
         /* Sidebar */
         .sidebar {
             width: 280px;
-            background: rgba(255, 255, 255, 0.95);
+            background: var(--sidebar-bg);
             backdrop-filter: blur(10px);
-            border-right: 1px solid rgba(255, 255, 255, 0.2);
+            border-right: 1px solid var(--border-color);
             padding: 20px;
-            box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+            box-shadow: 2px 0 10px var(--shadow);
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .sidebar.collapsed {
+            width: 80px;
+            padding: 20px 10px;
+        }
+
+        .sidebar-toggle {
+            position: absolute;
+            top: 15px;
+            right: -15px;
+            width: 30px;
+            height: 30px;
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 8px var(--shadow);
+            z-index: 10;
+            transition: all 0.3s ease;
+        }
+
+        .sidebar-toggle:hover {
+            background: #5a67d8;
+            transform: scale(1.1);
+        }
+
+        .theme-toggle {
+            position: absolute;
+            top: 55px;
+            right: -15px;
+            width: 30px;
+            height: 30px;
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 8px var(--shadow);
+            z-index: 10;
+            transition: all 0.3s ease;
+        }
+
+        .theme-toggle:hover {
+            background: #5a67d8;
+            transform: scale(1.1);
         }
 
         .logo {
             font-size: 28px;
             font-weight: bold;
-            color: #667eea;
+            color: var(--primary-color);
             margin-bottom: 30px;
             display: flex;
             align-items: center;
             gap: 10px;
+            overflow: hidden;
+            white-space: nowrap;
+        }
+
+        .sidebar.collapsed .logo .logo-text {
+            opacity: 0;
+            width: 0;
+        }
+
+        .logo-text {
+            transition: all 0.3s ease;
+            overflow: hidden;
         }
 
         .nav-item {
@@ -57,16 +153,40 @@
             display: flex;
             align-items: center;
             gap: 12px;
-            color: #666;
+            color: var(--text-secondary);
+            overflow: hidden;
+            white-space: nowrap;
+            position: relative;
+        }
+
+        .sidebar.collapsed .nav-item {
+            padding: 12px;
+            justify-content: center;
+        }
+
+        .sidebar.collapsed .nav-item .nav-text {
+            opacity: 0;
+            width: 0;
+        }
+
+        .nav-text {
+            transition: all 0.3s ease;
+            overflow: hidden;
+        }
+
+        .nav-icon {
+            flex-shrink: 0;
+            width: 20px;
+            text-align: center;
         }
 
         .nav-item:hover {
-            background: rgba(102, 126, 234, 0.1);
-            color: #667eea;
+            background: var(--hover-bg);
+            color: var(--primary-color);
         }
 
         .nav-item.active {
-            background: #667eea;
+            background: var(--primary-color);
             color: white;
         }
 
@@ -78,20 +198,20 @@
         }
 
         .content-header {
-            background: rgba(255, 255, 255, 0.95);
+            background: var(--content-bg);
             backdrop-filter: blur(10px);
             padding: 20px;
             border-radius: 12px;
             margin-bottom: 20px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 4px 20px var(--shadow);
         }
 
         .content-area {
-            background: rgba(255, 255, 255, 0.95);
+            background: var(--content-bg);
             backdrop-filter: blur(10px);
             border-radius: 12px;
             padding: 20px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 4px 20px var(--shadow);
             min-height: 500px;
         }
 
@@ -109,6 +229,30 @@
             border-radius: 8px;
             padding: 16px;
             border: 2px dashed #e2e8f0;
+            transition: all 0.3s ease;
+        }
+
+        .kanban-tasks {
+            min-height: 150px;
+            border-radius: 6px;
+            transition: all 0.3s ease;
+        }
+
+        /* Drop zone highlighting */
+        .kanban-tasks.sortable-ghost {
+            border: 2px dashed var(--primary-color);
+            background: var(--hover-bg);
+        }
+
+        .kanban-tasks:empty::after {
+            content: "Drop tasks here";
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100px;
+            color: var(--text-secondary);
+            font-style: italic;
+            opacity: 0.6;
         }
 
         .kanban-header {
@@ -125,19 +269,19 @@
         .status-done { background: #d1fae5; color: #065f46; }
 
         .task-card {
-            background: white;
+            background: var(--card-bg);
             border-radius: 8px;
             padding: 16px;
             margin-bottom: 12px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-            border-left: 4px solid #667eea;
+            box-shadow: 0 2px 8px var(--shadow);
+            border-left: 4px solid var(--primary-color);
             cursor: move;
             transition: all 0.3s ease;
         }
 
         .task-card:hover {
             transform: translateY(-2px);
-            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+            box-shadow: 0 4px 16px var(--shadow);
         }
 
         /* Drag & Drop States */
@@ -159,7 +303,7 @@
         .task-title {
             font-weight: bold;
             margin-bottom: 8px;
-            color: #1f2937;
+            color: var(--text-primary);
         }
 
         .task-meta {
@@ -167,12 +311,12 @@
             justify-content: space-between;
             align-items: center;
             font-size: 12px;
-            color: #6b7280;
+            color: var(--text-secondary);
             margin-top: 12px;
         }
 
         .task-assignee {
-            background: #667eea;
+            background: var(--primary-color);
             color: white;
             padding: 4px 8px;
             border-radius: 12px;
@@ -187,7 +331,7 @@
         }
 
         .btn {
-            background: #667eea;
+            background: var(--primary-color);
             color: white;
             border: none;
             padding: 10px 20px;
@@ -229,7 +373,7 @@
         }
 
         .modal-content {
-            background: white;
+            background: var(--card-bg);
             border-radius: 12px;
             padding: 24px;
             max-width: 500px;
@@ -246,15 +390,17 @@
             display: block;
             margin-bottom: 6px;
             font-weight: 500;
-            color: #374151;
+            color: var(--text-primary);
         }
 
         .form-input, .form-select, .form-textarea {
             width: 100%;
             padding: 10px 12px;
-            border: 1px solid #d1d5db;
+            border: 1px solid var(--border-color);
             border-radius: 6px;
             font-size: 14px;
+            background: var(--card-bg);
+            color: var(--text-primary);
         }
 
         .form-textarea {
@@ -264,11 +410,11 @@
 
         /* Hierarchy View */
         .hierarchy-item {
-            background: white;
+            background: var(--card-bg);
             border-radius: 8px;
             padding: 16px;
             margin-bottom: 12px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 2px 8px var(--shadow);
             border-left: 4px solid #10b981;
         }
 
@@ -345,45 +491,176 @@
         .text-center { text-align: center; }
         .mb-4 { margin-bottom: 16px; }
         .mt-4 { margin-top: 16px; }
+
+        /* Login Screen Styles */
+        .login-screen {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .login-container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 40px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+        }
+
+        .login-header {
+            margin-bottom: 30px;
+        }
+
+        .login-header .logo {
+            font-size: 32px;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .login-header p {
+            color: #666;
+            font-size: 16px;
+        }
+
+        .login-form {
+            text-align: left;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e1e5e9;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn-full {
+            width: 100%;
+            padding: 12px;
+            font-size: 16px;
+        }
+
+        .error-message {
+            background: #fee;
+            color: #c33;
+            padding: 10px;
+            border-radius: 8px;
+            margin-top: 15px;
+            border: 1px solid #fcc;
+        }
     </style>
 </head>
 <body>
-    <div x-data="worcha" x-init="init()" class="app-container">
+    <div x-data="worcha" x-init="init()">
+        <!-- Login Screen -->
+        <div x-show="!isAuthenticated" class="login-screen">
+            <div class="login-container">
+                <div class="login-header">
+                    <div class="logo">
+                        <i class="fas fa-users-cog"></i>
+                        Worcha
+                    </div>
+                    <p>Workforce Orchestrator</p>
+                </div>
+                
+                <form @submit.prevent="manualLogin()" class="login-form">
+                    <div class="form-group">
+                        <label for="username">Username</label>
+                        <input type="text" id="username" x-model="loginForm.username" required placeholder="Enter username">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="password">Password</label>
+                        <input type="password" id="password" x-model="loginForm.password" required placeholder="Enter password">
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary btn-full" :disabled="loading">
+                        <span x-show="!loading">Sign In</span>
+                        <span x-show="loading">Signing In...</span>
+                    </button>
+                </form>
+                
+                <div x-show="loginError" class="error-message" x-text="loginError"></div>
+            </div>
+        </div>
+
+        <!-- Main Dashboard (only show when authenticated) -->
+        <div x-show="isAuthenticated" class="app-container">
         <!-- Sidebar -->
-        <div class="sidebar" :class="{'open': sidebarOpen}">
+        <div class="sidebar" :class="{'open': sidebarOpen, 'collapsed': sidebarCollapsed}">
+            <!-- Toggle Buttons -->
+            <button class="sidebar-toggle" @click="toggleSidebar()" :title="sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'">
+                <i class="fas" :class="sidebarCollapsed ? 'fa-chevron-right' : 'fa-chevron-left'"></i>
+            </button>
+            <button class="theme-toggle" @click="toggleTheme()" :title="darkMode ? 'Switch to light mode' : 'Switch to dark mode'">
+                <i class="fas" :class="darkMode ? 'fa-sun' : 'fa-moon'"></i>
+            </button>
+            
             <div class="logo">
-                <i class="fas fa-users-cog"></i>
-                Worcha
+                <i class="fas fa-users-cog nav-icon"></i>
+                <span class="logo-text">Worcha</span>
             </div>
 
             <nav>
                 <div class="nav-item" :class="{'active': currentView === 'dashboard'}" @click="setView('dashboard')">
-                    <i class="fas fa-tachometer-alt"></i>
-                    Dashboard
+                    <i class="fas fa-tachometer-alt nav-icon"></i>
+                    <span class="nav-text">Dashboard</span>
                 </div>
                 <div class="nav-item" :class="{'active': currentView === 'kanban'}" @click="setView('kanban')">
-                    <i class="fas fa-columns"></i>
-                    Kanban Board
+                    <i class="fas fa-columns nav-icon"></i>
+                    <span class="nav-text">Kanban Board</span>
                 </div>
                 <div class="nav-item" :class="{'active': currentView === 'projects'}" @click="setView('projects')">
-                    <i class="fas fa-folder-open"></i>
-                    Projects
+                    <i class="fas fa-folder-open nav-icon"></i>
+                    <span class="nav-text">Projects</span>
                 </div>
                 <div class="nav-item" :class="{'active': currentView === 'team'}" @click="setView('team')">
-                    <i class="fas fa-users"></i>
-                    Team
+                    <i class="fas fa-users nav-icon"></i>
+                    <span class="nav-text">Team</span>
                 </div>
                 <div class="nav-item" :class="{'active': currentView === 'reports'}" @click="setView('reports')">
-                    <i class="fas fa-chart-bar"></i>
-                    Reports
+                    <i class="fas fa-chart-bar nav-icon"></i>
+                    <span class="nav-text">Reports</span>
                 </div>
                 <div class="nav-item" :class="{'active': currentView === 'sprints'}" @click="setView('sprints')">
-                    <i class="fas fa-running"></i>
-                    Sprints
+                    <i class="fas fa-running nav-icon"></i>
+                    <span class="nav-text">Sprints</span>
                 </div>
                 <div class="nav-item" :class="{'active': currentView === 'settings'}" @click="setView('settings')">
-                    <i class="fas fa-cog"></i>
-                    Settings
+                    <i class="fas fa-cog nav-icon"></i>
+                    <span class="nav-text">Settings</span>
+                </div>
+                
+                <div class="nav-item logout-btn" @click="logout()" style="margin-top: 20px; border-top: 1px solid var(--border-color); padding-top: 20px;">
+                    <i class="fas fa-sign-out-alt nav-icon"></i>
+                    <span class="nav-text">Logout</span>
                 </div>
             </nav>
         </div>
@@ -450,6 +727,13 @@
 
                 <!-- Kanban Board View -->
                 <div x-show="currentView === 'kanban'" class="kanban-view">
+                    <div style="margin-bottom: 20px;">
+                        <h3>Kanban Board</h3>
+                        <p style="color: var(--text-secondary); margin-top: 4px;">
+                            Drag tasks between columns to update their status. Total tasks: <span x-text="tasks.length"></span>
+                        </p>
+                    </div>
+                    
                     <div class="kanban-board">
                         <template x-for="status in kanbanStatuses" :key="status.id">
                             <div class="kanban-column" :data-status="status.id">
@@ -689,6 +973,7 @@
         </div>
     </div>
 
+    <script src="worcha-api.js"></script>
     <script src="worcha.js"></script>
 </body>
 </html>

@@ -35,6 +35,9 @@ EntityDB now features a unified Entity model with autochunking:
 - Configuration as entities
 - Health monitoring and metrics endpoints
 
+### Applications Built on EntityDB
+- **Worcha (Workforce Orchestrator)**: Complete workforce management platform with Kanban boards, team management, project hierarchies, and real-time analytics. Features drag-drop functionality, dark/light themes, and mobile-responsive design. Located at `/share/htdocs/worcha/`
+
 ### Architecture
 ```
 /opt/entitydb/
@@ -61,6 +64,11 @@ EntityDB now features a unified Entity model with autochunking:
 ├── bin/
 │   ├── entitydb                     # Server binary
 │   └── entitydbd.sh                 # Daemon script
+├── share/htdocs/worcha/             # Workforce Orchestrator Application
+│   ├── index.html                   # Main dashboard
+│   ├── cli.html                     # Conversational CLI
+│   ├── worcha.js                    # Core application logic
+│   └── worcha-api.js                # EntityDB API wrapper
 ```
 
 ### API Endpoints

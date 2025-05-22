@@ -10,6 +10,10 @@ class WorchaAPI {
     // Authentication
     async login(username, password) {
         try {
+            console.log('🔍 API login starting...');
+            console.log('🔍 Login URL:', `${this.baseURL}/auth/login`);
+            console.log('🔍 Login credentials:', { username, password: password ? '***' : 'MISSING' });
+            
             const response = await fetch(`${this.baseURL}/auth/login`, {
                 method: 'POST',
                 headers: {
@@ -17,13 +21,19 @@ class WorchaAPI {
                 },
                 body: JSON.stringify({ username, password })
             });
+            
+            console.log('🔍 Login response status:', response.status, response.statusText);
 
             if (response.ok) {
                 const data = await response.json();
+                console.log('🔍 Login response data:', data);
                 this.token = data.token;
+                console.log('🔍 Token set:', this.token ? 'SUCCESS' : 'FAILED');
                 localStorage.setItem('authToken', this.token);
                 return data;
             } else {
+                const errorText = await response.text();
+                console.error('🔍 Login failed:', response.status, errorText);
                 throw new Error('Login failed');
             }
         } catch (error) {
@@ -103,6 +113,7 @@ class WorchaAPI {
 
     async queryEntities(filters = {}) {
         try {
+            console.log('🔍 QueryEntities called with token:', this.token ? 'EXISTS' : 'MISSING');
             const params = new URLSearchParams();
             
             // Add filters as query parameters
@@ -112,15 +123,36 @@ class WorchaAPI {
                 }
             });
 
-            const response = await fetch(`${this.baseURL}/entities/list?${params.toString()}`, {
+            const url = `${this.baseURL}/entities/list?${params.toString()}`;
+            console.log('🔍 Query URL:', url);
+
+            const response = await fetch(url, {
                 headers: {
                     'Authorization': `Bearer ${this.token}`
                 }
             });
 
+            console.log('🔍 Query response status:', response.status, response.statusText);
+
             if (response.ok) {
-                return await response.json();
+                const result = await response.json();
+                console.log('🔍 Query result type:', typeof result, Array.isArray(result) ? 'ARRAY' : 'NOT_ARRAY');
+                console.log('🔍 Query result structure:', result);
+                
+                // EntityDB returns {entities: [...], total: N} format
+                if (result && result.entities && Array.isArray(result.entities)) {
+                    console.log('🔍 Extracting entities array:', result.entities.length, 'entities');
+                    return result.entities;
+                } else if (Array.isArray(result)) {
+                    console.log('🔍 Using direct array:', result.length, 'entities');
+                    return result;
+                } else {
+                    console.log('🔍 Unexpected result format, returning empty array');
+                    return [];
+                }
             } else {
+                const errorText = await response.text();
+                console.error('🔍 Query failed:', response.status, errorText);
                 throw new Error(`Failed to query entities: ${response.statusText}`);
             }
         } catch (error) {
@@ -197,7 +229,7 @@ class WorchaAPI {
         return await this.createEntity(storyData);
     }
 
-    async createTask(title, description, storyId = null, assignee = null, priority = 'medium') {
+    async createTask(title, description, assignee = null, priority = 'medium', traits = {}) {
         const tags = [
             'type:task',
             `title:${title}`,
@@ -206,8 +238,12 @@ class WorchaAPI {
             `created:${new Date().toISOString()}`
         ];
 
-        if (storyId) tags.push(`story:${storyId}`);
         if (assignee) tags.push(`assignee:${assignee}`);
+        
+        // Add traits as tags
+        Object.entries(traits).forEach(([key, value]) => {
+            if (value) tags.push(`${key}:${value}`);
+        });
 
         const taskData = {
             tags,
@@ -262,15 +298,41 @@ class WorchaAPI {
         return await this.createEntity(sprintData);
     }
 
+    async createUser(name, role, email, username = null) {
+        const userData = {
+            tags: [
+                'type:user',
+                `name:${name}`,
+                `role:${role}`,
+                `email:${email}`
+            ],
+            content: [{
+                type: 'profile',
+                value: { name, role, email, username: username || name.toLowerCase().replace(/\s+/g, '') }
+            }]
+        };
+
+        if (username) {
+            userData.tags.push(`username:${username}`);
+        }
+
+        return await this.createEntity(userData);
+    }
+
     // Query methods for different entity types
     async getOrganizations() {
+        console.log('🏢 Getting organizations...');
         const result = await this.queryEntities();
-        return this.filterEntitiesByType(result.entities || [], 'organization');
+        console.log('🔍 Raw query result for orgs:', result?.length || 0, 'entities');
+        const filtered = this.filterEntitiesByType(Array.isArray(result) ? result : [], 'organization');
+        console.log('🔍 Filtered organizations:', filtered.length, 'found');
+        console.log('🔍 Sample org:', filtered[0]);
+        return filtered;
     }
 
     async getProjects(orgId = null) {
         const result = await this.queryEntities();
-        let projects = this.filterEntitiesByType(result.entities || [], 'project');
+        let projects = this.filterEntitiesByType(Array.isArray(result) ? result : [], 'project');
         
         if (orgId) {
             projects = projects.filter(p => this.getTagValue(p.tags, 'org') === orgId);
@@ -281,7 +343,7 @@ class WorchaAPI {
 
     async getEpics(projectId = null) {
         const result = await this.queryEntities();
-        let epics = this.filterEntitiesByType(result.entities || [], 'epic');
+        let epics = this.filterEntitiesByType(Array.isArray(result) ? result : [], 'epic');
         
         if (projectId) {
             epics = epics.filter(e => this.getTagValue(e.tags, 'project') === projectId);
@@ -292,7 +354,7 @@ class WorchaAPI {
 
     async getStories(epicId = null) {
         const result = await this.queryEntities();
-        let stories = this.filterEntitiesByType(result.entities || [], 'story');
+        let stories = this.filterEntitiesByType(Array.isArray(result) ? result : [], 'story');
         
         if (epicId) {
             stories = stories.filter(s => this.getTagValue(s.tags, 'epic') === epicId);
@@ -302,8 +364,11 @@ class WorchaAPI {
     }
 
     async getTasks(filters = {}) {
+        console.log('📋 Getting tasks...');
         const result = await this.queryEntities();
-        let tasks = this.filterEntitiesByType(result.entities || [], 'task');
+        console.log('🔍 Raw query result for tasks:', result?.length || 0, 'entities');
+        let tasks = this.filterEntitiesByType(Array.isArray(result) ? result : [], 'task');
+        console.log('🔍 Filtered tasks:', tasks.length, 'found');
         
         // Apply filters
         if (filters.status) {
@@ -327,12 +392,12 @@ class WorchaAPI {
 
     async getUsers() {
         const result = await this.queryEntities();
-        return this.filterEntitiesByType(result.entities || [], 'user');
+        return this.filterEntitiesByType(Array.isArray(result) ? result : [], 'user');
     }
 
     async getSprints() {
         const result = await this.queryEntities();
-        return this.filterEntitiesByType(result.entities || [], 'sprint');
+        return this.filterEntitiesByType(Array.isArray(result) ? result : [], 'sprint');
     }
 
     // Update operations
@@ -376,9 +441,30 @@ class WorchaAPI {
 
     // Helper methods
     filterEntitiesByType(entities, type) {
-        return entities.filter(entity => 
-            entity.tags && entity.tags.some(tag => tag === `type:${type}`)
-        ).map(entity => this.transformEntity(entity));
+        console.log(`🔍 Filtering ${entities.length} entities for type: ${type}`);
+        
+        const filtered = entities.filter(entity => {
+            if (!entity.tags) {
+                console.log('❌ Entity has no tags:', entity.id);
+                return false;
+            }
+            
+            // Check for both standard format and hub format
+            const matches = entity.tags.some(tag => 
+                tag === `type:${type}` || 
+                tag === `worcha:self:type:${type}` ||
+                (tag.startsWith('hub:worcha') && entity.tags.some(t => t === `worcha:self:type:${type}`))
+            );
+            
+            if (matches) {
+                console.log(`✅ Found ${type}:`, entity.id, entity.tags.slice(0, 3));
+            }
+            
+            return matches;
+        });
+        
+        console.log(`🔍 Filter result: ${filtered.length} ${type} entities found`);
+        return filtered.map(entity => this.transformEntity(entity));
     }
 
     transformEntity(entity) {
@@ -391,18 +477,48 @@ class WorchaAPI {
             updatedAt: entity.updated_at
         };
 
-        // Extract common properties from tags
-        transformed.type = this.getTagValue(entity.tags, 'type');
-        transformed.status = this.getTagValue(entity.tags, 'status');
-        transformed.name = this.getTagValue(entity.tags, 'name');
-        transformed.title = this.getTagValue(entity.tags, 'title');
-        transformed.username = this.getTagValue(entity.tags, 'username');
-        transformed.assignee = this.getTagValue(entity.tags, 'assignee');
-        transformed.priority = this.getTagValue(entity.tags, 'priority') || 'medium';
+        // Extract common properties from tags (handle both standard and hub formats)
+        transformed.type = this.getTagValue(entity.tags, 'type') || this.getTagValue(entity.tags, 'worcha:self:type');
+        transformed.status = this.getTagValue(entity.tags, 'status') || this.getTagValue(entity.tags, 'worcha:self:status');
+        transformed.name = this.getTagValue(entity.tags, 'name') || this.getTagValue(entity.tags, 'worcha:self:name');
+        transformed.title = this.getTagValue(entity.tags, 'title') || this.getTagValue(entity.tags, 'worcha:self:title');
+        transformed.username = this.getTagValue(entity.tags, 'username') || this.getTagValue(entity.tags, 'worcha:self:username');
+        transformed.assignee = this.getTagValue(entity.tags, 'assignee') || this.getTagValue(entity.tags, 'worcha:self:assignee');
+        transformed.priority = this.getTagValue(entity.tags, 'priority') || this.getTagValue(entity.tags, 'worcha:self:priority') || 'medium';
 
-        // Extract description from content
-        const descContent = entity.content?.find(c => c.type === 'description');
-        transformed.description = descContent?.value || '';
+        // Extract description from content (handle base64 encoded content)
+        if (entity.content) {
+            try {
+                if (typeof entity.content === 'string') {
+                    // Decode base64 content
+                    const decodedContent = atob(entity.content);
+                    
+                    // Try to parse as JSON first
+                    try {
+                        const jsonContent = JSON.parse(decodedContent);
+                        if (jsonContent.description) {
+                            transformed.description = jsonContent.description;
+                        } else if (Array.isArray(jsonContent)) {
+                            // Look for description in array format
+                            const descItem = jsonContent.find(item => item.type === 'description');
+                            transformed.description = descItem?.value || '';
+                        }
+                    } catch (jsonError) {
+                        // If not JSON, use as plain text description
+                        transformed.description = decodedContent;
+                    }
+                } else if (Array.isArray(entity.content)) {
+                    // Handle array format content
+                    const descContent = entity.content.find(c => c.type === 'description');
+                    transformed.description = descContent?.value || '';
+                }
+            } catch (e) {
+                // If content parsing fails, use empty description
+                transformed.description = '';
+            }
+        } else {
+            transformed.description = '';
+        }
 
         // Type-specific transformations
         if (transformed.type === 'task') {

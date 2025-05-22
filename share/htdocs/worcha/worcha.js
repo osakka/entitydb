@@ -6,14 +6,18 @@ function worcha() {
         // State Management
         currentView: 'dashboard',
         sidebarOpen: false,
+        sidebarCollapsed: false,
+        darkMode: false,
         showCreateModal: false,
         loading: false,
         isAuthenticated: false,
+        dataLoading: false,
+        initialized: false,
         
         // EntityDB API
         api: null,
         
-        // Data
+        // Data (initialize as arrays to prevent undefined errors)
         organizations: [],
         projects: [],
         epics: [],
@@ -36,6 +40,13 @@ function worcha() {
             parent: ''
         },
         
+        // Login Form Data
+        loginForm: {
+            username: 'admin',
+            password: 'admin'
+        },
+        loginError: '',
+        
         // Configuration
         kanbanStatuses: [
             { id: 'todo', name: 'To Do', color: '#fef3c7' },
@@ -54,44 +65,107 @@ function worcha() {
 
         // Initialization
         async init() {
-            console.log('🚀 Initializing Worcha...');
-            
-            // Initialize EntityDB API
-            this.api = new WorchaAPI();
-            
-            // Check authentication
-            await this.checkAuth();
-            
-            if (this.isAuthenticated) {
-                await this.loadData();
-                this.initializeCharts();
-                this.calculateStats();
-                this.initializeKanbanDragDrop();
+            if (this.initialized) {
+                console.log('⚠️ Worcha already initialized, skipping...');
+                return;
             }
             
-            console.log('✅ Worcha initialized successfully');
+            this.initCounter = (this.initCounter || 0) + 1;
+            console.log(`🚀 Initializing Worcha (attempt ${this.initCounter})...`);
+            
+            try {
+                // Initialize EntityDB API
+                this.api = new WorchaAPI();
+                
+                // Load user preferences
+                this.loadUserPreferences();
+                
+                // Check authentication (will show login screen if not authenticated)
+                await this.checkAuth();
+                
+                // Don't load data here - wait for manual login
+                this.initialized = true;
+                console.log('✅ Worcha initialized - ready for login');
+            } catch (error) {
+                console.error('❌ Worcha initialization failed:', error);
+                this.initialized = false;
+            }
         },
 
         // Authentication
         async checkAuth() {
+            console.log('🔐 Checking authentication...');
+            // Don't auto-login anymore - wait for user to login manually
+            this.isAuthenticated = false;
+        },
+
+        async manualLogin() {
+            console.log('🚀 Starting manual login...');
             try {
-                // Try to load data to verify token is valid
-                const result = await this.api.queryEntities();
-                this.isAuthenticated = true;
-                console.log('✅ Authentication verified');
+                this.loading = true;
+                this.loginError = '';
+                console.log(`🔐 Manual login attempt for: ${this.loginForm.username}`);
+                console.log('🔍 API instance:', this.api);
+                console.log('🔍 About to call api.login...');
+                
+                const loginResult = await this.api.login(this.loginForm.username, this.loginForm.password);
+                console.log('🔍 Login call completed');
+                console.log('🔍 Login API call result:', loginResult);
+                console.log('🔍 API token after login:', this.api.token ? 'EXISTS (' + this.api.token.substring(0, 20) + '...)' : 'MISSING');
+                
+                if (loginResult && this.api.token) {
+                    this.isAuthenticated = true;
+                    console.log('✅ Authentication status set to true');
+                    
+                    // Verify the token works by querying entities
+                    console.log('🔍 Testing token with queryEntities...');
+                    const result = await this.api.queryEntities();
+                    console.log('🔍 Raw query result in login:', result);
+                    console.log('✅ Login verification: found', result?.length || 0, 'entities');
+                    console.log('🔍 Query result type:', typeof result, Array.isArray(result) ? 'ARRAY' : 'NOT_ARRAY');
+                    console.log('🔍 Sample entities:', Array.isArray(result) ? result.slice(0, 2) : result);
+                    
+                    // Reset any stuck loading flags first
+                    console.log('🔄 Resetting loading flags...');
+                    this.loading = false;
+                    this.dataLoading = false;
+                    
+                    // Load dashboard data
+                    console.log('📊 Starting data load...');
+                    await this.loadData();
+                    console.log('📊 Data load completed');
+                    
+                    this.initializeCharts();
+                    this.calculateStats();
+                    this.initializeKanbanDragDrop();
+                    console.log('✅ Dashboard fully initialized');
+                } else {
+                    console.log('❌ Login API returned false');
+                    this.loginError = 'Invalid username or password';
+                    this.isAuthenticated = false;
+                }
             } catch (error) {
-                console.log('⚠️ Authentication required');
+                console.error('❌ Login failed with error:', error);
+                console.error('Error stack:', error.stack);
+                this.loginError = error.message || 'Login failed. Please try again.';
                 this.isAuthenticated = false;
-                // Try default admin login
-                await this.tryDefaultLogin();
+            } finally {
+                this.loading = false;
+                console.log('🔍 Final state - authenticated:', this.isAuthenticated, 'loading:', this.loading);
             }
         },
 
         async tryDefaultLogin() {
             try {
-                await this.api.login('admin', 'admin');
-                this.isAuthenticated = true;
-                console.log('✅ Logged in with default credentials');
+                console.log('🔐 Attempting default login...');
+                const loginResult = await this.api.login('admin', 'admin');
+                if (loginResult) {
+                    this.isAuthenticated = true;
+                    console.log('✅ Logged in with default credentials');
+                } else {
+                    this.isAuthenticated = false;
+                    console.log('❌ Default login returned false');
+                }
             } catch (error) {
                 console.error('❌ Default login failed:', error);
                 this.isAuthenticated = false;
@@ -114,17 +188,67 @@ function worcha() {
             }
         },
 
+        // UI Controls
+        toggleSidebar() {
+            this.sidebarCollapsed = !this.sidebarCollapsed;
+            console.log('🔄 Sidebar toggled:', this.sidebarCollapsed ? 'collapsed' : 'expanded');
+            
+            // Save preference to localStorage
+            localStorage.setItem('worcha-sidebar-collapsed', this.sidebarCollapsed);
+        },
+
+        toggleTheme() {
+            this.darkMode = !this.darkMode;
+            console.log('🎨 Theme toggled:', this.darkMode ? 'dark' : 'light');
+            
+            // Apply theme to document
+            document.documentElement.setAttribute('data-theme', this.darkMode ? 'dark' : 'light');
+            
+            // Save preference to localStorage
+            localStorage.setItem('worcha-dark-mode', this.darkMode);
+        },
+
+        loadUserPreferences() {
+            // Load sidebar preference
+            const sidebarCollapsed = localStorage.getItem('worcha-sidebar-collapsed');
+            if (sidebarCollapsed !== null) {
+                this.sidebarCollapsed = sidebarCollapsed === 'true';
+            }
+            
+            // Load theme preference
+            const darkMode = localStorage.getItem('worcha-dark-mode');
+            if (darkMode !== null) {
+                this.darkMode = darkMode === 'true';
+                document.documentElement.setAttribute('data-theme', this.darkMode ? 'dark' : 'light');
+            }
+        },
+
         logout() {
             this.api.logout();
             this.isAuthenticated = false;
             this.clearData();
-            console.log('✅ Logged out');
+            this.loginForm.username = 'admin';
+            this.loginForm.password = 'admin';
+            this.loginError = '';
+            console.log('✅ Logged out - redirected to login screen');
         },
 
         // Data Loading
         async loadData() {
+            console.log('🔍 LoadData called - loading flag:', this.loading, 'dataLoading flag:', this.dataLoading);
+            if (this.loading) {
+                console.log('⚠️ Data loading already in progress (loading=true), skipping...');
+                return;
+            }
+            
+            if (this.dataLoading) {
+                console.log('⚠️ Data loading already in progress (dataLoading=true), skipping...');
+                return;
+            }
+            
             try {
                 this.loading = true;
+                console.log('📡 Loading data from EntityDB...');
                 
                 // Load real data from EntityDB
                 await this.loadRealData();
@@ -136,19 +260,90 @@ function worcha() {
             }
         },
 
-        async loadRealData() {
-            try {
-                console.log('📊 Loading data from EntityDB...');
+        // Transform hub entities to Worcha format
+        transformHubEntities(hubEntities) {
+            return hubEntities.map(entity => {
+                // Start with self properties
+                const transformed = {
+                    id: entity.id,
+                    hub: entity.hub,
+                    ...entity.self,
+                    traits: entity.traits,
+                    created_at: entity.created_at,
+                    updated_at: entity.updated_at
+                };
 
-                // Load all entity types in parallel
+                // Add common aliases for backward compatibility
+                if (entity.self) {
+                    // Map common properties
+                    if (entity.self.name) transformed.name = entity.self.name;
+                    if (entity.self.title) transformed.title = entity.self.title;
+                    if (entity.self.display_name) transformed.name = entity.self.display_name;
+                    if (entity.self.username) transformed.username = entity.self.username;
+                }
+
+                // Add trait-based properties for easy access
+                if (entity.traits) {
+                    // Organization hierarchy
+                    if (entity.traits.org) transformed.orgId = entity.traits.org;
+                    if (entity.traits.project) transformed.projectId = entity.traits.project;
+                    if (entity.traits.epic) transformed.epicId = entity.traits.epic;
+                    if (entity.traits.story) transformed.storyId = entity.traits.story;
+                    if (entity.traits.sprint) transformed.sprintId = entity.traits.sprint;
+                    
+                    // Team and component info
+                    if (entity.traits.team) transformed.team = entity.traits.team;
+                    if (entity.traits.component) transformed.component = entity.traits.component;
+                }
+
+                // Parse content if available
+                if (entity.content) {
+                    try {
+                        const content = typeof entity.content === 'string' ? 
+                            JSON.parse(atob(entity.content)) : entity.content;
+                        transformed.description = content.description || transformed.description;
+                        transformed.contentData = content;
+                    } catch (e) {
+                        // If content is not JSON, treat as plain text
+                        transformed.description = entity.content;
+                    }
+                }
+
+                return transformed;
+            });
+        },
+
+        async loadRealData() {
+            console.log('🔍 LoadRealData called - auth:', this.isAuthenticated, 'dataLoading:', this.dataLoading);
+            
+            if (!this.isAuthenticated) {
+                console.log('❌ Cannot load data - not authenticated');
+                return;
+            }
+
+            if (!this.api || !this.api.token) {
+                console.log('❌ Cannot load data - no API token');
+                return;
+            }
+
+            if (this.dataLoading) {
+                console.log('⚠️ Data already loading, resetting flag and continuing...');
+                this.dataLoading = false; // Reset stuck flag
+            }
+
+            try {
+                this.dataLoading = true;
+                console.log('📊 Loading data from EntityDB using Hub Architecture...');
+
+                // Load all entity types in parallel using hub-aware API
                 const [
-                    organizations,
-                    projects,
-                    epics,
-                    stories,
-                    tasks,
-                    users,
-                    sprints
+                    organizationsResult,
+                    projectsResult,
+                    epicsResult,
+                    storiesResult,
+                    tasksResult,
+                    usersResult,
+                    sprintsResult
                 ] = await Promise.all([
                     this.api.getOrganizations(),
                     this.api.getProjects(),
@@ -158,29 +353,60 @@ function worcha() {
                     this.api.getUsers(),
                     this.api.getSprints()
                 ]);
+                
+                // Debug: log raw API results
+                console.log('🔍 Raw API results:', {
+                    orgs: organizationsResult?.length || 0,
+                    projects: projectsResult?.length || 0,
+                    tasks: tasksResult?.length || 0,
+                    users: usersResult?.length || 0
+                });
+                
+                // Debug: log actual API results
+                console.log('🔍 Raw organizations data:', organizationsResult);
+                console.log('🔍 Raw tasks data:', tasksResult);
 
-                this.organizations = organizations;
-                this.projects = projects;
-                this.epics = epics;
-                this.stories = stories;
-                this.tasks = tasks;
-                this.teamMembers = users;
+                // Extract entities from hub API responses (ensure arrays)
+                this.organizations = Array.isArray(organizationsResult) ? organizationsResult : [];
+                this.projects = Array.isArray(projectsResult) ? projectsResult : [];
+                this.epics = Array.isArray(epicsResult) ? epicsResult : [];
+                this.stories = Array.isArray(storiesResult) ? storiesResult : [];
+                this.tasks = Array.isArray(tasksResult) ? tasksResult : [];
+                this.teamMembers = Array.isArray(usersResult) ? usersResult : [];
+                
+                // Verify assignment worked
+                console.log('🔍 Data assignment verification:', {
+                    orgsAssigned: this.organizations.length,
+                    projectsAssigned: this.projects.length,
+                    tasksAssigned: this.tasks.length,
+                    usersAssigned: this.teamMembers.length
+                });
+                
+                // Force UI update by triggering Alpine.js reactivity
+                console.log('🔄 Triggering UI reactivity update...');
+                this.$nextTick(() => {
+                    console.log('✅ UI update triggered');
+                });
 
-                // Process sprints
+                // Process sprints  
+                const sprints = Array.isArray(sprintsResult) ? sprintsResult : [];
                 this.currentSprint = sprints.find(s => s.status === 'active' || s.status === 'planning') || null;
                 this.pastSprints = sprints.filter(s => s.status === 'completed');
 
                 // Create product backlog from unassigned stories
-                this.productBacklog = stories.filter(story => 
-                    !this.tasks.some(task => task.storyId === story.id && task.sprintId)
+                const validStories = Array.isArray(this.stories) ? this.stories : [];
+                const validTasks = Array.isArray(this.tasks) ? this.tasks : [];
+                
+                this.productBacklog = validStories.filter(story => 
+                    !validTasks.some(task => task.storyId === story.id && task.sprintId)
                 ).map(story => ({
                     id: story.id,
-                    title: story.title,
+                    title: story.title || story.name,
                     description: story.description,
                     type: 'story',
-                    storyPoints: 5, // Default value
-                    priority: 'medium',
-                    status: 'ready'
+                    storyPoints: story.story_points || 5,
+                    priority: story.priority || 'medium',
+                    status: story.status || 'ready'
                 }));
 
                 // Generate recent activity from entity timestamps
@@ -195,11 +421,22 @@ function worcha() {
                     users: this.teamMembers.length,
                     sprints: sprints.length
                 });
+                
+                // Debug: log sample data to see what we actually got
+                if (this.organizations.length > 0) {
+                    console.log('Sample organization:', this.organizations[0]);
+                }
+                if (this.tasks.length > 0) {
+                    console.log('Sample task:', this.tasks[0]);
+                }
 
             } catch (error) {
-                console.error('Failed to load real data:', error);
+                console.error('❌ Failed to load real data:', error);
+                console.error('Error details:', error.message, error.stack);
                 // Fallback to sample data initialization
                 await this.initializeSampleDataIfEmpty();
+            } finally {
+                this.dataLoading = false;
             }
         },
 
@@ -208,16 +445,49 @@ function worcha() {
                 // Check if we have any data
                 const entities = await this.api.queryEntities();
                 
-                if (!entities.entities || entities.entities.length === 0) {
-                    console.log('🔧 No data found, initializing sample data...');
-                    await this.api.initializeSampleData();
-                    await this.loadRealData();
+                if (!Array.isArray(entities) || entities.length === 0) {
+                    console.log('🔧 No data found, creating sample team members...');
+                    await this.createSampleTeamMembers();
                 } else {
-                    console.log('📊 Using existing EntityDB data');
-                    await this.loadRealData();
+                    console.log('📊 EntityDB has existing data:', entities.length, 'entities');
+                    
+                    // Check if we have team members specifically
+                    const users = await this.api.getUsers();
+                    if (!users || users.length === 0) {
+                        console.log('👥 No team members found, creating sample users...');
+                        await this.createSampleTeamMembers();
+                    }
                 }
+                
             } catch (error) {
                 console.error('Failed to initialize sample data:', error);
+                // Try to create at least some team members
+                try {
+                    await this.createSampleTeamMembers();
+                } catch (createError) {
+                    console.error('Failed to create sample team members:', createError);
+                }
+            }
+        },
+
+        async createSampleTeamMembers() {
+            console.log('👥 Creating sample team members...');
+            
+            const sampleMembers = [
+                { name: 'Alex Johnson', role: 'Full Stack Developer', email: 'alex@techcorp.com' },
+                { name: 'Sarah Chen', role: 'UI/UX Designer', email: 'sarah@techcorp.com' },
+                { name: 'Mike Rodriguez', role: 'Backend Developer', email: 'mike@techcorp.com' },
+                { name: 'Emma Williams', role: 'Product Manager', email: 'emma@techcorp.com' }
+            ];
+
+            try {
+                for (const member of sampleMembers) {
+                    console.log(`👤 Creating user: ${member.name}`);
+                    await this.api.createUser(member.name, member.role, member.email);
+                }
+                console.log('✅ Sample team members created successfully');
+            } catch (error) {
+                console.error('❌ Failed to create team members:', error);
             }
         },
 
@@ -225,7 +495,8 @@ function worcha() {
             const activities = [];
             
             // Generate activity from recent tasks
-            this.tasks.slice(0, 10).forEach(task => {
+            const tasks = Array.isArray(this.tasks) ? this.tasks : [];
+            tasks.slice(0, 10).forEach(task => {
                 if (task.status === 'done') {
                     activities.push({
                         id: `activity_${task.id}`,
@@ -611,42 +882,45 @@ function worcha() {
 
         // Data Queries
         getProjectsByOrg(orgId) {
-            return this.projects.filter(p => p.orgId === orgId);
+            return Array.isArray(this.projects) ? this.projects.filter(p => p.orgId === orgId) : [];
         },
 
         getEpicsByProject(projectId) {
-            return this.epics.filter(e => e.projectId === projectId);
+            return Array.isArray(this.epics) ? this.epics.filter(e => e.projectId === projectId) : [];
         },
 
         getStoriesByEpic(epicId) {
-            return this.stories.filter(s => s.epicId === epicId);
+            return Array.isArray(this.stories) ? this.stories.filter(s => s.epicId === epicId) : [];
         },
 
         getTasksByStory(storyId) {
-            return this.tasks.filter(t => t.storyId === storyId);
+            return Array.isArray(this.tasks) ? this.tasks.filter(t => t.storyId === storyId) : [];
         },
 
         getTasksByStatus(status) {
-            return this.tasks.filter(t => t.status === status);
+            return Array.isArray(this.tasks) ? this.tasks.filter(t => t.status === status) : [];
         },
 
         getTasksByAssignee(assigneeId) {
-            return this.tasks.filter(t => t.assignee === assigneeId);
+            return Array.isArray(this.tasks) ? this.tasks.filter(t => t.assignee === assigneeId) : [];
         },
 
         getSprintTasksByStatus(status) {
             if (!this.currentSprint) return [];
-            return this.tasks.filter(t => 
+            return Array.isArray(this.tasks) ? this.tasks.filter(t => 
                 t.sprintId === this.currentSprint.id && t.status === status
-            );
+            ) : [];
         },
 
         // Statistics
         calculateStats() {
-            this.stats.totalTasks = this.tasks.length;
-            this.stats.activeTasks = this.tasks.filter(t => ['todo', 'doing', 'review'].includes(t.status)).length;
-            this.stats.completedTasks = this.tasks.filter(t => t.status === 'done').length;
-            this.stats.teamMembers = this.teamMembers.length;
+            const tasks = Array.isArray(this.tasks) ? this.tasks : [];
+            const members = Array.isArray(this.teamMembers) ? this.teamMembers : [];
+            
+            this.stats.totalTasks = tasks.length;
+            this.stats.activeTasks = tasks.filter(t => ['todo', 'doing', 'review'].includes(t.status)).length;
+            this.stats.completedTasks = tasks.filter(t => t.status === 'done').length;
+            this.stats.teamMembers = members.length;
         },
 
         // Chart Management
@@ -662,15 +936,26 @@ function worcha() {
 
         updateStatusChart() {
             const ctx = document.getElementById('statusChart');
-            if (!ctx) return;
+            if (!ctx) {
+                console.log('❌ Status chart canvas not found');
+                return;
+            }
 
             const statusCounts = this.kanbanStatuses.map(status => 
                 this.getTasksByStatus(status.id).length
             );
 
+            // Destroy existing chart to prevent memory leaks
             if (this.statusChart) {
                 this.statusChart.destroy();
+                this.statusChart = null;
             }
+
+            // Set canvas size explicitly to prevent growing
+            ctx.style.width = '100%';
+            ctx.style.height = '300px';
+            ctx.width = ctx.offsetWidth;
+            ctx.height = 300;
 
             this.statusChart = new Chart(ctx, {
                 type: 'doughnut',
@@ -684,11 +969,19 @@ function worcha() {
                     }]
                 },
                 options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
+                    responsive: false,
+                    maintainAspectRatio: true,
+                    animation: {
+                        duration: 500,
+                        easing: 'easeOutQuart'
+                    },
                     plugins: {
                         legend: {
-                            position: 'bottom'
+                            position: 'bottom',
+                            labels: {
+                                padding: 20,
+                                usePointStyle: true
+                            }
                         }
                     }
                 }
@@ -697,15 +990,26 @@ function worcha() {
 
         updateWorkloadChart() {
             const ctx = document.getElementById('workloadChart');
-            if (!ctx) return;
+            if (!ctx) {
+                console.log('❌ Workload chart canvas not found');
+                return;
+            }
 
             const workloadData = this.teamMembers.map(member => 
                 this.getTasksByAssignee(member.id).length
             );
 
+            // Destroy existing chart to prevent memory leaks
             if (this.workloadChart) {
                 this.workloadChart.destroy();
+                this.workloadChart = null;
             }
+
+            // Set canvas size explicitly to prevent growing
+            ctx.style.width = '100%';
+            ctx.style.height = '300px';
+            ctx.width = ctx.offsetWidth;
+            ctx.height = 300;
 
             this.workloadChart = new Chart(ctx, {
                 type: 'bar',
@@ -720,8 +1024,12 @@ function worcha() {
                     }]
                 },
                 options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
+                    responsive: false,
+                    maintainAspectRatio: true,
+                    animation: {
+                        duration: 500,
+                        easing: 'easeOutQuart'
+                    },
                     scales: {
                         y: {
                             beginAtZero: true,
@@ -749,57 +1057,66 @@ function worcha() {
                     case 'organization':
                         newItem = await this.api.createOrganization(
                             this.createForm.title,
-                            this.createForm.description
+                            this.createForm.description,
+                            { industry: 'technology', region: 'global' }
                         );
-                        this.organizations.push(this.api.transformEntity(newItem));
+                        this.organizations.push(newItem);
                         break;
 
                     case 'project':
-                        const orgId = this.organizations[0]?.id;
-                        if (!orgId) throw new Error('No organization found');
+                        const orgName = this.organizations[0]?.name || 'DefaultOrg';
                         
                         newItem = await this.api.createProject(
                             this.createForm.title,
-                            orgId,
+                            orgName,
                             this.createForm.description
                         );
-                        this.projects.push(this.api.transformEntity(newItem));
+                        this.projects.push(newItem);
                         break;
 
                     case 'epic':
-                        const projectId = this.projects[0]?.id;
-                        if (!projectId) throw new Error('No project found');
+                        const projectName = this.projects[0]?.name || 'DefaultProject';
                         
                         newItem = await this.api.createEpic(
                             this.createForm.title,
-                            projectId,
-                            this.createForm.description
+                            projectName,
+                            this.createForm.description,
+                            { org: orgName }
                         );
-                        this.epics.push(this.api.transformEntity(newItem));
+                        this.epics.push(newItem);
                         break;
 
                     case 'story':
-                        const epicId = this.epics[0]?.id;
-                        if (!epicId) throw new Error('No epic found');
+                        const epicName = this.epics[0]?.name || 'DefaultEpic';
+                        const projectForStory = this.epics[0]?.traits?.project || 'DefaultProject';
                         
                         newItem = await this.api.createStory(
                             this.createForm.title,
-                            epicId,
-                            this.createForm.description
+                            epicName,
+                            this.createForm.description,
+                            { project: projectForStory, org: orgName }
                         );
-                        this.stories.push(this.api.transformEntity(newItem));
+                        this.stories.push(newItem);
                         break;
 
                     case 'task':
-                        const storyId = this.stories[0]?.id; // Optional
+                        const storyName = this.stories[0]?.name; // Optional
+                        const projectForTask = this.stories[0]?.traits?.project || 'DefaultProject';
+                        const epicForTask = this.stories[0]?.traits?.epic || 'DefaultEpic';
+                        
                         newItem = await this.api.createTask(
                             this.createForm.title,
                             this.createForm.description,
-                            storyId,
                             this.createForm.assignee,
-                            'medium'
+                            'medium',
+                            { 
+                                project: projectForTask, 
+                                org: orgName,
+                                epic: epicForTask,
+                                story: storyName
+                            }
                         );
-                        this.tasks.push(this.api.transformEntity(newItem));
+                        this.tasks.push(newItem);
                         break;
 
                     default:
@@ -917,7 +1234,7 @@ function worcha() {
                     40
                 );
 
-                this.currentSprint = this.api.transformEntity(newSprint);
+                this.currentSprint = newSprint;
                 console.log('✅ Created new sprint:', this.currentSprint.id);
 
             } catch (error) {
@@ -934,23 +1251,24 @@ function worcha() {
             try {
                 this.loading = true;
 
-                // Create new task from backlog item
+                // Create new task from backlog item with sprint trait
                 const newTask = await this.api.createTask(
                     backlogItem.title,
                     backlogItem.description,
-                    backlogItem.id, // Use backlog item as story
                     null, // No assignee initially
-                    backlogItem.priority
+                    backlogItem.priority,
+                    {
+                        story: backlogItem.title,
+                        sprint: this.currentSprint.name,
+                        project: 'DefaultProject',
+                        org: 'DefaultOrg'
+                    }
                 );
 
-                // Add to current sprint
-                await this.api.addTaskToSprint(newTask.id, this.currentSprint.id);
-
                 // Add to local tasks
-                const transformedTask = this.api.transformEntity(newTask);
-                transformedTask.sprintId = this.currentSprint.id;
-                transformedTask.storyPoints = backlogItem.storyPoints;
-                this.tasks.push(transformedTask);
+                newTask.sprintId = this.currentSprint.id;
+                newTask.storyPoints = backlogItem.storyPoints;
+                this.tasks.push(newTask);
                 
                 // Remove from backlog
                 const index = this.productBacklog.findIndex(item => item.id === backlogItem.id);
@@ -976,18 +1294,26 @@ function worcha() {
         // Task Status Updates for Kanban Drag & Drop
         async updateTaskStatus(taskId, newStatus) {
             try {
-                const task = this.tasks.find(t => t.id === taskId);
-                if (!task) {
-                    console.error('Task not found:', taskId);
+                const taskIndex = this.tasks.findIndex(t => t.id === taskId);
+                if (taskIndex === -1) {
+                    console.error('❌ Task not found:', taskId);
                     return;
                 }
 
-                // Update in EntityDB
-                await this.api.updateTaskStatus(taskId, newStatus);
+                const task = this.tasks[taskIndex];
+                const oldStatus = task.status;
                 
-                // Update local task
+                console.log(`🔄 Moving "${task.title}": ${oldStatus} -> ${newStatus}`);
+
+                // Update local task FIRST (optimistic update)
                 task.status = newStatus;
                 task.updatedAt = new Date();
+                
+                // Force Alpine.js reactivity by replacing the array reference
+                this.tasks = [...this.tasks];
+
+                // Update in EntityDB
+                await this.api.updateTaskStatus(taskId, newStatus);
                 
                 // Add to activity log
                 this.recentActivity.unshift({
@@ -1000,10 +1326,10 @@ function worcha() {
                 // Update stats
                 this.calculateStats();
                 
-                console.log('✅ Task status updated:', taskId, '->', newStatus);
+                console.log(`✅ Task moved successfully: "${task.title}" -> ${newStatus}`);
                 
             } catch (error) {
-                console.error('Error updating task status:', error);
+                console.error('❌ Error updating task status:', error);
                 alert('Error updating task status: ' + error.message);
             }
         },
@@ -1044,37 +1370,94 @@ function worcha() {
 
         // Initialize Kanban Drag & Drop
         initializeKanbanDragDrop() {
-            // Wait for DOM to be ready
+            console.log('🎯 Initializing kanban drag & drop...');
+            
+            // Wait for DOM to be ready with multiple attempts
             this.$nextTick(() => {
-                if (typeof Sortable === 'undefined') {
-                    console.warn('SortableJS not loaded, drag & drop disabled');
-                    return;
-                }
-
-                // Initialize drag & drop for each kanban column
-                this.kanbanStatuses.forEach(status => {
-                    const column = document.querySelector(`[data-status="${status.id}"] .kanban-tasks`);
-                    if (column && !column.sortableInstance) {
-                        column.sortableInstance = Sortable.create(column, {
-                            group: 'kanban',
-                            animation: 150,
-                            ghostClass: 'task-ghost',
-                            chosenClass: 'task-chosen',
-                            dragClass: 'task-drag',
-                            onEnd: async (evt) => {
-                                const taskId = evt.item.getAttribute('data-task-id');
-                                const newStatus = evt.to.closest('.kanban-column').getAttribute('data-status');
-                                
-                                if (taskId && newStatus) {
-                                    await this.updateTaskStatus(taskId, newStatus);
-                                }
-                            }
-                        });
-                    }
-                });
-
-                console.log('✅ Kanban drag & drop initialized');
+                // Additional delay to ensure Alpine.js has finished rendering
+                setTimeout(() => {
+                    this.doInitializeKanban();
+                }, 100);
             });
+        },
+
+        doInitializeKanban() {
+            if (typeof Sortable === 'undefined') {
+                console.warn('❌ SortableJS not loaded, drag & drop disabled');
+                return;
+            }
+
+            console.log('✅ SortableJS is loaded');
+            
+            // Clear existing instances first
+            this.kanbanStatuses.forEach(status => {
+                const column = document.querySelector(`[data-status="${status.id}"] .kanban-tasks`);
+                if (column && column.sortableInstance) {
+                    column.sortableInstance.destroy();
+                    column.sortableInstance = null;
+                    console.log(`🗑️ Destroyed existing sortable for ${status.id}`);
+                }
+            });
+
+            // Initialize drag & drop for each kanban column
+            let successfulInitializations = 0;
+            this.kanbanStatuses.forEach(status => {
+                const columnSelector = `[data-status="${status.id}"] .kanban-tasks`;
+                const column = document.querySelector(columnSelector);
+                
+                console.log(`🔍 Looking for column: ${columnSelector}`, column);
+                
+                if (column) {
+                    console.log(`📋 Initializing drag & drop for ${status.id} column`);
+                    
+                    column.sortableInstance = Sortable.create(column, {
+                        group: 'kanban',
+                        animation: 150,
+                        ghostClass: 'task-ghost',
+                        chosenClass: 'task-chosen',
+                        dragClass: 'task-drag',
+                        onStart: (evt) => {
+                            console.log('🎯 Drag started:', evt.item.getAttribute('data-task-id'));
+                        },
+                        onEnd: async (evt) => {
+                            const taskId = evt.item.getAttribute('data-task-id');
+                            const newStatusColumn = evt.to.closest('.kanban-column');
+                            const newStatus = newStatusColumn ? newStatusColumn.getAttribute('data-status') : null;
+                            const fromStatus = evt.from.closest('.kanban-column')?.getAttribute('data-status');
+                            
+                            console.log(`📍 Drag: ${taskId} from ${fromStatus} to ${newStatus}`);
+                            
+                            if (taskId && newStatus) {
+                                // Only update if status actually changed
+                                if (fromStatus !== newStatus) {
+                                    console.log(`🔄 Status change detected: ${fromStatus} -> ${newStatus} for task ${taskId}`);
+                                    await this.updateTaskStatus(taskId, newStatus);
+                                } else {
+                                    console.log(`ℹ️ No status change needed: ${taskId} already in ${newStatus}`);
+                                }
+                            } else {
+                                console.warn('❌ Missing taskId or newStatus:', { taskId, newStatus });
+                                console.warn('❌ Full event object:', evt);
+                            }
+                        }
+                    });
+                    
+                    successfulInitializations++;
+                    console.log(`✅ Sortable created for ${status.id}`);
+                } else {
+                    console.warn(`❌ Column not found for status: ${status.id} (selector: ${columnSelector})`);
+                }
+            });
+
+            if (successfulInitializations === 0) {
+                console.warn('❌ No kanban columns found! Retrying in 500ms...');
+                setTimeout(() => {
+                    console.log('🔄 Retrying kanban initialization...');
+                    this.doInitializeKanban();
+                }, 500);
+            } else {
+                console.log(`✅ Kanban drag & drop initialization completed (${successfulInitializations}/${this.kanbanStatuses.length} columns)`);
+            }
         },
 
         // EntityDB Integration (Legacy)
