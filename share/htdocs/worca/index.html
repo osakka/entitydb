@@ -569,24 +569,56 @@
         .mb-4 { margin-bottom: 16px; }
         .mt-4 { margin-top: 16px; }
 
-        /* Login Screen Styles */
+        /* Login Screen Styles - Oceanic Theme */
         .login-screen {
             min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: var(--bg-gradient);
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Login screen waves animation */
+        .login-screen::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 200%;
+            height: 100%;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120" preserveAspectRatio="none"><path d="M0,60 C300,100 600,20 900,60 C1050,80 1100,40 1200,60 L1200,0 L0,0 Z" fill="rgba(6,182,212,0.1)"/></svg>') repeat-x;
+            z-index: -1;
+            animation: waveMove 20s linear infinite;
+            opacity: 0.6;
+        }
+
+        .login-screen::after {
+            content: '';
+            position: absolute;
+            top: 20px;
+            left: 0;
+            width: 200%;
+            height: 100%;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120" preserveAspectRatio="none"><path d="M0,40 C200,80 400,0 600,40 C800,80 1000,0 1200,40 L1200,0 L0,0 Z" fill="rgba(14,165,233,0.08)"/></svg>') repeat-x;
+            z-index: -1;
+            animation: waveMove 15s linear infinite reverse;
+            opacity: 0.4;
         }
 
         .login-container {
-            background: rgba(255, 255, 255, 0.95);
+            background: var(--card-bg);
             backdrop-filter: blur(10px);
+            border: 1px solid var(--border-color);
             border-radius: 15px;
             padding: 40px;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 20px 40px var(--shadow);
             width: 100%;
             max-width: 400px;
             text-align: center;
+            position: relative;
+            z-index: 1;
         }
 
         .login-header {
@@ -596,7 +628,10 @@
         .login-header .logo {
             font-size: 32px;
             font-weight: bold;
-            color: #667eea;
+            background: var(--bg-gradient);
+            background-clip: text;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
             margin-bottom: 10px;
             display: flex;
             align-items: center;
@@ -604,8 +639,14 @@
             gap: 10px;
         }
 
+        .login-header .logo img {
+            width: 40px;
+            height: 40px;
+            filter: drop-shadow(0 2px 4px var(--shadow));
+        }
+
         .login-header p {
-            color: #666;
+            color: var(--text-secondary);
             font-size: 16px;
         }
 
@@ -621,36 +662,52 @@
             display: block;
             margin-bottom: 5px;
             font-weight: 600;
-            color: #333;
+            color: var(--text-primary);
         }
 
         .form-group input {
             width: 100%;
             padding: 12px;
-            border: 2px solid #e1e5e9;
+            border: 2px solid var(--border-color);
             border-radius: 8px;
             font-size: 16px;
-            transition: border-color 0.3s;
+            transition: all 0.3s ease;
+            background: var(--card-bg);
+            color: var(--text-primary);
         }
 
         .form-group input:focus {
             outline: none;
-            border-color: #667eea;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.1);
         }
 
         .btn-full {
             width: 100%;
             padding: 12px;
             font-size: 16px;
+            background: var(--bg-gradient);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px var(--shadow);
+        }
+
+        .btn-full:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px var(--shadow);
         }
 
         .error-message {
-            background: #fee;
-            color: #c33;
+            background: rgba(239, 68, 68, 0.1);
+            color: #dc2626;
             padding: 10px;
             border-radius: 8px;
             margin-top: 15px;
-            border: 1px solid #fcc;
+            border: 1px solid rgba(239, 68, 68, 0.2);
         }
     </style>
 </head>
@@ -661,10 +718,10 @@
             <div class="login-container">
                 <div class="login-header">
                     <div class="logo" style="display: flex; flex-direction: column; align-items: center; gap: 15px;">
-                        <img src="worca-artistic-logo.svg" width="140" height="90" alt="Worca" style="filter: drop-shadow(0 4px 8px rgba(6, 182, 212, 0.3));">
+                        <img src="worca-logo.svg" width="120" height="120" alt="Worca" style="filter: drop-shadow(0 4px 8px rgba(6, 182, 212, 0.3));">
                         <div style="text-align: center;">
-                            <h1 style="font-size: 32px; margin: 0; background: linear-gradient(135deg, #0891b2, #06b6d4); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">Worca</h1>
-                            <p style="margin: 5px 0 0 0; color: #0891b2; font-weight: 500;">Workforce Orchestrator</p>
+                            <h1 style="font-size: 32px; margin: 0; background: var(--bg-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">Worca</h1>
+                            <p style="margin: 5px 0 0 0; color: var(--primary-color); font-weight: 500;">Workforce Orchestrator</p>
                         </div>
                     </div>
                 </div>
