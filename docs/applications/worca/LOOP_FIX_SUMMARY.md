@@ -1,7 +1,7 @@
-# 🔧 Worcha Infinite Loop Issue - FIXED
+# 🔧 Worca Infinite Loop Issue - FIXED
 
 ## Problem Identified
-The Worcha dashboard was experiencing an infinite loop caused by:
+The Worca dashboard was experiencing an infinite loop caused by:
 
 1. **Recursive Data Loading**: The `initializeSampleDataIfEmpty()` method was calling `loadRealData()` again, which if it failed, would call `initializeSampleDataIfEmpty()` again, creating an infinite loop.
 
@@ -62,10 +62,10 @@ if (!this.api.token) {
    ./bin/entitydbd.sh start
    ```
 
-2. **Access Worcha** (should load without loops):
-   - Main Dashboard: https://localhost:8085/worcha/
-   - Debug Console: https://localhost:8085/worcha/debug.html
-   - Integration Test: https://localhost:8085/worcha/test-integration.html
+2. **Access Worca** (should load without loops):
+   - Main Dashboard: https://localhost:8085/worca/
+   - Debug Console: https://localhost:8085/worca/debug.html
+   - Integration Test: https://localhost:8085/worca/test-integration.html
 
 3. **Login**: Uses admin/admin automatically or manual login
 
@@ -78,7 +78,7 @@ if (!this.api.token) {
 ## 🐛 Debug Tools
 
 If issues persist, use the debug console:
-- Visit: https://localhost:8085/worcha/debug.html
+- Visit: https://localhost:8085/worca/debug.html
 - Click "Test Authentication" to verify login
 - Click "Test Data Loading" to verify API calls
 - Monitor console for any remaining loops (max 50 logs to prevent overflow)
@@ -90,4 +90,4 @@ If issues persist, use the debug console:
 ✅ **SAFE**: Error boundaries prevent future loops  
 ✅ **DOCUMENTED**: Debug tools available for troubleshooting  
 
-The Worcha dashboard should now load properly without any infinite loops!
+The Worca dashboard should now load properly without any infinite loops!

@@ -1,11 +1,11 @@
-# Worcha Hub Architecture Design
+# Worca Hub Architecture Design
 
 ## Overview
-Worcha (Workforce Orchestrator) serves as the reference implementation for EntityDB's Multi-Hub Platform, demonstrating sophisticated tag-based inheritance and enterprise RBAC patterns.
+Worca (Workforce Orchestrator) serves as the reference implementation for EntityDB's Multi-Hub Platform, demonstrating sophisticated tag-based inheritance and enterprise RBAC patterns.
 
 ## Core Design Principle
 
-**Hub**: `worcha` - The workforce orchestrator application space
+**Hub**: `worca` - The workforce orchestrator application space
 **Self Properties**: What the entity IS (type, status, own attributes)  
 **Trait Properties**: What the entity BELONGS TO (organizational context)
 
@@ -14,7 +14,7 @@ Worcha (Workforce Orchestrator) serves as the reference implementation for Entit
 ### 1. Organizations
 ```javascript
 {
-  "hub": "worcha",
+  "hub": "worca",
   "self": {
     "type": "organization",
     "name": "TechCorp",
@@ -35,18 +35,18 @@ Worcha (Workforce Orchestrator) serves as the reference implementation for Entit
 ```
 
 **Tags Generated:**
-- `hub:worcha`
-- `worcha:self:type:organization`
-- `worcha:self:name:TechCorp`
-- `worcha:self:status:active`
-- `worcha:trait:industry:technology`
-- `worcha:trait:size:large`
-- `worcha:trait:region:north-america`
+- `hub:worca`
+- `worca:self:type:organization`
+- `worca:self:name:TechCorp`
+- `worca:self:status:active`
+- `worca:trait:industry:technology`
+- `worca:trait:size:large`
+- `worca:trait:region:north-america`
 
 ### 2. Projects
 ```javascript
 {
-  "hub": "worcha",
+  "hub": "worca",
   "self": {
     "type": "project",
     "name": "MobileApp",
@@ -70,21 +70,21 @@ Worcha (Workforce Orchestrator) serves as the reference implementation for Entit
 ```
 
 **Tags Generated:**
-- `hub:worcha`
-- `worcha:self:type:project`
-- `worcha:self:name:MobileApp`
-- `worcha:self:status:active`
-- `worcha:self:priority:high`
-- `worcha:self:progress:75`
-- `worcha:trait:org:TechCorp`
-- `worcha:trait:team:mobile-development`
-- `worcha:trait:technology:react-native`
-- `worcha:trait:phase:beta`
+- `hub:worca`
+- `worca:self:type:project`
+- `worca:self:name:MobileApp`
+- `worca:self:status:active`
+- `worca:self:priority:high`
+- `worca:self:progress:75`
+- `worca:trait:org:TechCorp`
+- `worca:trait:team:mobile-development`
+- `worca:trait:technology:react-native`
+- `worca:trait:phase:beta`
 
 ### 3. Epics
 ```javascript
 {
-  "hub": "worcha",
+  "hub": "worca",
   "self": {
     "type": "epic",
     "name": "UserAuthentication",
@@ -109,7 +109,7 @@ Worcha (Workforce Orchestrator) serves as the reference implementation for Entit
 ### 4. Stories
 ```javascript
 {
-  "hub": "worcha",
+  "hub": "worca",
   "self": {
     "type": "story",
     "name": "LoginFlow",
@@ -135,7 +135,7 @@ Worcha (Workforce Orchestrator) serves as the reference implementation for Entit
 ### 5. Tasks
 ```javascript
 {
-  "hub": "worcha",
+  "hub": "worca",
   "self": {
     "type": "task",
     "title": "Implement OAuth2 callback handler",
@@ -163,7 +163,7 @@ Worcha (Workforce Orchestrator) serves as the reference implementation for Entit
 ### 6. Users (Team Members)
 ```javascript
 {
-  "hub": "worcha",
+  "hub": "worca",
   "self": {
     "type": "user",
     "username": "john.doe",
@@ -190,7 +190,7 @@ Worcha (Workforce Orchestrator) serves as the reference implementation for Entit
 ### 7. Sprints
 ```javascript
 {
-  "hub": "worcha",
+  "hub": "worca",
   "self": {
     "type": "sprint",
     "name": "Sprint-24",
@@ -219,49 +219,49 @@ Worcha (Workforce Orchestrator) serves as the reference implementation for Entit
 ### 1. Hierarchical Queries
 ```javascript
 // All tasks in TechCorp organization
-GET /api/v1/hubs/entities/query?hub=worcha&self=type:task&traits=org:TechCorp
+GET /api/v1/hubs/entities/query?hub=worca&self=type:task&traits=org:TechCorp
 
 // All items in MobileApp project
-GET /api/v1/hubs/entities/query?hub=worcha&traits=project:MobileApp
+GET /api/v1/hubs/entities/query?hub=worca&traits=project:MobileApp
 
 // User authentication work items
-GET /api/v1/hubs/entities/query?hub=worcha&traits=epic:UserAuthentication
+GET /api/v1/hubs/entities/query?hub=worca&traits=epic:UserAuthentication
 
 // Current sprint tasks
-GET /api/v1/hubs/entities/query?hub=worcha&self=type:task&traits=sprint:Sprint-24
+GET /api/v1/hubs/entities/query?hub=worca&self=type:task&traits=sprint:Sprint-24
 
 // John's active tasks
-GET /api/v1/hubs/entities/query?hub=worcha&self=type:task,status:doing,assignee:john.doe
+GET /api/v1/hubs/entities/query?hub=worca&self=type:task,status:doing,assignee:john.doe
 ```
 
 ### 2. Cross-Cutting Queries  
 ```javascript
 // All high-priority work across organization
-GET /api/v1/hubs/entities/query?hub=worcha&self=priority:high&traits=org:TechCorp
+GET /api/v1/hubs/entities/query?hub=worca&self=priority:high&traits=org:TechCorp
 
 // Mobile team capacity
-GET /api/v1/hubs/entities/query?hub=worcha&self=type:user&traits=team:mobile-development
+GET /api/v1/hubs/entities/query?hub=worca&self=type:user&traits=team:mobile-development
 
 // Security-related work items
-GET /api/v1/hubs/entities/query?hub=worcha&traits=feature_area:security
+GET /api/v1/hubs/entities/query?hub=worca&traits=feature_area:security
 
 // Backend component tasks
-GET /api/v1/hubs/entities/query?hub=worcha&self=type:task&traits=component:backend-api
+GET /api/v1/hubs/entities/query?hub=worca&self=type:task&traits=component:backend-api
 ```
 
 ### 3. Analytics Queries
 ```javascript
 // Project velocity over time
-GET /api/v1/hubs/entities/query?hub=worcha&self=type:sprint&traits=project:MobileApp
+GET /api/v1/hubs/entities/query?hub=worca&self=type:sprint&traits=project:MobileApp
 
 // Team workload distribution  
-GET /api/v1/hubs/entities/query?hub=worcha&self=type:task,status:doing&traits=team:mobile-development
+GET /api/v1/hubs/entities/query?hub=worca&self=type:task,status:doing&traits=team:mobile-development
 
 // Epic progress tracking
-GET /api/v1/hubs/entities/query?hub=worcha&traits=epic:UserAuthentication
+GET /api/v1/hubs/entities/query?hub=worca&traits=epic:UserAuthentication
 
 // Organization-wide metrics
-GET /api/v1/hubs/entities/query?hub=worcha&traits=org:TechCorp
+GET /api/v1/hubs/entities/query?hub=worca&traits=org:TechCorp
 ```
 
 ## RBAC Permission Mapping
@@ -269,52 +269,52 @@ GET /api/v1/hubs/entities/query?hub=worcha&traits=org:TechCorp
 ### 1. Organization-Level Permissions
 ```bash
 # Full organization access
-rbac:perm:entity:*:worcha:trait:org:TechCorp
+rbac:perm:entity:*:worca:trait:org:TechCorp
 
 # Project-specific access  
-rbac:perm:entity:*:worcha:trait:project:MobileApp
+rbac:perm:entity:*:worca:trait:project:MobileApp
 
 # Team-specific access
-rbac:perm:entity:read:worcha:trait:team:mobile-development
+rbac:perm:entity:read:worca:trait:team:mobile-development
 ```
 
 ### 2. Role-Based Permissions
 ```bash
 # Project Manager
-rbac:perm:entity:*:worcha:trait:project:MobileApp
-rbac:perm:entity:create:worcha:self:type:epic
-rbac:perm:entity:update:worcha:self:type:sprint
+rbac:perm:entity:*:worca:trait:project:MobileApp
+rbac:perm:entity:create:worca:self:type:epic
+rbac:perm:entity:update:worca:self:type:sprint
 
 # Team Lead  
-rbac:perm:entity:*:worcha:trait:team:mobile-development
-rbac:perm:entity:assign:worcha:self:assignee:*
+rbac:perm:entity:*:worca:trait:team:mobile-development
+rbac:perm:entity:assign:worca:self:assignee:*
 
 # Developer
-rbac:perm:entity:read:worcha:trait:team:mobile-development  
-rbac:perm:entity:update:worcha:self:assignee:self
-rbac:perm:entity:update:worcha:self:status:*
+rbac:perm:entity:read:worca:trait:team:mobile-development  
+rbac:perm:entity:update:worca:self:assignee:self
+rbac:perm:entity:update:worca:self:status:*
 
 # Product Owner
-rbac:perm:entity:*:worcha:trait:project:MobileApp
-rbac:perm:entity:create:worcha:self:type:story
-rbac:perm:entity:update:worcha:self:priority:*
+rbac:perm:entity:*:worca:trait:project:MobileApp
+rbac:perm:entity:create:worca:self:type:story
+rbac:perm:entity:update:worca:self:priority:*
 ```
 
 ### 3. Granular Task Permissions
 ```bash
 # Can only update own task status
-rbac:perm:entity:update:worcha:self:status:*:assignee:self
+rbac:perm:entity:update:worca:self:status:*:assignee:self
 
 # Can assign tasks within team
-rbac:perm:entity:update:worcha:self:assignee:*:trait:team:mobile-development
+rbac:perm:entity:update:worca:self:assignee:*:trait:team:mobile-development
 
 # Can view all project tasks
-rbac:perm:entity:read:worcha:self:type:task:trait:project:MobileApp
+rbac:perm:entity:read:worca:self:type:task:trait:project:MobileApp
 ```
 
 ## Data Migration Strategy
 
-### 1. Current Worcha Data → Hub Architecture
+### 1. Current Worca Data → Hub Architecture
 ```javascript
 // OLD FORMAT (current)
 {
@@ -326,7 +326,7 @@ rbac:perm:entity:read:worcha:self:type:task:trait:project:MobileApp
 
 // NEW FORMAT (hub architecture)  
 {
-  "hub": "worcha",
+  "hub": "worca",
   "self": {
     "type": "task", 
     "title": "Implement OAuth2",
@@ -348,7 +348,7 @@ rbac:perm:entity:read:worcha:self:type:task:trait:project:MobileApp
 - Support both tag formats during transition
 - Provide migration utilities for data transformation
 
-## Benefits of Hub Architecture for Worcha
+## Benefits of Hub Architecture for Worca
 
 ### 1. **Cleaner Data Model**
 - Clear separation: what entities ARE vs what they BELONG TO
@@ -367,7 +367,7 @@ rbac:perm:entity:read:worcha:self:type:task:trait:project:MobileApp
 - Organization-wide security policies
 
 ### 4. **Scalability**
-- Multiple organizations in single Worcha instance
+- Multiple organizations in single Worca instance
 - Clear tenant isolation
 - Cross-project analytics
 - Enterprise-ready architecture
@@ -381,7 +381,7 @@ rbac:perm:entity:read:worcha:self:type:task:trait:project:MobileApp
 ## Implementation Phases
 
 ### Phase 1: API Wrapper Update
-- Modify `worcha-api.js` to use hub endpoints
+- Modify `worca-api.js` to use hub endpoints
 - Transform data between old and new formats
 - Maintain UI compatibility
 
@@ -396,4 +396,4 @@ rbac:perm:entity:read:worcha:self:type:task:trait:project:MobileApp
 - Performance optimizations
 - Analytics enhancements
 
-**Worcha will become the definitive reference for building sophisticated applications on EntityDB's Multi-Hub Platform!** 🚀
+**Worca will become the definitive reference for building sophisticated applications on EntityDB's Multi-Hub Platform!** 🚀

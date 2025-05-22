@@ -1,7 +1,7 @@
-// Worcha - Workforce Orchestrator JavaScript Application
+// Worca - Workforce Orchestrator JavaScript Application
 // Powered by EntityDB
 
-function worcha() {
+function worca() {
     return {
         // State Management
         currentView: 'dashboard',
@@ -66,16 +66,16 @@ function worcha() {
         // Initialization
         async init() {
             if (this.initialized) {
-                console.log('⚠️ Worcha already initialized, skipping...');
+                console.log('⚠️ Worca already initialized, skipping...');
                 return;
             }
             
             this.initCounter = (this.initCounter || 0) + 1;
-            console.log(`🚀 Initializing Worcha (attempt ${this.initCounter})...`);
+            console.log(`🚀 Initializing Worca (attempt ${this.initCounter})...`);
             
             try {
                 // Initialize EntityDB API
-                this.api = new WorchaAPI();
+                this.api = new WorcaAPI();
                 
                 // Load user preferences
                 this.loadUserPreferences();
@@ -85,9 +85,9 @@ function worcha() {
                 
                 // Don't load data here - wait for manual login
                 this.initialized = true;
-                console.log('✅ Worcha initialized - ready for login');
+                console.log('✅ Worca initialized - ready for login');
             } catch (error) {
-                console.error('❌ Worcha initialization failed:', error);
+                console.error('❌ Worca initialization failed:', error);
                 this.initialized = false;
             }
         },
@@ -194,7 +194,7 @@ function worcha() {
             console.log('🔄 Sidebar toggled:', this.sidebarCollapsed ? 'collapsed' : 'expanded');
             
             // Save preference to localStorage
-            localStorage.setItem('worcha-sidebar-collapsed', this.sidebarCollapsed);
+            localStorage.setItem('worca-sidebar-collapsed', this.sidebarCollapsed);
         },
 
         toggleTheme() {
@@ -205,18 +205,18 @@ function worcha() {
             document.documentElement.setAttribute('data-theme', this.darkMode ? 'dark' : 'light');
             
             // Save preference to localStorage
-            localStorage.setItem('worcha-dark-mode', this.darkMode);
+            localStorage.setItem('worca-dark-mode', this.darkMode);
         },
 
         loadUserPreferences() {
             // Load sidebar preference
-            const sidebarCollapsed = localStorage.getItem('worcha-sidebar-collapsed');
+            const sidebarCollapsed = localStorage.getItem('worca-sidebar-collapsed');
             if (sidebarCollapsed !== null) {
                 this.sidebarCollapsed = sidebarCollapsed === 'true';
             }
             
             // Load theme preference
-            const darkMode = localStorage.getItem('worcha-dark-mode');
+            const darkMode = localStorage.getItem('worca-dark-mode');
             if (darkMode !== null) {
                 this.darkMode = darkMode === 'true';
                 document.documentElement.setAttribute('data-theme', this.darkMode ? 'dark' : 'light');

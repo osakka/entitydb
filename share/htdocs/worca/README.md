@@ -1,8 +1,8 @@
-# 🚀 Worcha - Workforce Orchestrator
+# 🐋 Worca - Workforce Orchestrator
 
 > **A comprehensive workforce management platform built on EntityDB**
 
-Worcha is a powerful, scalable workforce orchestrator that provides both rich web interfaces and conversational CLI tools for managing teams, projects, and tasks across organizations of any size.
+Worca is a powerful, scalable workforce orchestrator that provides both rich web interfaces and conversational CLI tools for managing teams, projects, and tasks across organizations of any size.
 
 ## ✨ Features
 
@@ -37,12 +37,12 @@ Worcha is a powerful, scalable workforce orchestrator that provides both rich we
 
 ### Access the Web Interface
 ```
-https://localhost:8085/worcha/
+https://localhost:8085/worca/
 ```
 
 ### Use the CLI Interface
 ```
-https://localhost:8085/worcha/cli.html
+https://localhost:8085/worca/cli.html
 ```
 
 ## 💼 Use Cases
@@ -137,7 +137,7 @@ All data is stored as entities in EntityDB with appropriate tags:
 
 ## 📱 Responsive Design
 
-Worcha works seamlessly across:
+Worca works seamlessly across:
 - **Desktop**: Full-featured dashboard experience
 - **Tablet**: Touch-optimized interface
 - **Mobile**: Essential features accessible on-the-go
@@ -181,7 +181,7 @@ Worcha works seamlessly across:
 
 ## 🤝 Contributing
 
-Worcha is built on EntityDB and follows its development patterns:
+Worca is built on EntityDB and follows its development patterns:
 
 1. **Entity-First Design**: All features use EntityDB entities
 2. **Tag-Based Logic**: Leverage tags for flexible categorization
@@ -194,4 +194,4 @@ Built as part of the EntityDB ecosystem.
 
 ---
 
-**Worcha** - Where workforce orchestration meets intelligent simplicity. 🎯✨
+**Worca** - Where workforce orchestration meets intelligent simplicity. 🎯✨

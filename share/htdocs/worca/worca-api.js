@@ -1,7 +1,7 @@
-// Worcha EntityDB API Integration
+// Worca EntityDB API Integration
 // Complete backend functionality using EntityDB
 
-class WorchaAPI {
+class WorcaAPI {
     constructor() {
         this.baseURL = '/api/v1';
         this.token = localStorage.getItem('authToken');

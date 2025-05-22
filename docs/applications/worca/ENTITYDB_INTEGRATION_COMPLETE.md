@@ -1,8 +1,8 @@
-# ✅ Worcha EntityDB Integration Complete
+# ✅ Worca EntityDB Integration Complete
 
 ## Summary
 
-Worcha workforce orchestrator is now **fully integrated** with EntityDB backend as requested. The complete system provides:
+Worca workforce orchestrator is now **fully integrated** with EntityDB backend as requested. The complete system provides:
 
 - **Full EntityDB Backend**: All data persisted to EntityDB temporal database
 - **Complete CRUD Operations**: Create, read, update, delete for all entity types
@@ -23,9 +23,9 @@ Worcha workforce orchestrator is now **fully integrated** with EntityDB backend 
 - **Kanban Boards**: Drag-drop functionality with EntityDB persistence
 - **Reporting & Analytics**: Real-time charts from EntityDB data
 
-### ✅ API Integration (`worcha-api.js`)
+### ✅ API Integration (`worca-api.js`)
 ```javascript
-class WorchaAPI {
+class WorcaAPI {
     // Complete EntityDB integration
     async createTask(title, description, assignee, priority, traits)
     async updateTaskStatus(taskId, newStatus)
@@ -35,7 +35,7 @@ class WorchaAPI {
 }
 ```
 
-### ✅ Frontend Integration (`worcha.js`)
+### ✅ Frontend Integration (`worca.js`)
 - **Authentication**: Login with EntityDB credentials
 - **Real Data Loading**: All data loaded from EntityDB
 - **Live Updates**: All changes persist to EntityDB
@@ -54,9 +54,9 @@ Users:         type:user, username:X, displayName:Y, role:user
 
 ## Access Points
 
-1. **Main Application**: https://localhost:8085/worcha/
-2. **CLI Interface**: https://localhost:8085/worcha/cli.html  
-3. **Integration Test**: https://localhost:8085/worcha/test-integration.html
+1. **Main Application**: https://localhost:8085/worca/
+2. **CLI Interface**: https://localhost:8085/worca/cli.html  
+3. **Integration Test**: https://localhost:8085/worca/test-integration.html
 4. **EntityDB API**: https://localhost:8085/api/v1/
 
 ## Testing
@@ -71,14 +71,14 @@ The integration has been tested with:
 
 ## Files Updated
 
-- `/opt/entitydb/share/htdocs/worcha/worcha-api.js` - Complete EntityDB API wrapper
-- `/opt/entitydb/share/htdocs/worcha/worcha.js` - Updated to use EntityDB backend
-- `/opt/entitydb/share/htdocs/worcha/test-integration.html` - Integration test suite
+- `/opt/entitydb/share/htdocs/worca/worca-api.js` - Complete EntityDB API wrapper
+- `/opt/entitydb/share/htdocs/worca/worca.js` - Updated to use EntityDB backend
+- `/opt/entitydb/share/htdocs/worca/test-integration.html` - Integration test suite
 
 ## Usage
 
 1. **Start EntityDB**: Already running at https://localhost:8085
-2. **Access Worcha**: Navigate to https://localhost:8085/worcha/
+2. **Access Worca**: Navigate to https://localhost:8085/worca/
 3. **Login**: Use admin/admin credentials
 4. **Create Data**: Organizations → Projects → Epics → Stories → Tasks
 5. **Use Kanban**: Drag tasks between columns (persists to EntityDB)
@@ -87,7 +87,7 @@ The integration has been tested with:
 
 ## 🎯 Result
 
-**Worcha is now a complete workforce orchestrator with full EntityDB backend integration.** 
+**Worca is now a complete workforce orchestrator with full EntityDB backend integration.** 
 
 All functionality requested has been implemented:
 - ✅ Complete with full functionality ✅

@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Worcha - Workforce Orchestrator</title>
+    <title>Worca - Workforce Orchestrator</title>
+    <link rel="icon" type="image/svg+xml" href="worca-icon.svg">
     <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.12.3/dist/cdn.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
@@ -11,31 +12,35 @@
     <style>
         /* Modern Workforce Orchestrator Styles */
         :root {
-            /* Light theme variables */
-            --bg-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            --sidebar-bg: rgba(255, 255, 255, 0.95);
-            --content-bg: rgba(255, 255, 255, 0.95);
-            --text-primary: #333;
-            --text-secondary: #666;
-            --border-color: rgba(255, 255, 255, 0.2);
-            --card-bg: white;
-            --shadow: rgba(0, 0, 0, 0.1);
-            --primary-color: #667eea;
-            --hover-bg: rgba(102, 126, 234, 0.1);
+            /* Ocean Light theme - Crystal waters */
+            --bg-gradient: linear-gradient(135deg, #0891b2 0%, #06b6d4 25%, #0ea5e9 50%, #3b82f6 75%, #1e40af 100%);
+            --sidebar-bg: rgba(248, 250, 252, 0.95);
+            --content-bg: rgba(248, 250, 252, 0.95);
+            --text-primary: #0f172a;
+            --text-secondary: #475569;
+            --border-color: rgba(6, 182, 212, 0.2);
+            --card-bg: rgba(255, 255, 255, 0.98);
+            --shadow: rgba(8, 145, 178, 0.15);
+            --primary-color: #0891b2;
+            --hover-bg: rgba(6, 182, 212, 0.1);
+            --accent-color: #06b6d4;
+            --wave-color: rgba(6, 182, 212, 0.3);
         }
 
         [data-theme="dark"] {
-            /* Dark theme variables */
-            --bg-gradient: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-            --sidebar-bg: rgba(30, 30, 46, 0.95);
-            --content-bg: rgba(30, 30, 46, 0.95);
-            --text-primary: #e2e8f0;
-            --text-secondary: #a0aec0;
-            --border-color: rgba(255, 255, 255, 0.1);
-            --card-bg: #2d3748;
-            --shadow: rgba(0, 0, 0, 0.3);
-            --primary-color: #667eea;
-            --hover-bg: rgba(102, 126, 234, 0.2);
+            /* Ocean Dark theme - Deep waters */
+            --bg-gradient: linear-gradient(135deg, #0c4a6e 0%, #075985 25%, #0369a1 50%, #1e40af 75%, #1e3a8a 100%);
+            --sidebar-bg: rgba(15, 23, 42, 0.95);
+            --content-bg: rgba(15, 23, 42, 0.95);
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --border-color: rgba(6, 182, 212, 0.3);
+            --card-bg: rgba(30, 41, 59, 0.95);
+            --shadow: rgba(0, 0, 0, 0.4);
+            --primary-color: #06b6d4;
+            --hover-bg: rgba(6, 182, 212, 0.2);
+            --accent-color: #0891b2;
+            --wave-color: rgba(6, 182, 212, 0.4);
         }
 
         * {
@@ -50,6 +55,40 @@
             min-height: 100vh;
             color: var(--text-primary);
             transition: all 0.3s ease;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        /* Animated ocean waves background */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 200%;
+            height: 100%;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120" preserveAspectRatio="none"><path d="M0,60 C300,100 600,20 900,60 C1050,80 1100,40 1200,60 L1200,0 L0,0 Z" fill="rgba(6,182,212,0.1)"/></svg>') repeat-x;
+            z-index: -1;
+            animation: waveMove 20s linear infinite;
+            opacity: 0.6;
+        }
+
+        body::after {
+            content: '';
+            position: fixed;
+            top: 20px;
+            left: 0;
+            width: 200%;
+            height: 100%;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120" preserveAspectRatio="none"><path d="M0,40 C200,80 400,0 600,40 C800,80 1000,0 1200,40 L1200,0 L0,0 Z" fill="rgba(14,165,233,0.08)"/></svg>') repeat-x;
+            z-index: -1;
+            animation: waveMove 15s linear infinite reverse;
+            opacity: 0.4;
+        }
+
+        @keyframes waveMove {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(-50%); }
         }
 
         .app-container {
@@ -57,16 +96,34 @@
             min-height: 100vh;
         }
 
-        /* Sidebar */
+        /* Sidebar with oceanic feel */
         .sidebar {
             width: 280px;
             background: var(--sidebar-bg);
-            backdrop-filter: blur(10px);
-            border-right: 1px solid var(--border-color);
+            backdrop-filter: blur(15px);
+            border-right: 2px solid var(--accent-color);
             padding: 20px;
-            box-shadow: 2px 0 10px var(--shadow);
-            transition: all 0.3s ease;
+            box-shadow: 4px 0 20px var(--shadow);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
             position: relative;
+            overflow: hidden;
+        }
+
+        /* Sidebar wave effect */
+        .sidebar::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: -2px;
+            width: 4px;
+            height: 100%;
+            background: linear-gradient(180deg, transparent 0%, var(--accent-color) 50%, transparent 100%);
+            animation: sidebarFlow 3s ease-in-out infinite;
+        }
+
+        @keyframes sidebarFlow {
+            0%, 100% { opacity: 0.6; transform: scaleY(1); }
+            50% { opacity: 1; transform: scaleY(1.1); }
         }
 
         .sidebar.collapsed {
@@ -270,18 +327,38 @@
 
         .task-card {
             background: var(--card-bg);
-            border-radius: 8px;
+            border-radius: 12px;
             padding: 16px;
             margin-bottom: 12px;
-            box-shadow: 0 2px 8px var(--shadow);
+            box-shadow: 0 4px 12px var(--shadow);
             border-left: 4px solid var(--primary-color);
+            border: 1px solid var(--border-color);
             cursor: move;
-            transition: all 0.3s ease;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .task-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, var(--wave-color), transparent);
+            transition: left 0.6s ease;
         }
 
         .task-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 16px var(--shadow);
+            transform: translateY(-4px) scale(1.02);
+            box-shadow: 0 8px 25px var(--shadow);
+            border-color: var(--accent-color);
+            border-left-color: var(--accent-color);
+        }
+
+        .task-card:hover::before {
+            left: 100%;
         }
 
         /* Drag & Drop States */
@@ -578,7 +655,7 @@
     </style>
 </head>
 <body>
-    <div x-data="worcha" x-init="init()">
+    <div x-data="worca" x-init="init()">
         <!-- Login Screen -->
         <div x-show="!isAuthenticated" class="login-screen">
             <div class="login-container">
@@ -624,8 +701,8 @@
             </button>
             
             <div class="logo">
-                <i class="fas fa-users-cog nav-icon"></i>
-                <span class="logo-text">Worcha</span>
+                <img src="worca-icon.svg" width="32" height="32" class="nav-icon" alt="Worca" style="border-radius: 50%; filter: drop-shadow(0 2px 4px var(--shadow));">
+                <span class="logo-text">Worca</span>
             </div>
 
             <nav>
@@ -973,7 +1050,7 @@
         </div>
     </div>
 
-    <script src="worcha-api.js"></script>
-    <script src="worcha.js"></script>
+    <script src="worca-api.js"></script>
+    <script src="worca.js"></script>
 </body>
 </html>

@@ -1,15 +1,15 @@
-# 🚀 Worcha - Workforce Orchestrator
+# 🐋 Worca - Workforce Orchestrator
 
-> **A comprehensive workforce management platform built on EntityDB**
+> **A comprehensive workforce management platform built on EntityDB, inspired by the intelligence and teamwork of Orcas**
 
-Worcha is a powerful, scalable workforce orchestrator that provides both rich web interfaces and conversational CLI tools for managing teams, projects, and tasks across organizations of any size.
+Worca is a powerful, scalable workforce orchestrator that provides both rich web interfaces and conversational CLI tools for managing teams, projects, and tasks across organizations of any size. Named after the intelligent and collaborative Orca whale, Worca embodies the same principles of teamwork, intelligence, and coordinated effort.
 
 ## 📍 Location & Access
 
-- **Web Dashboard**: `/share/htdocs/worcha/index.html`
-- **CLI Interface**: `/share/htdocs/worcha/cli.html`
-- **API Layer**: `/share/htdocs/worcha/worcha-api.js`
-- **Core Application**: `/share/htdocs/worcha/worcha.js`
+- **Web Dashboard**: `/share/htdocs/worca/index.html`
+- **CLI Interface**: `/share/htdocs/worca/cli.html`
+- **API Layer**: `/share/htdocs/worca/worca-api.js`
+- **Core Application**: `/share/htdocs/worca/worca.js`
 
 ## ✨ Features Implemented
 
@@ -57,14 +57,14 @@ Worcha is a powerful, scalable workforce orchestrator that provides both rich we
 ## 🗂️ File Structure
 
 ```
-/share/htdocs/worcha/
+/share/htdocs/worca/
 ├── index.html          # Main dashboard application
 ├── cli.html            # Conversational CLI interface
-├── worcha.js           # Core application logic (Alpine.js)
-├── worcha-api.js       # EntityDB API wrapper
+├── worca.js           # Core application logic (Alpine.js)
+├── worca-api.js       # EntityDB API wrapper
 └── README.md           # User documentation
 
-/docs/applications/worcha/
+/docs/applications/worca/
 ├── README.md                           # This file
 ├── ENTITYDB_INTEGRATION_COMPLETE.md   # Integration details
 ├── EMPTY_DASHBOARD_FIX.md             # Data loading fixes
@@ -80,8 +80,8 @@ Worcha is a powerful, scalable workforce orchestrator that provides both rich we
    ./bin/entitydbd.sh start
    ```
 
-2. **Access Worcha Dashboard**:
-   - Open browser to `https://localhost:8443/worcha/`
+2. **Access Worca Dashboard**:
+   - Open browser to `https://localhost:8443/worca/`
    - Login with `admin/admin` (created automatically)
 
 3. **Start Managing Work**:
@@ -92,7 +92,7 @@ Worcha is a powerful, scalable workforce orchestrator that provides both rich we
 
 ## 📊 Data Model
 
-Worcha uses EntityDB's tag-based entity system:
+Worca uses EntityDB's tag-based entity system:
 
 ### Entity Types
 - `type:organization` - Business units
@@ -126,7 +126,7 @@ Worcha uses EntityDB's tag-based entity system:
 - Project hierarchy navigation
 
 **🔧 READY FOR PRODUCTION:**
-Worcha is fully functional and ready for production use with EntityDB as the backend.
+Worca is fully functional and ready for production use with EntityDB as the backend.
 
 ## 🔄 Recent Improvements
 
