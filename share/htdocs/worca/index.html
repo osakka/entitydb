@@ -139,10 +139,17 @@
             margin-bottom: 30px;
             display: flex;
             align-items: center;
-            justify-content: center;
+            justify-content: flex-start;
             gap: 10px;
             overflow: hidden;
             white-space: nowrap;
+            padding-left: 16px;
+        }
+        
+        .sidebar.collapsed .logo {
+            height: 32px;
+            overflow: hidden;
+            padding-left: 16px;
         }
 
         .sidebar.collapsed .logo .logo-text {
@@ -710,8 +717,18 @@
         <div class="sidebar" :class="{'open': sidebarOpen, 'collapsed': sidebarCollapsed}">
             <!-- Logo with sidebar toggle functionality -->
             <div class="logo" @click="toggleSidebar()" style="cursor: pointer;" :title="sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'">
-                <img :src="darkMode ? 'worca-logo-dark.svg' : 'worca-logo-light.svg'" width="32" height="32" class="nav-icon" alt="Worca" style="border-radius: 50%; filter: drop-shadow(0 2px 4px var(--shadow)); transition: transform 0.3s ease;" :style="sidebarCollapsed ? 'transform: scale(0.9)' : 'transform: scale(1)'">
-                <span class="logo-text">Worca</span>
+                <div style="display: flex; flex-direction: column; align-items: flex-start;">
+                    <img :src="darkMode ? 'worca-logo-dark.svg' : 'worca-logo-light.svg'" 
+                         :width="sidebarCollapsed ? '32' : '64'" 
+                         :height="sidebarCollapsed ? '32' : '64'" 
+                         class="nav-icon" 
+                         alt="Worca" 
+                         style="filter: drop-shadow(0 2px 4px var(--shadow)); transition: all 0.3s ease;">
+                    <span x-show="!sidebarCollapsed" 
+                          style="font-size: 11px; color: #000000; margin-top: 4px; line-height: 1.2; transition: all 0.3s ease;">
+                        Orca Workforce<br>Orchestration
+                    </span>
+                </div>
             </div>
 
             <nav style="display: flex; flex-direction: column; height: calc(100vh - 120px);">
