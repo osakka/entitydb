@@ -139,6 +139,7 @@
             margin-bottom: 30px;
             display: flex;
             align-items: center;
+            justify-content: center;
             gap: 10px;
             overflow: hidden;
             white-space: nowrap;
@@ -739,14 +740,16 @@
                     </div>
                 </div>
                 
-                <!-- Bottom Navigation Items -->
-                <div class="nav-bottom" style="margin-top: auto; border-top: 2px solid var(--border-color); padding-top: 15px;">
-                    <!-- Theme Toggle -->
-                    <div class="nav-item" @click="toggleTheme()" :title="darkMode ? 'Switch to light mode' : 'Switch to dark mode'" style="margin-bottom: 8px;">
+                <!-- Theme Toggle (above separator) -->
+                <div style="margin-top: auto; margin-bottom: 8px;">
+                    <div class="nav-item" @click="toggleTheme()" :title="darkMode ? 'Switch to light mode' : 'Switch to dark mode'">
                         <i class="fas nav-icon" :class="darkMode ? 'fa-sun' : 'fa-moon'"></i>
                         <span class="nav-text" x-text="darkMode ? 'Light Mode' : 'Dark Mode'"></span>
                     </div>
-                    
+                </div>
+                
+                <!-- Bottom Navigation Items -->
+                <div class="nav-bottom" style="border-top: 2px solid var(--border-color); padding-top: 15px;">
                     <div class="nav-item" :class="{'active': currentView === 'settings'}" @click="setView('settings')">
                         <i class="fas fa-cog nav-icon"></i>
                         <span class="nav-text">Settings</span>
