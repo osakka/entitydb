@@ -20,6 +20,7 @@ EntityDB now features a unified Entity model with autochunking:
 - **Entity Relationships**: Binary format supports relationships between entities
 - **Auto-Initialization**: Creates admin/admin user automatically on first start
 - **Query Adaptations**: All query functions handle temporal tags transparently
+- **Observability**: Comprehensive metrics with health checks, Prometheus format, and system analytics
 
 ## What's Implemented
 
@@ -32,6 +33,7 @@ EntityDB now features a unified Entity model with autochunking:
 - Dashboard UI (Alpine.js)
 - User management with secure password hashing
 - Configuration as entities
+- Health monitoring and metrics endpoints
 
 ### Architecture
 ```
@@ -48,6 +50,9 @@ EntityDB now features a unified Entity model with autochunking:
 │   │   ├── user_handler_rbac.go     # RBAC wrapper for users
 │   │   ├── entity_config_handler.go
 │   │   ├── config_handler_rbac.go   # RBAC wrapper for config
+│   │   ├── health_handler.go        # Health monitoring endpoint
+│   │   ├── metrics_handler.go       # Prometheus metrics endpoint
+│   │   ├── system_metrics_handler.go # EntityDB system metrics
 │   │   └── rbac_middleware.go       # RBAC enforcement middleware
 │   ├── models/                      # Entity models
 │   └── storage/binary/              # Binary format implementation
@@ -83,6 +88,11 @@ POST   /api/v1/users/create          # Requires user:create (admin only)
 GET    /api/v1/dashboard/stats       # Requires system:view
 GET    /api/v1/config                # Requires config:view
 POST   /api/v1/feature-flags/set     # Requires config:update
+
+# Monitoring & Observability
+GET    /health                       # Health check with system metrics (no auth)
+GET    /metrics                      # Prometheus metrics format (no auth)
+GET    /api/v1/system/metrics        # EntityDB comprehensive metrics (no auth)
 
 # API Documentation
 GET    /swagger/                     # Swagger UI
