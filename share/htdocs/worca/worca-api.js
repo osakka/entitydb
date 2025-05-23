@@ -50,6 +50,23 @@ class WorcaAPI {
     // Generic EntityDB operations
     async createEntity(entityData) {
         try {
+            // Ensure entityData has proper structure
+            if (!entityData.tags || !Array.isArray(entityData.tags)) {
+                throw new Error('EntityData must have tags array');
+            }
+
+            // Add creation timestamp if not present
+            const hasCreatedTag = entityData.tags.some(tag => tag.startsWith('created:'));
+            if (!hasCreatedTag) {
+                entityData.tags.push(`created:${new Date().toISOString()}`);
+            }
+
+            console.log('🔍 Creating entity with data:', {
+                tags: entityData.tags,
+                content: entityData.content,
+                fullPayload: entityData
+            });
+
             const response = await fetch(`${this.baseURL}/entities/create`, {
                 method: 'POST',
                 headers: {
@@ -59,10 +76,16 @@ class WorcaAPI {
                 body: JSON.stringify(entityData)
             });
 
+            console.log('🔍 EntityDB response status:', response.status, response.statusText);
+
             if (response.ok) {
-                return await response.json();
+                const result = await response.json();
+                console.log('🔍 EntityDB creation result:', result);
+                return result;
             } else {
-                throw new Error(`Failed to create entity: ${response.statusText}`);
+                const errorText = await response.text();
+                console.error('🔍 EntityDB error response:', errorText);
+                throw new Error(`Failed to create entity: ${response.status} ${response.statusText} - ${errorText}`);
             }
         } catch (error) {
             console.error('Create entity error:', error);
@@ -72,6 +95,20 @@ class WorcaAPI {
 
     async updateEntity(id, entityData) {
         try {
+            // Add updated timestamp if we have tags to update
+            if (entityData.tags && Array.isArray(entityData.tags)) {
+                // Remove any existing updated: tag and add new one
+                entityData.tags = entityData.tags.filter(tag => !tag.startsWith('updated:'));
+                entityData.tags.push(`updated:${new Date().toISOString()}`);
+            }
+
+            console.log('🔍 Updating entity with data:', {
+                id,
+                tags: entityData.tags,
+                content: entityData.content,
+                fullPayload: entityData
+            });
+
             const response = await fetch(`${this.baseURL}/entities/update`, {
                 method: 'PUT',
                 headers: {
@@ -81,10 +118,16 @@ class WorcaAPI {
                 body: JSON.stringify({ id, ...entityData })
             });
 
+            console.log('🔍 EntityDB update response status:', response.status, response.statusText);
+
             if (response.ok) {
-                return await response.json();
+                const result = await response.json();
+                console.log('🔍 EntityDB update result:', result);
+                return result;
             } else {
-                throw new Error(`Failed to update entity: ${response.statusText}`);
+                const errorText = await response.text();
+                console.error('🔍 EntityDB update error response:', errorText);
+                throw new Error(`Failed to update entity: ${response.status} ${response.statusText} - ${errorText}`);
             }
         } catch (error) {
             console.error('Update entity error:', error);
@@ -276,19 +319,14 @@ class WorcaAPI {
             }]
         };
 
-        console.log('🔍 Creating user with data:', {
-            username,
-            displayName,
-            role,
-            userData,
-            tagsToSend: userData.tags
-        });
+        // Validate that all required fields are present
+        if (!username || !displayName) {
+            throw new Error('Username and displayName are required for user creation');
+        }
 
-        const result = await this.createEntity(userData);
-        
-        console.log('🔍 User creation result:', result);
-        
-        return result;
+        console.log('🔍 Creating user:', { username, displayName, role });
+
+        return await this.createEntity(userData);
     }
 
     async createSprint(name, startDate, endDate, goal, capacity = 40) {
