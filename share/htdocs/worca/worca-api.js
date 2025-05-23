@@ -442,7 +442,15 @@ class WorcaAPI {
 
     async getUsers() {
         const result = await this.queryEntities();
-        return this.filterEntitiesByType(Array.isArray(result) ? result : [], 'user');
+        const users = this.filterEntitiesByType(Array.isArray(result) ? result : [], 'user');
+        
+        // Debug logging for users (can be removed in production)
+        console.log('🔍 Loaded', users.length, 'users from EntityDB');
+        users.forEach((user, index) => {
+            console.log(`🔍 User ${index + 1}:`, user.name || 'No Name', '-', user.role || 'No Role');
+        });
+        
+        return users;
     }
 
     async getSprints() {
@@ -541,30 +549,34 @@ class WorcaAPI {
         transformed.role = this.getTagValue(entity.tags, 'role') || this.getTagValue(entity.tags, 'worca:self:role');
         transformed.email = this.getTagValue(entity.tags, 'email') || this.getTagValue(entity.tags, 'worca:self:email');
         
-        // For users, ensure they always have a name
+        // For users, ensure they always have a name and handle special cases
         if (transformed.type === 'user') {
+            // Handle admin user role extraction from rbac tags
+            if (!transformed.role && entity.tags) {
+                const adminRole = entity.tags.find(t => t === 'rbac:role:admin');
+                if (adminRole) {
+                    transformed.role = 'Administrator';
+                }
+            }
+            
+            // Ensure name fallback logic
             if (!transformed.name && transformed.displayName) {
                 transformed.name = transformed.displayName;
             } else if (!transformed.name && transformed.username) {
-                transformed.name = transformed.username;
+                transformed.name = transformed.username.charAt(0).toUpperCase() + transformed.username.slice(1);
             } else if (!transformed.name) {
                 transformed.name = 'Unknown User';
             }
+            
+            // Ensure role fallback
+            if (!transformed.role) {
+                transformed.role = 'User';
+            }
         }
         
-        // Debug: log user transformation
+        // Debug: log user transformation (can be removed in production)
         if (transformed.type === 'user') {
-            console.log('🔍 User transformation debug:', {
-                id: transformed.id,
-                type: transformed.type,
-                rawName: this.getTagValue(entity.tags, 'name'),
-                rawDisplayName: this.getTagValue(entity.tags, 'displayName'),
-                finalName: transformed.name,
-                finalDisplayName: transformed.displayName,
-                username: transformed.username,
-                role: transformed.role,
-                allTags: entity.tags
-            });
+            console.log('🔍 Transformed user:', transformed.name, '-', transformed.role, '(ID:', transformed.id.slice(0, 8) + ')');
         }
 
         // Extract description from content (handle base64 encoded content)
@@ -624,8 +636,37 @@ class WorcaAPI {
 
     getTagValue(tags, key) {
         if (!tags) return null;
-        const tag = tags.find(t => t.startsWith(`${key}:`));
-        return tag ? tag.substring(key.length + 1) : null;
+        
+        // Debug: log tag search for user-related keys (verbose, can be removed in production)
+        const isUserKey = ['name', 'displayName', 'username', 'role', 'email'].includes(key);
+        if (isUserKey && false) { // Set to true for debugging
+            console.log(`🔍 getTagValue searching for '${key}' in:`, tags.slice(0, 8));
+        }
+        
+        // Try standard format first (key:value)
+        let tag = tags.find(t => t.startsWith(`${key}:`));
+        let result = tag ? tag.substring(key.length + 1) : null;
+        
+        // If not found and looking for username, try id:username:value format (for admin user)
+        if (!result && key === 'username') {
+            tag = tags.find(t => t.startsWith('id:username:'));
+            result = tag ? tag.substring('id:username:'.length) : null;
+        }
+        
+        // If still not found and looking for name, try using username as fallback
+        if (!result && key === 'name') {
+            const username = this.getTagValue(tags, 'username');
+            if (username) {
+                result = username;
+            }
+        }
+        
+        // Debug: log result for user-related keys (verbose, can be removed in production)
+        if (isUserKey && false) { // Set to true for debugging
+            console.log(`🔍 getTagValue('${key}') = '${result}' (from tag: '${tag}')`);
+        }
+        
+        return result;
     }
 
     // Initialize sample data (run once)
