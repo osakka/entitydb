@@ -841,12 +841,19 @@
 
         <!-- Top Taskbar (only show when authenticated) -->
         <div x-show="isAuthenticated" class="taskbar">
-            <!-- Left side: Logo and Username dropdown -->
+            <!-- Left side: Logo only -->
             <div class="taskbar-left">
                 <img :src="darkMode ? 'worca-logo-dark.svg' : 'worca-logo-light.svg'" 
                      width="32" height="32" 
                      alt="Worca" 
                      class="taskbar-logo">
+            </div>
+            
+            <!-- Right side: Theme toggle and Username dropdown -->
+            <div class="taskbar-right">
+                <button @click="toggleTheme()" class="theme-toggle">
+                    <i :class="darkMode ? 'fas fa-sun' : 'fas fa-moon'"></i>
+                </button>
                 
                 <!-- Username dropdown -->
                 <div class="dropdown" x-data="{ open: false }">
@@ -867,13 +874,6 @@
                         </a>
                     </div>
                 </div>
-            </div>
-            
-            <!-- Right side: Theme toggle -->
-            <div class="taskbar-right">
-                <button @click="toggleDarkMode()" class="theme-toggle">
-                    <i :class="darkMode ? 'fas fa-sun' : 'fas fa-moon'"></i>
-                </button>
             </div>
         </div>
 
