@@ -169,8 +169,13 @@
             align-items: center;
             padding: 16px;
             margin-bottom: 16px;
-            margin-left: 40px;
             /* No borders, no hover effects - just clickable */
+        }
+
+        /* Logo positioning only when sidebar is collapsed */
+        .sidebar.collapsed .logo-item {
+            margin-left: 50px;
+            margin-top: -20px;
         }
 
         .nav-item {
