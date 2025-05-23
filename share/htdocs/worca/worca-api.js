@@ -491,9 +491,30 @@ class WorcaAPI {
         transformed.role = this.getTagValue(entity.tags, 'role') || this.getTagValue(entity.tags, 'worca:self:role');
         transformed.email = this.getTagValue(entity.tags, 'email') || this.getTagValue(entity.tags, 'worca:self:email');
         
-        // For users, use displayName as name if name is not set
-        if (transformed.type === 'user' && !transformed.name && transformed.displayName) {
-            transformed.name = transformed.displayName;
+        // For users, ensure they always have a name
+        if (transformed.type === 'user') {
+            if (!transformed.name && transformed.displayName) {
+                transformed.name = transformed.displayName;
+            } else if (!transformed.name && transformed.username) {
+                transformed.name = transformed.username;
+            } else if (!transformed.name) {
+                transformed.name = 'Unknown User';
+            }
+        }
+        
+        // Debug: log user transformation
+        if (transformed.type === 'user') {
+            console.log('🔍 User transformation debug:', {
+                id: transformed.id,
+                type: transformed.type,
+                rawName: this.getTagValue(entity.tags, 'name'),
+                rawDisplayName: this.getTagValue(entity.tags, 'displayName'),
+                finalName: transformed.name,
+                finalDisplayName: transformed.displayName,
+                username: transformed.username,
+                role: transformed.role,
+                allTags: entity.tags
+            });
         }
 
         // Extract description from content (handle base64 encoded content)
