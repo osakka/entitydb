@@ -723,15 +723,12 @@
         <div class="sidebar" :class="{'open': sidebarOpen, 'collapsed': sidebarCollapsed}">
             <!-- Logo -->
             <div class="nav-item logo-item" @click="toggleSidebar()" style="cursor: pointer;" :title="sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'">
-                <img :src="darkMode ? 'worca-logo-light.svg' : 'worca-logo-dark.svg'" 
-                     :width="sidebarCollapsed ? '32' : '48'" 
-                     :height="sidebarCollapsed ? '32' : '48'" 
+                <img src="worca-logo.svg" 
+                     :width="sidebarCollapsed ? '80' : '120'" 
+                     :height="sidebarCollapsed ? '80' : '120'" 
                      class="nav-icon" 
                      alt="Worca" 
                      style="filter: drop-shadow(0 2px 4px var(--shadow)); transition: all 0.3s ease;">
-                <span x-show="!sidebarCollapsed" class="nav-text" style="font-size: 18px; font-weight: 500; color: var(--text-primary);">
-                    Worca
-                </span>
             </div>
 
             <nav style="display: flex; flex-direction: column; height: calc(100vh - 120px);">
