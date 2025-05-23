@@ -107,6 +107,12 @@ function worca() {
             this.isAuthenticated = false;
         },
 
+        // Refresh data manually
+        async refreshData() {
+            console.log('🔄 Manually refreshing data...');
+            await this.loadData();
+        },
+
         async manualLogin() {
             console.log('🚀 Starting manual login...');
             try {
@@ -1189,8 +1195,22 @@ function worca() {
                     this.createUserForm.role
                 );
                 
-                // Add to team members
-                this.teamMembers.push(newUser);
+                // Refresh team members list to get properly transformed data
+                const usersResult = await this.api.getUsers();
+                this.teamMembers = Array.isArray(usersResult) ? usersResult : [];
+                
+                // Debug: log the team members to see what data we have
+                console.log('🔍 Updated team members after user creation:', this.teamMembers);
+                this.teamMembers.forEach((member, index) => {
+                    console.log(`User ${index + 1}:`, {
+                        id: member.id,
+                        name: member.name,
+                        displayName: member.displayName,
+                        username: member.username,
+                        role: member.role,
+                        tags: member.tags
+                    });
+                });
                 
                 // Add to recent activity
                 this.recentActivity.unshift({
