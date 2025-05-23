@@ -162,61 +162,10 @@
             overflow: hidden;
         }
 
-        /* Enhanced Logo Split Effect */
-        .logo-container {
-            width: 192px;
-            height: 192px;
-            overflow: visible;
-            position: relative;
-            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        .logo-container.collapsed {
-            width: 96px;
-            height: 96px;
-            overflow: visible;
-            position: relative;
-        }
-
-        .logo-container.collapsed .logo-image {
-            position: absolute;
-            left: -48px;
-            top: -24px;
-            transform: scale(0.5);
-            transform-origin: center center;
-            z-index: 20;
-        }
-
-        /* Make sure sidebar allows overflow for the split effect */
-        .sidebar.collapsed {
-            overflow: visible;
-            position: relative;
-            z-index: 15;
-        }
-
-        .sidebar.collapsed .logo {
-            overflow: visible;
-            position: relative;
-            z-index: 16;
-            height: 48px;
-        }
-
-        /* Ensure main content doesn't cover the logo but allows the tucked effect */
-        .main-content {
-            position: relative;
-            z-index: 14;
-        }
-
-        /* Add a subtle shadow to enhance the tucked-under effect */
-        .logo-container.collapsed .logo-image::after {
-            content: '';
-            position: absolute;
-            top: 0;
-            right: -2px;
-            width: 4px;
-            height: 100%;
-            background: linear-gradient(to right, transparent, rgba(0, 0, 0, 0.1));
-            pointer-events: none;
+        /* Logo styling */
+        .logo-item {
+            margin-bottom: 16px;
+            border-bottom: 1px solid var(--border-color);
         }
 
         .nav-item {
@@ -772,22 +721,17 @@
         <div x-show="isAuthenticated" class="app-container">
         <!-- Sidebar -->
         <div class="sidebar" :class="{'open': sidebarOpen, 'collapsed': sidebarCollapsed}">
-            <!-- Logo with sidebar toggle functionality -->
-            <div class="logo" @click="toggleSidebar()" style="cursor: pointer;" :title="sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'">
-                <div style="display: flex; flex-direction: row; align-items: center; gap: 12px; position: relative; overflow: visible;">
-                    <div class="logo-container" :class="{'collapsed': sidebarCollapsed}">
-                        <img :src="darkMode ? 'worca-logo-light.svg' : 'worca-logo-dark.svg'" 
-                             :width="'192'" 
-                             :height="'192'" 
-                             class="nav-icon logo-image" 
-                             alt="Worca" 
-                             style="filter: drop-shadow(0 2px 4px var(--shadow)); transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);">
-                    </div>
-                    <span x-show="!sidebarCollapsed" 
-                          style="font-size: 24px; color: var(--text-primary); font-weight: 500; line-height: 1.2; transition: all 0.3s ease; white-space: nowrap; margin-left: 8px;">
-                        Worca
-                    </span>
-                </div>
+            <!-- Logo -->
+            <div class="nav-item logo-item" @click="toggleSidebar()" style="cursor: pointer;" :title="sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'">
+                <img :src="darkMode ? 'worca-logo-light.svg' : 'worca-logo-dark.svg'" 
+                     :width="sidebarCollapsed ? '32' : '48'" 
+                     :height="sidebarCollapsed ? '32' : '48'" 
+                     class="nav-icon" 
+                     alt="Worca" 
+                     style="filter: drop-shadow(0 2px 4px var(--shadow)); transition: all 0.3s ease;">
+                <span x-show="!sidebarCollapsed" class="nav-text" style="font-size: 18px; font-weight: 500; color: var(--text-primary);">
+                    Worca
+                </span>
             </div>
 
             <nav style="display: flex; flex-direction: column; height: calc(100vh - 120px);">
