@@ -165,18 +165,13 @@
 
         /* Taskbar Styles */
         .taskbar {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
             height: 60px;
             background: var(--sidebar-bg);
             display: flex;
             justify-content: space-between;
             align-items: center;
             padding: 0 20px;
-            z-index: 1000;
-            border-bottom: none;
+            border-bottom: 1px solid var(--border-color);
         }
 
 
@@ -316,9 +311,10 @@
             transform: rotate(180deg);
         }
 
-        /* Adjust main content to account for taskbar */
+        /* Main app container */
         .app-container {
-            margin-top: 60px;
+            display: flex;
+            min-height: calc(100vh - 60px);
         }
 
         .nav-item {
@@ -879,7 +875,7 @@
                      width="40" height="40" 
                      alt="Worca" 
                      class="taskbar-logo"
-                     style="margin-top: -6px;">
+                     style="margin-top: -10px;">
                 <span class="taskbar-brand">Worca</span>
                 <span class="taskbar-section" x-text="getViewTitle()"></span>
                 
