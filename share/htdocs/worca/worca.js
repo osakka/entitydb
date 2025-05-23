@@ -10,6 +10,7 @@ function worca() {
         darkMode: false,
         showCreateModal: false,
         showCreateUserModal: false,
+        showEditModal: false,
         loading: false,
         isAuthenticated: false,
         dataLoading: false,
@@ -49,6 +50,18 @@ function worca() {
             username: '',
             displayName: '',
             role: 'user'
+        },
+
+        // Edit Form Data
+        editForm: {
+            id: '',
+            type: '',
+            name: '',
+            description: '',
+            status: '',
+            priority: '',
+            assignee: '',
+            dueDate: ''
         },
         
         // Login Form Data
@@ -1105,9 +1118,141 @@ function worca() {
         },
         
         editItem(item) {
-            // For now, just log the item - in a real app, this would open an edit modal
-            console.log('Edit item:', item);
-            // TODO: Implement edit modal functionality
+            console.log('🖊️ Opening edit modal for:', item);
+            
+            // Determine item type
+            let itemType = 'task';
+            if (this.epics.some(e => e.id === item.id)) {
+                itemType = 'epic';
+            } else if (this.stories.some(s => s.id === item.id)) {
+                itemType = 'story';
+            }
+            
+            // Populate edit form
+            this.editForm = {
+                id: item.id,
+                type: itemType,
+                name: item.name || item.title || '',
+                description: item.description || '',
+                status: item.status || 'todo',
+                priority: item.priority || 'medium',
+                assignee: item.assignee || '',
+                dueDate: item.dueDate ? new Date(item.dueDate).toISOString().split('T')[0] : ''
+            };
+            
+            this.showEditModal = true;
+        },
+
+        async saveEditItem() {
+            try {
+                this.loading = true;
+                console.log('💾 Saving item:', this.editForm);
+
+                // Find the item in the appropriate array
+                let itemArray, itemIndex;
+                switch(this.editForm.type) {
+                    case 'epic':
+                        itemArray = this.epics;
+                        itemIndex = this.epics.findIndex(e => e.id === this.editForm.id);
+                        break;
+                    case 'story':
+                        itemArray = this.stories;
+                        itemIndex = this.stories.findIndex(s => s.id === this.editForm.id);
+                        break;
+                    case 'task':
+                        itemArray = this.tasks;
+                        itemIndex = this.tasks.findIndex(t => t.id === this.editForm.id);
+                        break;
+                }
+
+                if (itemIndex === -1) {
+                    throw new Error(`${this.editForm.type} not found`);
+                }
+
+                // Update the item
+                const item = itemArray[itemIndex];
+                const originalItem = { ...item };
+
+                // Update local item first (optimistic update)
+                if (this.editForm.name) {
+                    if (this.editForm.type === 'task') {
+                        item.title = this.editForm.name;
+                    } else {
+                        item.name = this.editForm.name;
+                    }
+                }
+                item.description = this.editForm.description;
+                item.status = this.editForm.status;
+                item.priority = this.editForm.priority;
+                item.dueDate = this.editForm.dueDate;
+                if (this.editForm.type === 'task') {
+                    item.assignee = this.editForm.assignee;
+                }
+                item.updatedAt = new Date();
+
+                // Update in EntityDB
+                try {
+                    await this.api.updateEntity(this.editForm.id, {
+                        name: this.editForm.name,
+                        description: this.editForm.description,
+                        status: this.editForm.status,
+                        priority: this.editForm.priority,
+                        assignee: this.editForm.assignee,
+                        dueDate: this.editForm.dueDate
+                    });
+                } catch (apiError) {
+                    // Revert local changes on API failure
+                    console.error('❌ API update failed, reverting local changes:', apiError);
+                    Object.assign(item, originalItem);
+                    throw apiError;
+                }
+
+                // Add to activity log
+                this.recentActivity.unshift({
+                    id: this.generateId(),
+                    description: `Updated ${this.editForm.type} "${this.editForm.name}"`,
+                    timestamp: new Date(),
+                    type: `${this.editForm.type}_updated`
+                });
+
+                // Force reactivity update
+                switch(this.editForm.type) {
+                    case 'epic':
+                        this.epics = [...this.epics];
+                        break;
+                    case 'story':
+                        this.stories = [...this.stories];
+                        break;
+                    case 'task':
+                        this.tasks = [...this.tasks];
+                        break;
+                }
+
+                this.showEditModal = false;
+                this.resetEditForm();
+                this.calculateStats();
+
+                console.log('✅ Item updated successfully');
+
+            } catch (error) {
+                console.error('❌ Error updating item:', error);
+                alert(`Error updating ${this.editForm.type}: ${error.message}`);
+            } finally {
+                this.loading = false;
+            }
+        },
+
+        resetEditForm() {
+            this.editForm = {
+                id: '',
+                type: '',
+                name: '',
+                description: '',
+                status: '',
+                priority: '',
+                assignee: '',
+                dueDate: ''
+            };
         },
 
         // Statistics
