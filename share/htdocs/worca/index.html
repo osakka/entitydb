@@ -912,11 +912,12 @@
                             <div class="hierarchy-item">
                                 <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
                                     <div style="width: 48px; height: 48px; background: #667eea; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold;">
-                                        <span x-text="member.name.charAt(0)"></span>
+                                        <span x-text="(member.name || member.displayName || member.username || '?').charAt(0).toUpperCase()"></span>
                                     </div>
                                     <div>
-                                        <h4 x-text="member.name"></h4>
-                                        <p style="color: #6b7280; font-size: 14px;" x-text="member.role"></p>
+                                        <h4 x-text="member.name || member.displayName || member.username || 'No Name'"></h4>
+                                        <p style="color: #6b7280; font-size: 14px;" x-text="member.role || 'No Role'"></p>
+                                        <p style="color: #999; font-size: 11px;" x-text="'ID: ' + (member.id || 'No ID')"></p>
                                     </div>
                                 </div>
                                 <div style="font-size: 14px; color: #6b7280;">

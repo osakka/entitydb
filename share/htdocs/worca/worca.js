@@ -113,6 +113,23 @@ function worca() {
             await this.loadData();
         },
 
+        // Debug helper - call from console
+        debugTeamMembers() {
+            console.log('🔍 Current team members:', this.teamMembers.length);
+            this.teamMembers.forEach((member, index) => {
+                console.log(`Member ${index + 1}:`, {
+                    id: member.id,
+                    name: member.name,
+                    displayName: member.displayName,
+                    username: member.username,
+                    role: member.role,
+                    type: member.type,
+                    tags: member.tags
+                });
+            });
+            return this.teamMembers;
+        },
+
         async manualLogin() {
             console.log('🚀 Starting manual login...');
             try {
