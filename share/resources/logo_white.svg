@@ -3,21 +3,9 @@
   <!-- Definitions for 3D ball effect with stronger highlight -->
   <defs>
     <radialGradient id="redSphereGlass" cx="0.3" cy="0.3" r="0.8">
-      <stop offset="0%" stop-color="#ff8f8f" />
-      <stop offset="50%" stop-color="#e74c3c" />
-      <stop offset="100%" stop-color="#c0392b" />
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="100%" stop-color="#ffffff" />
     </radialGradient>
-    <filter id="ballShadowSoft" x="-50%" y="-50%" width="200%" height="200%">
-      <feGaussianBlur in="SourceAlpha" stdDeviation="1" />
-      <feOffset dx="0.7" dy="1.2" result="offsetblur" />
-      <feComponentTransfer>
-        <feFuncA type="linear" slope="0.4" />
-      </feComponentTransfer>
-      <feMerge>
-        <feMergeNode />
-        <feMergeNode in="SourceGraphic" />
-      </feMerge>
-    </filter>
   </defs>
   
   <!-- Minimalist Logo (White Text Version) - Transparent Background -->

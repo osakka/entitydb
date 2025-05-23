@@ -907,6 +907,7 @@ function worca() {
                 team: 'Team Overview',
                 reports: 'Analytics & Reports',
                 sprints: 'Sprint Planning',
+                backlog: 'Backlog',
                 settings: 'Settings'
             };
             return titles[this.currentView] || 'Worcha';
@@ -920,6 +921,7 @@ function worca() {
                 team: 'Team members and workload distribution',
                 reports: 'Performance metrics and analytics',
                 sprints: 'Agile sprint planning and management',
+                backlog: 'Manage and track epics, stories, and tasks',
                 settings: 'Configure your workspace'
             };
             return descriptions[this.currentView] || '';
@@ -986,6 +988,126 @@ function worca() {
             return Array.isArray(this.tasks) ? this.tasks.filter(t => 
                 t.sprintId === this.currentSprint.id && t.status === status
             ) : [];
+        },
+
+        // Backlog view helper functions
+        getFilteredData(type, searchTerm, sortField, sortDirection) {
+            let data = [];
+            
+            // Get base data based on type
+            switch(type) {
+                case 'epics':
+                    data = this.selectedProject 
+                        ? this.epics.filter(epic => epic.projectId === this.selectedProject)
+                        : [...this.epics];
+                    break;
+                case 'stories':
+                    if (this.selectedProject) {
+                        const projectEpics = this.epics.filter(epic => epic.projectId === this.selectedProject);
+                        const epicIds = projectEpics.map(epic => epic.id);
+                        data = this.stories.filter(story => epicIds.includes(story.epicId));
+                    } else {
+                        data = [...this.stories];
+                    }
+                    break;
+                case 'tasks':
+                    if (this.selectedProject) {
+                        const projectEpics = this.epics.filter(epic => epic.projectId === this.selectedProject);
+                        const epicIds = projectEpics.map(epic => epic.id);
+                        const projectStories = this.stories.filter(story => epicIds.includes(story.epicId));
+                        const storyIds = projectStories.map(story => story.id);
+                        data = this.tasks.filter(task => storyIds.includes(task.storyId));
+                    } else {
+                        data = [...this.tasks];
+                    }
+                    break;
+            }
+            
+            // Apply search filter
+            if (searchTerm) {
+                const search = searchTerm.toLowerCase();
+                data = data.filter(item => 
+                    (item.name || item.title || '').toLowerCase().includes(search) ||
+                    (item.description || '').toLowerCase().includes(search)
+                );
+            }
+            
+            // Apply sorting
+            data.sort((a, b) => {
+                let aVal = a[sortField];
+                let bVal = b[sortField];
+                
+                // Handle missing values
+                if (sortField === 'name' || sortField === 'title') {
+                    aVal = a.name || a.title || '';
+                    bVal = b.name || b.title || '';
+                }
+                
+                // Handle special cases
+                if (sortField === 'priority') {
+                    const priorityOrder = { high: 3, medium: 2, low: 1 };
+                    aVal = priorityOrder[aVal] || 0;
+                    bVal = priorityOrder[bVal] || 0;
+                }
+                
+                if (sortField === 'createdAt' || sortField === 'dueDate') {
+                    aVal = new Date(aVal || 0);
+                    bVal = new Date(bVal || 0);
+                }
+                
+                if (sortDirection === 'asc') {
+                    return aVal > bVal ? 1 : -1;
+                } else {
+                    return aVal < bVal ? 1 : -1;
+                }
+            });
+            
+            return data;
+        },
+        
+        getProjectName(projectId) {
+            const project = this.projects.find(p => p.id === projectId);
+            return project ? project.name : 'Unknown';
+        },
+        
+        getEpicName(epicId) {
+            const epic = this.epics.find(e => e.id === epicId);
+            return epic ? (epic.name || epic.title) : 'Unknown';
+        },
+        
+        getStoryName(storyId) {
+            const story = this.stories.find(s => s.id === storyId);
+            return story ? (story.name || story.title) : 'Unknown';
+        },
+        
+        getEpicProgress(epicId) {
+            const stories = this.stories.filter(s => s.epicId === epicId);
+            if (stories.length === 0) return 0;
+            
+            let completedWeight = 0;
+            let totalWeight = 0;
+            
+            stories.forEach(story => {
+                const tasks = this.tasks.filter(t => t.storyId === story.id);
+                totalWeight += tasks.length || 1;
+                completedWeight += tasks.filter(t => t.status === 'done').length;
+            });
+            
+            return totalWeight > 0 ? Math.round((completedWeight / totalWeight) * 100) : 0;
+        },
+        
+        getStoryProgress(storyId) {
+            const tasks = this.tasks.filter(t => t.storyId === storyId);
+            if (tasks.length === 0) return 0;
+            
+            const completed = tasks.filter(t => t.status === 'done').length;
+            return Math.round((completed / tasks.length) * 100);
+        },
+        
+        editItem(item) {
+            // For now, just log the item - in a real app, this would open an edit modal
+            console.log('Edit item:', item);
+            // TODO: Implement edit modal functionality
         },
 
         // Statistics
