@@ -1139,6 +1139,21 @@
         .disabled\\:cursor-not-allowed:disabled {
             cursor: not-allowed;
         }
+        
+        /* Editable Row Styles */
+        .editable-row {
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+        
+        .editable-row:hover {
+            background-color: var(--hover-bg);
+        }
+        
+        .data-table tbody tr:not(.editable-row) {
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
     </style>
 </head>
 <body>
@@ -1593,12 +1608,11 @@
                                     <th>Project</th>
                                     <th>Stories</th>
                                     <th>Progress</th>
-                                    <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <template x-for="epic in getFilteredData('epics', searchTerm, sortField, sortDirection)" :key="epic.id">
-                                    <tr>
+                                    <tr @dblclick="canEdit() && editItem(epic)" :class="canEdit() ? 'editable-row' : ''" :title="canEdit() ? 'Double-click to edit' : 'No edit permission'">
                                         <td x-text="epic.name || 'Unnamed Epic'"></td>
                                         <td>
                                             <span class="status-badge" :class="'status-' + (epic.status || 'todo')" x-text="epic.status || 'Todo'"></span>
@@ -1609,11 +1623,6 @@
                                             <div class="progress-bar">
                                                 <div class="progress-fill" :style="'width: ' + getEpicProgress(epic.id) + '%'"></div>
                                             </div>
-                                        </td>
-                                        <td>
-                                            <button class="btn-icon" @click="editItem(epic)" title="Edit">
-                                                <i class="fas fa-edit"></i>
-                                            </button>
                                         </td>
                                     </tr>
                                 </template>
@@ -1636,12 +1645,11 @@
                                     <th>Tasks</th>
                                     <th>Story Points</th>
                                     <th>Progress</th>
-                                    <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <template x-for="story in getFilteredData('stories', searchTerm, sortField, sortDirection)" :key="story.id">
-                                    <tr>
+                                    <tr @dblclick="canEdit() && editItem(story)" :class="canEdit() ? 'editable-row' : ''" :title="canEdit() ? 'Double-click to edit' : 'No edit permission'">
                                         <td x-text="story.title || story.name || 'Unnamed Story'"></td>
                                         <td>
                                             <span class="status-badge" :class="'status-' + (story.status || 'todo')" x-text="story.status || 'Todo'"></span>
@@ -1653,11 +1661,6 @@
                                             <div class="progress-bar">
                                                 <div class="progress-fill" :style="'width: ' + getStoryProgress(story.id) + '%'"></div>
                                             </div>
-                                        </td>
-                                        <td>
-                                            <button class="btn-icon" @click="editItem(story)" title="Edit">
-                                                <i class="fas fa-edit"></i>
-                                            </button>
                                         </td>
                                     </tr>
                                 </template>
@@ -1682,12 +1685,11 @@
                                     <th>Story</th>
                                     <th>Assignee</th>
                                     <th>Story Points</th>
-                                    <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <template x-for="task in getFilteredData('tasks', searchTerm, sortField, sortDirection)" :key="task.id">
-                                    <tr>
+                                    <tr @dblclick="canEdit() && editItem(task)" :class="canEdit() ? 'editable-row' : ''" :title="canEdit() ? 'Double-click to edit' : 'No edit permission'">
                                         <td x-text="task.title || task.name || 'Unnamed Task'"></td>
                                         <td>
                                             <span class="status-badge" :class="'status-' + (task.status || 'todo')" x-text="task.status || 'Todo'"></span>
@@ -1698,11 +1700,6 @@
                                         <td x-text="getStoryName(task.storyId)"></td>
                                         <td x-text="getAssigneeName(task.assignee) || 'Unassigned'"></td>
                                         <td x-text="task.storyPoints || '3'"></td>
-                                        <td>
-                                            <button class="btn-icon" @click="editItem(task)" title="Edit">
-                                                <i class="fas fa-edit"></i>
-                                            </button>
-                                        </td>
                                     </tr>
                                 </template>
                             </tbody>

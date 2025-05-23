@@ -1255,6 +1255,24 @@ function worca() {
             };
         },
 
+        canEdit() {
+            // Check if user has edit permissions
+            // For now, we'll check if they're authenticated and have admin role or entity:update permission
+            if (!this.isAuthenticated || !this.api || !this.api.token) {
+                return false;
+            }
+            
+            // TODO: Implement proper RBAC permission checking
+            // For now, assume authenticated users can edit (you can enhance this later with proper permission checking)
+            return true;
+        },
+
+        getAssigneeName(assigneeId) {
+            if (!assigneeId) return 'Unassigned';
+            const member = this.teamMembers.find(m => m.id === assigneeId);
+            return member ? member.name : 'Unknown';
+        },
+
         // Statistics
         calculateStats() {
             const tasks = Array.isArray(this.tasks) ? this.tasks : [];
