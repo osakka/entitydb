@@ -196,6 +196,34 @@
             filter: drop-shadow(0 2px 4px var(--shadow));
         }
 
+        .taskbar-brand {
+            font-weight: bold;
+            font-size: 18px;
+            color: var(--text-primary);
+            margin-left: 8px;
+        }
+
+        .taskbar-section {
+            font-weight: normal;
+            font-size: 16px;
+            color: var(--text-secondary);
+            margin-left: 8px;
+        }
+
+        .refresh-button {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .refresh-button:hover {
+            background: var(--hover-bg);
+        }
+
         .username-button {
             background: var(--card-bg);
             border: 1px solid var(--border-color);
@@ -825,16 +853,23 @@
 
         <!-- Top Taskbar (only show when authenticated) -->
         <div x-show="isAuthenticated" class="taskbar">
-            <!-- Left side: Logo only -->
+            <!-- Left side: Logo, Worca text, and section name -->
             <div class="taskbar-left">
                 <img :src="darkMode ? 'worca-logo-dark.svg' : 'worca-logo-light.svg'" 
                      width="32" height="32" 
                      alt="Worca" 
-                     class="taskbar-logo">
+                     class="taskbar-logo"
+                     style="margin-top: -6px;">
+                <span class="taskbar-brand">Worca</span>
+                <span class="taskbar-section" x-text="getViewTitle()"></span>
             </div>
             
-            <!-- Right side: Theme toggle and Username dropdown -->
+            <!-- Right side: Refresh, Theme toggle and Username dropdown -->
             <div class="taskbar-right">
+                <button @click="refreshData()" class="refresh-button">
+                    <i class="fas fa-sync"></i>
+                </button>
+                
                 <button @click="toggleTheme()" class="theme-toggle">
                     <i :class="darkMode ? 'fas fa-sun' : 'fas fa-moon'"></i>
                 </button>
@@ -842,7 +877,7 @@
                 <!-- Username dropdown -->
                 <div class="dropdown" x-data="{ open: false }">
                     <button @click="open = !open" class="username-button">
-                        <span x-text="currentUser?.username || 'User'"></span>
+                        <span x-text="currentUser?.username || 'admin'"></span>
                         <i class="fas fa-chevron-down" :class="{'rotate-180': open}"></i>
                     </button>
                     <div x-show="open" @click.away="open = false" class="dropdown-menu">
@@ -895,19 +930,12 @@
                     </div>
                 </div>
                 
-                <!-- Theme Toggle (above separator) -->
-                <div style="margin-top: auto; margin-bottom: 8px;">
-                    <div class="nav-item" @click="toggleTheme()" :title="darkMode ? 'Switch to light mode' : 'Switch to dark mode'">
-                        <i class="fas nav-icon" :class="darkMode ? 'fa-sun' : 'fa-moon'"></i>
-                        <span class="nav-text" x-text="darkMode ? 'Light Mode' : 'Dark Mode'"></span>
-                    </div>
-                </div>
                 
                 <!-- Bottom Navigation Items -->
                 <div class="nav-bottom">
                     <div class="nav-item sidebar-toggle-btn" @click="toggleSidebar()" style="margin-top: 8px;">
-                        <i class="fas fa-sign-out-alt nav-icon" :class="{'rotate-180': sidebarCollapsed}"></i>
-                        <span class="nav-text">Toggle</span>
+                        <i class="fas fa-sign-out-alt nav-icon" :class="{'rotate-180': !sidebarCollapsed}"></i>
+                        <span class="nav-text">Sidebar Toggle</span>
                     </div>
                 </div>
             </nav>
@@ -915,23 +943,13 @@
 
         <!-- Main Content -->
         <div class="main-content">
-            <!-- Header -->
-            <div class="content-header">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <div>
-                        <h1 x-text="getViewTitle()" style="margin-bottom: 8px;"></h1>
-                        <p style="color: #6b7280;" x-text="getViewDescription()"></p>
-                    </div>
-                    <div class="quick-actions">
-                        <button class="btn" @click="showCreateModal = true">
-                            <i class="fas fa-plus"></i>
-                            Quick Add
-                        </button>
-                        <button class="btn btn-secondary" @click="refreshData()">
-                            <i class="fas fa-sync"></i>
-                            Refresh
-                        </button>
-                    </div>
+            <!-- Quick Actions -->
+            <div style="display: flex; justify-content: flex-end; align-items: center; margin-bottom: 20px;">
+                <div class="quick-actions">
+                    <button class="btn" @click="showCreateModal = true">
+                        <i class="fas fa-plus"></i>
+                        Quick Add
+                    </button>
                 </div>
             </div>
 
@@ -1179,17 +1197,6 @@
                         <p style="color: var(--text-secondary); margin-top: 8px;">Configure your workforce orchestrator</p>
                         
                         <div style="margin-top: 20px; display: grid; gap: 15px;">
-                            <div style="display: flex; justify-content: space-between; align-items: center; padding: 15px; background: var(--card-bg); border-radius: 8px; border: 1px solid var(--border-color);">
-                                <div>
-                                    <strong>Theme Mode</strong>
-                                    <p style="color: var(--text-secondary); font-size: 14px; margin-top: 2px;">Switch between light and dark themes</p>
-                                </div>
-                                <button @click="toggleTheme()" class="btn btn-secondary" style="padding: 8px 16px;">
-                                    <i class="fas" :class="darkMode ? 'fa-sun' : 'fa-moon'"></i>
-                                    <span x-text="darkMode ? 'Light Mode' : 'Dark Mode'"></span>
-                                </button>
-                            </div>
-                            
                             <div style="display: flex; justify-content: space-between; align-items: center; padding: 15px; background: var(--card-bg); border-radius: 8px; border: 1px solid var(--border-color);">
                                 <div>
                                     <strong>Sidebar Layout</strong>
