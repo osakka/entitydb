@@ -224,6 +224,26 @@
             background: var(--hover-bg);
         }
 
+        .quick-add-dropdown {
+            margin-left: 12px;
+        }
+
+        .quick-add-button {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 16px;
+            font-weight: normal;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            transition: color 0.3s ease;
+        }
+
+        .quick-add-button:hover {
+            color: var(--text-primary);
+        }
+
         .username-button {
             background: var(--card-bg);
             border: 1px solid var(--border-color);
@@ -853,7 +873,7 @@
 
         <!-- Top Taskbar (only show when authenticated) -->
         <div x-show="isAuthenticated" class="taskbar">
-            <!-- Left side: Logo, Worca text, and section name -->
+            <!-- Left side: Logo, Worca text, section name, and Quick Add -->
             <div class="taskbar-left">
                 <img :src="darkMode ? 'worca-logo-dark.svg' : 'worca-logo-light.svg'" 
                      width="32" height="32" 
@@ -862,6 +882,28 @@
                      style="margin-top: -6px;">
                 <span class="taskbar-brand">Worca</span>
                 <span class="taskbar-section" x-text="getViewTitle()"></span>
+                
+                <!-- Quick Add dropdown -->
+                <div class="dropdown quick-add-dropdown" x-data="{ open: false }">
+                    <button @click="open = !open" class="quick-add-button">
+                        <span>Quick Add</span>
+                        <i class="fas fa-chevron-down" :class="{'rotate-180': open}" style="font-size: 12px; margin-left: 4px;"></i>
+                    </button>
+                    <div x-show="open" @click.away="open = false" class="dropdown-menu">
+                        <a href="#" @click="showCreateModal = true; createForm.type = 'task'" class="dropdown-item">
+                            <i class="fas fa-tasks"></i> Create Task
+                        </a>
+                        <a href="#" @click="showCreateModal = true; createForm.type = 'project'" class="dropdown-item">
+                            <i class="fas fa-folder"></i> Create Project
+                        </a>
+                        <a href="#" @click="showCreateModal = true; createForm.type = 'epic'" class="dropdown-item">
+                            <i class="fas fa-flag"></i> Create Epic
+                        </a>
+                        <a href="#" @click="showCreateModal = true; createForm.type = 'story'" class="dropdown-item">
+                            <i class="fas fa-book"></i> Create Story
+                        </a>
+                    </div>
+                </div>
             </div>
             
             <!-- Right side: Refresh, Theme toggle and Username dropdown -->
@@ -943,15 +985,6 @@
 
         <!-- Main Content -->
         <div class="main-content">
-            <!-- Quick Actions -->
-            <div style="display: flex; justify-content: flex-end; align-items: center; margin-bottom: 20px;">
-                <div class="quick-actions">
-                    <button class="btn" @click="showCreateModal = true">
-                        <i class="fas fa-plus"></i>
-                        Quick Add
-                    </button>
-                </div>
-            </div>
 
             <!-- Content Area -->
             <div class="content-area">
