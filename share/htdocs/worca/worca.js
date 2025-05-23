@@ -27,6 +27,9 @@ function worca() {
         teamMembers: [],
         recentActivity: [],
         
+        // Filters
+        selectedProject: null,
+        
         // Sprint Data
         currentSprint: null,
         pastSprints: [],
@@ -948,7 +951,30 @@ function worca() {
         },
 
         getTasksByStatus(status) {
-            return Array.isArray(this.tasks) ? this.tasks.filter(t => t.status === status) : [];
+            const filteredTasks = Array.isArray(this.tasks) ? this.tasks.filter(t => {
+                // Filter by status
+                if (t.status !== status) return false;
+                
+                // Filter by selected project if one is selected
+                if (this.selectedProject) {
+                    // Check if task belongs to selected project (via story -> epic -> project)
+                    if (t.storyId) {
+                        const story = this.stories.find(s => s.id === t.storyId);
+                        if (story && story.epicId) {
+                            const epic = this.epics.find(e => e.id === story.epicId);
+                            if (epic && epic.projectId) {
+                                return epic.projectId === this.selectedProject;
+                            }
+                        }
+                    }
+                    // If no story/epic/project chain, don't show in filtered view
+                    return false;
+                }
+                
+                return true;
+            }) : [];
+            
+            return filteredTasks;
         },
 
         getTasksByAssignee(assigneeId) {

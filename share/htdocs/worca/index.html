@@ -219,6 +219,32 @@
             background: var(--hover-bg);
         }
 
+        .project-selector {
+            margin-left: 12px;
+        }
+
+        .project-button {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 8px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .project-button:hover {
+            background: var(--hover-bg);
+        }
+
+        .dropdown-item.active {
+            background: var(--primary-color);
+            color: white;
+        }
+
         .quick-add-dropdown {
             margin-left: 12px;
         }
@@ -908,11 +934,32 @@
                 </div>
             </div>
             
-            <!-- Right side: Refresh, Theme toggle and Username dropdown -->
+            <!-- Right side: Refresh, Project selector, Theme toggle and Username dropdown -->
             <div class="taskbar-right">
                 <button @click="refreshData()" class="refresh-button">
                     <i class="fas fa-sync"></i>
                 </button>
+                
+                <!-- Project selector dropdown -->
+                <div class="dropdown project-selector" x-data="{ open: false }">
+                    <button @click="open = !open" class="project-button">
+                        <i class="fas fa-folder"></i>
+                        <span x-text="selectedProject ? (projects.find(p => p.id === selectedProject)?.name || 'Project') : 'All Projects'"></span>
+                        <i class="fas fa-chevron-down" :class="{'rotate-180': open}" style="font-size: 12px; margin-left: 4px;"></i>
+                    </button>
+                    <div x-show="open" @click.away="open = false" class="dropdown-menu">
+                        <a href="#" @click="selectedProject = null; open = false" class="dropdown-item" :class="{'active': !selectedProject}">
+                            <i class="fas fa-globe"></i> All Projects
+                        </a>
+                        <hr class="dropdown-divider" x-show="projects.length > 0">
+                        <template x-for="project in projects" :key="project.id">
+                            <a href="#" @click="selectedProject = project.id; open = false" class="dropdown-item" :class="{'active': selectedProject === project.id}">
+                                <i class="fas fa-folder"></i>
+                                <span x-text="project.name"></span>
+                            </a>
+                        </template>
+                    </div>
+                </div>
                 
                 <button @click="toggleTheme()" class="theme-toggle">
                     <i :class="darkMode ? 'fas fa-sun' : 'fas fa-moon'"></i>
