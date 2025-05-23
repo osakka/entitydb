@@ -276,7 +276,19 @@ class WorcaAPI {
             }]
         };
 
-        return await this.createEntity(userData);
+        console.log('🔍 Creating user with data:', {
+            username,
+            displayName,
+            role,
+            userData,
+            tagsToSend: userData.tags
+        });
+
+        const result = await this.createEntity(userData);
+        
+        console.log('🔍 User creation result:', result);
+        
+        return result;
     }
 
     async createSprint(name, startDate, endDate, goal, capacity = 40) {

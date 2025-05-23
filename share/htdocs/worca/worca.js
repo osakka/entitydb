@@ -130,6 +130,24 @@ function worca() {
             return this.teamMembers;
         },
 
+        // Test helper - create a test user with detailed logging
+        async testCreateUser() {
+            console.log('🧪 Testing user creation...');
+            try {
+                const result = await this.api.createUser(
+                    'test.user',
+                    'Test User',
+                    'developer'
+                );
+                console.log('✅ Test user creation successful:', result);
+                await this.refreshData();
+                return result;
+            } catch (error) {
+                console.error('❌ Test user creation failed:', error);
+                throw error;
+            }
+        },
+
         async manualLogin() {
             console.log('🚀 Starting manual login...');
             try {
