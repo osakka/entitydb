@@ -544,12 +544,13 @@
         }
 
         .btn-secondary {
-            background: #e5e7eb;
-            color: #374151;
+            background: var(--card-bg);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
         }
 
         .btn-secondary:hover {
-            background: #d1d5db;
+            background: var(--hover-bg);
         }
 
         /* Forms and Modals */
@@ -805,7 +806,7 @@
             width: 100%;
             padding: 12px;
             font-size: 16px;
-            background: var(--bg-gradient);
+            background: var(--primary-color);
             border: none;
             border-radius: 8px;
             color: white;
@@ -813,9 +814,13 @@
             cursor: pointer;
             transition: all 0.3s ease;
             box-shadow: 0 4px 12px var(--shadow);
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         .btn-full:hover {
+            background: var(--accent-color);
             transform: translateY(-2px);
             box-shadow: 0 8px 20px var(--shadow);
         }
@@ -876,7 +881,7 @@
                      width="40" height="40" 
                      alt="Worca" 
                      class="taskbar-logo"
-                     style="margin-top: -10px;">
+                     style="margin-top: -15px;">
                 <span class="taskbar-brand">Worca</span>
                 <span class="taskbar-section" x-text="getViewTitle()"></span>
                 
