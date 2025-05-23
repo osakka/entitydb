@@ -163,6 +163,132 @@
         }
 
 
+        /* Taskbar Styles */
+        .taskbar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 60px;
+            background: var(--sidebar-bg);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 20px;
+            z-index: 1000;
+            border-bottom: none;
+        }
+
+        /* Wave bottom border for taskbar - Light mode */
+        .taskbar::after {
+            content: '';
+            position: absolute;
+            bottom: -10px;
+            left: 0;
+            width: 100%;
+            height: 20px;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120" preserveAspectRatio="none"><path d="M0,60 C300,100 600,20 900,60 C1050,80 1100,40 1200,60 L1200,0 L0,0 Z" fill="%230891b2" opacity="0.4"/></svg>') repeat-x;
+            pointer-events: none;
+        }
+
+        /* Wave bottom border for taskbar - Dark mode */
+        [data-theme="dark"] .taskbar::after {
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120" preserveAspectRatio="none"><path d="M0,60 C300,100 600,20 900,60 C1050,80 1100,40 1200,60 L1200,0 L0,0 Z" fill="%2306b6d4" opacity="0.3"/></svg>') repeat-x;
+        }
+
+        .taskbar-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .taskbar-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .taskbar-logo {
+            filter: drop-shadow(0 2px 4px var(--shadow));
+        }
+
+        .username-button {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 8px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .username-button:hover {
+            background: var(--hover-bg);
+        }
+
+        .theme-toggle {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .theme-toggle:hover {
+            background: var(--hover-bg);
+        }
+
+        .dropdown {
+            position: relative;
+        }
+
+        .dropdown-menu {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 8px 0;
+            min-width: 150px;
+            box-shadow: 0 4px 12px var(--shadow);
+            z-index: 1001;
+        }
+
+        .dropdown-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            color: var(--text-primary);
+            text-decoration: none;
+            transition: background 0.3s ease;
+        }
+
+        .dropdown-item:hover {
+            background: var(--hover-bg);
+        }
+
+        .dropdown-divider {
+            margin: 4px 0;
+            border: none;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .rotate-180 {
+            transform: rotate(180deg);
+        }
+
+        /* Adjust main content to account for taskbar */
+        .app-container {
+            margin-top: 60px;
+        }
+
         .nav-item {
             padding: 12px 16px;
             margin: 8px 0;
@@ -710,6 +836,44 @@
             <div style="text-align: center; margin-top: 18px;">
                 <p style="margin: 0; color: #cdcdcd; font-weight: 500; font-size: 15px; text-shadow: 0 2px 4px rgba(0, 0, 0, 0.6);">Worca Workforce Orchestrator <sup style="font-size: 9px;">™</sup></p>
                 <p style="margin: 4px 0 0 0; color: #cdcdcd; font-weight: 300; font-size: 11px; opacity: 0.8; text-shadow: 0 2px 4px rgba(0, 0, 0, 0.6);">Powered by EntityDB</p>
+            </div>
+        </div>
+
+        <!-- Top Taskbar (only show when authenticated) -->
+        <div x-show="isAuthenticated" class="taskbar">
+            <!-- Left side: Logo and Username dropdown -->
+            <div class="taskbar-left">
+                <img :src="darkMode ? 'worca-logo-dark.svg' : 'worca-logo-light.svg'" 
+                     width="32" height="32" 
+                     alt="Worca" 
+                     class="taskbar-logo">
+                
+                <!-- Username dropdown -->
+                <div class="dropdown" x-data="{ open: false }">
+                    <button @click="open = !open" class="username-button">
+                        <span x-text="currentUser?.username || 'User'"></span>
+                        <i class="fas fa-chevron-down" :class="{'rotate-180': open}"></i>
+                    </button>
+                    <div x-show="open" @click.away="open = false" class="dropdown-menu">
+                        <a href="#" class="dropdown-item">
+                            <i class="fas fa-user"></i> Profile
+                        </a>
+                        <a href="#" @click="setView('settings')" class="dropdown-item">
+                            <i class="fas fa-cog"></i> Settings
+                        </a>
+                        <hr class="dropdown-divider">
+                        <a href="#" @click="logout()" class="dropdown-item">
+                            <i class="fas fa-sign-out-alt"></i> Logout
+                        </a>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Right side: Theme toggle -->
+            <div class="taskbar-right">
+                <button @click="toggleDarkMode()" class="theme-toggle">
+                    <i :class="darkMode ? 'fas fa-sun' : 'fas fa-moon'"></i>
+                </button>
             </div>
         </div>
 
