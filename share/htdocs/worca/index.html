@@ -52,11 +52,11 @@
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: var(--bg-gradient);
-            min-height: 100vh;
+            height: 100vh;
             color: var(--text-primary);
             transition: all 0.3s ease;
             position: relative;
-            overflow-x: hidden;
+            overflow: hidden;
         }
 
         /* Animated ocean waves background */
@@ -314,7 +314,8 @@
         /* Main app container */
         .app-container {
             display: flex;
-            min-height: calc(100vh - 60px);
+            height: calc(100vh - 60px);
+            overflow: hidden;
         }
 
         .nav-item {
