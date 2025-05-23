@@ -243,10 +243,10 @@
 
         .kanban-column {
             min-width: 300px;
-            background: rgba(248, 250, 252, 0.8);
+            background: var(--card-bg);
             border-radius: 8px;
             padding: 16px;
-            border: 2px dashed #e2e8f0;
+            border: 2px dashed var(--border-color);
             transition: all 0.3s ease;
         }
 
@@ -325,7 +325,7 @@
         /* Drag & Drop States */
         .task-ghost {
             opacity: 0.5;
-            background: #f3f4f6;
+            background: var(--card-bg);
         }
 
         .task-chosen {
@@ -459,16 +459,16 @@
         .hierarchy-level {
             margin-left: 20px;
             padding-left: 16px;
-            border-left: 2px solid #e5e7eb;
+            border-left: 2px solid var(--border-color);
         }
 
         /* Charts and Analytics */
         .chart-container {
-            background: white;
+            background: var(--card-bg);
             padding: 20px;
             border-radius: 8px;
             margin-bottom: 20px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 2px 8px var(--shadow);
         }
 
         .stats-grid {
@@ -479,11 +479,11 @@
         }
 
         .stat-card {
-            background: white;
+            background: var(--card-bg);
             padding: 20px;
             border-radius: 8px;
             text-align: center;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 2px 8px var(--shadow);
         }
 
         .stat-number {
@@ -493,7 +493,7 @@
         }
 
         .stat-label {
-            color: #6b7280;
+            color: var(--text-secondary);
             margin-top: 8px;
         }
 
@@ -833,9 +833,9 @@
                         <h3 style="margin-bottom: 16px;">Recent Activity</h3>
                         <div style="max-height: 300px; overflow-y: auto;">
                             <template x-for="activity in recentActivity" :key="activity.id">
-                                <div style="padding: 12px; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between;">
+                                <div style="padding: 12px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between;">
                                     <span x-text="activity.description"></span>
-                                    <span style="color: #6b7280; font-size: 12px;" x-text="formatTime(activity.timestamp)"></span>
+                                    <span style="color: var(--text-secondary); font-size: 12px;" x-text="formatTime(activity.timestamp)"></span>
                                 </div>
                             </template>
                         </div>
@@ -862,7 +862,7 @@
                                     <template x-for="task in getTasksByStatus(status.id)" :key="task.id">
                                         <div class="task-card" :data-task-id="task.id" @click="viewTask(task)">
                                             <div class="task-title" x-text="task.title"></div>
-                                            <div x-text="task.description" style="font-size: 14px; color: #6b7280; margin-bottom: 8px;"></div>
+                                            <div x-text="task.description" style="font-size: 14px; color: var(--text-secondary); margin-bottom: 8px;"></div>
                                             <div class="task-meta">
                                                 <span x-text="task.type"></span>
                                                 <span class="task-assignee" x-text="task.assignee || 'Unassigned'"></span>
