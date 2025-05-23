@@ -179,22 +179,6 @@
             border-bottom: none;
         }
 
-        /* Wave bottom border for taskbar - Light mode */
-        .taskbar::after {
-            content: '';
-            position: absolute;
-            bottom: -10px;
-            left: 0;
-            width: 100%;
-            height: 20px;
-            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120" preserveAspectRatio="none"><path d="M0,60 C300,100 600,20 900,60 C1050,80 1100,40 1200,60 L1200,0 L0,0 Z" fill="%230891b2" opacity="0.4"/></svg>') repeat-x;
-            pointer-events: none;
-        }
-
-        /* Wave bottom border for taskbar - Dark mode */
-        [data-theme="dark"] .taskbar::after {
-            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120" preserveAspectRatio="none"><path d="M0,60 C300,100 600,20 900,60 C1050,80 1100,40 1200,60 L1200,0 L0,0 Z" fill="%2306b6d4" opacity="0.3"/></svg>') repeat-x;
-        }
 
         .taskbar-left {
             display: flex;
@@ -920,14 +904,10 @@
                 </div>
                 
                 <!-- Bottom Navigation Items -->
-                <div class="nav-bottom" style="border-top: 2px solid var(--border-color); padding-top: 15px;">
-                    <div class="nav-item" :class="{'active': currentView === 'settings'}" @click="setView('settings')">
-                        <i class="fas fa-cog nav-icon"></i>
-                        <span class="nav-text">Settings</span>
-                    </div>
-                    <div class="nav-item logout-btn" @click="logout()" style="margin-top: 8px;">
-                        <i class="fas fa-sign-out-alt nav-icon"></i>
-                        <span class="nav-text">Logout</span>
+                <div class="nav-bottom">
+                    <div class="nav-item sidebar-toggle-btn" @click="toggleSidebar()" style="margin-top: 8px;">
+                        <i class="fas fa-sign-out-alt nav-icon" :class="{'rotate-180': sidebarCollapsed}"></i>
+                        <span class="nav-text">Toggle</span>
                     </div>
                 </div>
             </nav>
