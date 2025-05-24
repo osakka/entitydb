@@ -491,10 +491,30 @@ func (s *EntityDBServer) Close() {
 	logger.Info("Closing repositories...")
 	
 	// Close entity repository to save tag index
-	if repo, ok := s.entityRepo.(*binary.EntityRepository); ok {
+	// Try different repository types
+	switch repo := s.entityRepo.(type) {
+	case *binary.EntityRepository:
 		if err := repo.Close(); err != nil {
 			logger.Error("Failed to close entity repository: %v", err)
 		}
+	case *binary.TemporalRepository:
+		// TemporalRepository embeds HighPerformanceRepository which embeds EntityRepository
+		if baseRepo := repo.HighPerformanceRepository; baseRepo != nil {
+			if entityRepo := baseRepo.EntityRepository; entityRepo != nil {
+				if err := entityRepo.Close(); err != nil {
+					logger.Error("Failed to close entity repository: %v", err)
+				}
+			}
+		}
+	case *binary.HighPerformanceRepository:
+		// HighPerformanceRepository embeds EntityRepository
+		if entityRepo := repo.EntityRepository; entityRepo != nil {
+			if err := entityRepo.Close(); err != nil {
+				logger.Error("Failed to close entity repository: %v", err)
+			}
+		}
+	default:
+		logger.Warn("Unknown repository type, cannot close: %T", s.entityRepo)
 	}
 }
 
