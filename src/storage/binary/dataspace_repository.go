@@ -1,0 +1,334 @@
+package binary
+
+import (
+	"entitydb/logger"
+	"entitydb/models"
+	"fmt"
+	"path/filepath"
+	"strings"
+	"sync"
+	"os"
+)
+
+// DataspaceRepository implements per-dataspace index isolation
+type DataspaceRepository struct {
+	*EntityRepository // Embed base repository for entity storage
+	
+	// Dataspace-specific indexes
+	dataspaceIndexes map[string]*DataspaceIndexImpl
+	dataspaceConfigs map[string]*models.Dataspace
+	dsLock          sync.RWMutex
+	
+	// Dataspace index directory
+	indexPath string
+}
+
+// DataspaceIndexImpl implements the DataspaceIndex interface
+type DataspaceIndexImpl struct {
+	name      string
+	indexPath string
+	
+	// In-memory indexes
+	entities  map[string]bool           // Entity IDs in this dataspace
+	tagIndex  map[string][]string       // tag -> entity IDs
+	
+	// Statistics
+	stats     models.DataspaceStats
+	
+	// Synchronization
+	mu        sync.RWMutex
+}
+
+// NewDataspaceRepository creates a repository with dataspace isolation
+func NewDataspaceRepository(dataPath string) (*DataspaceRepository, error) {
+	baseRepo, err := NewEntityRepository(dataPath)
+	if err != nil {
+		return nil, err
+	}
+	
+	indexPath := filepath.Join(dataPath, "dataspaces")
+	if err := os.MkdirAll(indexPath, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create dataspace index directory: %w", err)
+	}
+	
+	repo := &DataspaceRepository{
+		EntityRepository:  baseRepo,
+		dataspaceIndexes: make(map[string]*DataspaceIndexImpl),
+		dataspaceConfigs: make(map[string]*models.Dataspace),
+		indexPath:        indexPath,
+	}
+	
+	// Load existing dataspace indexes
+	if err := repo.loadDataspaceIndexes(); err != nil {
+		logger.Error("Failed to load dataspace indexes: %v", err)
+	}
+	
+	// Create default dataspace if none exists
+	if _, exists := repo.dataspaceIndexes["default"]; !exists {
+		defaultDs := &models.Dataspace{
+			Name: "default",
+			Config: models.DataspaceConfig{
+				IndexStrategy: models.IndexStrategyBTree,
+				OptimizeFor:   models.OptimizeForReads,
+			},
+		}
+		if err := repo.CreateDataspace(defaultDs); err != nil {
+			logger.Error("Failed to create default dataspace: %v", err)
+		}
+	}
+	
+	return repo, nil
+}
+
+// CreateDataspace creates a new dataspace with its own index
+func (r *DataspaceRepository) CreateDataspace(dataspace *models.Dataspace) error {
+	r.dsLock.Lock()
+	defer r.dsLock.Unlock()
+	
+	if _, exists := r.dataspaceIndexes[dataspace.Name]; exists {
+		return fmt.Errorf("dataspace %s already exists", dataspace.Name)
+	}
+	
+	// Create dataspace index
+	dsIndex := &DataspaceIndexImpl{
+		name:      dataspace.Name,
+		indexPath: filepath.Join(r.indexPath, dataspace.Name+".idx"),
+		entities:  make(map[string]bool),
+		tagIndex:  make(map[string][]string),
+	}
+	
+	r.dataspaceIndexes[dataspace.Name] = dsIndex
+	r.dataspaceConfigs[dataspace.Name] = dataspace
+	
+	// Save index to disk
+	if err := dsIndex.SaveToFile(dsIndex.indexPath); err != nil {
+		return fmt.Errorf("failed to save dataspace index: %w", err)
+	}
+	
+	logger.Info("Created dataspace: %s", dataspace.Name)
+	return nil
+}
+
+// Create entity in a specific dataspace
+func (r *DataspaceRepository) Create(entity *models.Entity) error {
+	// Extract dataspace from tags
+	dataspaceName := r.extractDataspace(entity)
+	
+	// Create in base repository
+	if err := r.EntityRepository.Create(entity); err != nil {
+		return err
+	}
+	
+	// Add to dataspace index
+	r.dsLock.RLock()
+	dsIndex, exists := r.dataspaceIndexes[dataspaceName]
+	r.dsLock.RUnlock()
+	
+	if exists {
+		if err := dsIndex.AddEntity(entity); err != nil {
+			logger.Error("Failed to add entity to dataspace index: %v", err)
+		}
+	}
+	
+	return nil
+}
+
+// ListByTags with dataspace awareness
+func (r *DataspaceRepository) ListByTags(tags []string, matchAll bool) ([]*models.Entity, error) {
+	// Check if query is dataspace-specific
+	dataspaceName := ""
+	filteredTags := []string{}
+	
+	for _, tag := range tags {
+		if strings.HasPrefix(tag, "dataspace:") || strings.HasPrefix(tag, "hub:") {
+			dataspaceName = strings.TrimPrefix(strings.TrimPrefix(tag, "dataspace:"), "hub:")
+		} else {
+			filteredTags = append(filteredTags, tag)
+		}
+	}
+	
+	// If dataspace-specific, use dataspace index
+	if dataspaceName != "" {
+		r.dsLock.RLock()
+		dsIndex, exists := r.dataspaceIndexes[dataspaceName]
+		r.dsLock.RUnlock()
+		
+		if !exists {
+			return []*models.Entity{}, nil
+		}
+		
+		entityIDs, err := dsIndex.QueryByTags(filteredTags, matchAll)
+		if err != nil {
+			return nil, err
+		}
+		
+		// Fetch entities using embedded repository
+		entities := make([]*models.Entity, 0, len(entityIDs))
+		for _, id := range entityIDs {
+			// Access the Get method through the embedded EntityRepository
+			if entity, exists := r.EntityRepository.entities[id]; exists {
+				entities = append(entities, entity)
+			}
+		}
+		
+		return entities, nil
+	}
+	
+	// Fall back to global search
+	return r.EntityRepository.ListByTags(tags, matchAll)
+}
+
+// extractDataspace determines which dataspace an entity belongs to
+func (r *DataspaceRepository) extractDataspace(entity *models.Entity) string {
+	for _, tag := range entity.Tags {
+		if strings.HasPrefix(tag, "dataspace:") {
+			return strings.TrimPrefix(tag, "dataspace:")
+		}
+		// Backward compatibility with hub
+		if strings.HasPrefix(tag, "hub:") {
+			return strings.TrimPrefix(tag, "hub:")
+		}
+	}
+	return "default"
+}
+
+// loadDataspaceIndexes loads all dataspace indexes from disk
+func (r *DataspaceRepository) loadDataspaceIndexes() error {
+	entries, err := os.ReadDir(r.indexPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+	
+	for _, entry := range entries {
+		if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".idx") {
+			name := strings.TrimSuffix(entry.Name(), ".idx")
+			indexPath := filepath.Join(r.indexPath, entry.Name())
+			
+			dsIndex := &DataspaceIndexImpl{
+				name:      name,
+				indexPath: indexPath,
+				entities:  make(map[string]bool),
+				tagIndex:  make(map[string][]string),
+			}
+			
+			if err := dsIndex.LoadFromFile(indexPath); err != nil {
+				logger.Error("Failed to load dataspace index %s: %v", name, err)
+				continue
+			}
+			
+			r.dataspaceIndexes[name] = dsIndex
+			logger.Info("Loaded dataspace index: %s", name)
+		}
+	}
+	
+	return nil
+}
+
+// DataspaceIndex Implementation
+
+// AddEntity adds an entity to the dataspace index
+func (d *DataspaceIndexImpl) AddEntity(entity *models.Entity) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	
+	d.entities[entity.ID] = true
+	
+	// Update tag index
+	for _, tag := range entity.Tags {
+		// Skip dataspace tags
+		if strings.HasPrefix(tag, "dataspace:") || strings.HasPrefix(tag, "hub:") {
+			continue
+		}
+		
+		if _, exists := d.tagIndex[tag]; !exists {
+			d.tagIndex[tag] = []string{}
+		}
+		
+		// Add entity ID if not already present
+		found := false
+		for _, id := range d.tagIndex[tag] {
+			if id == entity.ID {
+				found = true
+				break
+			}
+		}
+		if !found {
+			d.tagIndex[tag] = append(d.tagIndex[tag], entity.ID)
+		}
+	}
+	
+	d.stats.EntityCount++
+	return nil
+}
+
+// QueryByTags queries entities by tags within the dataspace
+func (d *DataspaceIndexImpl) QueryByTags(tags []string, matchAll bool) ([]string, error) {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+	
+	if len(tags) == 0 {
+		// Return all entities in dataspace
+		result := make([]string, 0, len(d.entities))
+		for id := range d.entities {
+			result = append(result, id)
+		}
+		return result, nil
+	}
+	
+	resultSet := make(map[string]int)
+	
+	for _, tag := range tags {
+		if entityIDs, exists := d.tagIndex[tag]; exists {
+			for _, id := range entityIDs {
+				resultSet[id]++
+			}
+		}
+	}
+	
+	// Filter based on matchAll
+	result := []string{}
+	requiredCount := len(tags)
+	
+	for id, count := range resultSet {
+		if matchAll && count == requiredCount {
+			result = append(result, id)
+		} else if !matchAll && count > 0 {
+			result = append(result, id)
+		}
+	}
+	
+	d.stats.QueryCount++
+	return result, nil
+}
+
+// SaveToFile persists the dataspace index
+func (d *DataspaceIndexImpl) SaveToFile(filepath string) error {
+	// For now, use the same format as tag index persistence
+	// TODO: Implement custom binary format for dataspace indexes
+	return SaveTagIndexV2(filepath, d.tagIndex)
+}
+
+// LoadFromFile loads the dataspace index
+func (d *DataspaceIndexImpl) LoadFromFile(filepath string) error {
+	// For now, use the same format as tag index persistence
+	tagIndex, err := LoadTagIndexV2(filepath)
+	if err != nil {
+		return err
+	}
+	
+	d.tagIndex = tagIndex
+	
+	// Rebuild entity set from tag index
+	d.entities = make(map[string]bool)
+	for _, ids := range tagIndex {
+		for _, id := range ids {
+			d.entities[id] = true
+		}
+	}
+	
+	d.stats.EntityCount = int64(len(d.entities))
+	return nil
+}

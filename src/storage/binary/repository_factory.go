@@ -16,6 +16,18 @@ func (f *RepositoryFactory) CreateRepository(dataPath string) (models.EntityRepo
 	enableHighPerf := os.Getenv("ENTITYDB_HIGH_PERFORMANCE") == "true"
 	enableTemporal := os.Getenv("ENTITYDB_TEMPORAL") != "false" // Temporal by default
 	enableWALOnly := os.Getenv("ENTITYDB_WAL_ONLY") == "true" // New WAL-only mode
+	enableDataspace := os.Getenv("ENTITYDB_DATASPACE") == "true" // New dataspace mode
+	
+	// Dataspace mode for isolated indexes
+	if enableDataspace {
+		logger.Info("Creating DataspaceRepository for isolated dataspace indexes")
+		dsRepo, err := NewDataspaceRepository(dataPath)
+		if err != nil {
+			logger.Error("Failed to create dataspace repository: %v, falling back to temporal", err)
+			return NewTemporalRepository(dataPath)
+		}
+		return dsRepo, nil
+	}
 	
 	// WAL-only mode for maximum write performance
 	if enableWALOnly {
