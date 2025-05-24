@@ -707,55 +707,7 @@
             background: var(--hover-bg);
         }
 
-        /* Forms and Modals */
-        .modal {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.5);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 1000;
-        }
-
-        .modal-content {
-            background: var(--card-bg);
-            border-radius: 12px;
-            padding: 24px;
-            max-width: 500px;
-            width: 90%;
-            max-height: 80vh;
-            overflow-y: auto;
-        }
-
-        .form-group {
-            margin-bottom: 16px;
-        }
-
-        .form-label {
-            display: block;
-            margin-bottom: 6px;
-            font-weight: 500;
-            color: var(--text-primary);
-        }
-
-        .form-input, .form-select, .form-textarea {
-            width: 100%;
-            padding: 10px 12px;
-            border: 1px solid var(--border-color);
-            border-radius: 6px;
-            font-size: 14px;
-            background: var(--card-bg);
-            color: var(--text-primary);
-        }
-
-        .form-textarea {
-            height: 80px;
-            resize: vertical;
-        }
+        /* Forms and Modals - REMOVED OLD CLASSES (now using unified modal styles) */
 
         /* Hierarchy View */
         .hierarchy-item {
@@ -928,18 +880,18 @@
             text-align: left;
         }
 
-        .form-group {
+        .login-form .form-group {
             margin-bottom: 20px;
         }
 
-        .form-group label {
+        .login-form .form-group label {
             display: block;
             margin-bottom: 5px;
             font-weight: 600;
             color: var(--text-primary);
         }
 
-        .form-group input {
+        .login-form .form-group input {
             width: 100%;
             padding: 12px;
             border: 2px solid var(--border-color);
@@ -950,7 +902,7 @@
             color: var(--text-primary);
         }
 
-        .form-group input:focus {
+        .login-form .form-group input:focus {
             outline: none;
             border-color: var(--primary-color);
             box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.1);
@@ -988,8 +940,8 @@
             border: 1px solid rgba(239, 68, 68, 0.2);
         }
 
-        /* Edit Modal Styles */
-        .edit-modal-backdrop {
+        /* Unified Modal Styles */
+        .modal-backdrop {
             position: fixed;
             top: 0;
             right: 0;
@@ -1003,7 +955,7 @@
             padding: 1rem;
         }
         
-        .edit-modal-container {
+        .modal-container {
             background: var(--card-bg);
             border-radius: 12px;
             box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
@@ -1014,7 +966,7 @@
             border: 1px solid var(--border-color);
         }
         
-        .edit-modal-header {
+        .modal-header {
             padding: 1.5rem;
             border-bottom: 1px solid var(--border-color);
             display: flex;
@@ -1022,7 +974,7 @@
             justify-content: space-between;
         }
         
-        .edit-modal-header h3 {
+        .modal-header h3 {
             font-size: 1.125rem;
             font-weight: 600;
             color: var(--text-primary);
@@ -1031,7 +983,7 @@
             margin: 0;
         }
         
-        .edit-modal-header button {
+        .modal-header .modal-close {
             color: var(--text-secondary);
             background: none;
             border: none;
@@ -1041,20 +993,20 @@
             transition: all 0.2s;
         }
         
-        .edit-modal-header button:hover {
+        .modal-header .modal-close:hover {
             background: var(--hover-bg);
             color: var(--text-primary);
         }
         
-        .edit-modal-body {
+        .modal-body {
             padding: 1.5rem;
         }
         
-        .edit-modal-body form > div {
+        .modal-body form > div {
             margin-bottom: 1rem;
         }
         
-        .edit-modal-body label {
+        .modal-body label {
             display: block;
             font-size: 0.875rem;
             font-weight: 500;
@@ -1062,10 +1014,10 @@
             margin-bottom: 0.5rem;
         }
         
-        .edit-modal-body input[type="text"],
-        .edit-modal-body input[type="date"],
-        .edit-modal-body textarea,
-        .edit-modal-body select {
+        .modal-body input[type="text"],
+        .modal-body input[type="date"],
+        .modal-body textarea,
+        .modal-body select {
             width: 100%;
             padding: 0.5rem 0.75rem;
             border: 1px solid var(--border-color);
@@ -1076,27 +1028,27 @@
             transition: all 0.2s;
         }
         
-        .edit-modal-body input:focus,
-        .edit-modal-body textarea:focus,
-        .edit-modal-body select:focus {
+        .modal-body input:focus,
+        .modal-body textarea:focus,
+        .modal-body select:focus {
             outline: none;
             border-color: var(--primary-color);
             box-shadow: 0 0 0 3px rgba(8, 145, 178, 0.1);
         }
         
-        .edit-modal-body textarea {
+        .modal-body textarea {
             resize: vertical;
             min-height: 80px;
         }
         
-        .edit-modal-footer {
+        .modal-footer {
             display: flex;
             justify-content: flex-end;
             gap: 0.75rem;
             padding: 0 1.5rem 1.5rem;
         }
         
-        .edit-modal-footer button {
+        .modal-footer button {
             padding: 0.5rem 1rem;
             border-radius: 6px;
             font-size: 0.875rem;
@@ -1106,48 +1058,48 @@
             border: 1px solid;
         }
         
-        .edit-modal-footer .btn-cancel {
+        .modal-footer .btn-cancel {
             background: transparent;
             color: var(--text-secondary);
             border-color: var(--border-color);
         }
         
-        .edit-modal-footer .btn-cancel:hover {
+        .modal-footer .btn-cancel:hover {
             background: var(--hover-bg);
             color: var(--text-primary);
         }
         
-        .edit-modal-footer .btn-save {
+        .modal-footer .btn-primary {
             background: var(--primary-color);
             color: white;
             border-color: var(--primary-color);
         }
         
-        .edit-modal-footer .btn-save:hover {
+        .modal-footer .btn-primary:hover {
             background: #0a7793;
             border-color: #0a7793;
         }
         
-        .edit-modal-footer .btn-save:disabled {
+        .modal-footer .btn-primary:disabled {
             opacity: 0.5;
             cursor: not-allowed;
         }
         
         /* Dark mode adjustments */
-        [data-theme="dark"] .edit-modal-container {
+        [data-theme="dark"] .modal-container {
             background: #1f2937;
         }
         
-        [data-theme="dark"] .edit-modal-body input,
-        [data-theme="dark"] .edit-modal-body textarea,
-        [data-theme="dark"] .edit-modal-body select {
+        [data-theme="dark"] .modal-body input,
+        [data-theme="dark"] .modal-body textarea,
+        [data-theme="dark"] .modal-body select {
             background: #374151;
             border-color: #4b5563;
         }
         
-        [data-theme="dark"] .edit-modal-body input:focus,
-        [data-theme="dark"] .edit-modal-body textarea:focus,
-        [data-theme="dark"] .edit-modal-body select:focus {
+        [data-theme="dark"] .modal-body input:focus,
+        [data-theme="dark"] .modal-body textarea:focus,
+        [data-theme="dark"] .modal-body select:focus {
             border-color: var(--primary-color);
         }
         
@@ -1726,22 +1678,23 @@
                      x-transition:leave="transition ease-in duration-200"
                      x-transition:leave-start="opacity-100 transform scale-100"
                      x-transition:leave-end="opacity-0 transform scale-90"
-                     class="edit-modal-backdrop"
+                     class="modal-backdrop"
+                     @click.self="showEditModal = false"
                      style="display: none;">
-                    <div class="edit-modal-container">
+                    <div class="modal-container">
                         <!-- Modal Header -->
-                        <div class="edit-modal-header">
+                        <div class="modal-header">
                             <h3>
                                 <i class="fas fa-edit" style="color: var(--primary-color); margin-right: 0.5rem;"></i>
                                 Edit <span x-text="editForm.type || 'Item'"></span>
                             </h3>
-                            <button @click="showEditModal = false">
+                            <button @click="showEditModal = false" class="modal-close">
                                 <i class="fas fa-times"></i>
                             </button>
                         </div>
 
                         <!-- Modal Body -->
-                        <div class="edit-modal-body">
+                        <div class="modal-body">
                             <form @submit.prevent="saveEditItem()">
                                 <!-- Name/Title Field -->
                                 <div>
@@ -1800,7 +1753,7 @@
                                 </div>
 
                                 <!-- Modal Footer -->
-                                <div class="edit-modal-footer">
+                                <div class="modal-footer">
                                     <button type="button" 
                                             @click="showEditModal = false"
                                             class="btn-cancel">
@@ -1808,7 +1761,7 @@
                                     </button>
                                     <button type="submit" 
                                             :disabled="loading"
-                                            class="btn-save">
+                                            class="btn-primary">
                                         <span x-show="!loading">Save Changes</span>
                                         <span x-show="loading">Saving...</span>
                                     </button>
@@ -1995,76 +1948,131 @@
         </div>
 
         <!-- Create Modal -->
-        <div x-show="showCreateModal" class="modal" @click.self="showCreateModal = false">
-            <div class="modal-content">
-                <h3 style="margin-bottom: 20px;">Create New Item</h3>
-                <form @submit.prevent="createItem()">
-                    <div class="form-group">
-                        <label class="form-label">Type</label>
-                        <select x-model="createForm.type" class="form-select">
-                            <option value="organization">Organization</option>
-                            <option value="project">Project</option>
-                            <option value="epic">Epic</option>
-                            <option value="story">Story</option>
-                            <option value="task">Task</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Title/Name</label>
-                        <input type="text" x-model="createForm.title" class="form-input" required>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Description</label>
-                        <textarea x-model="createForm.description" class="form-textarea"></textarea>
-                    </div>
-                    <div class="form-group" x-show="createForm.type === 'task'">
-                        <label class="form-label">Assignee</label>
-                        <select x-model="createForm.assignee" class="form-select">
-                            <option value="">Unassigned</option>
-                            <template x-for="member in teamMembers" :key="member.id">
-                                <option :value="member.id" x-text="member.name"></option>
-                            </template>
-                        </select>
-                    </div>
-                    <div style="display: flex; gap: 12px; margin-top: 24px;">
-                        <button type="submit" class="btn">Create</button>
-                        <button type="button" class="btn btn-secondary" @click="showCreateModal = false">Cancel</button>
-                    </div>
-                </form>
+        <div x-show="showCreateModal" 
+             x-transition:enter="transition ease-out duration-300"
+             x-transition:enter-start="opacity-0 transform scale-90"
+             x-transition:enter-end="opacity-100 transform scale-100"
+             x-transition:leave="transition ease-in duration-200"
+             x-transition:leave-start="opacity-100 transform scale-100"
+             x-transition:leave-end="opacity-0 transform scale-90"
+             class="modal-backdrop"
+             @click.self="showCreateModal = false"
+             style="display: none;">
+            <div class="modal-container">
+                <!-- Modal Header -->
+                <div class="modal-header">
+                    <h3>
+                        <i class="fas fa-plus-circle" style="color: var(--primary-color); margin-right: 0.5rem;"></i>
+                        Create New Item
+                    </h3>
+                    <button @click="showCreateModal = false" class="modal-close">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+
+                <!-- Modal Body -->
+                <div class="modal-body">
+                    <form @submit.prevent="createItem()">
+                        <div>
+                            <label>Type</label>
+                            <select x-model="createForm.type">
+                                <option value="organization">Organization</option>
+                                <option value="project">Project</option>
+                                <option value="epic">Epic</option>
+                                <option value="story">Story</option>
+                                <option value="task">Task</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label>Title/Name</label>
+                            <input type="text" x-model="createForm.title" required>
+                        </div>
+                        <div>
+                            <label>Description</label>
+                            <textarea x-model="createForm.description" rows="3"></textarea>
+                        </div>
+                        <div x-show="createForm.type === 'task'">
+                            <label>Assignee</label>
+                            <select x-model="createForm.assignee">
+                                <option value="">Unassigned</option>
+                                <template x-for="member in teamMembers" :key="member.id">
+                                    <option :value="member.id" x-text="member.name"></option>
+                                </template>
+                            </select>
+                        </div>
+                        
+                        <!-- Modal Footer -->
+                        <div class="modal-footer" style="margin-top: 1.5rem;">
+                            <button type="button" class="btn-cancel" @click="showCreateModal = false">
+                                Cancel
+                            </button>
+                            <button type="submit" class="btn-primary" :disabled="loading">
+                                <span x-show="!loading">Create</span>
+                                <span x-show="loading">Creating...</span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
             </div>
         </div>
         
         <!-- Create User Modal -->
-        <div x-show="showCreateUserModal" class="modal" @click.self="showCreateUserModal = false">
-            <div class="modal-content">
-                <h3 style="margin-bottom: 20px;">Add New Team Member</h3>
-                <form @submit.prevent="createUser()">
-                    <div class="form-group">
-                        <label class="form-label">Username</label>
-                        <input type="text" x-model="createUserForm.username" class="form-input" required placeholder="e.g., john.doe">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Display Name</label>
-                        <input type="text" x-model="createUserForm.displayName" class="form-input" required placeholder="e.g., John Doe">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Role</label>
-                        <select x-model="createUserForm.role" class="form-select">
-                            <option value="user">User</option>
-                            <option value="developer">Developer</option>
-                            <option value="designer">Designer</option>
-                            <option value="manager">Manager</option>
-                            <option value="admin">Admin</option>
-                        </select>
-                    </div>
-                    <div style="display: flex; gap: 12px; margin-top: 24px;">
-                        <button type="submit" class="btn" :disabled="loading">
-                            <span x-show="!loading">Add User</span>
-                            <span x-show="loading">Adding...</span>
-                        </button>
-                        <button type="button" class="btn btn-secondary" @click="showCreateUserModal = false">Cancel</button>
-                    </div>
-                </form>
+        <div x-show="showCreateUserModal" 
+             x-transition:enter="transition ease-out duration-300"
+             x-transition:enter-start="opacity-0 transform scale-90"
+             x-transition:enter-end="opacity-100 transform scale-100"
+             x-transition:leave="transition ease-in duration-200"
+             x-transition:leave-start="opacity-100 transform scale-100"
+             x-transition:leave-end="opacity-0 transform scale-90"
+             class="modal-backdrop"
+             @click.self="showCreateUserModal = false"
+             style="display: none;">
+            <div class="modal-container">
+                <!-- Modal Header -->
+                <div class="modal-header">
+                    <h3>
+                        <i class="fas fa-user-plus" style="color: var(--primary-color); margin-right: 0.5rem;"></i>
+                        Add New Team Member
+                    </h3>
+                    <button @click="showCreateUserModal = false" class="modal-close">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+
+                <!-- Modal Body -->
+                <div class="modal-body">
+                    <form @submit.prevent="createUser()">
+                        <div>
+                            <label>Username</label>
+                            <input type="text" x-model="createUserForm.username" required placeholder="e.g., john.doe">
+                        </div>
+                        <div>
+                            <label>Display Name</label>
+                            <input type="text" x-model="createUserForm.displayName" required placeholder="e.g., John Doe">
+                        </div>
+                        <div>
+                            <label>Role</label>
+                            <select x-model="createUserForm.role">
+                                <option value="user">User</option>
+                                <option value="developer">Developer</option>
+                                <option value="designer">Designer</option>
+                                <option value="manager">Manager</option>
+                                <option value="admin">Admin</option>
+                            </select>
+                        </div>
+
+                        <!-- Modal Footer -->
+                        <div class="modal-footer" style="margin-top: 1.5rem;">
+                            <button type="button" class="btn-cancel" @click="showCreateUserModal = false">
+                                Cancel
+                            </button>
+                            <button type="submit" class="btn-primary" :disabled="loading">
+                                <span x-show="!loading">Add User</span>
+                                <span x-show="loading">Adding...</span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
             </div>
         </div>
         
