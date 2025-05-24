@@ -59,20 +59,20 @@ docs/implementation/PERFORMANCE_OPTIMIZATION_SUMMARY.md
 
 ### Before Optimization
 - **Startup**: Full index rebuild required
-- **Hub Queries**: 0 results (broken)
+- **Dataspace Queries**: 0 results (broken)
 - **Index Persistence**: None
 - **Consistency**: Failed across restarts
 
 ### After Optimization  
 - **Startup**: ⚡ Load from persistent index
-- **Hub Queries**: 1,221 results (working)
+- **Dataspace Queries**: 1,221 results (working)
 - **Index Persistence**: ✅ Automatic save/load
 - **Consistency**: ✅ 100% across restarts
 
 ### Test Results
 ```bash
 ✅ test_persistent_index.sh: SUCCESS  
-✅ Hub queries: 1,221 entities returned
+✅ Dataspace queries: 1,221 entities returned
 ✅ Index health check: PASSED
 ✅ Multiple restart cycles: CONSISTENT
 ```
@@ -107,7 +107,7 @@ NEW: Handles TemporalRepository → HighPerformanceRepository → EntityReposito
 
 ### Automated Tests
 - ✅ `test_persistent_index.sh`: Full persistence cycle test
-- ✅ Hub queries: Entity retrieval verification
+- ✅ Dataspace queries: Entity retrieval verification
 - ✅ Multiple restart cycles: Consistency validation
 
 ### Manual Verification

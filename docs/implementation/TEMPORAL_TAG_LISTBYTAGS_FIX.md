@@ -1,7 +1,7 @@
 # Temporal Tag ListByTags Fix
 
 ## Problem
-After EntityDB restart, hub queries were returning 0 results despite entities existing in the database. The issue was that `ListByTags` (plural) was only searching for exact tag matches, while tags are stored with temporal prefixes in the format `TIMESTAMP|tag`.
+After EntityDB restart, dataspace queries were returning 0 results despite entities existing in the database. The issue was that `ListByTags` (plural) was only searching for exact tag matches, while tags are stored with temporal prefixes in the format `TIMESTAMP|tag`.
 
 ## Root Cause
 The `ListByTag` (singular) method was correctly handling both exact matches and temporal tags by:
@@ -53,8 +53,8 @@ findEntitiesByTag := func(searchTag string) map[string]bool {
 
 ## Verification
 After applying the fix:
-- Hub queries now return 1,137 entities for `hub:metrics`
-- MetHub dashboard should display metrics properly
+- Dataspace queries now return 1,137 entities for `dataspace:metrics`
+- MetDataspace dashboard should display metrics properly
 - Both exact and temporal tag queries work correctly
 
 ## Related Files

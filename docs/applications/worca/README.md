@@ -69,7 +69,7 @@ Worca is a powerful, scalable workforce orchestrator that provides both rich web
 ├── ENTITYDB_INTEGRATION_COMPLETE.md   # Integration details
 ├── EMPTY_DASHBOARD_FIX.md             # Data loading fixes
 ├── LOOP_FIX_SUMMARY.md               # Infinite loop debugging
-└── WORCHA_HUB_ARCHITECTURE.md        # Architecture overview
+└── WORCHA_DATASPACE_ARCHITECTURE.md        # Architecture overview
 ```
 
 ## 🚀 Getting Started

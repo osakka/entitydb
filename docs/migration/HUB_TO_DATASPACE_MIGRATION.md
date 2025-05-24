@@ -1,14 +1,14 @@
-# Hub to Dataspace Migration Plan
+# Dataspace to Dataspace Migration Plan
 
 ## Overview
-Migrating EntityDB from "hub" concept to "dataspace" concept - a fundamental shift from connection points to isolated data universes.
+Migrating EntityDB from "dataspace" concept to "dataspace" concept - a fundamental shift from connection points to isolated data universes.
 
 ## Migration Strategy
 
 ### Phase 1: Code Rename (Backward Compatible)
-1. Add dataspace aliases for all hub functions
+1. Add dataspace aliases for all dataspace functions
 2. Update internal variable names
-3. Keep hub endpoints working (redirect to dataspace)
+3. Keep dataspace endpoints working (redirect to dataspace)
 4. Add deprecation notices
 
 ### Phase 2: Per-Dataspace Indexes
@@ -18,19 +18,19 @@ Migrating EntityDB from "hub" concept to "dataspace" concept - a fundamental shi
 4. Performance optimization per dataspace
 
 ### Phase 3: Data Migration
-1. Update all `hub:` tags to `dataspace:`
+1. Update all `dataspace:` tags to `dataspace:`
 2. Update RBAC permissions
 3. Update client applications
-4. Remove hub compatibility layer
+4. Remove dataspace compatibility layer
 
 ## Backward Compatibility Plan
 
 During transition, both work:
-- `GET /api/v1/hubs/{name}/entities` → redirects to
+- `GET /api/v1/dataspaces/{name}/entities` → redirects to
 - `GET /api/v1/dataspaces/{name}/entities`
 
 Tags support both:
-- `hub:worca` (deprecated)
+- `dataspace:worca` (deprecated)
 - `dataspace:worca` (preferred)
 
 ## Breaking Changes

@@ -6,9 +6,9 @@ The Worca dashboard was showing empty because the data filtering wasn't properly
 ## Root Cause
 EntityDB contained entities with two different tag formats:
 1. **Standard format**: `type:task`, `type:organization` 
-2. **Hub format**: `hub:worca`, `worca:self:type:organization`
+2. **Dataspace format**: `dataspace:worca`, `worca:self:type:organization`
 
-The Worca API `filterEntitiesByType()` method was only looking for standard format tags, so it couldn't find the hub-format entities.
+The Worca API `filterEntitiesByType()` method was only looking for standard format tags, so it couldn't find the dataspace-format entities.
 
 ## ✅ Solution Implemented
 
@@ -21,7 +21,7 @@ entity.tags.some(tag => tag === `type:${type}`)
 entity.tags.some(tag => 
     tag === `type:${type}` || 
     tag === `worca:self:type:${type}` ||
-    (tag.startsWith('hub:worca') && entity.tags.some(t => t === `worca:self:type:${type}`))
+    (tag.startsWith('dataspace:worca') && entity.tags.some(t => t === `worca:self:type:${type}`))
 )
 ```
 

@@ -870,7 +870,7 @@ func (r *EntityRepository) ListByTags(tags []string, matchAll bool) ([]*models.E
 		// Debug: log a sample of available tags
 		tagCount := 0
 		for tag := range r.tagIndex {
-			if strings.HasPrefix(tag, "hub:") {
+			if strings.HasPrefix(tag, "dataspace:") {
 				logger.Debug("ListByTags: Available hub tag: '%s' with %d entities", tag, len(r.tagIndex[tag]))
 			}
 			tagCount++

@@ -17,7 +17,7 @@
 EntityDB is a revolutionary multi-tenant temporal database platform where every tag is timestamped with nanosecond precision. It features a **Multi-Hub Architecture** with sophisticated tag-based inheritance, enabling unlimited applications on a single platform.
 
 - **Multi-Hub Platform:** Complete isolation between applications with shared infrastructure
-- **Tag Inheritance:** Elegant `hub:name` + `hubname:self/trait:property` architecture  
+- **Tag Inheritance:** Elegant `dataspace:name` + `hubname:self/trait:property` architecture  
 - **Temporal Database:** Every change tracked with nanosecond-precision timestamps
 - **Enterprise RBAC:** Multi-level permissions (hub, trait, self) with granular access control
 - **Binary Storage:** Custom format (EBF) with Write-Ahead Logging and memory-mapped files
@@ -28,12 +28,12 @@ EntityDB is a revolutionary multi-tenant temporal database platform where every 
 
 ```bash
 # Create a hub for your application
-curl -k -X POST https://localhost:8085/api/v1/hubs/create \
+curl -k -X POST https://localhost:8085/api/v1/dataspaces/create \
   -H "Authorization: Bearer $TOKEN" \
   -d '{"name":"myapp","description":"My Application Hub"}'
 
 # Create hub-aware entities with inheritance
-curl -k -X POST https://localhost:8085/api/v1/hubs/entities/create \
+curl -k -X POST https://localhost:8085/api/v1/dataspaces/entities/create \
   -H "Authorization: Bearer $TOKEN" \
   -d '{
     "hub": "myapp",
@@ -78,7 +78,7 @@ EntityDB Multi-Hub Platform
 }
 ```
 
-**Stored as tags**: `hub:worcha`, `worcha:self:type:task`, `worcha:trait:org:TechCorp`
+**Stored as tags**: `dataspace:worcha`, `worcha:self:type:task`, `worcha:trait:org:TechCorp`
 
 **Query naturally**: `?hub=worcha&self=type:task&traits=team:backend`
 
@@ -88,8 +88,8 @@ EntityDB Multi-Hub Platform
 
 ```bash
 # Hub-level permissions
-rbac:perm:entity:*:hub:worcha           # Full access to worcha hub
-rbac:perm:hub:create                    # Can create new hubs
+rbac:perm:entity:*:dataspace:worcha           # Full access to worcha hub
+rbac:perm:dataspace:create                    # Can create new hubs
 
 # Trait-level permissions  
 rbac:perm:entity:write:worcha:trait:org:TechCorp    # Write TechCorp entities
@@ -98,7 +98,7 @@ rbac:perm:entity:write:worcha:trait:org:TechCorp    # Write TechCorp entities
 rbac:perm:entity:update:worcha:self:assignee:self   # Update own assignments
 
 # Hub management
-rbac:perm:hub:manage:worcha             # Manage worcha hub settings
+rbac:perm:dataspace:manage:worcha             # Manage worcha hub settings
 ```
 
 ## 📱 Reference Application: Worcha
@@ -150,7 +150,7 @@ TOKEN=$(curl -k -s -X POST https://localhost:8085/api/v1/auth/login \
   -d '{"username":"admin","password":"admin"}' | jq -r '.token')
 
 # Create a new hub
-curl -k -X POST https://localhost:8085/api/v1/hubs/create \
+curl -k -X POST https://localhost:8085/api/v1/dataspaces/create \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -160,7 +160,7 @@ curl -k -X POST https://localhost:8085/api/v1/hubs/create \
   }'
 
 # Create hub-aware entity with inheritance
-curl -k -X POST https://localhost:8085/api/v1/hubs/entities/create \
+curl -k -X POST https://localhost:8085/api/v1/dataspaces/entities/create \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -179,11 +179,11 @@ curl -k -X POST https://localhost:8085/api/v1/hubs/entities/create \
   }'
 
 # Query with inheritance filters
-curl -k -X GET "https://localhost:8085/api/v1/hubs/entities/query?hub=myproject&self=type:issue&traits=team:security" \
+curl -k -X GET "https://localhost:8085/api/v1/dataspaces/entities/query?hub=myproject&self=type:issue&traits=team:security" \
   -H "Authorization: Bearer $TOKEN"
 
 # List accessible hubs
-curl -k -X GET https://localhost:8085/api/v1/hubs/list \
+curl -k -X GET https://localhost:8085/api/v1/dataspaces/list \
   -H "Authorization: Bearer $TOKEN"
 
 # Traditional entity API (still works)
@@ -191,7 +191,7 @@ curl -k -X POST https://localhost:8085/api/v1/entities/create \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "tags": ["hub:legacy", "type:document", "project:demo"],
+    "tags": ["dataspace:legacy", "type:document", "project:demo"],
     "content": "Traditional entity creation still supported"
   }'
 ```
@@ -199,13 +199,13 @@ curl -k -X POST https://localhost:8085/api/v1/entities/create \
 ## Hub API Endpoints
 
 ### Hub Management
-- `POST /api/v1/hubs/create` - Create new hub
-- `GET /api/v1/hubs/list` - List accessible hubs  
-- `DELETE /api/v1/hubs/delete` - Delete empty hub
+- `POST /api/v1/dataspaces/create` - Create new hub
+- `GET /api/v1/dataspaces/list` - List accessible hubs  
+- `DELETE /api/v1/dataspaces/delete` - Delete empty hub
 
 ### Hub-Aware Entities
-- `POST /api/v1/hubs/entities/create` - Create with hub/self/traits
-- `GET /api/v1/hubs/entities/query` - Query with inheritance filters
+- `POST /api/v1/dataspaces/entities/create` - Create with hub/self/traits
+- `GET /api/v1/dataspaces/entities/query` - Query with inheritance filters
 
 ### Traditional APIs (Backward Compatible)
 - `POST /api/v1/entities/create` - Traditional entity creation
@@ -309,7 +309,7 @@ Comprehensive guides available in [docs](./docs):
 
 1. **Create Your Hub**
    ```bash
-   curl -k -X POST https://localhost:8085/api/v1/hubs/create \
+   curl -k -X POST https://localhost:8085/api/v1/dataspaces/create \
      -H "Authorization: Bearer $TOKEN" \
      -d '{"name":"yourapp","description":"Your Application"}'
    ```
@@ -324,8 +324,8 @@ Comprehensive guides available in [docs](./docs):
 3. **Implement RBAC**
    ```bash
    # Grant hub permissions to users
-   rbac:perm:entity:*:hub:yourapp     # Full hub access
-   rbac:perm:hub:manage:yourapp       # Hub administration
+   rbac:perm:entity:*:dataspace:yourapp     # Full hub access
+   rbac:perm:dataspace:manage:yourapp       # Hub administration
    ```
 
 4. **Build Your Application**  

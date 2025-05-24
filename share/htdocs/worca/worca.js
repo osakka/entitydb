@@ -326,12 +326,12 @@ function worca() {
         },
 
         // Transform hub entities to Worcha format
-        transformHubEntities(hubEntities) {
+        transformDataspaceEntities(hubEntities) {
             return hubEntities.map(entity => {
                 // Start with self properties
                 const transformed = {
                     id: entity.id,
-                    hub: entity.hub,
+                    dataspace: entity.hub,
                     ...entity.self,
                     traits: entity.traits,
                     created_at: entity.created_at,

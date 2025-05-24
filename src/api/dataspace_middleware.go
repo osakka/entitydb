@@ -9,9 +9,9 @@ import (
 	"entitydb/models"
 )
 
-// HubContext stores hub information in the request context
-type HubContext struct {
-	HubName        string
+// DataspaceContext stores hub information in the request context
+type DataspaceContext struct {
+	DataspaceName        string
 	UserHubs       []string // Hubs user has access to
 	CanAccessHub   bool
 	IsGlobalAdmin  bool
@@ -20,8 +20,8 @@ type HubContext struct {
 // Context key for hub data
 type hubContextKey struct{}
 
-// HubMiddleware creates middleware that enforces hub-based access control
-func HubMiddleware(entityRepo models.EntityRepository, sessionManager *models.SessionManager) MiddlewareFunc {
+// DataspaceMiddleware creates middleware that enforces hub-based access control
+func DataspaceMiddleware(entityRepo models.EntityRepository, sessionManager *models.SessionManager) MiddlewareFunc {
 	return func(next http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
 			// Get RBAC context (should be set by RBACMiddleware first)
@@ -32,20 +32,20 @@ func HubMiddleware(entityRepo models.EntityRepository, sessionManager *models.Se
 			}
 
 			// Extract hub from query parameter or request body
-			hubName := extractHubFromRequest(r)
-			if hubName == "" {
+			dataspaceName := extractHubFromRequest(r)
+			if dataspaceName == "" {
 				// For create operations, hub might be in request body
 				// This will be handled in individual handlers
-				hubName = "default" // Allow for now, handlers will validate
+				dataspaceName = "default" // Allow for now, handlers will validate
 			}
 
 			// Check if user has access to this hub
 			userHubs := getUserHubs(rbacCtx.Permissions)
-			canAccessHub := rbacCtx.IsAdmin || containsHub(userHubs, hubName) || hubName == "default"
+			canAccessHub := rbacCtx.IsAdmin || containsHub(userHubs, dataspaceName) || dataspaceName == "default"
 
 			// Create hub context
-			hubCtx := &HubContext{
-				HubName:       hubName,
+			hubCtx := &DataspaceContext{
+				DataspaceName:       dataspaceName,
 				UserHubs:      userHubs,
 				CanAccessHub:  canAccessHub,
 				IsGlobalAdmin: rbacCtx.IsAdmin,
@@ -58,14 +58,14 @@ func HubMiddleware(entityRepo models.EntityRepository, sessionManager *models.Se
 	}
 }
 
-// GetHubContext retrieves the hub context from the request
-func GetHubContext(r *http.Request) (*HubContext, bool) {
-	ctx, ok := r.Context().Value(hubContextKey{}).(*HubContext)
+// GetDataspaceContext retrieves the hub context from the request
+func GetDataspaceContext(r *http.Request) (*DataspaceContext, bool) {
+	ctx, ok := r.Context().Value(hubContextKey{}).(*DataspaceContext)
 	return ctx, ok
 }
 
-// ValidateEntityHub validates that an entity belongs to a hub the user can access
-func ValidateEntityHub(rbacCtx *RBACContext, entity *models.Entity) error {
+// ValidateEntityDataspace validates that an entity belongs to a hub the user can access
+func ValidateEntityDataspace(rbacCtx *RBACContext, entity *models.Entity) error {
 	// Global admin can access all hubs
 	if rbacCtx.IsAdmin {
 		return nil
@@ -99,50 +99,50 @@ func RequireHubTag(entity *models.Entity) error {
 func AddDefaultHubTag(tags []string, defaultHub string) []string {
 	// Check if hub tag already exists
 	for _, tag := range tags {
-		if strings.HasPrefix(tag, "hub:") {
+		if strings.HasPrefix(tag, "dataspace:") {
 			return tags // Hub tag already exists
 		}
 	}
 
 	// Add default hub tag
-	return append(tags, fmt.Sprintf("hub:%s", defaultHub))
+	return append(tags, fmt.Sprintf("dataspace:%s", defaultHub))
 }
 
-// CheckHubPermission checks if user has specific permission for a hub
-func CheckHubPermission(rbacCtx *RBACContext, hubName string, action string) bool {
+// CheckDataspacePermission checks if user has specific permission for a hub
+func CheckDataspacePermission(rbacCtx *RBACContext, dataspaceName string, action string) bool {
 	// Global admin has all permissions
 	if rbacCtx.IsAdmin {
 		return true
 	}
 
 	// Check hub-specific permission
-	hubPerm := fmt.Sprintf("rbac:perm:entity:%s:hub:%s", action, hubName)
+	hubPerm := fmt.Sprintf("rbac:perm:entity:%s:dataspace:%s", action, dataspaceName)
 	if models.HasPermission(rbacCtx.Permissions, hubPerm) {
 		return true
 	}
 
 	// Check general hub permission
-	generalPerm := fmt.Sprintf("rbac:perm:entity:%s:hub:*", action)
+	generalPerm := fmt.Sprintf("rbac:perm:entity:%s:dataspace:*", action)
 	return models.HasPermission(rbacCtx.Permissions, generalPerm)
 }
 
 // CheckHubManagementPermission checks hub management permissions
-func CheckHubManagementPermission(rbacCtx *RBACContext, action string, hubName string) bool {
+func CheckHubManagementPermission(rbacCtx *RBACContext, action string, dataspaceName string) bool {
 	// Global admin has all permissions
 	if rbacCtx.IsAdmin {
 		return true
 	}
 
 	// Check specific hub management permission
-	if hubName != "" {
-		hubPerm := fmt.Sprintf("rbac:perm:hub:%s:%s", action, hubName)
+	if dataspaceName != "" {
+		hubPerm := fmt.Sprintf("rbac:perm:dataspace:%s:%s", action, dataspaceName)
 		if models.HasPermission(rbacCtx.Permissions, hubPerm) {
 			return true
 		}
 	}
 
 	// Check general hub management permission
-	generalPerm := fmt.Sprintf("rbac:perm:hub:%s", action)
+	generalPerm := fmt.Sprintf("rbac:perm:dataspace:%s", action)
 	return models.HasPermission(rbacCtx.Permissions, generalPerm)
 }
 
@@ -167,13 +167,13 @@ func extractHubFromRequest(r *http.Request) string {
 func getUserHubs(permissions []string) []string {
 	var hubs []string
 	for _, perm := range permissions {
-		// Look for permissions like rbac:perm:entity:*:hub:worcha
-		if strings.Contains(perm, ":hub:") {
+		// Look for permissions like rbac:perm:entity:*:dataspace:worcha
+		if strings.Contains(perm, ":dataspace:") {
 			parts := strings.Split(perm, ":")
 			if len(parts) >= 6 && parts[4] == "hub" {
-				hubName := parts[5]
-				if hubName != "*" && !containsHub(hubs, hubName) {
-					hubs = append(hubs, hubName)
+				dataspaceName := parts[5]
+				if dataspaceName != "*" && !containsHub(hubs, dataspaceName) {
+					hubs = append(hubs, dataspaceName)
 				}
 			}
 		}
@@ -184,8 +184,8 @@ func getUserHubs(permissions []string) []string {
 // getEntityHub extracts hub name from entity tags
 func getEntityHub(entity *models.Entity) string {
 	for _, tag := range entity.Tags {
-		if strings.HasPrefix(tag, "hub:") {
-			return strings.TrimPrefix(tag, "hub:")
+		if strings.HasPrefix(tag, "dataspace:") {
+			return strings.TrimPrefix(tag, "dataspace:")
 		}
 	}
 	return ""
@@ -201,25 +201,25 @@ func containsHub(hubs []string, hub string) bool {
 	return false
 }
 
-// FormatHubTag creates a hub tag
-func FormatHubTag(hubName string) string {
-	return fmt.Sprintf("hub:%s", hubName)
+// FormatDataspaceTag creates a hub tag
+func FormatDataspaceTag(dataspaceName string) string {
+	return fmt.Sprintf("dataspace:%s", dataspaceName)
 }
 
 // FormatTraitTag creates a trait tag for a hub
-func FormatTraitTag(hubName, namespace, value string) string {
-	return fmt.Sprintf("%s:trait:%s:%s", hubName, namespace, value)
+func FormatTraitTag(dataspaceName, namespace, value string) string {
+	return fmt.Sprintf("%s:trait:%s:%s", dataspaceName, namespace, value)
 }
 
 // FormatSelfTag creates a self tag for a hub
-func FormatSelfTag(hubName, namespace, value string) string {
-	return fmt.Sprintf("%s:self:%s:%s", hubName, namespace, value)
+func FormatSelfTag(dataspaceName, namespace, value string) string {
+	return fmt.Sprintf("%s:self:%s:%s", dataspaceName, namespace, value)
 }
 
-// ParseHubTag parses a hub tag and returns the hub name
-func ParseHubTag(tag string) (string, bool) {
-	if strings.HasPrefix(tag, "hub:") {
-		return strings.TrimPrefix(tag, "hub:"), true
+// ParseDataspaceTag parses a hub tag and returns the hub name
+func ParseDataspaceTag(tag string) (string, bool) {
+	if strings.HasPrefix(tag, "dataspace:") {
+		return strings.TrimPrefix(tag, "dataspace:"), true
 	}
 	return "", false
 }

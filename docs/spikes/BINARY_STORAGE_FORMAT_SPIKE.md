@@ -180,5 +180,5 @@ Based on the spike investigation, we recommend **Option 2 (Variable Record Forma
 
 - [Memory-Mapped Files in Go](https://medium.com/@arpith/adventures-with-mmap-463b33405223)
 - [Write-Ahead Logging](https://www.sqlite.org/wal.html)
-- [B-tree Implementation](https://github.com/google/btree)
+- [B-tree Implementation](https://gitdataspace.com/google/btree)
 - [Skip Lists for Indexing](https://en.wikipedia.org/wiki/Skip_list)

@@ -22,7 +22,7 @@ Where m << n (m = entities in dataspace, n = total entities)
 - **Dataspace Creation**: Automatic on first entity
 - **Query Isolation**: Each dataspace searches its own index
 - **Temporal Tag Support**: Handles TIMESTAMP|tag format
-- **Backward Compatibility**: hub: tags still work
+- **Backward Compatibility**: dataspace: tags still work
 - **Cross-filtering**: Can filter within dataspaces
 
 ## Test Results
@@ -90,7 +90,7 @@ export ENTITYDB_DATASPACE=true
 
 ## Next Steps
 
-1. **Complete Hub → Dataspace Rename**: Update all references
+1. **Complete Dataspace → Dataspace Rename**: Update all references
 2. **Dataspace Management API**: Create, delete, configure dataspaces
 3. **Per-Dataspace Optimization**: Different strategies per dataspace
 4. **Cross-Dataspace Queries**: Federated search when needed

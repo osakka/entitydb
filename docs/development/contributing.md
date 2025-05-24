@@ -40,7 +40,7 @@ Thank you for your interest in contributing to the EntityDB (EntityDB) platform.
 ## Coding Standards
 
 ### Go Code Style
-- Follow the [Go Code Review Comments](https://github.com/golang/go/wiki/CodeReviewComments)
+- Follow the [Go Code Review Comments](https://gitdataspace.com/golang/go/wiki/CodeReviewComments)
 - Use `gofmt` to format code before committing
 - Add appropriate comments for public functions and packages
 - Use meaningful variable and function names

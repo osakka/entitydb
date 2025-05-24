@@ -9,8 +9,8 @@ import (
 func DataspaceCompatibilityMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Convert hub URLs to dataspace URLs
-		if strings.Contains(r.URL.Path, "/hubs/") {
-			newPath := strings.Replace(r.URL.Path, "/hubs/", "/dataspaces/", 1)
+		if strings.Contains(r.URL.Path, "/dataspaces/") {
+			newPath := strings.Replace(r.URL.Path, "/dataspaces/", "/dataspaces/", 1)
 			r.URL.Path = newPath
 			
 			// Add deprecation header
@@ -36,8 +36,8 @@ func DataspaceCompatibilityMiddleware(next http.Handler) http.Handler {
 func ConvertHubTagsToDataspace(tags []string) []string {
 	converted := make([]string, len(tags))
 	for i, tag := range tags {
-		if strings.HasPrefix(tag, "hub:") {
-			converted[i] = "dataspace:" + strings.TrimPrefix(tag, "hub:")
+		if strings.HasPrefix(tag, "dataspace:") {
+			converted[i] = "dataspace:" + strings.TrimPrefix(tag, "dataspace:")
 		} else {
 			converted[i] = tag
 		}
@@ -50,7 +50,7 @@ func ConvertDataspaceTagsToHub(tags []string) []string {
 	converted := make([]string, len(tags))
 	for i, tag := range tags {
 		if strings.HasPrefix(tag, "dataspace:") {
-			converted[i] = "hub:" + strings.TrimPrefix(tag, "dataspace:")
+			converted[i] = "dataspace:" + strings.TrimPrefix(tag, "dataspace:")
 		} else {
 			converted[i] = tag
 		}
@@ -60,7 +60,7 @@ func ConvertDataspaceTagsToHub(tags []string) []string {
 
 // IsHubRelatedTag checks if a tag is hub or dataspace related
 func IsHubRelatedTag(tag string) bool {
-	return strings.HasPrefix(tag, "hub:") || strings.HasPrefix(tag, "dataspace:")
+	return strings.HasPrefix(tag, "dataspace:") || strings.HasPrefix(tag, "dataspace:")
 }
 
 // ExtractDataspaceName extracts the dataspace name from hub: or dataspace: tags
@@ -69,8 +69,8 @@ func ExtractDataspaceName(tags []string) string {
 		if strings.HasPrefix(tag, "dataspace:") {
 			return strings.TrimPrefix(tag, "dataspace:")
 		}
-		if strings.HasPrefix(tag, "hub:") {
-			return strings.TrimPrefix(tag, "hub:")
+		if strings.HasPrefix(tag, "dataspace:") {
+			return strings.TrimPrefix(tag, "dataspace:")
 		}
 	}
 	return ""

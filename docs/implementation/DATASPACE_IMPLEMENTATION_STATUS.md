@@ -9,7 +9,7 @@
   - `/var/entitydb/dataspaces/metrics.idx`
   - `/var/entitydb/dataspaces/default.idx`
 - Dataspaces are created on-demand when entities are added
-- Full backward compatibility with `hub:` tags
+- Full backward compatibility with `dataspace:` tags
 
 ### 2. Temporal Tag Support ✅
 - Fixed dataspace extraction to handle temporal tags (`TIMESTAMP|tag`)
@@ -36,7 +36,7 @@
 - Dataspace creation and index file generation
 - Entity assignment to correct dataspaces
 - Index persistence across restarts
-- Backward compatibility with hub tags
+- Backward compatibility with dataspace tags
 
 ### Needs Refinement 🔧
 - **Query Isolation**: Dataspace queries currently fall back to global search
@@ -51,8 +51,8 @@
    - Implement proper filtering in `ListByTags`
    - Add query performance benchmarks
 
-2. **Complete Hub → Dataspace Rename**
-   - Rename all hub references in codebase
+2. **Complete Dataspace → Dataspace Rename**
+   - Rename all dataspace references in codebase
    - Update API endpoints
    - Create migration guide
 

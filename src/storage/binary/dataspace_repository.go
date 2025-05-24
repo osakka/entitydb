@@ -173,8 +173,8 @@ func (r *DataspaceRepository) ListByTags(tags []string, matchAll bool) ([]*model
 			actualTag = parts[1]
 		}
 		
-		if strings.HasPrefix(actualTag, "dataspace:") || strings.HasPrefix(actualTag, "hub:") {
-			dataspaceName = strings.TrimPrefix(strings.TrimPrefix(actualTag, "dataspace:"), "hub:")
+		if strings.HasPrefix(actualTag, "dataspace:") || strings.HasPrefix(actualTag, "dataspace:") {
+			dataspaceName = strings.TrimPrefix(strings.TrimPrefix(actualTag, "dataspace:"), "dataspace:")
 		} else {
 			filteredTags = append(filteredTags, actualTag)
 		}
@@ -229,8 +229,8 @@ func (r *DataspaceRepository) extractDataspace(entity *models.Entity) string {
 			return strings.TrimPrefix(actualTag, "dataspace:")
 		}
 		// Backward compatibility with hub
-		if strings.HasPrefix(actualTag, "hub:") {
-			return strings.TrimPrefix(actualTag, "hub:")
+		if strings.HasPrefix(actualTag, "dataspace:") {
+			return strings.TrimPrefix(actualTag, "dataspace:")
 		}
 	}
 	return "default"
@@ -290,7 +290,7 @@ func (d *DataspaceIndexImpl) AddEntity(entity *models.Entity) error {
 		}
 		
 		// Skip dataspace tags
-		if strings.HasPrefix(actualTag, "dataspace:") || strings.HasPrefix(actualTag, "hub:") {
+		if strings.HasPrefix(actualTag, "dataspace:") || strings.HasPrefix(actualTag, "dataspace:") {
 			continue
 		}
 		

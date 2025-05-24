@@ -5,7 +5,7 @@
 1. **O(n) Write Operations**: Every update/delete rewrites the entire database file
 2. **Global Index Bottleneck**: All queries search through a single global index
 3. **Memory Pressure**: All entities kept in memory
-4. **Hub Query Performance**: Hub queries scan all tags in the system
+4. **Dataspace Query Performance**: Dataspace queries scan all tags in the system
 
 ## Solutions Implemented
 
@@ -74,7 +74,7 @@ export ENTITYDB_DATASPACE=true
 | Operation | Before | With WAL-Only | With Dataspace | Both Enabled |
 |-----------|--------|---------------|----------------|--------------|
 | Write 1000th entity | 500ms | 2ms | 500ms | 2ms |
-| Query hub with 10k entities | 200ms | 200ms | 20ms | 20ms |
+| Query dataspace with 10k entities | 200ms | 200ms | 20ms | 20ms |
 | Startup with 100k entities | 30s | 30s | 3s | 3s |
 | Memory usage | All entities | All entities | Active dataspaces | Active dataspaces |
 

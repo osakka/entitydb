@@ -1,9 +1,9 @@
 # Dataspace Architecture: A New Vision for EntityDB
 
-## The Revelation: Hub → Namespace → DATASPACE
+## The Revelation: Dataspace → Namespace → DATASPACE
 
 Each evolution reveals deeper truth:
-- **Hub**: Connection points (too limiting)
+- **Dataspace**: Connection points (too limiting)
 - **Namespace**: Naming isolation (still thinking hierarchically)  
 - **Dataspace**: Complete data universes (TRUE insight!)
 
@@ -22,7 +22,7 @@ A dataspace is not just a namespace or folder - it's a **complete, self-containe
 ```
 EntityDB
   └── All entities (global soup)
-       └── Filtered by hub tags
+       └── Filtered by dataspace tags
             └── Same rules everywhere
 ```
 
@@ -172,13 +172,13 @@ worca := db.GetDataspace("worca")
 tasks := worca.Query("status:open")
 
 // Not this mess:
-tasks := db.Query("hub:worca AND worca:self:status:open")
+tasks := db.Query("dataspace:worca AND worca:self:status:open")
 ```
 
 ## Migration Path
 
-1. Start calling hubs "dataspaces" internally
-2. Create dataspace abstraction over current hub system
+1. Start calling dataspaces "dataspaces" internally
+2. Create dataspace abstraction over current dataspace system
 3. Implement per-dataspace index files
 4. Gradually optimize each dataspace
 5. Full federation when ready

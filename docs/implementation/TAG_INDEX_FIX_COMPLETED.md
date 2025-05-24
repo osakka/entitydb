@@ -76,9 +76,9 @@ func (r *EntityRepository) VerifyIndexHealth() error {
 ✅ SUCCESS: Persistent index working correctly!
 ```
 
-### Hub Queries Test ✅
+### Dataspace Queries Test ✅
 ```bash
-Hub metrics count: 1221
+Dataspace metrics count: 1221
 ```
 
 ## Performance Impact

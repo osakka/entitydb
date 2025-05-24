@@ -289,17 +289,17 @@ func main() {
 	apiRouter.HandleFunc("/entities/update", entityHandlerRBAC.UpdateEntityWithRBAC()).Methods("PUT")
 	apiRouter.HandleFunc("/entities/query", entityHandlerRBAC.QueryEntitiesWithRBAC()).Methods("GET")
 
-	// Hub-aware Entity API routes with RBAC and Hub validation
-	hubEntityHandler := api.NewHubEntityHandlerRBAC(server.entityHandler, server.entityRepo, server.sessionManager)
-	apiRouter.HandleFunc("/hubs/entities/create", hubEntityHandler.CreateHubEntityWithRBAC()).Methods("POST")
-	apiRouter.HandleFunc("/hubs/entities/query", hubEntityHandler.QueryHubEntitiesWithRBAC()).Methods("GET")
+	// Dataspace-aware Entity API routes with RBAC and Dataspace validation
+	dataspaceEntityHandler := api.NewDataspaceEntityHandlerRBAC(server.entityHandler, server.entityRepo, server.sessionManager)
+	apiRouter.HandleFunc("/dataspaces/entities/create", dataspaceEntityHandler.CreateDataspaceEntityWithRBAC()).Methods("POST")
+	apiRouter.HandleFunc("/dataspaces/entities/query", dataspaceEntityHandler.QueryDataspaceEntitiesWithRBAC()).Methods("GET")
 	
-	// Hub management routes with RBAC
-	hubManagementHandler := api.NewHubManagementHandler(server.entityRepo)
-	hubManagementHandlerRBAC := api.NewHubManagementHandlerRBAC(hubManagementHandler, server.entityRepo, server.sessionManager)
-	apiRouter.HandleFunc("/hubs/create", hubManagementHandlerRBAC.CreateHubWithRBAC()).Methods("POST")
-	apiRouter.HandleFunc("/hubs/list", hubManagementHandlerRBAC.ListHubsWithRBAC()).Methods("GET")
-	apiRouter.HandleFunc("/hubs/delete", hubManagementHandlerRBAC.DeleteHubWithRBAC()).Methods("DELETE")
+	// Dataspace management routes with RBAC
+	dataspaceManagementHandler := api.NewDataspaceManagementHandler(server.entityRepo)
+	dataspaceManagementHandlerRBAC := api.NewDataspaceManagementHandlerRBAC(dataspaceManagementHandler, server.entityRepo, server.sessionManager)
+	apiRouter.HandleFunc("/dataspaces/create", dataspaceManagementHandlerRBAC.CreateDataspaceWithRBAC()).Methods("POST")
+	apiRouter.HandleFunc("/dataspaces/list", dataspaceManagementHandlerRBAC.ListDataspacesWithRBAC()).Methods("GET")
+	apiRouter.HandleFunc("/dataspaces/delete", dataspaceManagementHandlerRBAC.DeleteDataspaceWithRBAC()).Methods("DELETE")
 	
 	// Chunked content API routes
 	apiRouter.HandleFunc("/entities/stream", server.entityHandler.StreamEntity).Methods("GET")

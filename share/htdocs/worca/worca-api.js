@@ -507,13 +507,13 @@ class WorcaAPI {
                 return false;
             }
             
-            // Check for both standard format and hub format (worcha legacy + worca current)
+            // Check for both standard format and dataspace format (worcha legacy + worca current)
             const matches = entity.tags.some(tag => 
                 tag === `type:${type}` || 
                 tag === `worcha:self:type:${type}` ||
                 tag === `worca:self:type:${type}` ||
-                (tag.startsWith('hub:worcha') && entity.tags.some(t => t === `worcha:self:type:${type}`)) ||
-                (tag.startsWith('hub:worca') && entity.tags.some(t => t === `worca:self:type:${type}`))
+                (tag.startsWith('dataspace:worcha') && entity.tags.some(t => t === `worcha:self:type:${type}`)) ||
+                (tag.startsWith('dataspace:worca') && entity.tags.some(t => t === `worca:self:type:${type}`))
             );
             
             if (matches) {
@@ -537,7 +537,7 @@ class WorcaAPI {
             updatedAt: entity.updated_at
         };
 
-        // Extract common properties from tags (handle both standard and hub formats)
+        // Extract common properties from tags (handle both standard and dataspace formats)
         transformed.type = this.getTagValue(entity.tags, 'type') || this.getTagValue(entity.tags, 'worca:self:type');
         transformed.status = this.getTagValue(entity.tags, 'status') || this.getTagValue(entity.tags, 'worca:self:status');
         transformed.name = this.getTagValue(entity.tags, 'name') || this.getTagValue(entity.tags, 'worca:self:name');

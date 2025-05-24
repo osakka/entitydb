@@ -125,6 +125,6 @@ Based on the spike investigation, we recommend **Option 1 (Prefix Format)** for 
 
 ## Resources
 
-- [B-tree Implementation](https://github.com/google/btree)
+- [B-tree Implementation](https://gitdataspace.com/google/btree)
 - [RFC3339 Timestamp Format](https://tools.ietf.org/html/rfc3339)
 - [Time-Series Database Benchmarks](https://www.timescale.com/blog/time-series-database-benchmarks/)
