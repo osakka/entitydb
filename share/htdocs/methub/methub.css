@@ -1,5 +1,9 @@
 /* MetHub - Metrics Dashboard Styles */
 
+* {
+    box-sizing: border-box;
+}
+
 :root {
     --bg-primary: #f9fafb;
     --bg-secondary: #ffffff;

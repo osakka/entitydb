@@ -1,5 +1,5 @@
 // MetHub - Main Application
-function methub() {
+window.methub = function() {
     return {
         // State
         loading: false,
@@ -32,31 +32,43 @@ function methub() {
         
         // Initialization
         async init() {
-            console.log('🚀 Initializing MetHub...');
-            
-            // Initialize API
-            this.api = new MetHubAPI();
-            this.widgetRenderer = new MetHubWidgets();
-            
-            // Check authentication
-            if (!this.api.token) {
-                // Redirect to login or show login modal
-                await this.login();
+            try {
+                console.log('🚀 Initializing MetHub...');
+                
+                // Initialize API
+                this.api = new MetHubAPI();
+                this.widgetRenderer = new MetHubWidgets();
+                
+                // Check authentication
+                if (!this.api.token) {
+                    console.log('📝 No token found, attempting login...');
+                    await this.login();
+                }
+                
+                // Load saved widgets
+                this.loadWidgets();
+                
+                // Load hosts
+                try {
+                    await this.loadHosts();
+                } catch (error) {
+                    console.warn('⚠️ Could not load hosts:', error);
+                    this.hosts = [];
+                }
+                
+                // Initial data load
+                await this.refreshData();
+                
+                // Start auto-refresh
+                this.startAutoRefresh();
+                
+                // Initialize watchers
+                this.initWatchers();
+                
+                console.log('✅ MetHub initialized');
+            } catch (error) {
+                console.error('❌ MetHub initialization failed:', error);
             }
-            
-            // Load saved widgets
-            this.loadWidgets();
-            
-            // Load hosts
-            await this.loadHosts();
-            
-            // Initial data load
-            await this.refreshData();
-            
-            // Start auto-refresh
-            this.startAutoRefresh();
-            
-            console.log('✅ MetHub initialized');
         },
         
         // Simple login (you might want to add a proper login screen)
@@ -273,17 +285,19 @@ function methub() {
             return 'widget_' + Math.random().toString(36).substr(2, 9);
         },
         
-        // Watch for changes
-        $watch('autoRefresh', function(value) {
-            this.startAutoRefresh();
-        }),
-        
-        $watch('timeRange', function(value) {
-            this.refreshData();
-        }),
-        
-        $watch('selectedHost', function(value) {
-            this.refreshData();
-        })
+        // Initialize watchers after Alpine loads
+        initWatchers() {
+            this.$watch('autoRefresh', () => {
+                this.startAutoRefresh();
+            });
+            
+            this.$watch('timeRange', () => {
+                this.refreshData();
+            });
+            
+            this.$watch('selectedHost', () => {
+                this.refreshData();
+            });
+        }
     };
 }

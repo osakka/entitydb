@@ -26,13 +26,24 @@ class MetHubAPI {
             options.body = JSON.stringify(data);
         }
 
-        const response = await fetch(`${this.baseUrl}${endpoint}`, options);
-        
-        if (!response.ok) {
-            throw new Error(`API Error: ${response.status} ${response.statusText}`);
-        }
+        try {
+            const response = await fetch(`${this.baseUrl}${endpoint}`, options);
+            
+            if (!response.ok) {
+                throw new Error(`API Error: ${response.status} ${response.statusText}`);
+            }
 
-        return await response.json();
+            const text = await response.text();
+            try {
+                return JSON.parse(text);
+            } catch (e) {
+                console.warn('Response is not JSON:', text);
+                return { error: text };
+            }
+        } catch (error) {
+            console.error('Request failed:', error);
+            throw error;
+        }
     }
 
     // Login

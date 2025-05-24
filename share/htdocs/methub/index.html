@@ -5,13 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MetHub - Metrics Dashboard</title>
     <link rel="icon" type="image/svg+xml" href="methub-icon.svg">
-    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.12.3/dist/cdn.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <link href="methub.css" rel="stylesheet">
+    
+    <!-- Load our scripts first -->
+    <script src="methub-api.js"></script>
+    <script src="methub-widgets.js"></script>
+    <script src="methub.js"></script>
+    
+    <!-- Then load Alpine.js -->
+    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.12.3/dist/cdn.min.js" defer></script>
 </head>
 <body>
-    <div x-data="methub" x-init="init()" class="methub-app">
+    <div x-data="methub()" x-init="init()" class="methub-app">
         <!-- Header -->
         <header class="header">
             <div class="header-content">
@@ -193,9 +200,5 @@
             </div>
         </div>
     </div>
-
-    <script src="methub-api.js"></script>
-    <script src="methub-widgets.js"></script>
-    <script src="methub.js"></script>
 </body>
 </html>
