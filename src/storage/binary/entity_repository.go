@@ -44,8 +44,9 @@ type EntityRepository struct {
 	namespaceIndex *NamespaceIndex
 	
 	// Tag index persistence
-	tagIndexDirty bool        // Whether tag index needs to be saved
-	lastIndexSave time.Time   // Last time index was saved
+	tagIndexDirty         bool        // Whether tag index needs to be saved
+	lastIndexSave         time.Time   // Last time index was saved
+	persistentIndexLoaded bool        // Whether persistent index was loaded successfully
 }
 
 // NewEntityRepository creates a new binary entity repository
@@ -114,10 +115,15 @@ func NewEntityRepository(dataPath string) (*EntityRepository, error) {
 	}
 	
 	// Replay WAL to catch any entries not yet in the data file
-	logger.Info("Replaying WAL to rebuild complete tag index...")
-	if err := repo.replayWAL(); err != nil {
-		logger.Error("Failed to replay WAL: %v", err)
-		// Continue anyway - we may have partial data
+	// Skip WAL replay if we successfully loaded a persistent index
+	if repo.persistentIndexLoaded {
+		logger.Info("Persistent index loaded successfully, skipping WAL replay to preserve index consistency")
+	} else {
+		logger.Info("No persistent index loaded, replaying WAL to rebuild complete tag index...")
+		if err := repo.replayWAL(); err != nil {
+			logger.Error("Failed to replay WAL: %v", err)
+			// Continue anyway - we may have partial data
+		}
 	}
 	
 	// Verify index health
@@ -155,6 +161,7 @@ func (r *EntityRepository) buildIndexes() error {
 	if tagIndex, err := LoadTagIndexV2(r.getDataFile()); err == nil {
 		logger.Info("Loading tag index from persistent storage...")
 		r.tagIndex = tagIndex
+		r.persistentIndexLoaded = true
 		logger.Info("Loaded %d tags from persistent index in %v", len(tagIndex), time.Since(startTime))
 		
 		// Still need to load entities and build other indexes
@@ -205,6 +212,7 @@ func (r *EntityRepository) buildIndexes() error {
 		return nil
 	} else {
 		logger.Info("No persistent tag index found or error loading: %v. Building from scratch...", err)
+		r.persistentIndexLoaded = false
 	}
 	
 	reader, err := NewReader(r.getDataFile())
@@ -1777,11 +1785,14 @@ func (r *EntityRepository) VerifyIndexHealth() error {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	
-	// Count unique entities in tag index
-	indexedEntities := make(map[string]bool)
+	// Count unique entities in tag index with detailed tracking
+	indexedEntities := make(map[string]int) // entity -> tag count
+	totalTagEntries := 0
+	
 	for tag, entityIDs := range r.tagIndex {
 		for _, id := range entityIDs {
-			indexedEntities[id] = true
+			indexedEntities[id]++
+			totalTagEntries++
 		}
 		logger.Trace("Tag '%s' has %d entities", tag, len(entityIDs))
 	}
@@ -1790,12 +1801,42 @@ func (r *EntityRepository) VerifyIndexHealth() error {
 	entityCount := len(r.entities)
 	indexCount := len(indexedEntities)
 	
-	logger.Info("Index health check: %d entities in repository, %d entities in tag index", entityCount, indexCount)
+	logger.Info("Index health check: %d entities in repository, %d entities in tag index, %d total tag entries", 
+		entityCount, indexCount, totalTagEntries)
 	
 	if entityCount != indexCount {
-		return fmt.Errorf("index mismatch: %d entities but only %d in tag index", entityCount, indexCount)
+		logger.Error("Index mismatch details:")
+		logger.Error("- Entities in repository: %d", entityCount)
+		logger.Error("- Entities in tag index: %d", indexCount)
+		logger.Error("- Total tag entries: %d", totalTagEntries)
+		logger.Error("- Persistent index loaded: %v", r.persistentIndexLoaded)
+		
+		// Find entities that are missing from index
+		missingFromIndex := 0
+		for entityID := range r.entities {
+			if _, exists := indexedEntities[entityID]; !exists {
+				logger.Error("- Entity %s not found in tag index", entityID)
+				missingFromIndex++
+			}
+		}
+		
+		// Find entities in index but not in repository
+		missingFromRepo := 0
+		for entityID := range indexedEntities {
+			if _, exists := r.entities[entityID]; !exists {
+				logger.Error("- Entity %s in tag index but not in repository", entityID)
+				missingFromRepo++
+			}
+		}
+		
+		logger.Error("- Missing from index: %d", missingFromIndex)
+		logger.Error("- Missing from repository: %d", missingFromRepo)
+		
+		return fmt.Errorf("index mismatch: %d entities in repo, %d in index (missing from index: %d, missing from repo: %d)", 
+			entityCount, indexCount, missingFromIndex, missingFromRepo)
 	}
 	
+	logger.Info("Index health check passed: all %d entities properly indexed", entityCount)
 	return nil
 }
 
