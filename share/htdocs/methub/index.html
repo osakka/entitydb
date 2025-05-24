@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MetHub - Metrics Dashboard</title>
+    <link rel="icon" type="image/svg+xml" href="methub-icon.svg">
+    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.12.3/dist/cdn.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="methub.css" rel="stylesheet">
+</head>
+<body>
+    <div x-data="methub" x-init="init()" class="methub-app">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <div class="logo-section">
+                    <i class="fas fa-chart-line logo-icon"></i>
+                    <h1>MetHub</h1>
+                    <span class="tagline">Metrics Monitoring Hub</span>
+                </div>
+                
+                <div class="header-actions">
+                    <!-- Time Range Selector -->
+                    <select x-model="timeRange" @change="refreshData()" class="time-selector">
+                        <option value="5m">Last 5 minutes</option>
+                        <option value="15m">Last 15 minutes</option>
+                        <option value="1h">Last 1 hour</option>
+                        <option value="6h">Last 6 hours</option>
+                        <option value="24h">Last 24 hours</option>
+                        <option value="7d">Last 7 days</option>
+                    </select>
+                    
+                    <!-- Refresh Button -->
+                    <button @click="refreshData()" class="btn-refresh" :class="{'spinning': loading}">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                    
+                    <!-- Auto-refresh Toggle -->
+                    <label class="auto-refresh">
+                        <input type="checkbox" x-model="autoRefresh">
+                        <span>Auto-refresh</span>
+                    </label>
+                    
+                    <!-- Add Widget Button -->
+                    <button @click="showAddWidget = true" class="btn-primary">
+                        <i class="fas fa-plus"></i> Add Widget
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Host Selector -->
+        <div class="host-selector" x-show="hosts.length > 0">
+            <div class="host-tabs">
+                <button 
+                    @click="selectedHost = null" 
+                    :class="{'active': selectedHost === null}"
+                    class="host-tab">
+                    <i class="fas fa-globe"></i> All Hosts
+                </button>
+                <template x-for="host in hosts" :key="host">
+                    <button 
+                        @click="selectedHost = host" 
+                        :class="{'active': selectedHost === host}"
+                        class="host-tab">
+                        <i class="fas fa-server"></i> <span x-text="host"></span>
+                    </button>
+                </template>
+            </div>
+        </div>
+
+        <!-- Dashboard Grid -->
+        <div class="dashboard-grid" :class="'grid-cols-' + gridColumns">
+            <template x-for="(widget, index) in widgets" :key="widget.id">
+                <div class="widget-container" :class="'span-' + (widget.span || 1)">
+                    <div class="widget">
+                        <div class="widget-header">
+                            <h3 x-text="widget.title"></h3>
+                            <div class="widget-actions">
+                                <button @click="editWidget(widget)" class="btn-icon">
+                                    <i class="fas fa-cog"></i>
+                                </button>
+                                <button @click="removeWidget(widget.id)" class="btn-icon">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="widget-body">
+                            <!-- Dynamic widget content based on type -->
+                            <div x-html="renderWidget(widget)"></div>
+                        </div>
+                    </div>
+                </div>
+            </template>
+            
+            <!-- Empty State -->
+            <div x-show="widgets.length === 0" class="empty-state">
+                <i class="fas fa-chart-pie"></i>
+                <h3>No widgets yet</h3>
+                <p>Click "Add Widget" to start monitoring metrics</p>
+            </div>
+        </div>
+
+        <!-- Add/Edit Widget Modal -->
+        <div x-show="showAddWidget || editingWidget" 
+             x-transition
+             class="modal-backdrop"
+             @click.self="closeWidgetModal()">
+            <div class="modal-container">
+                <div class="modal-header">
+                    <h3>
+                        <i class="fas fa-chart-line"></i>
+                        <span x-text="editingWidget ? 'Edit Widget' : 'Add Widget'"></span>
+                    </h3>
+                    <button @click="closeWidgetModal()" class="modal-close">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                
+                <div class="modal-body">
+                    <form @submit.prevent="saveWidget()">
+                        <!-- Widget Title -->
+                        <div class="form-group">
+                            <label>Title</label>
+                            <input type="text" x-model="widgetForm.title" required>
+                        </div>
+                        
+                        <!-- Widget Type -->
+                        <div class="form-group">
+                            <label>Type</label>
+                            <select x-model="widgetForm.type" @change="updateWidgetDefaults()">
+                                <option value="gauge">Gauge</option>
+                                <option value="line">Line Chart</option>
+                                <option value="bar">Bar Chart</option>
+                                <option value="value">Single Value</option>
+                                <option value="table">Table</option>
+                                <option value="heatmap">Heatmap</option>
+                            </select>
+                        </div>
+                        
+                        <!-- Metric Type -->
+                        <div class="form-group">
+                            <label>Metric Type</label>
+                            <select x-model="widgetForm.metricType">
+                                <option value="cpu">CPU</option>
+                                <option value="memory">Memory</option>
+                                <option value="disk">Disk</option>
+                                <option value="custom">Custom</option>
+                            </select>
+                        </div>
+                        
+                        <!-- Metric Name -->
+                        <div class="form-group">
+                            <label>Metric Name</label>
+                            <input type="text" x-model="widgetForm.metricName" 
+                                   placeholder="e.g., cpu_usage, mem_percent">
+                        </div>
+                        
+                        <!-- Widget Span -->
+                        <div class="form-group">
+                            <label>Width (columns)</label>
+                            <select x-model="widgetForm.span">
+                                <option value="1">1 column</option>
+                                <option value="2">2 columns</option>
+                                <option value="3">3 columns</option>
+                                <option value="4">4 columns (full width)</option>
+                            </select>
+                        </div>
+                        
+                        <!-- Additional Options -->
+                        <div class="form-group" x-show="widgetForm.type === 'gauge'">
+                            <label>Thresholds</label>
+                            <div class="threshold-inputs">
+                                <input type="number" x-model="widgetForm.thresholds.warning" 
+                                       placeholder="Warning" style="width: 48%">
+                                <input type="number" x-model="widgetForm.thresholds.critical" 
+                                       placeholder="Critical" style="width: 48%">
+                            </div>
+                        </div>
+                        
+                        <div class="modal-footer">
+                            <button type="button" class="btn-cancel" @click="closeWidgetModal()">
+                                Cancel
+                            </button>
+                            <button type="submit" class="btn-primary">
+                                <span x-text="editingWidget ? 'Save Changes' : 'Add Widget'"></span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="methub-api.js"></script>
+    <script src="methub-widgets.js"></script>
+    <script src="methub.js"></script>
+</body>
+</html>
