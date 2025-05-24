@@ -3,7 +3,7 @@
 > [!IMPORTANT]
 > EntityDB is a high-performance temporal database where every tag is timestamped with nanosecond precision. All data is stored in a custom binary format (EBF) with Write-Ahead Logging for durability and concurrent access support.
 
-## Current State (v2.14.0)
+## Current State (v2.15.0)
 
 EntityDB now features a unified Entity model with autochunking:
 - **Unified Entity Model**: Single content field ([]byte) per entity
@@ -21,6 +21,7 @@ EntityDB now features a unified Entity model with autochunking:
 - **Auto-Initialization**: Creates admin/admin user automatically on first start
 - **Query Adaptations**: All query functions handle temporal tags transparently
 - **Observability**: Comprehensive metrics with health checks, Prometheus format, and system analytics
+- **Modular Widget System**: Customizable dashboards with extensible widget registry and full-screen responsive layout
 
 ## What's Implemented
 
@@ -36,7 +37,7 @@ EntityDB now features a unified Entity model with autochunking:
 - Health monitoring and metrics endpoints
 
 ### Applications Built on EntityDB
-- **Worca (Workforce Orchestrator)**: Complete workforce management platform inspired by Orca intelligence. Features Kanban boards, team management, project hierarchies, and real-time analytics with oceanic theming. Includes drag-drop functionality, dark/light themes, and mobile-responsive design. Located at `/share/htdocs/worca/`
+- **Worca (Workforce Orchestrator)**: Complete workforce management platform inspired by Orca intelligence. Features modular widget system, full-screen responsive layout, Kanban boards, team management, project hierarchies, and real-time analytics with oceanic theming. Includes customizable dashboards, comprehensive widget registry, dark/light themes, and mobile-responsive design. Located at `/share/htdocs/worca/`
 
 ### Architecture
 ```
@@ -65,12 +66,14 @@ EntityDB now features a unified Entity model with autochunking:
 │   ├── entitydb                     # Server binary
 │   └── entitydbd.sh                 # Daemon script
 ├── share/htdocs/worca/              # Workforce Orchestrator Application  
-│   ├── index.html                   # Main dashboard with oceanic theme
-│   ├── cli.html                     # Conversational CLI
-│   ├── worca.js                     # Core application logic
+│   ├── index.html                   # Main dashboard with full-screen layout
+│   ├── worca.js                     # Core application logic with widget system
 │   ├── worca-api.js                 # EntityDB API wrapper
-│   ├── worca-logo.svg               # Orca-inspired logo
-│   └── worca-icon.svg               # Application icon
+│   ├── worca-widgets.js             # Modular widget system registry
+│   ├── worca-logo-dark.svg          # Orca-inspired logo (dark theme)
+│   ├── worca-logo-light.svg         # Orca-inspired logo (light theme)
+│   ├── metrics.html                 # System metrics dashboard
+│   └── demo.md                      # Usage examples and demos
 ```
 
 ### API Endpoints
@@ -207,7 +210,7 @@ All development follows the standardized Git workflow described in [docs/develop
 
 - URL: https://git.home.arpa/itdlabs/entitydb.git
 - Branch: main
-- Latest tag: v2.13.0
+- Latest tag: v2.15.0
 
 ## Development Principles
 

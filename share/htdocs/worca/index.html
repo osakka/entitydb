@@ -9,6 +9,10 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <!-- Gridster for widget layout -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gridster@0.5.6/dist/jquery.gridster.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gridster@0.5.6/dist/jquery.gridster.min.js"></script>
     <style>
         /* Modern Workforce Orchestrator Styles */
         :root {
@@ -465,7 +469,7 @@
             transform: rotate(180deg);
         }
 
-        /* Main app container */
+        /* Main app container - Full screen with sidebar */
         .app-container {
             display: flex;
             height: calc(100vh - 60px);
@@ -518,11 +522,13 @@
             color: white;
         }
 
-        /* Main Content */
+        /* Main Content - Full remaining width with proper scrolling */
         .main-content {
             flex: 1;
-            padding: 20px;
-            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            height: 100%;
         }
 
         .content-header {
@@ -538,9 +544,13 @@
             background: var(--content-bg);
             backdrop-filter: blur(10px);
             border-radius: 12px;
+            margin: 20px;
+            margin-bottom: 20px; /* Same as top margin for consistent spacing */
             padding: 20px;
             box-shadow: 0 4px 20px var(--shadow);
-            min-height: 500px;
+            overflow-y: auto;
+            overflow-x: hidden;
+            height: calc(100vh - 60px - 40px); /* Full height minus taskbar and top/bottom margins */
         }
 
         /* Kanban Board */
@@ -792,6 +802,256 @@
         .text-center { text-align: center; }
         .mb-4 { margin-bottom: 16px; }
         .mt-4 { margin-top: 16px; }
+
+        /* Widget System Styles */
+        .widget-grid {
+            display: grid;
+            grid-template-columns: repeat(12, 1fr);
+            grid-auto-rows: 100px;
+            gap: 16px;
+            width: 100%;
+            min-height: 100%;
+        }
+
+        .widget {
+            background: var(--card-bg);
+            border-radius: 12px;
+            box-shadow: 0 4px 12px var(--shadow);
+            border: 1px solid var(--border-color);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            transition: all 0.3s ease;
+        }
+
+        .widget:hover {
+            box-shadow: 0 8px 24px var(--shadow);
+        }
+
+        .widget-header {
+            background: var(--hover-bg);
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--border-color);
+            cursor: move;
+        }
+
+        .widget-header i {
+            margin-right: 8px;
+            color: var(--primary-color);
+        }
+
+        .widget-header span {
+            font-weight: 600;
+            flex: 1;
+        }
+
+        .widget-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .widget-actions button {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 4px;
+            transition: all 0.2s ease;
+        }
+
+        .widget-actions button:hover {
+            background: var(--hover-bg);
+            color: var(--primary-color);
+        }
+
+        .widget-body {
+            padding: 16px;
+            flex: 1;
+            overflow: auto;
+        }
+
+        /* Widget content styles */
+        .metric-value {
+            font-size: 32px;
+            font-weight: bold;
+            color: var(--primary-color);
+            margin: 8px 0;
+        }
+
+        .metric-label {
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        .metric-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 16px;
+        }
+
+        .metric-item {
+            text-align: center;
+        }
+
+        .widget-chart {
+            width: 100%;
+            height: 200px;
+        }
+
+        .widget-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .widget-list-item {
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .widget-list-item:last-child {
+            border-bottom: none;
+        }
+
+        /* Dashboard management */
+        .dashboard-tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 8px;
+        }
+
+        .dashboard-tab {
+            padding: 8px 16px;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 6px 6px 0 0;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .dashboard-tab:hover {
+            background: var(--hover-bg);
+        }
+
+        .dashboard-tab.active {
+            background: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+        }
+
+        .dashboard-actions {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 20px;
+            align-items: center;
+        }
+
+        .add-widget-panel {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 12px var(--shadow);
+        }
+
+        .widget-categories {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+
+        .widget-category {
+            padding: 6px 12px;
+            background: var(--hover-bg);
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 14px;
+        }
+
+        .widget-category:hover,
+        .widget-category.active {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .widget-gallery {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 16px;
+        }
+
+        .widget-card {
+            background: var(--hover-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+
+        .widget-card:hover {
+            background: var(--primary-color);
+            color: white;
+            transform: translateY(-2px);
+        }
+
+        .widget-card i {
+            font-size: 32px;
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        .widget-card h4 {
+            margin: 0;
+            font-size: 14px;
+        }
+
+        /* Edit mode styles */
+        .edit-mode .widget {
+            border: 2px dashed var(--primary-color);
+        }
+
+        .edit-mode .widget-header {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .edit-mode .widget-header i {
+            color: white;
+        }
+
+        /* Gridster overrides */
+        .gridster {
+            margin: 0 auto;
+        }
+
+        .gridster .gs-w {
+            cursor: default;
+        }
+
+        .edit-mode .gridster .gs-w {
+            cursor: move;
+        }
+
+        .gridster .preview-holder {
+            border: 3px dashed var(--primary-color);
+            background: var(--hover-bg);
+            border-radius: 12px;
+        }
 
         /* Login Screen Styles - Oceanic Theme */
         .login-screen {
@@ -1120,13 +1380,13 @@
     </style>
 </head>
 <body>
-    <div x-data="worca" x-init="init()">
+    <div x-data="worca()" x-init="init()">
         <!-- Login Screen -->
         <div x-show="!isAuthenticated" class="login-screen">
             <div class="login-container">
                 <div class="login-header">
                     <div class="logo" style="display: flex; flex-direction: column; align-items: center; gap: 10px;">
-                        <img src="worca-logo.svg" width="220" height="220" alt="Worca" style="filter: drop-shadow(0 4px 8px rgba(6, 182, 212, 0.3));">
+                        <img :src="darkMode ? 'worca-logo-dark.svg' : 'worca-logo-light.svg'" width="220" height="220" alt="Worca" style="filter: drop-shadow(0 4px 8px rgba(6, 182, 212, 0.3));">
                     </div>
                 </div>
                 
@@ -1299,39 +1559,282 @@
 
             <!-- Content Area -->
             <div class="content-area">
-                <!-- Dashboard View -->
-                <div x-show="currentView === 'dashboard'" class="dashboard-view">
-                    <!-- Stats Grid -->
-                    <div class="stats-grid">
-                        <div class="stat-card">
-                            <div class="stat-number" x-text="stats.totalTasks"></div>
-                            <div class="stat-label">Total Tasks</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-number" x-text="stats.activeTasks"></div>
-                            <div class="stat-label">Active Tasks</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-number" x-text="stats.completedTasks"></div>
-                            <div class="stat-label">Completed Tasks</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-number" x-text="stats.teamMembers"></div>
-                            <div class="stat-label">Team Members</div>
+                <!-- Dashboard View with Widget System -->
+                <div x-show="currentView === 'dashboard'" class="dashboard-view" :class="{'edit-mode': editMode}">
+                    <!-- Dashboard Tabs -->
+                    <div class="dashboard-tabs">
+                        <template x-for="dashboard in dashboards" :key="dashboard.id">
+                            <div class="dashboard-tab" 
+                                 :class="{'active': currentDashboard?.id === dashboard.id}"
+                                 @click="switchDashboard(dashboard)">
+                                <i class="fas" :class="dashboard.icon"></i>
+                                <span x-text="dashboard.name"></span>
+                            </div>
+                        </template>
+                        <div class="dashboard-tab" @click="createNewDashboard()">
+                            <i class="fas fa-plus"></i>
+                            <span>New Dashboard</span>
                         </div>
                     </div>
 
-                    <!-- Recent Activity -->
-                    <div class="chart-container">
-                        <h3 style="margin-bottom: 16px;">Recent Activity</h3>
-                        <div style="max-height: 300px; overflow-y: auto;">
-                            <template x-for="activity in recentActivity" :key="activity.id">
-                                <div style="padding: 12px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between;">
-                                    <span x-text="activity.description"></span>
-                                    <span style="color: var(--text-secondary); font-size: 12px;" x-text="formatTime(activity.timestamp)"></span>
+                    <!-- Dashboard Actions -->
+                    <div class="dashboard-actions">
+                        <button class="btn btn-secondary" @click="toggleEditMode()">
+                            <i class="fas" :class="editMode ? 'fa-save' : 'fa-edit'"></i>
+                            <span x-text="editMode ? 'Save Layout' : 'Edit Dashboard'"></span>
+                        </button>
+                        <button class="btn btn-secondary" @click="showAddWidget = !showAddWidget" x-show="editMode">
+                            <i class="fas fa-plus-circle"></i>
+                            Add Widget
+                        </button>
+                        <button class="btn btn-secondary" @click="refreshMetrics()">
+                            <i class="fas fa-sync"></i>
+                            Refresh Metrics
+                        </button>
+                        <button class="btn btn-secondary" @click="showDashboardSettings = true" x-show="editMode">
+                            <i class="fas fa-cog"></i>
+                            Dashboard Settings
+                        </button>
+                    </div>
+
+                    <!-- Add Widget Panel -->
+                    <div x-show="showAddWidget && editMode" class="add-widget-panel" x-transition>
+                        <h3 style="margin-bottom: 16px;">Add Widget</h3>
+                        
+                        <!-- Widget Categories -->
+                        <div class="widget-categories">
+                            <template x-for="(category, key) in WIDGET_CATEGORIES" :key="key">
+                                <div class="widget-category" 
+                                     :class="{'active': selectedCategory === key}"
+                                     @click="selectedCategory = key">
+                                    <i class="fas" :class="category.icon"></i>
+                                    <span x-text="category.name"></span>
                                 </div>
                             </template>
                         </div>
+
+                        <!-- Widget Gallery -->
+                        <div class="widget-gallery">
+                            <template x-for="(widget, key) in Object.entries(WIDGET_REGISTRY).filter(([k,w]) => !selectedCategory || w.category === selectedCategory)" :key="key">
+                                <div class="widget-card" @click="addWidget(widget[0])">
+                                    <i class="fas" :class="widget[1].icon"></i>
+                                    <h4 x-text="widget[1].name"></h4>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+
+                    <!-- Simple Widget Grid -->
+                    <div class="widget-grid">
+                        <template x-for="(widget, index) in widgets" :key="widget.id">
+                            <div class="widget" 
+                                 :data-widget-id="widget.id"
+                                 :style="`grid-column: ${widget.x + 1} / span ${widget.w}; grid-row: ${widget.y + 1} / span ${widget.h};`">
+                                <div class="widget-header">
+                                    <i class="fas" :class="WIDGET_REGISTRY[widget.type]?.icon || 'fa-cube'"></i>
+                                    <span x-text="WIDGET_REGISTRY[widget.type]?.name || 'Unknown Widget'"></span>
+                                    <div class="widget-actions" x-show="editMode">
+                                        <button @click="removeWidget(widget.id)" title="Remove Widget">
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="widget-body">
+                                    <!-- System Info Widget -->
+                                    <template x-if="widget.type === 'systemInfo'">
+                                        <div>
+                                            <div class="metric-grid">
+                                                <div class="metric-item">
+                                                    <div class="metric-value" x-text="metricsData?.system?.version || 'N/A'"></div>
+                                                    <div class="metric-label">Version</div>
+                                                </div>
+                                                <div class="metric-item">
+                                                    <div class="metric-value" x-text="formatDuration(metricsData?.system?.uptime_seconds)"></div>
+                                                    <div class="metric-label">Uptime</div>
+                                                </div>
+                                                <div class="metric-item">
+                                                    <div class="metric-value" x-text="metricsData?.system?.num_goroutines || 0"></div>
+                                                    <div class="metric-label">Goroutines</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </template>
+
+                                    <!-- Memory Usage Widget -->
+                                    <template x-if="widget.type === 'memoryUsage'">
+                                        <div>
+                                            <div class="metric-grid">
+                                                <div class="metric-item">
+                                                    <div class="metric-value" x-text="formatBytes(metricsData?.memory?.heap_alloc_bytes)"></div>
+                                                    <div class="metric-label">Heap Alloc</div>
+                                                </div>
+                                                <div class="metric-item">
+                                                    <div class="metric-value" x-text="formatBytes(metricsData?.memory?.sys_bytes)"></div>
+                                                    <div class="metric-label">System</div>
+                                                </div>
+                                            </div>
+                                            <div style="margin-top: 16px;">
+                                                <canvas :id="'memory-chart-' + widget.id" class="widget-chart"></canvas>
+                                            </div>
+                                        </div>
+                                    </template>
+
+                                    <!-- Database Stats Widget -->
+                                    <template x-if="widget.type === 'databaseStats'">
+                                        <div>
+                                            <div class="metric-grid">
+                                                <div class="metric-item">
+                                                    <div class="metric-value" x-text="metricsData?.database?.total_entities || 0"></div>
+                                                    <div class="metric-label">Total Entities</div>
+                                                </div>
+                                                <div class="metric-item">
+                                                    <div class="metric-value" x-text="metricsData?.database?.tags_unique || 0"></div>
+                                                    <div class="metric-label">Unique Tags</div>
+                                                </div>
+                                                <div class="metric-item">
+                                                    <div class="metric-value" x-text="(metricsData?.database?.avg_tags_per_entity || 0).toFixed(1)"></div>
+                                                    <div class="metric-label">Avg Tags/Entity</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </template>
+
+                                    <!-- Storage Usage Widget -->
+                                    <template x-if="widget.type === 'storageUsage'">
+                                        <div>
+                                            <div class="metric-item">
+                                                <div class="metric-value" x-text="formatBytes(metricsData?.storage?.total_storage_bytes)"></div>
+                                                <div class="metric-label">Total Storage</div>
+                                            </div>
+                                            <div style="margin-top: 16px;">
+                                                <div class="widget-list">
+                                                    <div class="widget-list-item">
+                                                        <span>Database</span>
+                                                        <span x-text="formatBytes(metricsData?.storage?.database_size_bytes)"></span>
+                                                    </div>
+                                                    <div class="widget-list-item">
+                                                        <span>WAL</span>
+                                                        <span x-text="formatBytes(metricsData?.storage?.wal_size_bytes)"></span>
+                                                    </div>
+                                                    <div class="widget-list-item">
+                                                        <span>Index</span>
+                                                        <span x-text="formatBytes(metricsData?.storage?.index_size_bytes)"></span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </template>
+
+                                    <!-- Temporal Stats Widget -->
+                                    <template x-if="widget.type === 'temporalStats'">
+                                        <div>
+                                            <div class="metric-grid">
+                                                <div class="metric-item">
+                                                    <div class="metric-value" x-text="((metricsData?.temporal?.temporal_tags_ratio || 0) * 100).toFixed(1) + '%'"></div>
+                                                    <div class="metric-label">Temporal Tags</div>
+                                                </div>
+                                                <div class="metric-item">
+                                                    <div class="metric-value" x-text="metricsData?.temporal?.temporal_tags_count || 0"></div>
+                                                    <div class="metric-label">Count</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </template>
+
+                                    <!-- Task Overview Widget -->
+                                    <template x-if="widget.type === 'taskOverview'">
+                                        <div>
+                                            <div class="metric-grid">
+                                                <div class="metric-item">
+                                                    <div class="metric-value" x-text="stats.totalTasks"></div>
+                                                    <div class="metric-label">Total Tasks</div>
+                                                </div>
+                                                <div class="metric-item">
+                                                    <div class="metric-value" x-text="stats.activeTasks"></div>
+                                                    <div class="metric-label">Active</div>
+                                                </div>
+                                                <div class="metric-item">
+                                                    <div class="metric-value" x-text="stats.completedTasks"></div>
+                                                    <div class="metric-label">Completed</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </template>
+
+                                    <!-- Team Members Widget -->
+                                    <template x-if="widget.type === 'teamMembers'">
+                                        <div>
+                                            <div class="metric-value text-center" x-text="teamMembers.length"></div>
+                                            <div class="metric-label text-center">Team Members</div>
+                                            <div class="widget-list" style="margin-top: 16px;">
+                                                <template x-for="member in teamMembers.slice(0, 5)" :key="member.id">
+                                                    <div class="widget-list-item">
+                                                        <span x-text="member.name || member.displayName || member.username"></span>
+                                                        <span style="font-size: 12px; color: var(--text-secondary);" x-text="member.role"></span>
+                                                    </div>
+                                                </template>
+                                            </div>
+                                        </div>
+                                    </template>
+
+                                    <!-- Recent Activity Widget -->
+                                    <template x-if="widget.type === 'recentActivity'">
+                                        <div>
+                                            <div class="widget-list">
+                                                <template x-for="activity in recentActivity.slice(0, 8)" :key="activity.id">
+                                                    <div class="widget-list-item">
+                                                        <div style="flex: 1;">
+                                                            <div x-text="activity.description" style="font-size: 14px;"></div>
+                                                            <div x-text="formatTime(activity.timestamp)" style="font-size: 12px; color: var(--text-secondary);"></div>
+                                                        </div>
+                                                    </div>
+                                                </template>
+                                            </div>
+                                        </div>
+                                    </template>
+
+                                    <!-- Mini Kanban Widget -->
+                                    <template x-if="widget.type === 'kanbanMini'">
+                                        <div>
+                                            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; height: 100%;">
+                                                <template x-for="status in kanbanStatuses" :key="status.id">
+                                                    <div style="background: var(--hover-bg); border-radius: 8px; padding: 8px;">
+                                                        <div :class="'status-' + status.id" style="padding: 4px 8px; border-radius: 4px; text-align: center; font-size: 12px; margin-bottom: 8px;">
+                                                            <span x-text="status.name"></span>
+                                                            <span x-text="'(' + getTasksByStatus(status.id).length + ')'"></span>
+                                                        </div>
+                                                        <div style="max-height: 150px; overflow-y: auto;">
+                                                            <template x-for="task in getTasksByStatus(status.id).slice(0, 3)" :key="task.id">
+                                                                <div style="background: var(--card-bg); padding: 6px; margin-bottom: 4px; border-radius: 4px; font-size: 12px;">
+                                                                    <div x-text="task.title" style="font-weight: 500;"></div>
+                                                                    <div x-text="task.assignee ? getAssigneeName(task.assignee) : 'Unassigned'" style="font-size: 10px; color: var(--text-secondary);"></div>
+                                                                </div>
+                                                            </template>
+                                                        </div>
+                                                    </div>
+                                                </template>
+                                            </div>
+                                        </div>
+                                    </template>
+
+                                    <!-- Performance Metrics Widget -->
+                                    <template x-if="widget.type === 'performanceMetrics'">
+                                        <div>
+                                            <div class="metric-grid">
+                                                <div class="metric-item">
+                                                    <div class="metric-value" x-text="metricsData?.performance?.gc_runs || 0"></div>
+                                                    <div class="metric-label">GC Runs</div>
+                                                </div>
+                                                <div class="metric-item">
+                                                    <div class="metric-value" x-text="((metricsData?.performance?.last_gc_pause_ns || 0) / 1000000).toFixed(2) + 'ms'"></div>
+                                                    <div class="metric-label">Last GC Pause</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+                        </template>
                     </div>
                 </div>
 
@@ -2076,9 +2579,73 @@
             </div>
         </div>
         
+        <!-- Dashboard Settings Modal -->
+        <div x-show="showDashboardSettings" 
+             x-transition:enter="transition ease-out duration-300"
+             x-transition:enter-start="opacity-0 transform scale-90"
+             x-transition:enter-end="opacity-100 transform scale-100"
+             x-transition:leave="transition ease-in duration-200"
+             x-transition:leave-start="opacity-100 transform scale-100"
+             x-transition:leave-end="opacity-0 transform scale-90"
+             class="modal-backdrop"
+             @click.self="showDashboardSettings = false"
+             style="display: none;">
+            <div class="modal-container">
+                <div class="modal-header">
+                    <h3>
+                        <i class="fas fa-cog" style="color: var(--primary-color); margin-right: 0.5rem;"></i>
+                        Dashboard Settings
+                    </h3>
+                    <button @click="showDashboardSettings = false" class="modal-close">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+
+                <div class="modal-body">
+                    <form @submit.prevent="saveNewDashboard()">
+                        <div>
+                            <label>Dashboard Name</label>
+                            <input type="text" x-model="dashboardForm.name" required placeholder="e.g., Project Overview">
+                        </div>
+                        <div>
+                            <label>Description</label>
+                            <textarea x-model="dashboardForm.description" rows="3" placeholder="Describe this dashboard's purpose..."></textarea>
+                        </div>
+                        <div>
+                            <label>Icon</label>
+                            <select x-model="dashboardForm.icon">
+                                <option value="fa-tachometer-alt">Dashboard</option>
+                                <option value="fa-chart-line">Analytics</option>
+                                <option value="fa-tasks">Tasks</option>
+                                <option value="fa-users">Team</option>
+                                <option value="fa-folder">Projects</option>
+                                <option value="fa-server">System</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label>
+                                <input type="checkbox" x-model="dashboardForm.isPublic">
+                                Make this dashboard public
+                            </label>
+                        </div>
+
+                        <div class="modal-footer" style="margin-top: 1.5rem;">
+                            <button type="button" class="btn-cancel" @click="showDashboardSettings = false">
+                                Cancel
+                            </button>
+                            <button type="submit" class="btn-primary" :disabled="loading">
+                                <span x-show="!loading">Save Dashboard</span>
+                                <span x-show="loading">Saving...</span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script src="worca-api.js"></script>
+    <script src="worca-widgets.js"></script>
     <script src="worca.js"></script>
 </body>
 </html>

@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Worca Metrics Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.12.3/dist/cdn.min.js" defer></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --bg-gradient: linear-gradient(135deg, #fefefe 0%, #f8fafc 25%, #f1f5f9 50%, #e2e8f0 75%, #cbd5e1 100%);
+            --text-primary: #0f172a;
+            --text-secondary: #475569;
+            --primary-color: #0891b2;
+            --card-bg: rgba(255, 255, 255, 0.98);
+            --shadow: rgba(8, 145, 178, 0.15);
+            --border-color: rgba(6, 182, 212, 0.2);
+        }
+
+        [data-theme="dark"] {
+            --bg-gradient: linear-gradient(135deg, #020617 0%, #0f172a 25%, #1e293b 50%, #334155 75%, #475569 100%);
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --primary-color: #06b6d4;
+            --card-bg: rgba(30, 41, 59, 0.95);
+            --shadow: rgba(0, 0, 0, 0.4);
+            --border-color: rgba(6, 182, 212, 0.3);
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--bg-gradient);
+            color: var(--text-primary);
+            margin: 0;
+            padding: 20px;
+            transition: all 0.3s ease;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: var(--card-bg);
+            border-radius: 12px;
+            box-shadow: 0 2px 8px var(--shadow);
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .metric-card {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px var(--shadow);
+            border: 1px solid var(--border-color);
+        }
+
+        .metric-value {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: var(--primary-color);
+            margin: 10px 0;
+        }
+
+        .metric-label {
+            font-size: 0.9em;
+            color: var(--text-secondary);
+        }
+
+        .chart-container {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px var(--shadow);
+            position: relative;
+            height: 300px;
+        }
+        
+        .chart-wrapper {
+            position: relative;
+            height: 250px;
+        }
+
+        .chart-title {
+            font-size: 1.2em;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: var(--text-primary);
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-secondary);
+        }
+
+        .error {
+            background: #fee;
+            color: #c00;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+
+        .refresh-btn {
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: all 0.3s ease;
+        }
+
+        .refresh-btn:hover {
+            opacity: 0.9;
+        }
+    </style>
+</head>
+<body x-data="metricsApp()">
+    <div class="container">
+        <div class="header">
+            <div>
+                <h1 style="margin: 0; color: var(--text-primary);">
+                    <i class="fas fa-chart-line"></i> Worca Metrics Dashboard
+                </h1>
+                <p style="margin: 5px 0 0 0; color: var(--text-secondary);">Real-time project and team analytics</p>
+            </div>
+            <button class="refresh-btn" @click="loadMetrics()">
+                <i class="fas fa-sync-alt"></i> Refresh
+            </button>
+        </div>
+
+        <div x-show="loading" class="loading">
+            <i class="fas fa-spinner fa-spin fa-2x"></i>
+            <p>Loading metrics...</p>
+        </div>
+
+        <div x-show="error" class="error" x-text="error"></div>
+
+        <div x-show="!loading && !error">
+            <!-- Summary Cards -->
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-label">Total Tasks Completed</div>
+                    <div class="metric-value" x-text="currentMetrics.tasksCompleted || 0"></div>
+                    <div class="metric-label">This Sprint</div>
+                </div>
+                
+                <div class="metric-card">
+                    <div class="metric-label">Team Productivity</div>
+                    <div class="metric-value">
+                        <span x-text="(currentMetrics.teamProductivity || 0).toFixed(1)"></span>%
+                    </div>
+                    <div class="metric-label">Current Sprint</div>
+                </div>
+                
+                <div class="metric-card">
+                    <div class="metric-label">Sprint Velocity</div>
+                    <div class="metric-value" x-text="currentMetrics.sprintVelocity || 0"></div>
+                    <div class="metric-label">Story Points</div>
+                </div>
+                
+                <div class="metric-card">
+                    <div class="metric-label">Active Team Members</div>
+                    <div class="metric-value" x-text="currentMetrics.activeMembers || 0"></div>
+                    <div class="metric-label">Currently Working</div>
+                </div>
+            </div>
+
+            <!-- Charts -->
+            <div class="chart-container">
+                <div class="chart-title">Task Status Distribution</div>
+                <div class="chart-wrapper">
+                    <canvas id="taskStatusChart"></canvas>
+                </div>
+            </div>
+
+            <div class="chart-container">
+                <div class="chart-title">Team Member Utilization</div>
+                <div class="chart-wrapper">
+                    <canvas id="utilizationChart"></canvas>
+                </div>
+            </div>
+
+            <div class="chart-container">
+                <div class="chart-title">Epic Progress</div>
+                <div class="chart-wrapper">
+                    <canvas id="epicProgressChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    function metricsApp() {
+        return {
+            loading: true,
+            error: null,
+            metricsData: null,
+            currentMetrics: {},
+            charts: {},
+            
+            async init() {
+                await this.loadMetrics();
+                setInterval(() => this.loadMetrics(), 30000); // Refresh every 30 seconds
+            },
+            
+            async loadMetrics() {
+                this.loading = true;
+                this.error = null;
+                
+                try {
+                    const token = localStorage.getItem('authToken');
+                    if (!token) {
+                        // Try to get from parent window if in iframe
+                        if (window.parent && window.parent !== window) {
+                            const parentToken = window.parent.localStorage.getItem('authToken');
+                            if (parentToken) {
+                                localStorage.setItem('authToken', parentToken);
+                            }
+                        }
+                    }
+                    
+                    const response = await fetch('/api/v1/entities/list?tags=type:metric', {
+                        headers: {
+                            'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+                        }
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error('Failed to load metrics');
+                    }
+                    
+                    const data = await response.json();
+                    this.processMetrics(data.entities || []);
+                    this.updateCharts();
+                    
+                } catch (err) {
+                    this.error = err.message;
+                    console.error('Error loading metrics:', err);
+                } finally {
+                    this.loading = false;
+                }
+            },
+            
+            processMetrics(entities) {
+                // Initialize metrics
+                const metrics = {
+                    tasksCompleted: 0,
+                    teamProductivity: 0,
+                    sprintVelocity: 0,
+                    activeMembers: 0,
+                    taskStatus: {},
+                    memberUtilization: {},
+                    epicProgress: {}
+                };
+                
+                // Process each metric entity
+                entities.forEach(entity => {
+                    const tags = entity.tags || [];
+                    let metricName = '';
+                    let value = 0;
+                    
+                    // Extract metric name and value
+                    tags.forEach(tag => {
+                        if (tag.startsWith('metric:name:')) {
+                            metricName = tag.replace('metric:name:', '');
+                        }
+                        if (tag.startsWith('metric:current:')) {
+                            const parts = tag.split(':');
+                            if (parts.length >= 4) {
+                                value = parseFloat(parts[3]);
+                            }
+                        }
+                    });
+                    
+                    // Update metrics based on type
+                    switch(metricName) {
+                        case 'worca_tasks_completed':
+                            metrics.tasksCompleted = Math.max(metrics.tasksCompleted, value);
+                            break;
+                        case 'worca_team_productivity':
+                            metrics.teamProductivity = Math.max(metrics.teamProductivity, value);
+                            break;
+                        case 'worca_sprint_velocity':
+                            metrics.sprintVelocity = Math.max(metrics.sprintVelocity, value);
+                            break;
+                        case 'worca_task_status':
+                            const status = this.extractLabel(tags, 'status');
+                            if (status) {
+                                metrics.taskStatus[status] = value;
+                            }
+                            break;
+                        case 'worca_member_utilization':
+                            const member = this.extractLabel(tags, 'member');
+                            if (member) {
+                                metrics.memberUtilization[member] = value;
+                                metrics.activeMembers++;
+                            }
+                            break;
+                        case 'worca_epic_progress':
+                            const epic = this.extractLabel(tags, 'epic');
+                            if (epic) {
+                                metrics.epicProgress[epic] = value;
+                            }
+                            break;
+                    }
+                });
+                
+                this.currentMetrics = metrics;
+            },
+            
+            extractLabel(tags, labelName) {
+                for (const tag of tags) {
+                    if (tag.startsWith(`metric:label:${labelName}:`)) {
+                        return tag.split(':')[3];
+                    }
+                }
+                return null;
+            },
+            
+            updateCharts() {
+                // Task Status Chart
+                this.updateTaskStatusChart();
+                
+                // Utilization Chart
+                this.updateUtilizationChart();
+                
+                // Epic Progress Chart
+                this.updateEpicProgressChart();
+            },
+            
+            updateTaskStatusChart() {
+                const ctx = document.getElementById('taskStatusChart').getContext('2d');
+                
+                if (this.charts.taskStatus) {
+                    this.charts.taskStatus.destroy();
+                }
+                
+                const data = this.currentMetrics.taskStatus || {};
+                
+                this.charts.taskStatus = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: Object.keys(data),
+                        datasets: [{
+                            data: Object.values(data),
+                            backgroundColor: [
+                                '#3b82f6', // todo - blue
+                                '#f59e0b', // in_progress - amber
+                                '#10b981', // done - green
+                                '#ef4444'  // blocked - red
+                            ]
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'right'
+                            }
+                        }
+                    }
+                });
+            },
+            
+            updateUtilizationChart() {
+                const ctx = document.getElementById('utilizationChart').getContext('2d');
+                
+                if (this.charts.utilization) {
+                    this.charts.utilization.destroy();
+                }
+                
+                const data = this.currentMetrics.memberUtilization || {};
+                
+                this.charts.utilization = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: Object.keys(data),
+                        datasets: [{
+                            label: 'Utilization %',
+                            data: Object.values(data),
+                            backgroundColor: '#0891b2'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                max: 100
+                            }
+                        }
+                    }
+                });
+            },
+            
+            updateEpicProgressChart() {
+                const ctx = document.getElementById('epicProgressChart').getContext('2d');
+                
+                if (this.charts.epicProgress) {
+                    this.charts.epicProgress.destroy();
+                }
+                
+                const data = this.currentMetrics.epicProgress || {};
+                
+                this.charts.epicProgress = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: Object.keys(data).map(k => k.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())),
+                        datasets: [{
+                            label: 'Progress %',
+                            data: Object.values(data),
+                            backgroundColor: '#10b981'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        indexAxis: 'y',
+                        scales: {
+                            x: {
+                                beginAtZero: true,
+                                max: 100
+                            }
+                        }
+                    }
+                });
+            }
+        }
+    }
+    </script>
+</body>
+</html>

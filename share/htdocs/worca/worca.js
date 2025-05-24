@@ -87,6 +87,34 @@ function worca() {
             teamMembers: 0
         },
 
+        // Widget System
+        dashboards: [],
+        currentDashboard: null,
+        widgets: [],
+        editMode: false,
+        showAddWidget: false,
+        showDashboardSettings: false,
+        selectedCategory: null,
+        metricsData: null,
+        metricsRefreshInterval: null,
+        
+        // Widget Registry Access
+        get WIDGET_REGISTRY() {
+            return window.WIDGET_REGISTRY || {};
+        },
+        
+        get WIDGET_CATEGORIES() {
+            return window.WIDGET_CATEGORIES || {};
+        },
+        
+        // Dashboard Form
+        dashboardForm: {
+            name: '',
+            description: '',
+            icon: 'fa-tachometer-alt',
+            isPublic: false
+        },
+
         // Initialization
         async init() {
             if (this.initialized) {
@@ -103,6 +131,9 @@ function worca() {
                 
                 // Load user preferences
                 this.loadUserPreferences();
+                
+                // Initialize widget system
+                this.initializeWidgets();
                 
                 // Check authentication (will show login screen if not authenticated)
                 await this.checkAuth();
@@ -1922,6 +1953,315 @@ function worca() {
             } catch (error) {
                 console.error('EntityDB API Error:', error);
                 throw error;
+            }
+        },
+
+        // Widget System Methods
+        initializeWidgets() {
+            console.log('🧩 ========== INITIALIZING WIDGET SYSTEM ==========');
+            
+            // Load dashboards from storage first
+            console.log('📂 Loading dashboards from storage...');
+            this.loadDashboardsFromStorage();
+            console.log(`📂 Loaded ${this.dashboards.length} dashboards from storage`);
+            
+            // Create default dashboard if none exist
+            if (this.dashboards.length === 0) {
+                console.log('🆕 Creating default dashboard - no dashboards found');
+                
+                const defaultDashboard = {
+                    id: this.generateId(),
+                    name: 'Main Dashboard',
+                    icon: 'tachometer-alt',
+                    widgets: [
+                        {
+                            id: this.generateId(),
+                            type: 'systemInfo',
+                            x: 0, y: 0, w: 3, h: 2
+                        },
+                        {
+                            id: this.generateId(),
+                            type: 'taskOverview',
+                            x: 3, y: 0, w: 3, h: 2
+                        },
+                        {
+                            id: this.generateId(),
+                            type: 'teamMembers',
+                            x: 6, y: 0, w: 3, h: 2
+                        }
+                    ]
+                };
+                
+                console.log('🆕 Default dashboard created:', defaultDashboard);
+                
+                this.dashboards = [defaultDashboard];
+                this.currentDashboard = this.dashboards[0];
+                this.widgets = [...this.currentDashboard.widgets];
+                
+                console.log(`🆕 Set current dashboard: ${this.currentDashboard.name} with ${this.widgets.length} widgets`);
+                
+                // Save the default dashboard
+                this.saveDashboard();
+            } else {
+                console.log(`✅ Using existing dashboards - setting current to first one`);
+                if (!this.currentDashboard && this.dashboards.length > 0) {
+                    this.currentDashboard = this.dashboards[0];
+                    this.widgets = [...this.currentDashboard.widgets];
+                    console.log(`✅ Set current dashboard: ${this.currentDashboard.name} with ${this.widgets.length} widgets`);
+                }
+            }
+            
+            console.log('📊 Starting metrics refresh...');
+            this.refreshMetrics();
+            this.startMetricsRefresh();
+            
+            this.logWidgetState('INITIALIZATION_COMPLETE');
+            console.log('🧩 ========== WIDGET SYSTEM INITIALIZATION DONE ==========');
+        },
+
+        async refreshMetrics() {
+            try {
+                const response = await fetch('/api/v1/system/metrics');
+                if (response.ok) {
+                    this.metricsData = await response.json();
+                }
+            } catch (error) {
+                console.error('Failed to fetch metrics:', error);
+            }
+        },
+
+        startMetricsRefresh() {
+            this.metricsRefreshInterval = setInterval(() => {
+                this.refreshMetrics();
+            }, 30000);
+        },
+
+        getWidgetIcon(type) {
+            const registry = window.WIDGET_REGISTRY || {};
+            return registry[type]?.icon?.replace('fa-', '') || 'cube';
+        },
+
+        getWidgetName(type) {
+            const registry = window.WIDGET_REGISTRY || {};
+            return registry[type]?.name || 'Unknown Widget';
+        },
+
+        renderWidgetContent(widget) {
+            // Simple widget content rendering
+            switch (widget.type) {
+                case 'systemInfo':
+                    return this.metricsData ? `
+                        <div>
+                            <div><strong>CPU:</strong> ${(this.metricsData.cpu_percent || 0).toFixed(1)}%</div>
+                            <div><strong>Memory:</strong> ${this.formatBytes(this.metricsData.memory_used || 0)}</div>
+                            <div><strong>Uptime:</strong> ${this.formatDuration(this.metricsData.uptime_seconds || 0)}</div>
+                        </div>
+                    ` : '<div>Loading...</div>';
+                case 'taskOverview':
+                    return `
+                        <div>
+                            <div><strong>Total:</strong> ${this.stats.totalTasks}</div>
+                            <div><strong>Active:</strong> ${this.stats.activeTasks}</div>
+                            <div><strong>Done:</strong> ${this.stats.completedTasks}</div>
+                        </div>
+                    `;
+                case 'teamMembers':
+                    return `
+                        <div>
+                            <div><strong>Team Size:</strong> ${this.teamMembers.length}</div>
+                            <div>Active members working on ${this.stats.activeTasks} tasks</div>
+                        </div>
+                    `;
+                default:
+                    return '<div>Widget content loading...</div>';
+            }
+        },
+
+        formatBytes(bytes) {
+            if (!bytes) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        },
+
+        formatDuration(seconds) {
+            if (!seconds) return '0s';
+            const days = Math.floor(seconds / 86400);
+            const hours = Math.floor((seconds % 86400) / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            
+            if (days > 0) return `${days}d ${hours}h`;
+            if (hours > 0) return `${hours}h ${minutes}m`;
+            return `${minutes}m`;
+        },
+
+        // Dashboard Management Methods
+        toggleEditMode() {
+            console.log(`🔧 TOGGLE EDIT MODE - Before: ${this.editMode}`);
+            this.editMode = !this.editMode;
+            console.log(`🔧 TOGGLE EDIT MODE - After: ${this.editMode}`);
+            
+            this.logWidgetState('EDIT_MODE_TOGGLE');
+            
+            if (!this.editMode) {
+                console.log(`💾 Exiting edit mode - saving dashboard`);
+                this.saveDashboard();
+            }
+        },
+
+        async saveDashboard() {
+            if (!this.currentDashboard) return;
+            
+            try {
+                // In a real implementation, this would save to EntityDB
+                console.log('💾 Saving dashboard:', this.currentDashboard.name);
+                
+                // Update the dashboard in the dashboards array
+                const index = this.dashboards.findIndex(d => d.id === this.currentDashboard.id);
+                if (index >= 0) {
+                    this.dashboards[index] = { ...this.currentDashboard };
+                }
+                
+                // Save to localStorage as fallback
+                localStorage.setItem('worca_dashboards', JSON.stringify(this.dashboards));
+                
+                console.log('✅ Dashboard saved successfully');
+            } catch (error) {
+                console.error('❌ Failed to save dashboard:', error);
+            }
+        },
+
+        addWidget(type) {
+            console.log(`➕ ADD WIDGET CALLED - Type: ${type}`);
+            
+            if (!this.currentDashboard) {
+                console.error(`❌ ADD WIDGET FAILED - No current dashboard`);
+                return;
+            }
+            
+            console.log(`📋 Current dashboard: ${this.currentDashboard.name}`);
+            console.log(`📋 Dashboard has ${this.currentDashboard.widgets.length} widgets before adding`);
+            
+            // Get widget definition
+            const widgetDef = this.WIDGET_REGISTRY[type] || {};
+            console.log(`🔍 Widget definition found:`, widgetDef);
+            
+            // Simple positioning - just add to end of grid
+            const existingWidgets = this.currentDashboard.widgets.length;
+            const newWidget = {
+                id: this.generateId(),
+                type: type,
+                x: (existingWidgets % 4) * 3, // Simple 4-column layout
+                y: Math.floor(existingWidgets / 4) * 2,
+                w: 3, // Simple fixed width
+                h: 2  // Simple fixed height
+            };
+            
+            console.log(`🆕 Created new widget:`, newWidget);
+            
+            // Add to dashboard
+            this.currentDashboard.widgets.push(newWidget);
+            console.log(`📋 Dashboard now has ${this.currentDashboard.widgets.length} widgets`);
+            
+            // Update local widgets array
+            this.widgets = [...this.currentDashboard.widgets];
+            console.log(`🔄 Updated local widgets array to ${this.widgets.length} items`);
+            
+            // Close add widget panel
+            this.showAddWidget = false;
+            console.log(`✅ Set showAddWidget to false`);
+            
+            this.logWidgetState('ADD_WIDGET_COMPLETE');
+        },
+
+        removeWidget(widgetId) {
+            console.log(`🗑️ REMOVE WIDGET CALLED - ID: ${widgetId}`);
+            
+            if (!this.currentDashboard) {
+                console.error(`❌ REMOVE WIDGET FAILED - No current dashboard`);
+                return;
+            }
+            
+            console.log(`📋 Dashboard has ${this.currentDashboard.widgets.length} widgets before removal`);
+            
+            const beforeCount = this.currentDashboard.widgets.length;
+            this.currentDashboard.widgets = this.currentDashboard.widgets.filter(w => w.id !== widgetId);
+            const afterCount = this.currentDashboard.widgets.length;
+            
+            console.log(`📋 Removed ${beforeCount - afterCount} widgets`);
+            console.log(`📋 Dashboard now has ${afterCount} widgets`);
+            
+            this.widgets = [...this.currentDashboard.widgets];
+            console.log(`🔄 Updated local widgets array to ${this.widgets.length} items`);
+            
+            this.logWidgetState('REMOVE_WIDGET_COMPLETE');
+        },
+
+        createDashboard() {
+            const newDashboard = {
+                id: this.generateId(),
+                name: this.dashboardForm.name || 'New Dashboard',
+                icon: this.dashboardForm.icon || 'tachometer-alt',
+                widgets: []
+            };
+            
+            this.dashboards.push(newDashboard);
+            this.currentDashboard = newDashboard;
+            this.widgets = [];
+            
+            // Reset form
+            this.dashboardForm = {
+                name: '',
+                description: '',
+                icon: 'fa-tachometer-alt',
+                isPublic: false
+            };
+            
+            this.showDashboardSettings = false;
+            console.log(`📊 Created new dashboard: ${newDashboard.name}`);
+        },
+
+        // Alias for HTML form
+        saveNewDashboard() {
+            this.createDashboard();
+        },
+
+        switchDashboard(dashboard) {
+            this.currentDashboard = dashboard;
+            this.widgets = [...dashboard.widgets];
+            console.log(`🔄 Switched to dashboard: ${dashboard.name}`);
+        },
+
+        loadDashboardsFromStorage() {
+            try {
+                const stored = localStorage.getItem('worca_dashboards');
+                if (stored) {
+                    this.dashboards = JSON.parse(stored);
+                    if (this.dashboards.length > 0 && !this.currentDashboard) {
+                        this.currentDashboard = this.dashboards[0];
+                        this.widgets = [...this.currentDashboard.widgets];
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to load dashboards from storage:', error);
+            }
+        },
+
+        // Simple Widget System - No Complex Grid
+        logWidgetState(action) {
+            console.log(`🧩 WIDGET ${action.toUpperCase()}:`);
+            console.log(`   - Current Dashboard:`, this.currentDashboard?.name || 'NONE');
+            console.log(`   - Dashboard Widgets:`, this.currentDashboard?.widgets?.length || 0);
+            console.log(`   - Local Widgets Array:`, this.widgets.length);
+            console.log(`   - Edit Mode:`, this.editMode);
+            console.log(`   - Show Add Widget:`, this.showAddWidget);
+            console.log(`   - Available Widget Types:`, Object.keys(this.WIDGET_REGISTRY).length);
+            
+            if (this.currentDashboard?.widgets) {
+                this.currentDashboard.widgets.forEach((widget, index) => {
+                    console.log(`   - Widget ${index + 1}: ${widget.type} (${widget.id}) at ${widget.x},${widget.y} size ${widget.w}x${widget.h}`);
+                });
             }
         }
     };
