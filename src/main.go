@@ -202,6 +202,19 @@ func main() {
 	case *binary.WALOnlyRepository:
 		// WALOnlyRepository embeds EntityRepository
 		binaryRepo = repo.EntityRepository
+	case *binary.CachedRepository:
+		// CachedRepository wraps another repository, unwrap it
+		// We need to get the underlying repository
+		switch underlying := repo.EntityRepository.(type) {
+		case *binary.TemporalRepository:
+			binaryRepo = underlying.HighPerformanceRepository.EntityRepository
+		case *binary.HighPerformanceRepository:
+			binaryRepo = underlying.EntityRepository
+		case *binary.EntityRepository:
+			binaryRepo = underlying
+		default:
+			logger.Fatalf("Unsupported underlying repository type in CachedRepository: %T", underlying)
+		}
 	default:
 		logger.Fatalf("Unsupported repository type for relationships: %T", entityRepo)
 	}
@@ -281,13 +294,18 @@ func main() {
 	// Temporal test endpoint
 	apiRouter.HandleFunc("/test/temporal/status", server.entityHandler.TestTemporalFixHandler).Methods("GET")
 	
+	// Create optimized handler for performance-critical endpoints
+	optimizedHandler := api.NewOptimizedEntityHandler(server.entityRepo)
+	
 	// Entity API routes with RBAC
 	apiRouter.HandleFunc("/entities", server.handleEntities).Methods("GET", "POST")
-	apiRouter.HandleFunc("/entities/list", entityHandlerRBAC.ListEntitiesWithRBAC()).Methods("GET")
+	// Use optimized handlers for list and query
+	apiRouter.HandleFunc("/entities/list", api.RBACMiddleware(server.entityRepo, server.sessionManager, api.PermEntityView)(optimizedHandler.ListEntitiesOptimized)).Methods("GET")
+	apiRouter.HandleFunc("/entities/query", api.RBACMiddleware(server.entityRepo, server.sessionManager, api.PermEntityView)(optimizedHandler.QueryEntitiesOptimized)).Methods("GET")
+	// Keep regular handlers for other operations
 	apiRouter.HandleFunc("/entities/get", entityHandlerRBAC.GetEntityWithRBAC()).Methods("GET")
 	apiRouter.HandleFunc("/entities/create", entityHandlerRBAC.CreateEntityWithRBAC()).Methods("POST")
 	apiRouter.HandleFunc("/entities/update", entityHandlerRBAC.UpdateEntityWithRBAC()).Methods("PUT")
-	apiRouter.HandleFunc("/entities/query", entityHandlerRBAC.QueryEntitiesWithRBAC()).Methods("GET")
 
 	// Dataspace-aware Entity API routes with RBAC and Dataspace validation
 	dataspaceEntityHandler := api.NewDataspaceEntityHandlerRBAC(server.entityHandler, server.entityRepo, server.sessionManager)
@@ -373,13 +391,23 @@ func main() {
 	apiRouter.HandleFunc("/admin/reindex", api.RBACMiddleware(server.entityRepo, server.sessionManager, api.RBACPermission{Resource: "admin", Action: "reindex"})(adminHandler.ReindexHandler)).Methods("POST")
 	apiRouter.HandleFunc("/admin/health", api.RBACMiddleware(server.entityRepo, server.sessionManager, api.RBACPermission{Resource: "admin", Action: "health"})(adminHandler.HealthCheckHandler)).Methods("GET")
 	
-	// Health endpoint (no authentication required)
-	healthHandler := api.NewHealthHandler(server.entityRepo)
+	// Health endpoint (no authentication required) - using optimized version
+	healthHandler := api.NewOptimizedHealthHandler(server.entityRepo)
 	router.HandleFunc("/health", healthHandler.Health).Methods("GET")
 	
 	// Metrics endpoint (Prometheus format, no authentication required)
 	metricsHandler := api.NewMetricsHandler(server.entityRepo)
 	router.HandleFunc("/metrics", metricsHandler.PrometheusMetrics).Methods("GET")
+	
+	// Temporal metrics collection endpoints
+	metricsCollector := api.NewMetricsCollector(server.entityRepo)
+	apiRouter.HandleFunc("/metrics/collect", api.RBACMiddleware(server.entityRepo, server.sessionManager, api.RBACPermission{Resource: "metrics", Action: "write"})(metricsCollector.CollectMetric)).Methods("POST")
+	apiRouter.HandleFunc("/metrics/history", api.RBACMiddleware(server.entityRepo, server.sessionManager, api.RBACPermission{Resource: "metrics", Action: "read"})(metricsCollector.GetMetricHistory)).Methods("GET")
+	apiRouter.HandleFunc("/metrics/current", api.RBACMiddleware(server.entityRepo, server.sessionManager, api.RBACPermission{Resource: "metrics", Action: "read"})(metricsCollector.GetCurrentMetrics)).Methods("GET")
+	
+	// Worca dashboard metrics endpoint
+	worcaMetricsHandler := api.NewWorcaMetricsHandler(server.entityRepo)
+	apiRouter.HandleFunc("/worca/metrics", api.RBACMiddleware(server.entityRepo, server.sessionManager, api.RBACPermission{Resource: "metrics", Action: "read"})(worcaMetricsHandler.GetDashboardMetrics)).Methods("GET")
 	
 	// System metrics endpoint (EntityDB-specific, no authentication required)
 	systemMetricsHandler := api.NewSystemMetricsHandler(server.entityRepo)

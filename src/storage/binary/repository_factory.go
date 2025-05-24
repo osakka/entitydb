@@ -4,6 +4,7 @@ import (
 	"entitydb/models"
 	"entitydb/logger"
 	"os"
+	"time"
 )
 
 // RepositoryFactory creates the appropriate repository based on configuration
@@ -11,70 +12,79 @@ type RepositoryFactory struct{}
 
 // CreateRepository creates either a regular, high-performance, or temporal repository
 func (f *RepositoryFactory) CreateRepository(dataPath string) (models.EntityRepository, error) {
+	var baseRepo models.EntityRepository
+	var err error
+	
 	// Check environment variables
 	disableHighPerf := os.Getenv("ENTITYDB_DISABLE_HIGH_PERFORMANCE") == "true"
 	enableHighPerf := os.Getenv("ENTITYDB_HIGH_PERFORMANCE") == "true"
 	enableTemporal := os.Getenv("ENTITYDB_TEMPORAL") != "false" // Temporal by default
 	enableWALOnly := os.Getenv("ENTITYDB_WAL_ONLY") == "true" // New WAL-only mode
-	enableDataspace := os.Getenv("ENTITYDB_DATASPACE") == "true" // New dataspace mode
+	enableCache := os.Getenv("ENTITYDB_ENABLE_CACHE") != "false" // Cache by default
 	
-	// Dataspace mode for isolated indexes
-	if enableDataspace {
-		logger.Info("Creating DataspaceRepository for isolated dataspace indexes")
-		dsRepo, err := NewDataspaceRepository(dataPath)
-		if err != nil {
-			logger.Error("Failed to create dataspace repository: %v, falling back to temporal", err)
-			return NewTemporalRepository(dataPath)
+	// Determine cache settings
+	cacheTTL := 5 * time.Minute
+	if ttlStr := os.Getenv("ENTITYDB_CACHE_TTL"); ttlStr != "" {
+		if ttl, err := time.ParseDuration(ttlStr); err == nil {
+			cacheTTL = ttl
 		}
-		return dsRepo, nil
 	}
 	
-	// WAL-only mode for maximum write performance
-	if enableWALOnly {
+	// Create the base repository based on configuration
+	switch {
+	case enableTemporal && enableHighPerf:
+		logger.Info("Creating TemporalRepository with high-performance optimizations")
+		baseRepo, err = NewTemporalRepository(dataPath)
+		if err != nil {
+			logger.Error("Failed to create temporal repository: %v", err)
+			return nil, err
+		}
+		
+	case enableWALOnly:
 		logger.Info("Creating WALOnlyRepository for O(1) write performance")
-		walRepo, err := NewWALOnlyRepository(dataPath)
+		baseRepo, err = NewWALOnlyRepository(dataPath)
 		if err != nil {
-			logger.Error("Failed to create WAL-only repository: %v, falling back to temporal", err)
-			return NewTemporalRepository(dataPath)
+			logger.Error("Failed to create WAL-only repository: %v", err)
+			return nil, err
 		}
-		return walRepo, nil
-	}
-	
-	// Explicit disable overrides enable
-	if disableHighPerf {
+		
+	case disableHighPerf:
 		logger.Info("Creating standard EntityRepository (high-performance disabled)")
-		return NewEntityRepository(dataPath)
-	}
-	
-	// If high performance mode is explicitly requested, use it regardless of temporal setting
-	if enableHighPerf {
+		baseRepo, err = NewEntityRepository(dataPath)
+		if err != nil {
+			return nil, err
+		}
+		
+	case enableHighPerf:
 		logger.Info("Creating HighPerformanceRepository (explicitly enabled)")
-		highPerfRepo, err := NewHighPerformanceRepository(dataPath)
+		baseRepo, err = NewHighPerformanceRepository(dataPath)
 		if err != nil {
-			logger.Error("Failed to create high-performance repository: %v, falling back to standard", err)
-			return NewEntityRepository(dataPath)
+			logger.Error("Failed to create high-performance repository: %v", err)
+			return nil, err
 		}
-		return highPerfRepo, nil
-	}
-	
-	if enableTemporal {
-		// Use temporal mode by default for maximum performance
+		
+	case enableTemporal:
 		logger.Info("Creating TemporalRepository for maximum temporal performance")
-		temporalRepo, err := NewTemporalRepository(dataPath)
+		baseRepo, err = NewTemporalRepository(dataPath)
 		if err != nil {
-			logger.Error("Failed to create temporal repository: %v, falling back to high-performance", err)
-			return NewHighPerformanceRepository(dataPath)
+			logger.Error("Failed to create temporal repository: %v", err)
+			return nil, err
 		}
-		return temporalRepo, nil
+		
+	default:
+		logger.Info("Creating HighPerformanceRepository for maximum performance")
+		baseRepo, err = NewHighPerformanceRepository(dataPath)
+		if err != nil {
+			logger.Error("Failed to create high-performance repository: %v", err)
+			return nil, err
+		}
 	}
 	
-	// Use regular high-performance mode
-	logger.Info("Creating HighPerformanceRepository for maximum performance")
-	highPerfRepo, err := NewHighPerformanceRepository(dataPath)
-	if err != nil {
-		logger.Error("Failed to create high-performance repository: %v, falling back to standard", err)
-		return NewEntityRepository(dataPath)
+	// Wrap with caching if enabled
+	if enableCache {
+		logger.Info("Wrapping repository with CachedRepository (TTL: %v)", cacheTTL)
+		return NewCachedRepository(baseRepo, cacheTTL), nil
 	}
 	
-	return highPerfRepo, nil
+	return baseRepo, nil
 }
