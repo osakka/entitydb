@@ -39,9 +39,9 @@ for i in 1 2 3; do
          -H "Authorization: Bearer $TOKEN" \
          -H "Content-Type: application/json" \
          -d "{
-           \"id\": \"worcha-$i\",
-           \"tags\": [\"dataspace:worcha\", \"type:task\", \"priority:p$i\"],
-           \"content\": \"Worcha task $i\"
+           \"id\": \"worca-$i\",
+           \"tags\": [\"dataspace:worca\", \"type:task\", \"priority:p$i\"],
+           \"content\": \"Worca task $i\"
          }" > /dev/null
     echo -n "W"
 done
@@ -77,11 +77,11 @@ echo
 echo "Testing dataspace isolation..."
 echo
 
-echo "1. Worcha dataspace (should have 3 tasks):"
-WORCHA_COUNT=$(curl -s -X GET "http://localhost:8085/api/v1/entities/list?tags=dataspace:worcha" \
+echo "1. Worca dataspace (should have 3 tasks):"
+WORCA_COUNT=$(curl -s -X GET "http://localhost:8085/api/v1/entities/list?tags=dataspace:worca" \
      -H "Authorization: Bearer $TOKEN" | jq -r 'length')
-echo "   Found: $WORCHA_COUNT entities"
-curl -s -X GET "http://localhost:8085/api/v1/entities/list?tags=dataspace:worcha" \
+echo "   Found: $WORCA_COUNT entities"
+curl -s -X GET "http://localhost:8085/api/v1/entities/list?tags=dataspace:worca" \
      -H "Authorization: Bearer $TOKEN" | jq -r '.[] | "   - " + .id + " (" + (.tags | join(", ")) + ")"'
 
 echo
@@ -105,8 +105,8 @@ TOTAL_COUNT=$(curl -s -X GET "http://localhost:8085/api/v1/entities/list" \
 echo "   Found: $TOTAL_COUNT entities"
 
 echo
-echo "5. Cross-filter: worcha + type:task (should have 3):"
-CROSS_COUNT=$(curl -s -X GET "http://localhost:8085/api/v1/entities/list?tags=dataspace:worcha,type:task&matchAll=true" \
+echo "5. Cross-filter: worca + type:task (should have 3):"
+CROSS_COUNT=$(curl -s -X GET "http://localhost:8085/api/v1/entities/list?tags=dataspace:worca,type:task&matchAll=true" \
      -H "Authorization: Bearer $TOKEN" | jq -r 'length')
 echo "   Found: $CROSS_COUNT entities"
 
@@ -117,12 +117,12 @@ ls -la var/test_final/dataspaces/
 echo
 echo "Test Summary:"
 echo "============"
-if [ "$WORCHA_COUNT" -eq 3 ] && [ "$METRICS_COUNT" -eq 2 ]; then
+if [ "$WORCA_COUNT" -eq 3 ] && [ "$METRICS_COUNT" -eq 2 ]; then
     echo "✅ PASS: Dataspace isolation is working correctly!"
 else
     echo "❌ FAIL: Dataspace isolation not working"
-    echo "   Expected: worcha=3, metrics=2"
-    echo "   Actual: worcha=$WORCHA_COUNT, metrics=$METRICS_COUNT"
+    echo "   Expected: worca=3, metrics=2"
+    echo "   Actual: worca=$WORCA_COUNT, metrics=$METRICS_COUNT"
 fi
 
 # Cleanup

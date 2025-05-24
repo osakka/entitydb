@@ -26,14 +26,14 @@ TOKEN=$(curl -s -X POST http://localhost:8085/api/v1/auth/login \
      -H "Content-Type: application/json" \
      -d '{"username":"admin","password":"admin"}' | jq -r '.token')
 
-# Create one entity in worcha
+# Create one entity in worca
 curl -s -X POST http://localhost:8085/api/v1/entities/create \
      -H "Authorization: Bearer $TOKEN" \
      -H "Content-Type: application/json" \
      -d '{
-       "id": "worcha-task",
-       "tags": ["dataspace:worcha", "type:task"],
-       "content": "A worcha task"
+       "id": "worca-task",
+       "tags": ["dataspace:worca", "type:task"],
+       "content": "A worca task"
      }' > /dev/null
 
 # Create one entity in metrics
@@ -49,9 +49,9 @@ curl -s -X POST http://localhost:8085/api/v1/entities/create \
 echo "Testing dataspace query..."
 echo
 
-# Query worcha dataspace
-echo "Querying dataspace:worcha..."
-curl -s -X GET "http://localhost:8085/api/v1/entities/list?tags=dataspace:worcha" \
+# Query worca dataspace
+echo "Querying dataspace:worca..."
+curl -s -X GET "http://localhost:8085/api/v1/entities/list?tags=dataspace:worca" \
      -H "Authorization: Bearer $TOKEN" | jq -r '.[] | .id'
 
 echo

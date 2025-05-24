@@ -40,14 +40,14 @@ echo
 echo "Test 1: Creating entities in different dataspaces"
 echo "================================================"
 
-# Create in worcha dataspace
-echo -n "Creating task in 'worcha' dataspace... "
+# Create in worca dataspace
+echo -n "Creating task in 'worca' dataspace... "
 RESULT=$(curl -s -X POST http://localhost:8085/api/v1/entities/create \
      -H "Authorization: Bearer $TOKEN" \
      -H "Content-Type: application/json" \
      -d '{
        "id": "task-001",
-       "tags": ["dataspace:worcha", "type:task", "status:open", "priority:high"],
+       "tags": ["dataspace:worca", "type:task", "status:open", "priority:high"],
        "content": "Implement dataspace feature"
      }')
 if [ -n "$RESULT" ]; then
@@ -84,9 +84,9 @@ echo
 echo "Test 2: Querying specific dataspaces"
 echo "===================================="
 
-# Query worcha dataspace
-echo "Querying 'worcha' dataspace:"
-curl -s -X GET "http://localhost:8085/api/v1/entities/list?tags=dataspace:worcha" \
+# Query worca dataspace
+echo "Querying 'worca' dataspace:"
+curl -s -X GET "http://localhost:8085/api/v1/entities/list?tags=dataspace:worca" \
      -H "Authorization: Bearer $TOKEN" | jq -r '.[] | "  - \(.id): \(.tags | join(", "))"'
 
 echo
@@ -107,13 +107,13 @@ curl -s -X POST http://localhost:8085/api/v1/entities/create \
      -H "Content-Type: application/json" \
      -d '{
        "id": "legacy-001",
-       "tags": ["hub:worcha", "type:legacy", "status:active"],
+       "tags": ["hub:worca", "type:legacy", "status:active"],
        "content": "Legacy hub entity"
      }' > /dev/null && echo "OK"
 
 # Query with hub tag (should work)
-echo "Querying with 'hub:worcha' (legacy):"
-curl -s -X GET "http://localhost:8085/api/v1/entities/list?tags=hub:worcha" \
+echo "Querying with 'hub:worca' (legacy):"
+curl -s -X GET "http://localhost:8085/api/v1/entities/list?tags=hub:worca" \
      -H "Authorization: Bearer $TOKEN" | jq -r '.[] | "  - \(.id)"'
 
 echo

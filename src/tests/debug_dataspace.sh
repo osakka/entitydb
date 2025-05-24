@@ -43,13 +43,13 @@ echo "Token: ${TOKEN:0:20}..."
 echo
 
 # Create a simple entity
-echo "Creating test entity in worcha dataspace..."
+echo "Creating test entity in worca dataspace..."
 CREATE_RESULT=$(curl -s -X POST http://localhost:8085/api/v1/entities/create \
      -H "Authorization: Bearer $TOKEN" \
      -H "Content-Type: application/json" \
      -d '{
        "id": "test-123",
-       "tags": ["dataspace:worcha", "type:test"],
+       "tags": ["dataspace:worca", "type:test"],
        "content": "Test entity"
      }')
 echo "Create result: $CREATE_RESULT"
@@ -61,8 +61,8 @@ curl -s -X GET "http://localhost:8085/api/v1/entities/list" \
      -H "Authorization: Bearer $TOKEN" | jq '.'
 
 echo
-echo "Query 2: List with dataspace:worcha tag..."
-curl -s -X GET "http://localhost:8085/api/v1/entities/list?tags=dataspace:worcha" \
+echo "Query 2: List with dataspace:worca tag..."
+curl -s -X GET "http://localhost:8085/api/v1/entities/list?tags=dataspace:worca" \
      -H "Authorization: Bearer $TOKEN" | jq '.'
 
 echo

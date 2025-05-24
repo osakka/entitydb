@@ -28,8 +28,8 @@ Transform EntityDB from a hub-centric model to a namespace-isolated architecture
 ├── entities.ebf              # Global entity storage (shared)
 ├── namespaces/
 │   ├── default.idx          # Default namespace index
-│   ├── worcha.idx           # Worcha namespace index
-│   ├── worcha.wal           # Worcha write-ahead log
+│   ├── worca.idx            # Worca namespace index
+│   ├── worca.wal            # Worca write-ahead log
 │   ├── metrics.idx          # Metrics namespace index
 │   ├── metrics.wal          # Metrics write-ahead log
 │   └── system.idx           # System namespace index
@@ -47,8 +47,8 @@ type Entity struct {
 }
 
 // Examples:
-// Old: tags = ["hub:worcha", "worcha:self:type:task", "worcha:trait:status:open"]
-// New: namespace = "worcha", tags = ["type:task", "status:open"]
+// Old: tags = ["hub:worca", "worca:self:type:task", "worca:trait:status:open"]
+// New: namespace = "worca", tags = ["type:task", "status:open"]
 ```
 
 ### Index Structure
@@ -56,7 +56,7 @@ type Entity struct {
 ```go
 type NamespaceIndex struct {
     Name      string
-    FilePath  string                    // /var/entitydb/namespaces/worcha.idx
+    FilePath  string                    // /var/entitydb/namespaces/worca.idx
     Entities  map[string]bool          // Entity IDs in this namespace
     TagIndex  map[string][]string      // tag -> entity IDs (namespace-local)
     TypeIndex map[string][]string      // type:value -> entity IDs
@@ -160,8 +160,8 @@ GET /api/v1/hubs/{hub}/entities → GET /api/v1/namespaces/{hub}/entities
 
 ## Example Use Cases
 
-### 1. Worcha (Workforce Management)
-- Namespace: `worcha`
+### 1. Worca (Workforce Management)
+- Namespace: `worca`
 - Contains: tasks, projects, teams
 - Benefits: Fast project queries, isolated from other systems
 

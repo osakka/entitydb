@@ -30,7 +30,7 @@ Enable with: `ENTITYDB_DATASPACE=true`
 - 10-100x improvement for dataspace-scoped queries
 
 **Key Benefits:**
-- `/var/entitydb/dataspaces/worcha.idx` - Worcha-only index
+- `/var/entitydb/dataspaces/worca.idx` - Worca-only index
 - `/var/entitydb/dataspaces/metrics.idx` - Metrics-only index
 - Queries only search within relevant dataspace
 - Parallel operations across dataspaces

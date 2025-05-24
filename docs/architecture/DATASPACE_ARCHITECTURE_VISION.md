@@ -29,7 +29,7 @@ EntityDB
 ### New: Federation of Data Universes
 ```
 EntityDB Federation
-  ├── dataspace: worcha/
+  ├── dataspace: worca/
   │   ├── Optimized for: Kanban workflows
   │   ├── Index strategy: By status/assignee
   │   └── Temporal: Task history tracking
@@ -62,7 +62,7 @@ type DataspaceConfig struct {
 ### 2. Specialized Storage Per Dataspace
 ```
 /var/entitydb/dataspaces/
-├── worcha/
+├── worca/
 │   ├── data.ebf         # Entities
 │   ├── status.idx       # Status-optimized index
 │   ├── assignee.idx     # Person-optimized index
@@ -82,8 +82,8 @@ type DataspaceConfig struct {
 ### 3. Query Optimization Per Dataspace
 
 ```go
-// Worcha dataspace - optimized for status queries
-worcha.Query("status:open AND assignee:john")  // Uses status.idx
+// Worca dataspace - optimized for status queries
+worca.Query("status:open AND assignee:john")  // Uses status.idx
 
 // Metrics dataspace - optimized for time ranges  
 metrics.Query("metric:cpu.usage AND time:[now-1h TO now]")  // Uses window.idx
@@ -123,7 +123,7 @@ type EntityDB struct {
 
 ## Dataspace Types (Built-in)
 
-### 1. Workflow Dataspace (like Worcha)
+### 1. Workflow Dataspace (like Worca)
 - Optimized for: State machines, task tracking
 - Indexes: Status, assignee, priority, deadlines
 - Special features: State transition tracking
@@ -168,11 +168,11 @@ type EntityDB struct {
 ### 4. Developer Experience
 ```go
 // Clear, intuitive API
-worcha := db.GetDataspace("worcha")
-tasks := worcha.Query("status:open")
+worca := db.GetDataspace("worca")
+tasks := worca.Query("status:open")
 
 // Not this mess:
-tasks := db.Query("hub:worcha AND worcha:self:status:open")
+tasks := db.Query("hub:worca AND worca:self:status:open")
 ```
 
 ## Migration Path

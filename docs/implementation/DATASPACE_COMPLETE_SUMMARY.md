@@ -11,10 +11,10 @@
 ### 2. Performance Benefits Realized ✅
 ```bash
 # Before (Global Index)
-Query "dataspace:worcha" → Searches ALL entities → O(n)
+Query "dataspace:worca" → Searches ALL entities → O(n)
 
 # After (Dataspace Index)  
-Query "dataspace:worcha" → Searches ONLY worcha.idx → O(m)
+Query "dataspace:worca" → Searches ONLY worca.idx → O(m)
 Where m << n (m = entities in dataspace, n = total entities)
 ```
 
@@ -30,13 +30,13 @@ Where m << n (m = entities in dataspace, n = total entities)
 ```bash
 Testing dataspace isolation...
 
-1. Worcha dataspace (should have 3 tasks):
+1. Worca dataspace (should have 3 tasks):
    Found: 3 entities ✅
 
 2. Metrics dataspace (should have 2 metrics):
    Found: 2 entities ✅
 
-3. Cross-filter: worcha + type:task (should have 3):
+3. Cross-filter: worca + type:task (should have 3):
    Found: 3 entities ✅
 
 Test Summary:
@@ -57,18 +57,18 @@ export ENTITYDB_DATASPACE=true
 POST /api/v1/entities/create
 {
   "id": "task-123",
-  "tags": ["dataspace:worcha", "type:task", "priority:high"],
+  "tags": ["dataspace:worca", "type:task", "priority:high"],
   "content": "Task content"
 }
 ```
 
 ### Query Specific Dataspace
 ```bash
-# Returns ONLY entities in worcha dataspace
-GET /api/v1/entities/list?tags=dataspace:worcha
+# Returns ONLY entities in worca dataspace
+GET /api/v1/entities/list?tags=dataspace:worca
 
 # Filter within dataspace
-GET /api/v1/entities/list?tags=dataspace:worcha,type:task&matchAll=true
+GET /api/v1/entities/list?tags=dataspace:worca,type:task&matchAll=true
 ```
 
 ## Architecture Benefits

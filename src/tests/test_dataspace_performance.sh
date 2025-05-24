@@ -33,15 +33,15 @@ echo "Creating entities across multiple dataspaces..."
 echo
 
 # Create many entities in different dataspaces
-echo -n "Creating worcha entities: "
+echo -n "Creating worca entities: "
 for i in $(seq 1 100); do
     curl -s -X POST http://localhost:8085/api/v1/entities/create \
          -H "Authorization: Bearer $TOKEN" \
          -H "Content-Type: application/json" \
          -d "{
-           \"id\": \"worcha-task-$i\",
-           \"tags\": [\"dataspace:worcha\", \"type:task\", \"project:p$((i % 10))\"],
-           \"content\": \"Task $i in worcha\"
+           \"id\": \"worca-task-$i\",
+           \"tags\": [\"dataspace:worca\", \"type:task\", \"project:p$((i % 10))\"],
+           \"content\": \"Task $i in worca\"
          }" > /dev/null
     [ $((i % 10)) -eq 0 ] && echo -n "."
 done
@@ -76,7 +76,7 @@ done
 echo " (50 created)"
 
 echo
-echo "Total: 351 entities (100 worcha + 200 metrics + 50 config + 1 admin)"
+echo "Total: 351 entities (100 worca + 200 metrics + 50 config + 1 admin)"
 echo
 
 # Test query performance
@@ -84,9 +84,9 @@ echo "Testing query performance..."
 echo
 
 # Test 1: Query specific dataspace
-echo "1. Querying worcha dataspace (100 entities):"
+echo "1. Querying worca dataspace (100 entities):"
 START=$(date +%s.%N)
-RESULT=$(curl -s -X GET "http://localhost:8085/api/v1/entities/list?tags=dataspace:worcha" \
+RESULT=$(curl -s -X GET "http://localhost:8085/api/v1/entities/list?tags=dataspace:worca" \
      -H "Authorization: Bearer $TOKEN" | jq -r 'length')
 END=$(date +%s.%N)
 TIME=$(echo "$END - $START" | bc)
@@ -114,9 +114,9 @@ echo "   Found: $RESULT entities in ${TIME}s"
 
 # Test 4: Complex filter within dataspace
 echo
-echo "4. Filtered query in worcha (project:p5):"
+echo "4. Filtered query in worca (project:p5):"
 START=$(date +%s.%N)
-RESULT=$(curl -s -X GET "http://localhost:8085/api/v1/entities/list?tags=dataspace:worcha,project:p5&matchAll=true" \
+RESULT=$(curl -s -X GET "http://localhost:8085/api/v1/entities/list?tags=dataspace:worca,project:p5&matchAll=true" \
      -H "Authorization: Bearer $TOKEN" | jq -r 'length')
 END=$(date +%s.%N)
 TIME=$(echo "$END - $START" | bc)

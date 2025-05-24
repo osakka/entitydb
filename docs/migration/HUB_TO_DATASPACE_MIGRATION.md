@@ -30,8 +30,8 @@ During transition, both work:
 - `GET /api/v1/dataspaces/{name}/entities`
 
 Tags support both:
-- `hub:worcha` (deprecated)
-- `dataspace:worcha` (preferred)
+- `hub:worca` (deprecated)
+- `dataspace:worca` (preferred)
 
 ## Breaking Changes
 - API endpoints change (with compatibility redirects)

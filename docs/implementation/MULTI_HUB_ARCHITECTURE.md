@@ -7,13 +7,13 @@ Implementation of multi-database (hub) system with tag-based inheritance and enh
 
 ### 1. Permission Evaluation Strategy ✅
 **Choice**: Simple tag matching (Option A)
-- `rbac:perm:entity:write:hub:worcha` = can write entities with `hub:worcha`
+- `rbac:perm:entity:write:hub:worca` = can write entities with `hub:worca`
 - Natural fit with EntityDB's existing tag system
 - High performance, minimal changes to RBAC middleware
 
 ### 2. Session Management Strategy ✅
 **Choice**: Sessions as entities + relationships (Options A + C)
-- Session entities: `type:session`, `hub:worcha`, `status:active`
+- Session entities: `type:session`, `hub:worca`, `status:active`
 - User-session relationships via EntityDB relationship system
 - Multi-session support per user
 - Rich session metadata and temporal tracking
@@ -21,11 +21,11 @@ Implementation of multi-database (hub) system with tag-based inheritance and enh
 ### 3. Hub + Trait/Self Architecture ✅
 **Choice**: Hub namespace with trait/self separation
 ```
-hub:worcha                          # Hub membership
-worcha:self:type:task              # Entity's own properties
-worcha:self:assignee:john
-worcha:trait:org:TechCorp          # Inherited/shared context
-worcha:trait:project:MobileApp
+hub:worca                          # Hub membership
+worca:self:type:task              # Entity's own properties
+worca:self:assignee:john
+worca:trait:org:TechCorp          # Inherited/shared context
+worca:trait:project:MobileApp
 ```
 
 **Logic**: 
@@ -36,20 +36,20 @@ worcha:trait:project:MobileApp
 ## Architecture Components
 
 ### Hub System
-- **Hub Tag**: `hub:worcha` (mandatory on all entities)
-- **Self Namespace**: `worcha:self:namespace:value` (entity's own properties)
-- **Trait Namespace**: `worcha:trait:namespace:value` (inherited context)
+- **Hub Tag**: `hub:worca` (mandatory on all entities)
+- **Self Namespace**: `worca:self:namespace:value` (entity's own properties)
+- **Trait Namespace**: `worca:trait:namespace:value` (inherited context)
 
 ### Session Management
-- **Session Entities**: `type:session`, `hub:worcha`, `status:active/expired`
+- **Session Entities**: `type:session`, `hub:worca`, `status:active/expired`
 - **Session-User Relationships**: Link users to their active sessions
 - **Multi-session Support**: Users can have multiple concurrent sessions
 - **Hub-scoped Sessions**: Sessions belong to specific hubs
 
 ### RBAC Enhancement
-- **Hub-scoped Permissions**: `rbac:perm:entity:write:hub:worcha`
-- **Trait-based Permissions**: `rbac:perm:entity:read:worcha:trait:org:TechCorp`
-- **Self-based Permissions**: `rbac:perm:entity:update:worcha:self:assignee:self`
+- **Hub-scoped Permissions**: `rbac:perm:entity:write:hub:worca`
+- **Trait-based Permissions**: `rbac:perm:entity:read:worca:trait:org:TechCorp`
+- **Self-based Permissions**: `rbac:perm:entity:update:worca:self:assignee:self`
 
 ## Implementation Steps
 
@@ -81,9 +81,9 @@ worcha:trait:project:MobileApp
 
 ### 4. RBAC Granularity Level ✅
 **Choice**: All levels supported (Option D)
-- **Hub-level**: `rbac:perm:entity:write:hub:worcha`
-- **Trait-level**: `rbac:perm:entity:write:worcha:trait:org:TechCorp` 
-- **Self-level**: `rbac:perm:entity:write:worcha:self:type:task`
+- **Hub-level**: `rbac:perm:entity:write:hub:worca`
+- **Trait-level**: `rbac:perm:entity:write:worca:trait:org:TechCorp` 
+- **Self-level**: `rbac:perm:entity:write:worca:self:type:task`
 - **Maximum flexibility**: Users can have any combination
 
 ### 5. Cross-Hub Access ✅
@@ -98,7 +98,7 @@ worcha:trait:project:MobileApp
 - **Hub Management Permissions**:
   - `rbac:perm:hub:create` - Can create new hubs
   - `rbac:perm:hub:delete` - Can delete hubs
-  - `rbac:perm:hub:manage:worcha` - Can manage specific hub
+  - `rbac:perm:hub:manage:worca` - Can manage specific hub
   - `rbac:perm:hub:assign-admin` - Can assign hub admins
   - `rbac:perm:hub:*` - All hub management permissions
 - **Natural Permission Flow**: Global admin has all, hub creators get create, hub admins get manage
@@ -174,7 +174,7 @@ GET    /api/v1/hubs/entities/query      # Query hub entities
 ### **Hub-Aware Entity Format** ✨
 ```json
 {
-  "hub": "worcha",
+  "hub": "worca",
   "self": {"type": "task", "status": "todo", "title": "Test Task"},
   "traits": {"org": "TechCorp", "project": "Mobile"},
   "content": "Task description"
@@ -183,18 +183,18 @@ GET    /api/v1/hubs/entities/query      # Query hub entities
 
 ### **Tag Structure Implementation** 🏷️
 ```
-hub:worcha                          # Hub membership
-worcha:self:type:task              # Entity's own properties  
-worcha:self:status:todo
-worcha:trait:org:TechCorp          # Inherited context
-worcha:trait:project:Mobile
+hub:worca                          # Hub membership
+worca:self:type:task              # Entity's own properties  
+worca:self:status:todo
+worca:trait:org:TechCorp          # Inherited context
+worca:trait:project:Mobile
 ```
 
 ### **RBAC Permissions** 🔐
 ```
-rbac:perm:entity:*:hub:worcha      # Full hub access
+rbac:perm:entity:*:hub:worca      # Full hub access
 rbac:perm:hub:create               # Can create hubs
-rbac:perm:hub:manage:worcha        # Can manage specific hub
+rbac:perm:hub:manage:worca        # Can manage specific hub
 ```
 
 ## Testing Results
@@ -211,7 +211,7 @@ rbac:perm:hub:manage:worcha        # Can manage specific hub
 
 ## Next Steps
 1. ✅ Complete hub listing bug fix
-2. 📝 Update Worcha to use new hub-aware API
+2. 📝 Update Worca to use new hub-aware API
 3. 🔄 Implement session management with hub scoping
 4. 📋 Create comprehensive test suite
 5. 📚 Update API documentation

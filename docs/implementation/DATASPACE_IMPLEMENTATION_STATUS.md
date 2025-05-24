@@ -5,7 +5,7 @@
 ### 1. Core Dataspace Architecture ✅
 - Created `DataspaceRepository` with per-dataspace index isolation
 - Each dataspace gets its own `.idx` file:
-  - `/var/entitydb/dataspaces/worcha.idx`
+  - `/var/entitydb/dataspaces/worca.idx`
   - `/var/entitydb/dataspaces/metrics.idx`
   - `/var/entitydb/dataspaces/default.idx`
 - Dataspaces are created on-demand when entities are added
@@ -81,15 +81,15 @@ export ENTITYDB_DATASPACE=true
 ```json
 {
   "id": "task-123",
-  "tags": ["dataspace:worcha", "type:task", "status:open"],
+  "tags": ["dataspace:worca", "type:task", "status:open"],
   "content": "Task content"
 }
 ```
 
 ### Query Specific Dataspace
 ```bash
-# Query only worcha dataspace (once isolation is fixed)
-GET /api/v1/entities/list?tags=dataspace:worcha
+# Query only worca dataspace (once isolation is fixed)
+GET /api/v1/entities/list?tags=dataspace:worca
 ```
 
 ## Architecture Benefits
