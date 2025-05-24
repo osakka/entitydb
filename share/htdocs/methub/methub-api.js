@@ -14,22 +14,38 @@ class MetHubAPI {
 
     // Make API request
     async request(method, endpoint, data = null) {
+        const headers = {
+            'Content-Type': 'application/json'
+        };
+        
+        // Only add Authorization header if we have a token
+        if (this.token) {
+            headers['Authorization'] = `Bearer ${this.token}`;
+        }
+        
         const options = {
             method,
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': this.token ? `Bearer ${this.token}` : ''
-            }
+            headers
         };
 
         if (data) {
             options.body = JSON.stringify(data);
         }
 
+        console.log(`🌐 API Request: ${method} ${this.baseUrl}${endpoint}`, { 
+            hasToken: !!this.token, 
+            tokenPreview: this.token ? `${this.token.substring(0, 10)}...` : 'none'
+        });
+        
         try {
             const response = await fetch(`${this.baseUrl}${endpoint}`, options);
             
             if (!response.ok) {
+                console.error(`❌ API Error: ${response.status} ${response.statusText}`, {
+                    endpoint: `${this.baseUrl}${endpoint}`,
+                    method,
+                    hasToken: !!this.token
+                });
                 throw new Error(`API Error: ${response.status} ${response.statusText}`);
             }
 
@@ -48,13 +64,19 @@ class MetHubAPI {
 
     // Login
     async login(username, password) {
+        console.log(`🔐 Attempting login for user: ${username}`);
+        
         const result = await this.request('POST', '/api/v1/auth/login', {
             username,
             password
         });
         
         if (result.token) {
+            console.log(`✅ Login successful, token received: ${result.token.substring(0, 10)}...`);
             this.setToken(result.token);
+        } else {
+            console.error('❌ Login failed: No token in response', result);
+            throw new Error('Login failed: No token received');
         }
         
         return result;

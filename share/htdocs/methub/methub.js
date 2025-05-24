@@ -46,6 +46,9 @@ window.methub = function() {
                 if (!this.api.token) {
                     console.log('📝 No token found, attempting login...');
                     await this.login();
+                    console.log('🔑 Login completed, token available:', !!this.api.token);
+                } else {
+                    console.log('🔑 Existing token found:', this.api.token.substring(0, 10) + '...');
                 }
                 
                 // Load saved widgets
