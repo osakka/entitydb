@@ -53,4 +53,4 @@ coverage.txt
 *.so
 *.dylib
 *.out
-go.work
+go.worktest_persistent_index/
