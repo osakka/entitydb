@@ -95,9 +95,30 @@ class MetHubAPI {
             query.tags.push(`name:${metricName}`);
         }
         
-        // Query entities
+        // Query entities - build query string for GET request
+        let selfFilter = 'type:metric';
+        if (host) selfFilter += `,host:${host}`;
+        if (metricName) selfFilter += `,name:${metricName}`;
+        
+        // For metric type, use traits filter instead
+        let traitsFilter = '';
+        if (metricType) traitsFilter = `metric_type:${metricType}`;
+        
+        const params = new URLSearchParams({
+            hub: this.hub,
+            self: selfFilter,
+            include_content: 'true',
+            include_raw_tags: 'true'
+        });
+        
+        if (traitsFilter) {
+            params.append('traits', traitsFilter);
+        }
+        
+        console.log('Query params:', params.toString());
+        
         try {
-            const result = await this.request('POST', `/api/v1/hubs/${this.hub}/entities/query`, query);
+            const result = await this.request('GET', `/api/v1/hubs/entities/query?${params}`);
             console.log('Query result:', result);
             return this.transformMetrics(result.entities || result || []);
         } catch (error) {
@@ -128,16 +149,20 @@ class MetHubAPI {
 
     // Get available hosts
     async getHosts() {
-        const result = await this.request('POST', `/api/v1/hubs/${this.hub}/entities/query`, {
+        const params = new URLSearchParams({
             hub: this.hub,
-            tags: ['type:metric'],
-            limit: 1000
+            self: 'type:metric',
+            include_content: 'true',
+            include_raw_tags: 'true'
         });
+        
+        const result = await this.request('GET', `/api/v1/hubs/entities/query?${params}`);
         
         const hosts = new Set();
         (result.entities || []).forEach(entity => {
-            if (entity.traits && entity.traits.host) {
-                hosts.add(entity.traits.host);
+            const host = (entity.traits && entity.traits.host) || (entity.self && entity.self.host);
+            if (host) {
+                hosts.add(host);
             }
         });
         
@@ -146,26 +171,38 @@ class MetHubAPI {
 
     // Transform entities to metric format
     transformMetrics(entities) {
+        console.log('Transforming entities:', entities);
         return entities.map(entity => {
+            console.log('Processing entity:', entity);
+            
+            // Handle timestamp - convert from nanoseconds to milliseconds
+            let timestamp = 0;
+            if (entity.self && entity.self.timestamp) {
+                timestamp = Math.floor(parseInt(entity.self.timestamp) / 1000000); // Convert nanoseconds to milliseconds
+            } else if (entity.created_at) {
+                timestamp = new Date(entity.created_at).getTime();
+            }
+            
             const metric = {
                 id: entity.id,
-                timestamp: parseInt(entity.self.timestamp || entity.created_at),
-                host: entity.traits.host || entity.self.host,
-                type: entity.traits.metric_type,
-                name: entity.self.name,
-                value: parseFloat(entity.self.value),
-                unit: this.extractTagValue(entity.tags, 'unit')
+                timestamp: timestamp,
+                host: (entity.traits && entity.traits.host) || (entity.self && entity.self.host),
+                type: (entity.traits && entity.traits.metric_type) || (entity.self && entity.self.type),
+                name: (entity.self && entity.self.name),
+                value: parseFloat((entity.self && entity.self.value) || 0),
+                unit: this.extractTagValue(entity.tags || [], 'unit')
             };
             
             // Add device/mount info for disk metrics
-            const device = this.extractTagValue(entity.tags, 'device');
+            const device = this.extractTagValue(entity.tags || [], 'device');
             if (device) metric.device = device;
             
-            const mount = this.extractTagValue(entity.tags, 'mount');
+            const mount = this.extractTagValue(entity.tags || [], 'mount');
             if (mount) metric.mount = mount;
             
+            console.log('Transformed metric:', metric);
             return metric;
-        });
+        }).filter(metric => metric.value !== undefined && !isNaN(metric.value));
     }
 
     // Extract value from tag

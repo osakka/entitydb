@@ -169,6 +169,13 @@ window.methub = function() {
         // Update single widget data
         async updateWidget(widget) {
             try {
+                console.log(`🔍 Updating widget ${widget.title}:`, {
+                    timeRange: this.timeRange,
+                    selectedHost: this.selectedHost,
+                    metricType: widget.metricType,
+                    metricName: widget.metricName
+                });
+                
                 // Query metrics for this widget
                 const metrics = await this.api.queryMetrics(
                     this.timeRange,
@@ -177,7 +184,7 @@ window.methub = function() {
                     widget.metricName
                 );
                 
-                console.log(`📊 Widget ${widget.title} metrics:`, metrics.length, 'data points');
+                console.log(`📊 Widget ${widget.title} received metrics:`, metrics);
                 
                 // Wait for next tick to ensure DOM is ready
                 await this.$nextTick();
