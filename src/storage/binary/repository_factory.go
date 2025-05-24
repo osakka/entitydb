@@ -15,6 +15,18 @@ func (f *RepositoryFactory) CreateRepository(dataPath string) (models.EntityRepo
 	disableHighPerf := os.Getenv("ENTITYDB_DISABLE_HIGH_PERFORMANCE") == "true"
 	enableHighPerf := os.Getenv("ENTITYDB_HIGH_PERFORMANCE") == "true"
 	enableTemporal := os.Getenv("ENTITYDB_TEMPORAL") != "false" // Temporal by default
+	enableWALOnly := os.Getenv("ENTITYDB_WAL_ONLY") == "true" // New WAL-only mode
+	
+	// WAL-only mode for maximum write performance
+	if enableWALOnly {
+		logger.Info("Creating WALOnlyRepository for O(1) write performance")
+		walRepo, err := NewWALOnlyRepository(dataPath)
+		if err != nil {
+			logger.Error("Failed to create WAL-only repository: %v, falling back to temporal", err)
+			return NewTemporalRepository(dataPath)
+		}
+		return walRepo, nil
+	}
 	
 	// Explicit disable overrides enable
 	if disableHighPerf {

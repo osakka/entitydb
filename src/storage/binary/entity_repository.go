@@ -1902,3 +1902,68 @@ func (r *EntityRepository) Close() error {
 	logger.Info("Entity repository closed successfully")
 	return nil
 }
+
+// saveEntities writes all entities to disk - exposed for WALOnlyRepository
+func (r *EntityRepository) saveEntities() error {
+	dataFile := r.getDataFile()
+	tempFile := dataFile + ".tmp"
+	writer, err := NewWriter(tempFile)
+	if err != nil {
+		return err
+	}
+	defer writer.Close()
+	
+	// Write all entities
+	for _, entity := range r.entities {
+		if err := writer.WriteEntity(entity); err != nil {
+			os.Remove(tempFile)
+			return err
+		}
+	}
+	
+	// Close writer to finalize the file
+	if err := writer.Close(); err != nil {
+		os.Remove(tempFile)
+		return err
+	}
+	
+	// Atomically replace the old file
+	if err := os.Rename(tempFile, dataFile); err != nil {
+		os.Remove(tempFile)
+		return err
+	}
+	
+	return nil
+}
+
+// addToTagIndex adds an entity ID to a tag's index
+func (r *EntityRepository) addToTagIndex(tag, entityID string) {
+	if ids, exists := r.tagIndex[tag]; exists {
+		// Check if already present
+		for _, id := range ids {
+			if id == entityID {
+				return
+			}
+		}
+		r.tagIndex[tag] = append(ids, entityID)
+	} else {
+		r.tagIndex[tag] = []string{entityID}
+	}
+}
+
+// removeFromTagIndex removes an entity ID from a tag's index  
+func (r *EntityRepository) removeFromTagIndex(tag, entityID string) {
+	if ids, exists := r.tagIndex[tag]; exists {
+		newIDs := make([]string, 0, len(ids))
+		for _, id := range ids {
+			if id != entityID {
+				newIDs = append(newIDs, id)
+			}
+		}
+		if len(newIDs) > 0 {
+			r.tagIndex[tag] = newIDs
+		} else {
+			delete(r.tagIndex, tag)
+		}
+	}
+}
