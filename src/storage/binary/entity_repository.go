@@ -42,6 +42,10 @@ type EntityRepository struct {
 	
 	// Namespace index for efficient namespace queries
 	namespaceIndex *NamespaceIndex
+	
+	// Tag index persistence
+	tagIndexDirty bool        // Whether tag index needs to be saved
+	lastIndexSave time.Time   // Last time index was saved
 }
 
 // NewEntityRepository creates a new binary entity repository
@@ -146,6 +150,63 @@ func (r *EntityRepository) buildIndexes() error {
 	r.temporalIndex = NewTemporalIndex()
 	r.namespaceIndex = NewNamespaceIndex()
 	
+	// Try to load tag index from persistent storage first
+	startTime := time.Now()
+	if tagIndex, err := LoadTagIndexV2(r.getDataFile()); err == nil {
+		logger.Info("Loading tag index from persistent storage...")
+		r.tagIndex = tagIndex
+		logger.Info("Loaded %d tags from persistent index in %v", len(tagIndex), time.Since(startTime))
+		
+		// Still need to load entities and build other indexes
+		reader, err := NewReader(r.getDataFile())
+		if err != nil {
+			return err
+		}
+		defer reader.Close()
+		
+		// Read all entities to populate entity cache and other indexes
+		entities, err := reader.GetAllEntities()
+		if err != nil {
+			return err
+		}
+		
+		for _, entity := range entities {
+			// Add to entity cache
+			r.entities[entity.ID] = entity
+			
+			// Build temporal index
+			for _, tag := range entity.Tags {
+				parts := strings.SplitN(tag, "|", 2)
+				if len(parts) == 2 {
+					if ts, err := time.Parse(time.RFC3339Nano, parts[0]); err == nil {
+						r.temporalIndex.AddEntry(entity.ID, parts[1], ts)
+					}
+				}
+			}
+			
+			// Build namespace index
+			for _, tag := range entity.Tags {
+				r.namespaceIndex.AddTag(entity.ID, tag)
+			}
+			
+			// Build content index
+			if len(entity.Content) > 0 {
+				contentStr := string(entity.Content)
+				// Index first 100 chars for search
+				if len(contentStr) > 100 {
+					contentStr = contentStr[:100]
+				}
+				r.contentIndex[contentStr] = append(r.contentIndex[contentStr], entity.ID)
+			}
+		}
+		
+		logger.Info("Loaded %d entities and built supplementary indexes", len(entities))
+		logger.Debug("After loading from persistent index: %d tags in index, %d entities in cache", len(r.tagIndex), len(r.entities))
+		return nil
+	} else {
+		logger.Info("No persistent tag index found or error loading: %v. Building from scratch...", err)
+	}
+	
 	reader, err := NewReader(r.getDataFile())
 	if err != nil {
 		return err
@@ -196,11 +257,23 @@ func (r *EntityRepository) buildIndexes() error {
 func (r *EntityRepository) updateIndexes(entity *models.Entity) {
 	logger.Debug("Updating indexes for entity %s with %d tags", entity.ID, len(entity.Tags))
 	
+	// Helper function to add entity ID to tag if not already present
+	addEntityToTag := func(tag, entityID string) {
+		// Check if entity is already indexed for this tag
+		existing := r.tagIndex[tag]
+		for _, id := range existing {
+			if id == entityID {
+				return // Already indexed
+			}
+		}
+		r.tagIndex[tag] = append(r.tagIndex[tag], entityID)
+	}
+	
 	// Update tag index
 	for _, tag := range entity.Tags {
 		// Always index the full tag (with timestamp)
 		logger.Debug("Indexing tag: '%s' for entity %s", tag, entity.ID)
-		r.tagIndex[tag] = append(r.tagIndex[tag], entity.ID)
+		addEntityToTag(tag, entity.ID)
 		
 		// Also index the non-timestamped version for easier searching
 		if strings.Contains(tag, "|") {
@@ -219,13 +292,16 @@ func (r *EntityRepository) updateIndexes(entity *models.Entity) {
 				actualTag := parts[1]
 				logger.Debug("Also indexing non-timestamped version: '%s' for entity %s", 
 					actualTag, entity.ID)
-				r.tagIndex[actualTag] = append(r.tagIndex[actualTag], entity.ID)
+				addEntityToTag(actualTag, entity.ID)
 			}
 		}
 		
 		// Add to namespace index
 		r.namespaceIndex.AddTag(entity.ID, tag)
 	}
+	
+	// Mark tag index as dirty
+	r.tagIndexDirty = true
 	
 	// Update content index - store content as string for searching
 	if len(entity.Content) > 0 {
@@ -307,6 +383,11 @@ func (r *EntityRepository) Create(entity *models.Entity) error {
 	}
 	
 	logger.Debug("Entity %s successfully created and persisted", entity.ID)
+	
+	// Save tag index periodically
+	if err := r.SaveTagIndexIfNeeded(); err != nil {
+		logger.Warn("Failed to save tag index: %v", err)
+	}
 	
 	return nil
 }
@@ -510,6 +591,11 @@ func (r *EntityRepository) Update(entity *models.Entity) error {
 	
 	// Invalidate cache
 	r.cache.Clear()
+	
+	// Save tag index periodically
+	if err := r.SaveTagIndexIfNeeded(); err != nil {
+		logger.Warn("Failed to save tag index: %v", err)
+	}
 	
 	return nil
 }
@@ -1710,5 +1796,68 @@ func (r *EntityRepository) VerifyIndexHealth() error {
 		return fmt.Errorf("index mismatch: %d entities but only %d in tag index", entityCount, indexCount)
 	}
 	
+	return nil
+}
+
+// SaveTagIndex persists the current tag index to disk
+func (r *EntityRepository) SaveTagIndex() error {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	
+	if !r.tagIndexDirty {
+		logger.Debug("Tag index not dirty, skipping save")
+		return nil
+	}
+	
+	startTime := time.Now()
+	logger.Info("Saving tag index to disk...")
+	
+	if err := SaveTagIndexV2(r.getDataFile(), r.tagIndex); err != nil {
+		return fmt.Errorf("failed to save tag index: %w", err)
+	}
+	
+	r.tagIndexDirty = false
+	r.lastIndexSave = time.Now()
+	
+	logger.Info("Tag index saved successfully in %v", time.Since(startTime))
+	return nil
+}
+
+// SaveTagIndexIfNeeded saves the tag index if it's dirty and enough time has passed
+func (r *EntityRepository) SaveTagIndexIfNeeded() error {
+	// Save every 5 minutes if dirty
+	if r.tagIndexDirty && time.Since(r.lastIndexSave) > 5*time.Minute {
+		return r.SaveTagIndex()
+	}
+	return nil
+}
+
+// Close closes the repository and saves any pending data
+func (r *EntityRepository) Close() error {
+	logger.Info("Closing entity repository...")
+	
+	// Save tag index if dirty
+	if err := r.SaveTagIndex(); err != nil {
+		logger.Error("Failed to save tag index on close: %v", err)
+	}
+	
+	// Close WAL
+	if r.wal != nil {
+		if err := r.wal.Close(); err != nil {
+			logger.Error("Failed to close WAL: %v", err)
+		}
+	}
+	
+	// Close current file
+	if r.currentFile != nil {
+		if err := r.currentFile.Close(); err != nil {
+			logger.Error("Failed to close current file: %v", err)
+		}
+	}
+	
+	// Clear reader pool
+	r.readerPool = sync.Pool{}
+	
+	logger.Info("Entity repository closed successfully")
 	return nil
 }

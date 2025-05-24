@@ -489,6 +489,13 @@ func main() {
 func (s *EntityDBServer) Close() {
 	// Close repositories if they have close methods
 	logger.Info("Closing repositories...")
+	
+	// Close entity repository to save tag index
+	if repo, ok := s.entityRepo.(*binary.EntityRepository); ok {
+		if err := repo.Close(); err != nil {
+			logger.Error("Failed to close entity repository: %v", err)
+		}
+	}
 }
 
 // redirectToHTTPS redirects HTTP requests to HTTPS
