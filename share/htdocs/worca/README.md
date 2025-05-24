@@ -13,13 +13,6 @@ Worca is a powerful, scalable workforce orchestrator that provides both rich web
 - **Project Hierarchy** management (Org → Project → Epic → Story → Task)
 - **Mobile-responsive** design with modern UI
 
-### 💬 Conversational CLI
-- **Natural Language** processing for intuitive commands
-- **Smart Auto-completion** and command suggestions
-- **Command History** with arrow key navigation
-- **Flexible Syntax** - works with both formal commands and natural speech
-- **Terminal-style** interface with color coding
-
 ### 📊 Analytics & Reporting
 - Task status distribution charts
 - Team workload analysis
@@ -123,12 +116,6 @@ All data is stored as entities in EntityDB with appropriate tags:
 - **Font Awesome**: Icon library
 - **CSS Grid/Flexbox**: Responsive layout
 
-### CLI Technologies
-- **Natural Language Processing**: Pattern matching for conversational commands
-- **Command History**: Full bash-like history management
-- **Auto-completion**: Tab completion and smart suggestions
-- **Terminal Emulation**: Authentic CLI experience
-
 ### Backend Integration
 - **EntityDB API**: Direct integration with EntityDB REST endpoints
 - **Real-time Updates**: Live data synchronization
@@ -163,7 +150,6 @@ Worca works seamlessly across:
 
 ### Phase 1: Core Features ✅
 - ✅ Web dashboard with kanban boards
-- ✅ Conversational CLI interface
 - ✅ Basic analytics and reporting
 - ✅ Team management
 
