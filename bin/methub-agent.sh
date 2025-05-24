@@ -50,9 +50,10 @@ send_metric() {
     # Create metric entity
     local metric_data=$(cat <<EOF
 {
+    "hub": "$METHUB_HUB",
     "self": {
         "name": "$metric_name",
-        "value": $metric_value,
+        "value": "$metric_value",
         "timestamp": "$timestamp",
         "host": "$METHUB_HOSTNAME"
     },
@@ -66,10 +67,14 @@ EOF
 )
     
     # Send to EntityDB
-    curl -sk -X POST "$ENTITYDB_URL/api/v1/hubs/$METHUB_HUB/entities" \
+    local result=$(curl -sk -X POST "$ENTITYDB_URL/api/v1/hubs/entities/create" \
         -H "Authorization: Bearer $AUTH_TOKEN" \
         -H "Content-Type: application/json" \
-        -d "$metric_data" >/dev/null 2>&1
+        -d "$metric_data" 2>&1)
+    
+    if [ $? -ne 0 ]; then
+        echo "Failed to send metric: $result" >&2
+    fi
 }
 
 # CPU metrics collector

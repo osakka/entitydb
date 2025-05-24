@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"runtime"
 	"strings"
 )
 
@@ -67,11 +68,41 @@ func GetLogLevel() string {
 	return levelNames[currentLevel]
 }
 
+// getFunctionName gets the name of the calling function
+func getFunctionName(skip int) string {
+	pc, _, _, ok := runtime.Caller(skip)
+	if !ok {
+		return "unknown"
+	}
+	
+	fn := runtime.FuncForPC(pc)
+	if fn == nil {
+		return "unknown"
+	}
+	
+	// Get full function name
+	fullName := fn.Name()
+	
+	// Extract just the function name (remove package path)
+	parts := strings.Split(fullName, "/")
+	lastPart := parts[len(parts)-1]
+	
+	// Remove package name if present
+	if idx := strings.LastIndex(lastPart, "."); idx != -1 {
+		return lastPart[idx+1:]
+	}
+	
+	return lastPart
+}
+
 // logf is the internal logging function
 func logf(level LogLevel, format string, args ...interface{}) {
 	if level >= currentLevel {
+		// Get caller info (skip 3: logf -> Debug/Info/etc -> actual caller)
+		funcName := getFunctionName(3)
+		
 		msg := fmt.Sprintf(format, args...)
-		Logger.Printf("%s%s", levelPrefixes[level], msg)
+		Logger.Printf("%s[%s] %s", levelPrefixes[level], funcName, msg)
 	}
 }
 

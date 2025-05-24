@@ -58,7 +58,7 @@ func (r *Router) Handle(method, path string, handler http.HandlerFunc) {
 	}
 	
 	// Log the route being registered
-	logger.Debug("Registering route: %s %s", method, path)
+	logger.Trace("Registering route: %s %s", method, path)
 	
 	// Create an exact path pattern for ServeMux
 	exactPath := path
@@ -75,18 +75,18 @@ func (r *Router) Handle(method, path string, handler http.HandlerFunc) {
 	// Handle function to check method and path
 	handleRequest := func(w http.ResponseWriter, req *http.Request) {
 		// Log the request
-		logger.Debug("Handler called for: %s %s (registered as %s %s)", 
+		logger.Trace("Handler called for: %s %s (registered as %s %s)", 
 			req.Method, req.URL.Path, method, path)
 		
 		// Check if method matches
 		if req.Method != method {
-			logger.Debug("Method mismatch: received %s, expected %s", req.Method, method)
+			logger.Trace("Method mismatch: received %s, expected %s", req.Method, method)
 			w.WriteHeader(http.StatusMethodNotAllowed)
 			return
 		}
 		
 		// Apply middleware and execute handler
-		logger.Debug("Executing handler for %s %s", method, path)
+		logger.Trace("Executing handler for %s %s", method, path)
 		r.applyMiddleware(handler)(w, req)
 	}
 	
@@ -94,7 +94,7 @@ func (r *Router) Handle(method, path string, handler http.HandlerFunc) {
 	r.mux.HandleFunc(exactPath, func(w http.ResponseWriter, req *http.Request) {
 		// Check if the path matches exactly
 		if req.URL.Path != path {
-			logger.Debug("Path mismatch: received %s, expected %s", req.URL.Path, path)
+			logger.Trace("Path mismatch: received %s, expected %s", req.URL.Path, path)
 			http.NotFound(w, req)
 			return
 		}
@@ -125,7 +125,7 @@ func (r *Router) DELETE(path string, handler http.HandlerFunc) {
 
 // ServeStatic registers a path for serving static files
 func (r *Router) ServeStatic(urlPath, fsPath string) {
-	logger.Debug("Registering static file server for %s -> %s", urlPath, fsPath)
+	logger.Trace("Registering static file server for %s -> %s", urlPath, fsPath)
 	r.staticPaths[urlPath] = fsPath
 	
 	fileServer := http.FileServer(http.Dir(fsPath))
@@ -133,33 +133,33 @@ func (r *Router) ServeStatic(urlPath, fsPath string) {
 	// Create a handler that only serves static files for non-API requests
 	handler := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		// Log request path
-		logger.Debug("Static handler received request: %s", req.URL.Path)
+		logger.Trace("Static handler received request: %s", req.URL.Path)
 		
 		// Skip API requests, as they're handled by the API routes
 		if strings.HasPrefix(req.URL.Path, "/api/") {
-			logger.Debug("Skipping static file handling for API request: %s", req.URL.Path)
+			logger.Trace("Skipping static file handling for API request: %s", req.URL.Path)
 			http.NotFound(w, req)
 			return
 		}
 		
 		// For requests to the root, redirect to dashboard.html by default
 		if req.URL.Path == "/" {
-			logger.Debug("Redirecting root request to dashboard.html")
+			logger.Trace("Redirecting root request to dashboard.html")
 			http.Redirect(w, req, "/dashboard.html", http.StatusFound)
 			return
 		}
 		
 		// For all other requests, serve the static file
-		logger.Debug("Serving static file for path: %s", req.URL.Path)
+		logger.Trace("Serving static file for path: %s", req.URL.Path)
 		fileServer.ServeHTTP(w, req)
 	})
 	
 	// Register the handler without stripping the prefix for the root path
 	if urlPath == "/" {
-		logger.Debug("Registering root static handler at: %s", urlPath)
+		logger.Trace("Registering root static handler at: %s", urlPath)
 		r.mux.Handle(urlPath, handler)
 	} else {
-		logger.Debug("Registering static handler with prefix strip at: %s", urlPath)
+		logger.Trace("Registering static handler with prefix strip at: %s", urlPath)
 		r.mux.Handle(urlPath, http.StripPrefix(urlPath, handler))
 	}
 }
@@ -169,7 +169,7 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	start := time.Now()
 	
 	// Log received request
-	logger.Debug("Router received request: %s %s", req.Method, req.URL.Path)
+	logger.Trace("Router received request: %s %s", req.Method, req.URL.Path)
 	
 	// Set enhanced CORS headers
 	w.Header().Set("Access-Control-Allow-Origin", "*")
@@ -181,23 +181,23 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	
 	// Handle preflight requests
 	if req.Method == "OPTIONS" {
-		logger.Debug("Responding to OPTIONS request for %s", req.URL.Path)
+		logger.Trace("Responding to OPTIONS request for %s", req.URL.Path)
 		w.WriteHeader(http.StatusOK)
 		return
 	}
 	
 	// First, try the API status endpoint
 	if req.URL.Path == "/api/v1/status" && req.Method == "GET" {
-		logger.Debug("Handling API status request directly")
+		logger.Trace("Handling API status request directly")
 		StatusHandler()(w, req)
 		return
 	}
 	
 	// Let the ServeMux handle the request
-	logger.Debug("Delegating request to mux: %s %s", req.Method, req.URL.Path)
+	logger.Trace("Delegating request to mux: %s %s", req.Method, req.URL.Path)
 	r.mux.ServeHTTP(w, req)
 	
-	logger.Debug("%s %s %s - %v", req.RemoteAddr, req.Method, req.URL.Path, time.Since(start))
+	logger.Trace("%s %s %s - %v", req.RemoteAddr, req.Method, req.URL.Path, time.Since(start))
 }
 
 // Note: RespondJSON and RespondError moved to auth.go
@@ -225,7 +225,7 @@ func LoggingMiddleware(next http.HandlerFunc) http.HandlerFunc {
 		
 		// Log the request
 		duration := time.Since(start)
-		logger.Debug("%s %s %s - %v", r.RemoteAddr, r.Method, r.URL.Path, duration)
+		logger.Trace("%s %s %s - %v", r.RemoteAddr, r.Method, r.URL.Path, duration)
 	}
 }
 
@@ -234,7 +234,7 @@ func LoggingMiddleware(next http.HandlerFunc) http.HandlerFunc {
 func AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Log deprecation warning
-		logger.Debug("Warning: Using deprecated global AuthMiddleware. Use Auth.AuthMiddleware() instead")
+		logger.Trace("Warning: Using deprecated global AuthMiddleware. Use Auth.AuthMiddleware() instead")
 		
 		// Get the authentication token from the request
 		authHeader := r.Header.Get("Authorization")

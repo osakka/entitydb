@@ -184,12 +184,14 @@ func (h *EntityHandler) QueryHubEntities(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Query entities
+	logger.Debug("QueryHubEntities: Querying with tags: %v", queryTags)
 	entities, err := h.repo.ListByTags(queryTags, true) // matchAll = true
 	if err != nil {
 		logger.Error("Failed to query hub entities: %v", err)
 		RespondError(w, http.StatusInternalServerError, "Failed to query entities")
 		return
 	}
+	logger.Debug("QueryHubEntities: Found %d entities", len(entities))
 
 	// Filter entities user has access to
 	var accessibleEntities []*models.Entity

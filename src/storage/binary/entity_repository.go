@@ -737,6 +737,8 @@ func (r *EntityRepository) fetchEntitiesWithReader(reader *Reader, entityIDs []s
 
 // ListByTags retrieves entities with all specified tags
 func (r *EntityRepository) ListByTags(tags []string, matchAll bool) ([]*models.Entity, error) {
+	logger.Debug("ListByTags called with tags: %v, matchAll: %v", tags, matchAll)
+	
 	if len(tags) == 0 {
 		return r.List()
 	}
@@ -748,10 +750,13 @@ func (r *EntityRepository) ListByTags(tags []string, matchAll bool) ([]*models.E
 	
 	if matchAll {
 		// Get entity IDs for first tag
+		logger.Debug("ListByTags: Looking for tag '%s' in index", tags[0])
 		if ids, exists := r.tagIndex[tags[0]]; exists {
+			logger.Debug("ListByTags: Found %d entities for tag '%s'", len(ids), tags[0])
 			entityIDs = make([]string, len(ids))
 			copy(entityIDs, ids)
 		} else {
+			logger.Debug("ListByTags: Tag '%s' not found in index", tags[0])
 			r.mu.RUnlock()
 			return []*models.Entity{}, nil
 		}
