@@ -140,14 +140,20 @@ class MetHubAPI {
         console.log('Query params:', params.toString());
         
         try {
+            // Try hub-aware query first
             const result = await this.request('GET', `/api/v1/hubs/entities/query?${params}`);
-            console.log('Query result:', result);
+            console.log('Hub query result:', result);
             return this.transformMetrics(result.entities || result || []);
         } catch (error) {
-            console.error('Failed to query metrics:', error);
-            // Try fallback query without hub
+            console.warn('Hub query failed, trying fallback:', error);
+            // Use fallback query with hub:metrics tag (this works reliably)
             try {
-                const fallbackResult = await this.request('GET', `/api/v1/entities/list?tags=type:metric`);
+                const fallbackParams = new URLSearchParams({
+                    tags: 'hub:metrics',
+                    matchAll: 'true'
+                });
+                const fallbackResult = await this.request('GET', `/api/v1/entities/list?${fallbackParams}`);
+                console.log('Fallback query result:', fallbackResult);
                 return this.transformMetrics(fallbackResult || []);
             } catch (fallbackError) {
                 console.error('Fallback query also failed:', fallbackError);
