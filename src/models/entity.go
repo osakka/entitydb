@@ -57,6 +57,10 @@ type EntityRepository interface {
 	
 	// Query builder
 	Query() *EntityQuery
+	
+	// Maintenance operations
+	ReindexTags() error
+	VerifyIndexHealth() error
 }
 
 // Entity - The ONE entity type we need

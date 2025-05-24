@@ -109,6 +109,18 @@ func NewEntityRepository(dataPath string) (*EntityRepository, error) {
 		// Don't fail initialization - we can still write entities
 	}
 	
+	// Replay WAL to catch any entries not yet in the data file
+	logger.Info("Replaying WAL to rebuild complete tag index...")
+	if err := repo.replayWAL(); err != nil {
+		logger.Error("Failed to replay WAL: %v", err)
+		// Continue anyway - we may have partial data
+	}
+	
+	// Verify index health
+	if err := repo.VerifyIndexHealth(); err != nil {
+		logger.Warn("Index health check failed: %v", err)
+	}
+	
 	// Open the current file for use with readers
 	repo.currentFile, err = os.OpenFile(repo.getDataFile(), os.O_RDWR|os.O_CREATE, 0644)
 	if err != nil {
@@ -146,8 +158,11 @@ func (r *EntityRepository) buildIndexes() error {
 		return err
 	}
 	
-	// Build indexes
+	// Build indexes and load entities
 	for _, entity := range entities {
+		// Add to entity cache
+		r.entities[entity.ID] = entity
+		
 		// Update tag index
 		for _, tag := range entity.Tags {
 			r.tagIndex[tag] = append(r.tagIndex[tag], entity.ID)
@@ -751,45 +766,107 @@ func (r *EntityRepository) ListByTags(tags []string, matchAll bool) ([]*models.E
 	if matchAll {
 		// Get entity IDs for first tag
 		logger.Debug("ListByTags: Looking for tag '%s' in index", tags[0])
-		if ids, exists := r.tagIndex[tags[0]]; exists {
-			logger.Debug("ListByTags: Found %d entities for tag '%s'", len(ids), tags[0])
-			entityIDs = make([]string, len(ids))
-			copy(entityIDs, ids)
-		} else {
-			logger.Debug("ListByTags: Tag '%s' not found in index", tags[0])
+		
+		// Debug: log a sample of available tags
+		tagCount := 0
+		for tag := range r.tagIndex {
+			if strings.HasPrefix(tag, "hub:") {
+				logger.Debug("ListByTags: Available hub tag: '%s' with %d entities", tag, len(r.tagIndex[tag]))
+			}
+			tagCount++
+			if tagCount > 10 {
+				break
+			}
+		}
+		
+		// Helper function to find entities by tag (including temporal matches)
+		findEntitiesByTag := func(searchTag string) map[string]bool {
+			entitySet := make(map[string]bool)
+			
+			// First check for exact tag match
+			if ids, exists := r.tagIndex[searchTag]; exists {
+				logger.Debug("ListByTags: Found exact match for '%s' with %d entities", searchTag, len(ids))
+				for _, id := range ids {
+					entitySet[id] = true
+				}
+			}
+			
+			// Then check for temporal tags with timestamp prefix
+			for indexedTag, ids := range r.tagIndex {
+				if indexedTag == searchTag {
+					continue // Skip if already processed
+				}
+				
+				// Extract the actual tag part (after the timestamp)
+				tagParts := strings.SplitN(indexedTag, "|", 2)
+				if len(tagParts) == 2 && tagParts[1] == searchTag {
+					logger.Debug("ListByTags: Found temporal match '%s' in '%s' with %d entities", 
+						searchTag, indexedTag, len(ids))
+					for _, id := range ids {
+						entitySet[id] = true
+					}
+				}
+			}
+			
+			return entitySet
+		}
+		
+		// Get entities for first tag
+		firstTagEntities := findEntitiesByTag(tags[0])
+		if len(firstTagEntities) == 0 {
+			logger.Debug("ListByTags: Tag '%s' not found in index (total tags: %d)", tags[0], len(r.tagIndex))
 			r.mu.RUnlock()
 			return []*models.Entity{}, nil
 		}
 		
+		// Convert to slice for processing
+		entityIDs = make([]string, 0, len(firstTagEntities))
+		for id := range firstTagEntities {
+			entityIDs = append(entityIDs, id)
+		}
+		logger.Debug("ListByTags: Found %d entities for first tag '%s'", len(entityIDs), tags[0])
+		
 		// Intersect with remaining tags
 		for i := 1; i < len(tags) && len(entityIDs) > 0; i++ {
-			if tagIDs, exists := r.tagIndex[tags[i]]; exists {
-				// Create a set for fast lookup
-				idSet := make(map[string]bool)
-				for _, id := range tagIDs {
-					idSet[id] = true
-				}
-				
-				// Filter to keep only common IDs
-				filtered := make([]string, 0)
-				for _, id := range entityIDs {
-					if idSet[id] {
-						filtered = append(filtered, id)
-					}
-				}
-				entityIDs = filtered
-			} else {
+			tagEntities := findEntitiesByTag(tags[i])
+			if len(tagEntities) == 0 {
 				r.mu.RUnlock()
 				return []*models.Entity{}, nil
 			}
+			
+			// Filter to keep only common IDs
+			filtered := make([]string, 0)
+			for _, id := range entityIDs {
+				if tagEntities[id] {
+					filtered = append(filtered, id)
+				}
+			}
+			entityIDs = filtered
+			logger.Debug("ListByTags: After intersecting with tag '%s', %d entities remain", tags[i], len(entityIDs))
 		}
 	} else {
 		// For matchAny, create a set to collect unique entity IDs
 		entitySet := make(map[string]bool)
 		for _, tag := range tags {
+			// First check for exact tag match
 			if tagIDs, exists := r.tagIndex[tag]; exists {
 				for _, id := range tagIDs {
 					entitySet[id] = true
+				}
+			}
+			
+			// Then check for temporal tags with timestamp prefix
+			for indexedTag, ids := range r.tagIndex {
+				if indexedTag == tag {
+					continue // Skip if already processed
+				}
+				
+				// Extract the actual tag part (after the timestamp)
+				tagParts := strings.SplitN(indexedTag, "|", 2)
+				if len(tagParts) == 2 && tagParts[1] == tag {
+					for _, id := range ids {
+						entitySet[id] = true
+					}
 				}
 			}
 		}
@@ -1520,5 +1597,118 @@ func (r *EntityRepository) ReindexTags() error {
 	r.cache.Clear()
 	
 	logger.Info("Tag reindexing completed successfully. Indexed %d entities", len(entities))
+	return nil
+}
+
+// replayWAL replays the WAL to rebuild indexes for any operations not yet in the data file
+func (r *EntityRepository) replayWAL() error {
+	if r.wal == nil {
+		return fmt.Errorf("WAL not initialized")
+	}
+	
+	entitiesReplayed := 0
+	err := r.wal.Replay(func(entry WALEntry) error {
+		switch entry.OpType {
+		case WALOpCreate, WALOpUpdate:
+			if entry.Entity != nil {
+				// Add to in-memory cache
+				r.mu.Lock()
+				r.entities[entry.EntityID] = entry.Entity
+				
+				// Update tag index
+				for _, tag := range entry.Entity.Tags {
+					if r.tagIndex[tag] == nil {
+						r.tagIndex[tag] = []string{}
+					}
+					// Check if entity ID already exists in this tag's index
+					found := false
+					for _, id := range r.tagIndex[tag] {
+						if id == entry.EntityID {
+							found = true
+							break
+						}
+					}
+					if !found {
+						r.tagIndex[tag] = append(r.tagIndex[tag], entry.EntityID)
+					}
+				}
+				
+				// Update temporal index
+				// TODO: Add temporal index update when methods are available
+				// if r.temporalIndex != nil {
+				//     r.temporalIndex.AddEntity(entry.Entity)
+				// }
+				
+				// Update namespace index  
+				// TODO: Add namespace index update when methods are available
+				// if r.namespaceIndex != nil {
+				//     r.namespaceIndex.IndexEntity(entry.Entity)
+				// }
+				
+				r.mu.Unlock()
+				entitiesReplayed++
+			}
+			
+		case WALOpDelete:
+			// Remove from indexes
+			r.mu.Lock()
+			if entity, exists := r.entities[entry.EntityID]; exists {
+				// Remove from tag index
+				for _, tag := range entity.Tags {
+					if ids, ok := r.tagIndex[tag]; ok {
+						newIDs := make([]string, 0, len(ids))
+						for _, id := range ids {
+							if id != entry.EntityID {
+								newIDs = append(newIDs, id)
+							}
+						}
+						if len(newIDs) > 0 {
+							r.tagIndex[tag] = newIDs
+						} else {
+							delete(r.tagIndex, tag)
+						}
+					}
+				}
+				
+				// Remove from cache
+				delete(r.entities, entry.EntityID)
+			}
+			r.mu.Unlock()
+		}
+		return nil
+	})
+	
+	if err != nil {
+		return err
+	}
+	
+	logger.Info("WAL replay completed: %d entities processed", entitiesReplayed)
+	return nil
+}
+
+// VerifyIndexHealth checks if the tag index is consistent with the entities
+func (r *EntityRepository) VerifyIndexHealth() error {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	
+	// Count unique entities in tag index
+	indexedEntities := make(map[string]bool)
+	for tag, entityIDs := range r.tagIndex {
+		for _, id := range entityIDs {
+			indexedEntities[id] = true
+		}
+		logger.Trace("Tag '%s' has %d entities", tag, len(entityIDs))
+	}
+	
+	// Count entities in repository
+	entityCount := len(r.entities)
+	indexCount := len(indexedEntities)
+	
+	logger.Info("Index health check: %d entities in repository, %d entities in tag index", entityCount, indexCount)
+	
+	if entityCount != indexCount {
+		return fmt.Errorf("index mismatch: %d entities but only %d in tag index", entityCount, indexCount)
+	}
+	
 	return nil
 }

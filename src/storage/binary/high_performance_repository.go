@@ -285,3 +285,13 @@ func (r *HighPerformanceRepository) Delete(id string) error {
 // - ListRawTags (if not in base)
 // - ListByContent (if not in base)
 // - GetContentValue (if not in base)
+
+// ReindexTags rebuilds all tag indexes
+func (r *HighPerformanceRepository) ReindexTags() error {
+	return r.EntityRepository.ReindexTags()
+}
+
+// VerifyIndexHealth checks index consistency
+func (r *HighPerformanceRepository) VerifyIndexHealth() error {
+	return r.EntityRepository.VerifyIndexHealth()
+}

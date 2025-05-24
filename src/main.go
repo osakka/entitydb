@@ -360,6 +360,11 @@ func main() {
 	apiRouter.HandleFunc("/feature-flags", configHandlerRBAC.GetFeatureFlagsWithRBAC()).Methods("GET")
 	apiRouter.HandleFunc("/feature-flags/set", configHandlerRBAC.SetFeatureFlagWithRBAC()).Methods("POST")
 	
+	// Admin routes with RBAC (require admin permission)
+	adminHandler := api.NewAdminHandler(server.entityRepo)
+	apiRouter.HandleFunc("/admin/reindex", api.RBACMiddleware(server.entityRepo, server.sessionManager, api.RBACPermission{Resource: "admin", Action: "reindex"})(adminHandler.ReindexHandler)).Methods("POST")
+	apiRouter.HandleFunc("/admin/health", api.RBACMiddleware(server.entityRepo, server.sessionManager, api.RBACPermission{Resource: "admin", Action: "health"})(adminHandler.HealthCheckHandler)).Methods("GET")
+	
 	// Health endpoint (no authentication required)
 	healthHandler := api.NewHealthHandler(server.entityRepo)
 	router.HandleFunc("/health", healthHandler.Health).Methods("GET")

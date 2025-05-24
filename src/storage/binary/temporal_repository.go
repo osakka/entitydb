@@ -693,3 +693,13 @@ func (r *TemporalRepository) ListByTag(tag string) ([]*models.Entity, error) {
 	// Use the base repository for now
 	return r.HighPerformanceRepository.ListByTag(tag)
 }
+
+// ReindexTags rebuilds all tag indexes
+func (r *TemporalRepository) ReindexTags() error {
+	return r.HighPerformanceRepository.ReindexTags()
+}
+
+// VerifyIndexHealth checks index consistency
+func (r *TemporalRepository) VerifyIndexHealth() error {
+	return r.HighPerformanceRepository.VerifyIndexHealth()
+}
