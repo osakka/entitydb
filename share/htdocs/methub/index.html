@@ -29,56 +29,73 @@
                 </div>
                 
                 <div class="header-actions">
-                    <!-- Time Range Selector -->
-                    <select x-model="timeRange" @change="refreshData()" class="time-selector">
-                        <option value="5m">Last 5 minutes</option>
-                        <option value="15m">Last 15 minutes</option>
-                        <option value="1h">Last 1 hour</option>
-                        <option value="6h">Last 6 hours</option>
-                        <option value="24h">Last 24 hours</option>
-                        <option value="7d">Last 7 days</option>
-                    </select>
+                    <!-- View Selector -->
+                    <div class="view-tabs">
+                        <button @click="currentView = 'dashboard'" :class="{'active': currentView === 'dashboard'}" class="view-tab">
+                            <i class="fas fa-chart-line"></i> Dashboard
+                        </button>
+                        <button @click="currentView = 'agents'" :class="{'active': currentView === 'agents'}" class="view-tab">
+                            <i class="fas fa-server"></i> Agents
+                        </button>
+                    </div>
                     
-                    <!-- Refresh Button -->
-                    <button @click="refreshData()" class="btn-refresh" :class="{'spinning': loading}">
-                        <i class="fas fa-sync-alt"></i>
-                    </button>
-                    
-                    <!-- Auto-refresh Toggle -->
-                    <label class="auto-refresh">
-                        <input type="checkbox" x-model="autoRefresh">
-                        <span>Auto-refresh</span>
-                    </label>
-                    
-                    <!-- Add Widget Button -->
-                    <button @click="showAddWidget = true" class="btn-primary">
-                        <i class="fas fa-plus"></i> Add Widget
-                    </button>
+                    <template x-if="currentView === 'dashboard'">
+                        <div style="display: flex; align-items: center; gap: 1rem;">
+                            <!-- Time Range Selector -->
+                            <select x-model="timeRange" @change="refreshData()" class="time-selector">
+                                <option value="5m">Last 5 minutes</option>
+                                <option value="15m">Last 15 minutes</option>
+                                <option value="1h">Last 1 hour</option>
+                                <option value="6h">Last 6 hours</option>
+                                <option value="24h">Last 24 hours</option>
+                                <option value="7d">Last 7 days</option>
+                            </select>
+                            
+                            <!-- Refresh Button -->
+                            <button @click="refreshData()" class="btn-refresh" :class="{'spinning': loading}">
+                                <i class="fas fa-sync-alt"></i>
+                            </button>
+                            
+                            <!-- Auto-refresh Toggle -->
+                            <label class="auto-refresh">
+                                <input type="checkbox" x-model="autoRefresh">
+                                <span>Auto-refresh</span>
+                            </label>
+                            
+                            <!-- Add Widget Button -->
+                            <button @click="showAddWidget = true" class="btn-primary">
+                                <i class="fas fa-plus"></i> Add Widget
+                            </button>
+                        </div>
+                    </template>
                 </div>
             </div>
         </header>
 
-        <!-- Host Selector -->
-        <div class="host-selector" x-show="hosts.length > 0">
-            <div class="host-tabs">
-                <button 
-                    @click="selectedHost = null" 
-                    :class="{'active': selectedHost === null}"
-                    class="host-tab">
-                    <i class="fas fa-globe"></i> All Hosts
-                </button>
-                <template x-for="host in hosts" :key="host">
-                    <button 
-                        @click="selectedHost = host" 
-                        :class="{'active': selectedHost === host}"
-                        class="host-tab">
-                        <i class="fas fa-server"></i> <span x-text="host"></span>
-                    </button>
-                </template>
-            </div>
-        </div>
+        <!-- Dashboard View -->
+        <template x-if="currentView === 'dashboard'">
+            <div>
+                <!-- Host Selector -->
+                <div class="host-selector" x-show="hosts.length > 0">
+                    <div class="host-tabs">
+                        <button 
+                            @click="selectedHost = null" 
+                            :class="{'active': selectedHost === null}"
+                            class="host-tab">
+                            <i class="fas fa-globe"></i> All Hosts
+                        </button>
+                        <template x-for="host in hosts" :key="host">
+                            <button 
+                                @click="selectedHost = host" 
+                                :class="{'active': selectedHost === host}"
+                                class="host-tab">
+                                <i class="fas fa-server"></i> <span x-text="host"></span>
+                            </button>
+                        </template>
+                    </div>
+                </div>
 
-        <!-- Dashboard Grid -->
+                <!-- Dashboard Grid -->
         <div class="dashboard-grid" :class="'grid-cols-' + gridColumns">
             <template x-for="(widget, index) in widgets" :key="widget.id">
                 <div class="widget-container" :class="'span-' + (widget.span || 1)">
@@ -109,6 +126,60 @@
                 <p>Click "Add Widget" to start monitoring metrics</p>
             </div>
         </div>
+            </div>
+        </template>
+        
+        <!-- Agents View -->
+        <template x-if="currentView === 'agents'">
+            <div class="agents-view">
+                <div class="agents-header">
+                    <h2>Connected Agents</h2>
+                    <button @click="loadAgents()" class="btn-refresh" :class="{'spinning': loadingAgents}">
+                        <i class="fas fa-sync-alt"></i> Refresh
+                    </button>
+                </div>
+                
+                <div class="agents-grid">
+                    <template x-for="agent in agents" :key="agent.host">
+                        <div class="agent-card">
+                            <div class="agent-header">
+                                <i class="fas fa-server"></i>
+                                <h3 x-text="agent.host"></h3>
+                                <span class="agent-status" :class="agent.isActive ? 'active' : 'inactive'">
+                                    <i class="fas fa-circle"></i>
+                                    <span x-text="agent.isActive ? 'Active' : 'Inactive'"></span>
+                                </span>
+                            </div>
+                            <div class="agent-details">
+                                <div class="detail-row">
+                                    <span>Last Seen:</span>
+                                    <span x-text="formatTime(agent.lastSeen)"></span>
+                                </div>
+                                <div class="detail-row">
+                                    <span>Metrics:</span>
+                                    <span x-text="agent.metricCount"></span>
+                                </div>
+                                <div class="detail-row">
+                                    <span>First Seen:</span>
+                                    <span x-text="formatTime(agent.firstSeen)"></span>
+                                </div>
+                            </div>
+                            <div class="agent-actions">
+                                <button @click="selectedHost = agent.host; currentView = 'dashboard'" class="btn-secondary">
+                                    <i class="fas fa-chart-line"></i> View Metrics
+                                </button>
+                            </div>
+                        </div>
+                    </template>
+                    
+                    <div x-show="agents.length === 0" class="empty-state">
+                        <i class="fas fa-server"></i>
+                        <h3>No agents connected</h3>
+                        <p>Start the MetHub agent on your servers to begin monitoring</p>
+                    </div>
+                </div>
+            </div>
+        </template>
 
         <!-- Add/Edit Widget Modal -->
         <div x-show="showAddWidget || editingWidget" 

@@ -12,6 +12,9 @@ window.methub = function() {
         showAddWidget: false,
         editingWidget: null,
         gridColumns: 4,
+        currentView: 'dashboard',
+        agents: [],
+        loadingAgents: false,
         
         // API instances
         api: null,
@@ -174,14 +177,26 @@ window.methub = function() {
                     widget.metricName
                 );
                 
+                console.log(`📊 Widget ${widget.title} metrics:`, metrics.length, 'data points');
+                
+                // Wait for next tick to ensure DOM is ready
+                await this.$nextTick();
+                
                 // Find widget container
                 const container = document.querySelector(`#widget-${widget.id} .widget-content`);
                 if (container) {
                     widget.api = this.api; // Pass API reference
                     await this.widgetRenderer.renderWidget(widget, metrics, container);
+                } else {
+                    console.warn(`Container not found for widget ${widget.id}`);
                 }
             } catch (error) {
                 console.error(`Error updating widget ${widget.title}:`, error);
+                // Show error in widget
+                const container = document.querySelector(`#widget-${widget.id} .widget-content`);
+                if (container) {
+                    container.innerHTML = '<div class="error">Failed to load data</div>';
+                }
             }
         },
         
@@ -285,6 +300,69 @@ window.methub = function() {
             return 'widget_' + Math.random().toString(36).substr(2, 9);
         },
         
+        // Load agents data
+        async loadAgents() {
+            if (this.loadingAgents) return;
+            
+            try {
+                this.loadingAgents = true;
+                console.log('🔄 Loading agents...');
+                
+                // Get all unique hosts from metrics
+                const recentMetrics = await this.api.queryMetrics('24h'); // Last 24 hours
+                const hostMap = new Map();
+                
+                recentMetrics.forEach(metric => {
+                    const host = metric.host;
+                    if (!host) return;
+                    
+                    if (!hostMap.has(host)) {
+                        hostMap.set(host, {
+                            host: host,
+                            firstSeen: metric.timestamp,
+                            lastSeen: metric.timestamp,
+                            metricCount: 0
+                        });
+                    }
+                    
+                    const agentData = hostMap.get(host);
+                    agentData.metricCount++;
+                    agentData.lastSeen = Math.max(agentData.lastSeen, metric.timestamp);
+                    agentData.firstSeen = Math.min(agentData.firstSeen, metric.timestamp);
+                });
+                
+                // Convert to array and determine active status
+                const now = Date.now() * 1000000; // nanoseconds
+                this.agents = Array.from(hostMap.values()).map(agent => ({
+                    ...agent,
+                    isActive: (now - agent.lastSeen) < (5 * 60 * 1e9) // Active if seen in last 5 minutes
+                }));
+                
+                // Sort by last seen
+                this.agents.sort((a, b) => b.lastSeen - a.lastSeen);
+                
+                console.log('✅ Loaded', this.agents.length, 'agents');
+            } catch (error) {
+                console.error('Error loading agents:', error);
+            } finally {
+                this.loadingAgents = false;
+            }
+        },
+        
+        // Format time helper
+        formatTime(timestamp) {
+            if (!timestamp) return 'Never';
+            const date = new Date(timestamp / 1000000); // Convert from nanoseconds
+            const now = new Date();
+            const diff = now - date;
+            
+            if (diff < 60000) return 'Just now';
+            if (diff < 3600000) return Math.floor(diff / 60000) + ' minutes ago';
+            if (diff < 86400000) return Math.floor(diff / 3600000) + ' hours ago';
+            
+            return date.toLocaleString();
+        },
+        
         // Initialize watchers after Alpine loads
         initWatchers() {
             this.$watch('autoRefresh', () => {
@@ -297,6 +375,12 @@ window.methub = function() {
             
             this.$watch('selectedHost', () => {
                 this.refreshData();
+            });
+            
+            this.$watch('currentView', (value) => {
+                if (value === 'agents') {
+                    this.loadAgents();
+                }
             });
         }
     };

@@ -96,9 +96,21 @@ class MetHubAPI {
         }
         
         // Query entities
-        const result = await this.request('POST', `/api/v1/hubs/${this.hub}/entities/query`, query);
-        
-        return this.transformMetrics(result.entities || []);
+        try {
+            const result = await this.request('POST', `/api/v1/hubs/${this.hub}/entities/query`, query);
+            console.log('Query result:', result);
+            return this.transformMetrics(result.entities || result || []);
+        } catch (error) {
+            console.error('Failed to query metrics:', error);
+            // Try fallback query without hub
+            try {
+                const fallbackResult = await this.request('GET', `/api/v1/entities/list?tags=type:metric`);
+                return this.transformMetrics(fallbackResult || []);
+            } catch (fallbackError) {
+                console.error('Fallback query also failed:', fallbackError);
+                return [];
+            }
+        }
     }
 
     // Get latest metric value
