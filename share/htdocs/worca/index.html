@@ -989,155 +989,166 @@
         }
 
         /* Edit Modal Styles */
-        .fixed {
+        .edit-modal-backdrop {
             position: fixed;
-        }
-        
-        .inset-0 {
             top: 0;
             right: 0;
             bottom: 0;
             left: 0;
-        }
-        
-        .z-50 {
-            z-index: 50;
-        }
-        
-        .bg-black {
             background-color: rgba(0, 0, 0, 0.5);
+            z-index: 50;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
         }
         
-        .max-w-2xl {
-            max-width: 42rem;
-        }
-        
-        .max-h-\\[90vh\\] {
-            max-height: 90vh;
-        }
-        
-        .overflow-y-auto {
-            overflow-y: auto;
-        }
-        
-        .shadow-xl {
+        .edit-modal-container {
+            background: var(--card-bg);
+            border-radius: 12px;
             box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            max-width: 42rem;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            border: 1px solid var(--border-color);
         }
         
-        .border-b {
-            border-bottom-width: 1px;
+        .edit-modal-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
         }
         
-        .border-gray-200 {
-            border-color: #e5e7eb;
+        .edit-modal-header h3 {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            margin: 0;
         }
         
-        [data-theme="dark"] .border-gray-200 {
-            border-color: #4b5563;
+        .edit-modal-header button {
+            color: var(--text-secondary);
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 0.5rem;
+            border-radius: 6px;
+            transition: all 0.2s;
         }
         
-        .border-gray-700 {
-            border-color: #4b5563;
+        .edit-modal-header button:hover {
+            background: var(--hover-bg);
+            color: var(--text-primary);
         }
         
-        .text-gray-900 {
-            color: #111827;
+        .edit-modal-body {
+            padding: 1.5rem;
         }
         
-        [data-theme="dark"] .text-gray-900 {
-            color: #f9fafb;
+        .edit-modal-body form > div {
+            margin-bottom: 1rem;
         }
         
-        .text-gray-400 {
-            color: #9ca3af;
+        .edit-modal-body label {
+            display: block;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
         }
         
-        .text-gray-600 {
-            color: #4b5563;
+        .edit-modal-body input[type="text"],
+        .edit-modal-body input[type="date"],
+        .edit-modal-body textarea,
+        .edit-modal-body select {
+            width: 100%;
+            padding: 0.5rem 0.75rem;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background: var(--content-bg);
+            color: var(--text-primary);
+            font-size: 0.875rem;
+            transition: all 0.2s;
         }
         
-        .text-gray-300 {
-            color: #d1d5db;
+        .edit-modal-body input:focus,
+        .edit-modal-body textarea:focus,
+        .edit-modal-body select:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(8, 145, 178, 0.1);
         }
         
-        .text-gray-700 {
-            color: #374151;
+        .edit-modal-body textarea {
+            resize: vertical;
+            min-height: 80px;
         }
         
-        [data-theme="dark"] .text-gray-700 {
-            color: #d1d5db;
+        .edit-modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.75rem;
+            padding: 0 1.5rem 1.5rem;
         }
         
-        .bg-gray-800 {
-            background-color: #1f2937;
+        .edit-modal-footer button {
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px solid;
         }
         
-        .bg-gray-700 {
-            background-color: #374151;
+        .edit-modal-footer .btn-cancel {
+            background: transparent;
+            color: var(--text-secondary);
+            border-color: var(--border-color);
         }
         
-        .bg-gray-50 {
-            background-color: #f9fafb;
+        .edit-modal-footer .btn-cancel:hover {
+            background: var(--hover-bg);
+            color: var(--text-primary);
         }
         
-        [data-theme="dark"] .bg-gray-50 {
-            background-color: #374151;
+        .edit-modal-footer .btn-save {
+            background: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
         }
         
-        .border-gray-300 {
-            border-color: #d1d5db;
+        .edit-modal-footer .btn-save:hover {
+            background: #0a7793;
+            border-color: #0a7793;
         }
         
-        [data-theme="dark"] .border-gray-300 {
-            border-color: #4b5563;
-        }
-        
-        .border-gray-600 {
-            border-color: #4b5563;
-        }
-        
-        .focus\\:ring-2:focus {
-            ring-width: 2px;
-        }
-        
-        .focus\\:ring-blue-500:focus {
-            ring-color: #3b82f6;
-        }
-        
-        .focus\\:border-blue-500:focus {
-            border-color: #3b82f6;
-        }
-        
-        .bg-blue-500 {
-            background-color: #3b82f6;
-        }
-        
-        .bg-blue-600 {
-            background-color: #2563eb;
-        }
-        
-        .hover\\:bg-blue-600:hover {
-            background-color: #2563eb;
-        }
-        
-        .hover\\:bg-gray-50:hover {
-            background-color: #f9fafb;
-        }
-        
-        [data-theme="dark"] .hover\\:bg-gray-50:hover {
-            background-color: #374151;
-        }
-        
-        .hover\\:bg-gray-700:hover {
-            background-color: #374151;
-        }
-        
-        .disabled\\:opacity-50:disabled {
+        .edit-modal-footer .btn-save:disabled {
             opacity: 0.5;
+            cursor: not-allowed;
         }
         
-        .disabled\\:cursor-not-allowed:disabled {
-            cursor: not-allowed;
+        /* Dark mode adjustments */
+        [data-theme="dark"] .edit-modal-container {
+            background: #1f2937;
+        }
+        
+        [data-theme="dark"] .edit-modal-body input,
+        [data-theme="dark"] .edit-modal-body textarea,
+        [data-theme="dark"] .edit-modal-body select {
+            background: #374151;
+            border-color: #4b5563;
+        }
+        
+        [data-theme="dark"] .edit-modal-body input:focus,
+        [data-theme="dark"] .edit-modal-body textarea:focus,
+        [data-theme="dark"] .edit-modal-body select:focus {
+            border-color: var(--primary-color);
         }
         
         /* Editable Row Styles */
@@ -1715,47 +1726,44 @@
                      x-transition:leave="transition ease-in duration-200"
                      x-transition:leave-start="opacity-100 transform scale-100"
                      x-transition:leave-end="opacity-0 transform scale-90"
-                     class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
+                     class="edit-modal-backdrop"
                      style="display: none;">
-                    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto mx-4">
+                    <div class="edit-modal-container">
                         <!-- Modal Header -->
-                        <div class="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
-                            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
-                                <i class="fas fa-edit mr-2 text-blue-500"></i>
+                        <div class="edit-modal-header">
+                            <h3>
+                                <i class="fas fa-edit" style="color: var(--primary-color); margin-right: 0.5rem;"></i>
                                 Edit <span x-text="editForm.type || 'Item'"></span>
                             </h3>
-                            <button @click="showEditModal = false" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
-                                <i class="fas fa-times text-xl"></i>
+                            <button @click="showEditModal = false">
+                                <i class="fas fa-times"></i>
                             </button>
                         </div>
 
                         <!-- Modal Body -->
-                        <div class="p-6">
+                        <div class="edit-modal-body">
                             <form @submit.prevent="saveEditItem()">
                                 <!-- Name/Title Field -->
-                                <div class="mb-4">
-                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                <div>
+                                    <label>
                                         <span x-text="editForm.type === 'task' ? 'Title' : 'Name'"></span>
                                     </label>
                                     <input type="text" 
                                            x-model="editForm.name" 
-                                           class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
                                            required>
                                 </div>
 
                                 <!-- Description Field -->
-                                <div class="mb-4">
-                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Description</label>
+                                <div>
+                                    <label>Description</label>
                                     <textarea x-model="editForm.description" 
-                                              rows="3"
-                                              class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"></textarea>
+                                              rows="3"></textarea>
                                 </div>
 
                                 <!-- Status Field -->
-                                <div class="mb-4">
-                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Status</label>
-                                    <select x-model="editForm.status" 
-                                            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white">
+                                <div>
+                                    <label>Status</label>
+                                    <select x-model="editForm.status">
                                         <option value="todo">To Do</option>
                                         <option value="doing">In Progress</option>
                                         <option value="review">Review</option>
@@ -1764,10 +1772,9 @@
                                 </div>
 
                                 <!-- Priority Field -->
-                                <div class="mb-4">
-                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Priority</label>
-                                    <select x-model="editForm.priority" 
-                                            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white">
+                                <div>
+                                    <label>Priority</label>
+                                    <select x-model="editForm.priority">
                                         <option value="low">Low</option>
                                         <option value="medium">Medium</option>
                                         <option value="high">High</option>
@@ -1775,10 +1782,9 @@
                                 </div>
 
                                 <!-- Assignee Field (for tasks) -->
-                                <div x-show="editForm.type === 'task'" class="mb-4">
-                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Assignee</label>
-                                    <select x-model="editForm.assignee" 
-                                            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white">
+                                <div x-show="editForm.type === 'task'">
+                                    <label>Assignee</label>
+                                    <select x-model="editForm.assignee">
                                         <option value="">Unassigned</option>
                                         <template x-for="member in teamMembers" :key="member.id">
                                             <option :value="member.id" x-text="member.name"></option>
@@ -1787,23 +1793,22 @@
                                 </div>
 
                                 <!-- Due Date Field -->
-                                <div class="mb-6">
-                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Due Date</label>
+                                <div style="margin-bottom: 1.5rem;">
+                                    <label>Due Date</label>
                                     <input type="date" 
-                                           x-model="editForm.dueDate" 
-                                           class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white">
+                                           x-model="editForm.dueDate">
                                 </div>
 
                                 <!-- Modal Footer -->
-                                <div class="flex justify-end space-x-3">
+                                <div class="edit-modal-footer">
                                     <button type="button" 
                                             @click="showEditModal = false"
-                                            class="px-4 py-2 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700">
+                                            class="btn-cancel">
                                         Cancel
                                     </button>
                                     <button type="submit" 
                                             :disabled="loading"
-                                            class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed">
+                                            class="btn-save">
                                         <span x-show="!loading">Save Changes</span>
                                         <span x-show="loading">Saving...</span>
                                     </button>
