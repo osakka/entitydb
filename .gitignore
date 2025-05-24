@@ -54,3 +54,4 @@ coverage.txt
 *.dylib
 *.out
 go.worktest_persistent_index/
+var/entities.idx
