@@ -33,7 +33,7 @@ func (h *EntityHandlerRBAC) GetEntityWithRBAC() http.HandlerFunc {
 
 // ListEntitiesWithRBAC wraps ListEntities with permission check
 func (h *EntityHandlerRBAC) ListEntitiesWithRBAC() http.HandlerFunc {
-	return RequirePermission(h.sessionManager, h.repo, PermEntityView)(h.handler.ListEntities)
+	return RequirePermission(h.sessionManager, h.repo, PermEntityView)(h.handler.ListEntitiesDataspaceAware)
 }
 
 // UpdateEntityWithRBAC wraps UpdateEntity with permission check

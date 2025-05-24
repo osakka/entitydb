@@ -167,10 +167,16 @@ func (r *DataspaceRepository) ListByTags(tags []string, matchAll bool) ([]*model
 	filteredTags := []string{}
 	
 	for _, tag := range tags {
-		if strings.HasPrefix(tag, "dataspace:") || strings.HasPrefix(tag, "hub:") {
-			dataspaceName = strings.TrimPrefix(strings.TrimPrefix(tag, "dataspace:"), "hub:")
+		// Handle temporal tags
+		actualTag := tag
+		if parts := strings.SplitN(tag, "|", 2); len(parts) == 2 {
+			actualTag = parts[1]
+		}
+		
+		if strings.HasPrefix(actualTag, "dataspace:") || strings.HasPrefix(actualTag, "hub:") {
+			dataspaceName = strings.TrimPrefix(strings.TrimPrefix(actualTag, "dataspace:"), "hub:")
 		} else {
-			filteredTags = append(filteredTags, tag)
+			filteredTags = append(filteredTags, actualTag)
 		}
 	}
 	
@@ -277,25 +283,32 @@ func (d *DataspaceIndexImpl) AddEntity(entity *models.Entity) error {
 	
 	// Update tag index
 	for _, tag := range entity.Tags {
+		// Handle temporal tags
+		actualTag := tag
+		if parts := strings.SplitN(tag, "|", 2); len(parts) == 2 {
+			actualTag = parts[1]
+		}
+		
 		// Skip dataspace tags
-		if strings.HasPrefix(tag, "dataspace:") || strings.HasPrefix(tag, "hub:") {
+		if strings.HasPrefix(actualTag, "dataspace:") || strings.HasPrefix(actualTag, "hub:") {
 			continue
 		}
 		
-		if _, exists := d.tagIndex[tag]; !exists {
-			d.tagIndex[tag] = []string{}
+		// Use the actual tag (without timestamp) for indexing
+		if _, exists := d.tagIndex[actualTag]; !exists {
+			d.tagIndex[actualTag] = []string{}
 		}
 		
 		// Add entity ID if not already present
 		found := false
-		for _, id := range d.tagIndex[tag] {
+		for _, id := range d.tagIndex[actualTag] {
 			if id == entity.ID {
 				found = true
 				break
 			}
 		}
 		if !found {
-			d.tagIndex[tag] = append(d.tagIndex[tag], entity.ID)
+			d.tagIndex[actualTag] = append(d.tagIndex[actualTag], entity.ID)
 		}
 	}
 	
