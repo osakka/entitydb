@@ -196,6 +196,12 @@ func main() {
 		binaryRepo = repo.EntityRepository
 	case *binary.EntityRepository:
 		binaryRepo = repo
+	case *binary.DataspaceRepository:
+		// DataspaceRepository embeds EntityRepository
+		binaryRepo = repo.EntityRepository
+	case *binary.WALOnlyRepository:
+		// WALOnlyRepository embeds EntityRepository
+		binaryRepo = repo.EntityRepository
 	default:
 		logger.Fatalf("Unsupported repository type for relationships: %T", entityRepo)
 	}

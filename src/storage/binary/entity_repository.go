@@ -52,6 +52,12 @@ type EntityRepository struct {
 // NewEntityRepository creates a new binary entity repository
 func NewEntityRepository(dataPath string) (*EntityRepository, error) {
 	logger.Debug("NewEntityRepository called with dataPath: %s", dataPath)
+	
+	// Ensure data directory exists
+	if err := os.MkdirAll(dataPath, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create data directory: %w", err)
+	}
+	
 	repo := &EntityRepository{
 		dataPath:      dataPath,
 		tagIndex:      make(map[string][]string),

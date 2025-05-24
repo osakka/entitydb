@@ -89,10 +89,10 @@ func (r *DataspaceRepository) CreateDataspace(dataspace *models.Dataspace) error
 		return fmt.Errorf("dataspace %s already exists", dataspace.Name)
 	}
 	
-	// Create dataspace index
+	// Create dataspace index (use .ebf extension so SaveTagIndexV2 creates .idx)
 	dsIndex := &DataspaceIndexImpl{
 		name:      dataspace.Name,
-		indexPath: filepath.Join(r.indexPath, dataspace.Name+".idx"),
+		indexPath: filepath.Join(r.indexPath, dataspace.Name+".ebf"),
 		entities:  make(map[string]bool),
 		tagIndex:  make(map[string][]string),
 	}
@@ -113,6 +113,7 @@ func (r *DataspaceRepository) CreateDataspace(dataspace *models.Dataspace) error
 func (r *DataspaceRepository) Create(entity *models.Entity) error {
 	// Extract dataspace from tags
 	dataspaceName := r.extractDataspace(entity)
+	logger.Debug("Creating entity %s in dataspace: %s", entity.ID, dataspaceName)
 	
 	// Create in base repository
 	if err := r.EntityRepository.Create(entity); err != nil {
@@ -124,10 +125,36 @@ func (r *DataspaceRepository) Create(entity *models.Entity) error {
 	dsIndex, exists := r.dataspaceIndexes[dataspaceName]
 	r.dsLock.RUnlock()
 	
+	if !exists && dataspaceName != "default" {
+		// Create dataspace if it doesn't exist
+		logger.Info("Creating dataspace '%s' on demand", dataspaceName)
+		newDataspace := &models.Dataspace{
+			Name: dataspaceName,
+			Config: models.DataspaceConfig{
+				IndexStrategy: models.IndexStrategyBTree,
+				OptimizeFor:   models.OptimizeForReads,
+			},
+		}
+		if err := r.CreateDataspace(newDataspace); err != nil {
+			logger.Error("Failed to create dataspace: %v", err)
+		} else {
+			// Get the newly created index
+			r.dsLock.RLock()
+			dsIndex, exists = r.dataspaceIndexes[dataspaceName]
+			r.dsLock.RUnlock()
+		}
+	}
+	
 	if exists {
 		if err := dsIndex.AddEntity(entity); err != nil {
 			logger.Error("Failed to add entity to dataspace index: %v", err)
+		} else {
+			// Save index after adding entity
+			if err := dsIndex.SaveToFile(dsIndex.indexPath); err != nil {
+				logger.Error("Failed to save dataspace index: %v", err)
+			}
 		}
+		logger.Debug("Added entity %s to dataspace '%s' index", entity.ID, dataspaceName)
 	}
 	
 	return nil
@@ -149,11 +176,14 @@ func (r *DataspaceRepository) ListByTags(tags []string, matchAll bool) ([]*model
 	
 	// If dataspace-specific, use dataspace index
 	if dataspaceName != "" {
+		logger.Debug("Dataspace query for '%s' with tags: %v", dataspaceName, filteredTags)
+		
 		r.dsLock.RLock()
 		dsIndex, exists := r.dataspaceIndexes[dataspaceName]
 		r.dsLock.RUnlock()
 		
 		if !exists {
+			logger.Debug("Dataspace '%s' not found", dataspaceName)
 			return []*models.Entity{}, nil
 		}
 		
@@ -161,6 +191,8 @@ func (r *DataspaceRepository) ListByTags(tags []string, matchAll bool) ([]*model
 		if err != nil {
 			return nil, err
 		}
+		
+		logger.Debug("Found %d entities in dataspace '%s'", len(entityIDs), dataspaceName)
 		
 		// Fetch entities using embedded repository
 		entities := make([]*models.Entity, 0, len(entityIDs))
@@ -181,12 +213,18 @@ func (r *DataspaceRepository) ListByTags(tags []string, matchAll bool) ([]*model
 // extractDataspace determines which dataspace an entity belongs to
 func (r *DataspaceRepository) extractDataspace(entity *models.Entity) string {
 	for _, tag := range entity.Tags {
-		if strings.HasPrefix(tag, "dataspace:") {
-			return strings.TrimPrefix(tag, "dataspace:")
+		// Handle temporal tags (TIMESTAMP|tag format)
+		actualTag := tag
+		if parts := strings.SplitN(tag, "|", 2); len(parts) == 2 {
+			actualTag = parts[1]
+		}
+		
+		if strings.HasPrefix(actualTag, "dataspace:") {
+			return strings.TrimPrefix(actualTag, "dataspace:")
 		}
 		// Backward compatibility with hub
-		if strings.HasPrefix(tag, "hub:") {
-			return strings.TrimPrefix(tag, "hub:")
+		if strings.HasPrefix(actualTag, "hub:") {
+			return strings.TrimPrefix(actualTag, "hub:")
 		}
 	}
 	return "default"
@@ -205,7 +243,8 @@ func (r *DataspaceRepository) loadDataspaceIndexes() error {
 	for _, entry := range entries {
 		if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".idx") {
 			name := strings.TrimSuffix(entry.Name(), ".idx")
-			indexPath := filepath.Join(r.indexPath, entry.Name())
+			// Use .ebf extension for consistency with SaveTagIndexV2
+			indexPath := filepath.Join(r.indexPath, name+".ebf")
 			
 			dsIndex := &DataspaceIndexImpl{
 				name:      name,

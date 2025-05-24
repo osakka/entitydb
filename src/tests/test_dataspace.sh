@@ -15,6 +15,7 @@ mkdir -p var/test_dataspace
 # Start server with dataspace mode
 export ENTITYDB_DATA_PATH=var/test_dataspace
 export ENTITYDB_DATASPACE=true
+export ENTITYDB_LOG_LEVEL=debug
 
 echo "Starting EntityDB with dataspace mode enabled..."
 ./bin/entitydb server > /tmp/dataspace_test.log 2>&1 &
@@ -41,14 +42,19 @@ echo "================================================"
 
 # Create in worcha dataspace
 echo -n "Creating task in 'worcha' dataspace... "
-curl -s -X POST http://localhost:8085/api/v1/entities/create \
+RESULT=$(curl -s -X POST http://localhost:8085/api/v1/entities/create \
      -H "Authorization: Bearer $TOKEN" \
      -H "Content-Type: application/json" \
      -d '{
        "id": "task-001",
        "tags": ["dataspace:worcha", "type:task", "status:open", "priority:high"],
        "content": "Implement dataspace feature"
-     }' > /dev/null && echo "OK"
+     }')
+if [ -n "$RESULT" ]; then
+    echo "Response: $RESULT"
+else
+    echo "OK"
+fi
 
 # Create in metrics dataspace
 echo -n "Creating metric in 'metrics' dataspace... "
@@ -122,7 +128,13 @@ ls -la var/test_dataspace/dataspaces/ 2>/dev/null || echo "  No dataspace direct
 
 echo
 
+# Check server logs
+echo
+echo "Server logs (last 20 lines):"
+tail -20 /tmp/dataspace_test.log
+
 # Cleanup
+echo
 echo "Cleaning up..."
 kill $SERVER_PID 2>/dev/null
 wait $SERVER_PID 2>/dev/null
