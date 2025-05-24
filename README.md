@@ -265,7 +265,7 @@ Optimized for multi-hub scalability:
 
 ## Version History
 
-- **v2.15.0** - 🚀 **Worca Widget System** with modular dashboards and full-screen responsive layout
+- **v2.16.0** - 🚀 **Worca Widget System** with modular dashboards and full-screen responsive layout
 - **v2.14.0** - High-performance mode and enhanced autochunking capabilities  
 - **v2.13.1** - Content format standardization and API testing framework
 - **v2.13.0** - Configuration system overhaul and content encoding fixes
@@ -336,7 +336,7 @@ Comprehensive guides available in [docs](./docs):
 ## Repository
 
 **Primary**: https://git.home.arpa/itdlabs/entitydb  
-**Latest Release**: v2.15.0 (Worca Widget System)
+**Latest Release**: v2.16.0 (Worca Widget System)
 
 ## License
 

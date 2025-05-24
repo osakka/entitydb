@@ -3,7 +3,7 @@
 > [!IMPORTANT]
 > EntityDB is a high-performance temporal database where every tag is timestamped with nanosecond precision. All data is stored in a custom binary format (EBF) with Write-Ahead Logging for durability and concurrent access support.
 
-## Current State (v2.15.0)
+## Current State (v2.16.0)
 
 EntityDB now features a unified Entity model with autochunking:
 - **Unified Entity Model**: Single content field ([]byte) per entity
@@ -210,7 +210,7 @@ All development follows the standardized Git workflow described in [docs/develop
 
 - URL: https://git.home.arpa/itdlabs/entitydb.git
 - Branch: main
-- Latest tag: v2.15.0
+- Latest tag: v2.16.0
 
 ## Development Principles
 
