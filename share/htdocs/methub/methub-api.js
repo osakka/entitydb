@@ -2,14 +2,14 @@
 class MetHubAPI {
     constructor() {
         this.baseUrl = window.location.origin;
-        this.token = localStorage.getItem('entitydb-token');
+        this.token = localStorage.getItem('methub-token');
         this.hub = 'metrics';
     }
 
     // Set auth token
     setToken(token) {
         this.token = token;
-        localStorage.setItem('entitydb-token', token);
+        localStorage.setItem('methub-token', token);
     }
 
     // Make API request
@@ -106,6 +106,7 @@ class MetHubAPI {
         };
         
         if (host) {
+            // Support both host: and metric:instance: formats
             query.tags.push(`host:${host}`);
         }
         
@@ -175,22 +176,28 @@ class MetHubAPI {
         return metrics[0];
     }
 
-    // Get available hosts
+    // Get available hosts/instances
     async getHosts() {
         const params = new URLSearchParams({
-            hub: this.hub,
-            self: 'type:metric',
+            tags: 'type:metric',
             include_content: 'true',
             include_raw_tags: 'true'
         });
         
-        const result = await this.request('GET', `/api/v1/hubs/entities/query?${params}`);
+        const result = await this.request('GET', `/api/v1/entities/list?${params}`);
         
         const hosts = new Set();
-        (result.entities || []).forEach(entity => {
-            const host = (entity.traits && entity.traits.host) || (entity.self && entity.self.host);
-            if (host) {
-                hosts.add(host);
+        (result.entities || result || []).forEach(entity => {
+            // Extract host from various tag formats
+            if (entity.tags) {
+                for (const tag of entity.tags) {
+                    // Look for host:hostname or metric:instance:name patterns
+                    if (tag.startsWith('host:')) {
+                        hosts.add(tag.substring(5));
+                    } else if (tag.startsWith('metric:instance:')) {
+                        hosts.add(tag.substring(16));
+                    }
+                }
             }
         });
         
