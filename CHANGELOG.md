@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **RBAC Metrics Dashboard**: Comprehensive real-time monitoring system for authentication, sessions, and access control
+  - `/api/v1/rbac/metrics` endpoint with detailed session analytics
+  - Authentication success/failure timeline with visual charts
+  - Active session monitoring with user details and duration tracking
+  - Role distribution analysis and permission usage statistics
+  - Security scoring and health indicators
+  - Professional charts using Chart.js with dark/light theme support
+  - Zero mock data - 100% real session and authentication metrics
+- **Enhanced Admin Interface**: New RBAC Metrics tab in EntityDB admin dashboard
+  - Real-time session table with username, role, duration, and status
+  - Authentication activity log with timestamps and details
+  - Interactive charts for authentication timeline and session activity
+  - Role distribution doughnut chart with live data
+  - Summary cards showing key security metrics and statistics
+
+### Changed
+- **System Metrics Enhancement**: Added environment variables to `/api/v1/system/metrics` response
+- **Fixed Index Health Metrics**: Updated Storage Engine page to show real index metrics instead of placeholders
+- **Storage Components Display**: Replaced non-functional "File System Analysis" with real storage component breakdown
+- **API Documentation**: Updated Swagger specifications to include new RBAC metrics structures
+
 ## [v2.14.0] - 2025-05-20
 
 ### Changed

@@ -21,6 +21,7 @@ EntityDB now features a unified Entity model with autochunking:
 - **Auto-Initialization**: Creates admin/admin user automatically on first start
 - **Query Adaptations**: All query functions handle temporal tags transparently
 - **Observability**: Comprehensive metrics with health checks, Prometheus format, and system analytics
+- **RBAC Metrics**: Real-time session monitoring, authentication analytics, and security metrics dashboard
 - **Modular Widget System**: Customizable dashboards with extensible widget registry and full-screen responsive layout
 
 ## What's Implemented
@@ -35,6 +36,7 @@ EntityDB now features a unified Entity model with autochunking:
 - User management with secure password hashing
 - Configuration as entities
 - Health monitoring and metrics endpoints
+- RBAC & session metrics with real-time monitoring dashboard
 
 ### Applications Built on EntityDB
 - **Worca (Workforce Orchestrator)**: Complete workforce management platform inspired by Orca intelligence. Features modular widget system, full-screen responsive layout, Kanban boards, team management, project hierarchies, and real-time analytics with oceanic theming. Includes customizable dashboards, comprehensive widget registry, dark/light themes, and mobile-responsive design. Located at `/share/htdocs/worca/`
@@ -57,6 +59,7 @@ EntityDB now features a unified Entity model with autochunking:
 │   │   ├── health_handler.go        # Health monitoring endpoint
 │   │   ├── metrics_handler.go       # Prometheus metrics endpoint
 │   │   ├── system_metrics_handler.go # EntityDB system metrics
+│   │   ├── rbac_metrics_handler.go  # RBAC & session metrics
 │   │   └── rbac_middleware.go       # RBAC enforcement middleware
 │   ├── models/                      # Entity models
 │   └── storage/binary/              # Binary format implementation
@@ -106,6 +109,7 @@ POST   /api/v1/feature-flags/set     # Requires config:update
 GET    /health                       # Health check with system metrics (no auth)
 GET    /metrics                      # Prometheus metrics format (no auth)
 GET    /api/v1/system/metrics        # EntityDB comprehensive metrics (no auth)
+GET    /api/v1/rbac/metrics          # RBAC & session metrics (requires admin)
 
 # API Documentation
 GET    /swagger/                     # Swagger UI

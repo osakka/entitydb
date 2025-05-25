@@ -836,6 +836,26 @@
                 }
             }
         },
+        "/api/v1/rbac/metrics": {
+            "get": {
+                "description": "Get comprehensive RBAC, session, and authentication metrics",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "rbac"
+                ],
+                "summary": "Get RBAC metrics",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.RBACMetricsResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/system/metrics": {
             "get": {
                 "description": "Get comprehensive system metrics specific to EntityDB",
@@ -1124,6 +1144,23 @@
         }
     },
     "definitions": {
+        "api.ActivityInfo": {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "string"
+                },
+                "details": {
+                    "type": "string"
+                },
+                "timestamp": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        },
         "api.ActivityItem": {
             "type": "object",
             "properties": {
@@ -1186,6 +1223,49 @@
                 },
                 "user": {
                     "$ref": "#/definitions/api.UserInfo"
+                }
+            }
+        },
+        "api.AuthTimePoint": {
+            "type": "object",
+            "properties": {
+                "failed": {
+                    "type": "integer"
+                },
+                "success": {
+                    "type": "integer"
+                },
+                "time": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.AuthenticationMetrics": {
+            "type": "object",
+            "properties": {
+                "failed_logins": {
+                    "type": "integer"
+                },
+                "failure_reasons": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "integer"
+                    }
+                },
+                "success_rate": {
+                    "type": "number"
+                },
+                "successful_logins": {
+                    "type": "integer"
+                },
+                "timeline": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.AuthTimePoint"
+                    }
+                },
+                "total_attempts": {
+                    "type": "integer"
                 }
             }
         },
@@ -1379,6 +1459,92 @@
                 },
                 "updated_today": {
                     "type": "integer"
+                }
+            }
+        },
+        "api.EnvironmentVariables": {
+            "type": "object",
+            "properties": {
+                "ENTITYDB_ADMIN_USER": {
+                    "type": "string"
+                },
+                "ENTITYDB_AUTH_REQUIRED": {
+                    "description": "Security Settings",
+                    "type": "string"
+                },
+                "ENTITYDB_AUTO_BACKUP": {
+                    "type": "string"
+                },
+                "ENTITYDB_BACKUP_INTERVAL": {
+                    "type": "string"
+                },
+                "ENTITYDB_BACKUP_PATH": {
+                    "type": "string"
+                },
+                "ENTITYDB_CACHE_SIZE": {
+                    "description": "Performance Settings",
+                    "type": "string"
+                },
+                "ENTITYDB_COMPRESSION": {
+                    "type": "string"
+                },
+                "ENTITYDB_DATASPACE_DEFAULT": {
+                    "type": "string"
+                },
+                "ENTITYDB_HIGH_PERFORMANCE": {
+                    "type": "string"
+                },
+                "ENTITYDB_HOST": {
+                    "type": "string"
+                },
+                "ENTITYDB_HTTPS_PORT": {
+                    "type": "string"
+                },
+                "ENTITYDB_HTTP_PORT": {
+                    "description": "Server Configuration",
+                    "type": "string"
+                },
+                "ENTITYDB_INSTANCE_ID": {
+                    "description": "Instance Settings",
+                    "type": "string"
+                },
+                "ENTITYDB_LOG_LEVEL": {
+                    "description": "Debug \u0026 Logging",
+                    "type": "string"
+                },
+                "ENTITYDB_LOG_PATH": {
+                    "type": "string"
+                },
+                "ENTITYDB_MAX_CONNECTIONS": {
+                    "type": "string"
+                },
+                "ENTITYDB_METRICS_ENABLED": {
+                    "type": "string"
+                },
+                "ENTITYDB_QUERY_TIMEOUT": {
+                    "type": "string"
+                },
+                "ENTITYDB_RBAC_ENABLED": {
+                    "type": "string"
+                },
+                "ENTITYDB_SESSION_TIMEOUT": {
+                    "type": "string"
+                },
+                "ENTITYDB_SSL_CERT": {
+                    "type": "string"
+                },
+                "ENTITYDB_SSL_ENABLED": {
+                    "type": "string"
+                },
+                "ENTITYDB_SSL_KEY": {
+                    "type": "string"
+                },
+                "ENTITYDB_STORAGE_PATH": {
+                    "description": "Storage Configuration",
+                    "type": "string"
+                },
+                "ENTITYDB_WAL_MODE": {
+                    "type": "string"
                 }
             }
         },
@@ -1580,6 +1746,20 @@
                 }
             }
         },
+        "api.PermissionInfo": {
+            "type": "object",
+            "properties": {
+                "usage_count": {
+                    "type": "integer"
+                },
+                "users": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
         "api.QueryEntityResponse": {
             "type": "object",
             "properties": {
@@ -1597,6 +1777,58 @@
                 },
                 "total": {
                     "type": "integer"
+                }
+            }
+        },
+        "api.RBACMetricsResponse": {
+            "type": "object",
+            "properties": {
+                "active_sessions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.SessionInfo"
+                    }
+                },
+                "authentication": {
+                    "$ref": "#/definitions/api.AuthenticationMetrics"
+                },
+                "recent_activity": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.ActivityInfo"
+                    }
+                },
+                "roles": {
+                    "$ref": "#/definitions/api.RoleMetrics"
+                },
+                "sessions": {
+                    "$ref": "#/definitions/api.SessionMetrics"
+                },
+                "summary": {
+                    "$ref": "#/definitions/api.RBACMetricsSummary"
+                },
+                "timestamp": {
+                    "type": "string"
+                },
+                "users": {
+                    "$ref": "#/definitions/api.UserMetrics"
+                }
+            }
+        },
+        "api.RBACMetricsSummary": {
+            "type": "object",
+            "properties": {
+                "active_session_rate": {
+                    "type": "number"
+                },
+                "admin_ratio": {
+                    "type": "number"
+                },
+                "auth_success_rate": {
+                    "type": "number"
+                },
+                "security_score": {
+                    "type": "number"
                 }
             }
         },
@@ -1684,6 +1916,110 @@
                     "type": "string"
                 },
                 "username": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.RoleMetrics": {
+            "type": "object",
+            "properties": {
+                "permissions": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "$ref": "#/definitions/api.PermissionInfo"
+                    }
+                },
+                "role_distribution": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "integer"
+                    }
+                },
+                "total_roles": {
+                    "type": "integer"
+                }
+            }
+        },
+        "api.SessionInfo": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "duration": {
+                    "type": "string"
+                },
+                "expires_at": {
+                    "type": "string"
+                },
+                "last_used": {
+                    "type": "string"
+                },
+                "roles": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "status": {
+                    "type": "string"
+                },
+                "token": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.SessionMetrics": {
+            "type": "object",
+            "properties": {
+                "average_session_duration_minutes": {
+                    "type": "number"
+                },
+                "peak_concurrent_sessions": {
+                    "type": "integer"
+                },
+                "session_timeline": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.SessionTimePoint"
+                    }
+                },
+                "sessions_by_duration": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "integer"
+                    }
+                },
+                "sessions_per_user": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "integer"
+                    }
+                },
+                "total_active_sessions": {
+                    "type": "integer"
+                }
+            }
+        },
+        "api.SessionTimePoint": {
+            "type": "object",
+            "properties": {
+                "active": {
+                    "type": "integer"
+                },
+                "created": {
+                    "type": "integer"
+                },
+                "expired": {
+                    "type": "integer"
+                },
+                "time": {
                     "type": "string"
                 }
             }
@@ -1782,6 +2118,9 @@
                 "entity_stats": {
                     "$ref": "#/definitions/api.EntityStats"
                 },
+                "environment": {
+                    "$ref": "#/definitions/api.EnvironmentVariables"
+                },
                 "memory": {
                     "$ref": "#/definitions/api.DetailedMemoryMetrics"
                 },
@@ -1822,6 +2161,17 @@
                 }
             }
         },
+        "api.UserCreationPoint": {
+            "type": "object",
+            "properties": {
+                "count": {
+                    "type": "integer"
+                },
+                "date": {
+                    "type": "string"
+                }
+            }
+        },
         "api.UserInfo": {
             "description": "User details",
             "type": "object",
@@ -1843,6 +2193,35 @@
                 "username": {
                     "type": "string",
                     "example": "admin"
+                }
+            }
+        },
+        "api.UserMetrics": {
+            "type": "object",
+            "properties": {
+                "active_users": {
+                    "type": "integer"
+                },
+                "admin_users": {
+                    "type": "integer"
+                },
+                "regular_users": {
+                    "type": "integer"
+                },
+                "total_users": {
+                    "type": "integer"
+                },
+                "user_creation_timeline": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.UserCreationPoint"
+                    }
+                },
+                "users_by_role": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "integer"
+                    }
                 }
             }
         },

@@ -1,5 +1,16 @@
 basePath: /api/v1
 definitions:
+  api.ActivityInfo:
+    properties:
+      action:
+        type: string
+      details:
+        type: string
+      timestamp:
+        type: string
+      username:
+        type: string
+    type: object
   api.ActivityItem:
     properties:
       description:
@@ -42,6 +53,34 @@ definitions:
         type: string
       user:
         $ref: '#/definitions/api.UserInfo'
+    type: object
+  api.AuthTimePoint:
+    properties:
+      failed:
+        type: integer
+      success:
+        type: integer
+      time:
+        type: string
+    type: object
+  api.AuthenticationMetrics:
+    properties:
+      failed_logins:
+        type: integer
+      failure_reasons:
+        additionalProperties:
+          type: integer
+        type: object
+      success_rate:
+        type: number
+      successful_logins:
+        type: integer
+      timeline:
+        items:
+          $ref: '#/definitions/api.AuthTimePoint'
+        type: array
+      total_attempts:
+        type: integer
     type: object
   api.ChangePasswordRequest:
     properties:
@@ -171,6 +210,65 @@ definitions:
         $ref: '#/definitions/api.EntitySizeInfo'
       updated_today:
         type: integer
+    type: object
+  api.EnvironmentVariables:
+    properties:
+      ENTITYDB_ADMIN_USER:
+        type: string
+      ENTITYDB_AUTH_REQUIRED:
+        description: Security Settings
+        type: string
+      ENTITYDB_AUTO_BACKUP:
+        type: string
+      ENTITYDB_BACKUP_INTERVAL:
+        type: string
+      ENTITYDB_BACKUP_PATH:
+        type: string
+      ENTITYDB_CACHE_SIZE:
+        description: Performance Settings
+        type: string
+      ENTITYDB_COMPRESSION:
+        type: string
+      ENTITYDB_DATASPACE_DEFAULT:
+        type: string
+      ENTITYDB_HIGH_PERFORMANCE:
+        type: string
+      ENTITYDB_HOST:
+        type: string
+      ENTITYDB_HTTP_PORT:
+        description: Server Configuration
+        type: string
+      ENTITYDB_HTTPS_PORT:
+        type: string
+      ENTITYDB_INSTANCE_ID:
+        description: Instance Settings
+        type: string
+      ENTITYDB_LOG_LEVEL:
+        description: Debug & Logging
+        type: string
+      ENTITYDB_LOG_PATH:
+        type: string
+      ENTITYDB_MAX_CONNECTIONS:
+        type: string
+      ENTITYDB_METRICS_ENABLED:
+        type: string
+      ENTITYDB_QUERY_TIMEOUT:
+        type: string
+      ENTITYDB_RBAC_ENABLED:
+        type: string
+      ENTITYDB_SESSION_TIMEOUT:
+        type: string
+      ENTITYDB_SSL_CERT:
+        type: string
+      ENTITYDB_SSL_ENABLED:
+        type: string
+      ENTITYDB_SSL_KEY:
+        type: string
+      ENTITYDB_STORAGE_PATH:
+        description: Storage Configuration
+        type: string
+      ENTITYDB_WAL_MODE:
+        type: string
     type: object
   api.ErrorResponse:
     description: Error information
@@ -310,6 +408,15 @@ definitions:
         example: 236206
         type: integer
     type: object
+  api.PermissionInfo:
+    properties:
+      usage_count:
+        type: integer
+      users:
+        items:
+          type: string
+        type: array
+    type: object
   api.QueryEntityResponse:
     properties:
       entities:
@@ -322,6 +429,40 @@ definitions:
         type: integer
       total:
         type: integer
+    type: object
+  api.RBACMetricsResponse:
+    properties:
+      active_sessions:
+        items:
+          $ref: '#/definitions/api.SessionInfo'
+        type: array
+      authentication:
+        $ref: '#/definitions/api.AuthenticationMetrics'
+      recent_activity:
+        items:
+          $ref: '#/definitions/api.ActivityInfo'
+        type: array
+      roles:
+        $ref: '#/definitions/api.RoleMetrics'
+      sessions:
+        $ref: '#/definitions/api.SessionMetrics'
+      summary:
+        $ref: '#/definitions/api.RBACMetricsSummary'
+      timestamp:
+        type: string
+      users:
+        $ref: '#/definitions/api.UserMetrics'
+    type: object
+  api.RBACMetricsSummary:
+    properties:
+      active_session_rate:
+        type: number
+      admin_ratio:
+        type: number
+      auth_success_rate:
+        type: number
+      security_score:
+        type: number
     type: object
   api.RefreshResponse:
     description: Refreshed session information
@@ -383,6 +524,74 @@ definitions:
       user_id:
         type: string
       username:
+        type: string
+    type: object
+  api.RoleMetrics:
+    properties:
+      permissions:
+        additionalProperties:
+          $ref: '#/definitions/api.PermissionInfo'
+        type: object
+      role_distribution:
+        additionalProperties:
+          type: integer
+        type: object
+      total_roles:
+        type: integer
+    type: object
+  api.SessionInfo:
+    properties:
+      created_at:
+        type: string
+      duration:
+        type: string
+      expires_at:
+        type: string
+      last_used:
+        type: string
+      roles:
+        items:
+          type: string
+        type: array
+      status:
+        type: string
+      token:
+        type: string
+      user_id:
+        type: string
+      username:
+        type: string
+    type: object
+  api.SessionMetrics:
+    properties:
+      average_session_duration_minutes:
+        type: number
+      peak_concurrent_sessions:
+        type: integer
+      session_timeline:
+        items:
+          $ref: '#/definitions/api.SessionTimePoint'
+        type: array
+      sessions_by_duration:
+        additionalProperties:
+          type: integer
+        type: object
+      sessions_per_user:
+        additionalProperties:
+          type: integer
+        type: object
+      total_active_sessions:
+        type: integer
+    type: object
+  api.SessionTimePoint:
+    properties:
+      active:
+        type: integer
+      created:
+        type: integer
+      expired:
+        type: integer
+      time:
         type: string
     type: object
   api.StatusResponse:
@@ -451,6 +660,8 @@ definitions:
         $ref: '#/definitions/api.DatabaseMetrics'
       entity_stats:
         $ref: '#/definitions/api.EntityStats'
+      environment:
+        $ref: '#/definitions/api.EnvironmentVariables'
       memory:
         $ref: '#/definitions/api.DetailedMemoryMetrics'
       performance:
@@ -477,6 +688,13 @@ definitions:
       time_range_start:
         type: string
     type: object
+  api.UserCreationPoint:
+    properties:
+      count:
+        type: integer
+      date:
+        type: string
+    type: object
   api.UserInfo:
     description: User details
     properties:
@@ -493,6 +711,25 @@ definitions:
       username:
         example: admin
         type: string
+    type: object
+  api.UserMetrics:
+    properties:
+      active_users:
+        type: integer
+      admin_users:
+        type: integer
+      regular_users:
+        type: integer
+      total_users:
+        type: integer
+      user_creation_timeline:
+        items:
+          $ref: '#/definitions/api.UserCreationPoint'
+        type: array
+      users_by_role:
+        additionalProperties:
+          type: integer
+        type: object
     type: object
   models.Entity:
     properties:
@@ -1058,6 +1295,19 @@ paths:
       summary: Set feature flag
       tags:
       - configuration
+  /api/v1/rbac/metrics:
+    get:
+      description: Get comprehensive RBAC, session, and authentication metrics
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.RBACMetricsResponse'
+      summary: Get RBAC metrics
+      tags:
+      - rbac
   /api/v1/system/metrics:
     get:
       consumes:
