@@ -14,6 +14,9 @@ function entityManager() {
         showChangePasswordModal: false,
         showTypeDropdown: false,
         
+        // Theme management
+        isDarkMode: localStorage.getItem('entitydb-theme') === 'dark',
+        
         // Change password form
         changePasswordForm: {
             currentPassword: '',
@@ -292,6 +295,9 @@ function entityManager() {
         // Initialize
         init() {
             console.log("🚀 Initializing EntityDB Dashboard");
+            
+            // Initialize theme
+            this.initTheme();
 
             // Clear any stuck localStorage for debugging
             if (window.location.search.includes('clear_cache=1')) {
@@ -1857,6 +1863,18 @@ function entityManager() {
             
             console.log("===============================================");
         },
+        
+        // Theme management
+        toggleTheme() {
+            this.isDarkMode = !this.isDarkMode;
+            localStorage.setItem('entitydb-theme', this.isDarkMode ? 'dark' : 'light');
+            document.documentElement.setAttribute('data-theme', this.isDarkMode ? 'dark' : 'light');
+        },
+        
+        // Initialize theme on startup
+        initTheme() {
+            document.documentElement.setAttribute('data-theme', this.isDarkMode ? 'dark' : 'light');
+        }
     };
 }
 

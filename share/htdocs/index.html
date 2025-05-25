@@ -22,11 +22,21 @@
         Loading EntityDB Dashboard...
     </div>
     
-    <div x-data="entityManager" x-cloak class="container">
+    <div x-data="entityManager" x-init="init()" x-cloak class="container">
         <!-- Header -->
         <header class="header">
             <div class="header-left">
+                <div class="logo-container">
+                    <img src="/share/resources/logo_white.svg" alt="EntityDB" class="logo logo-light" />
+                    <img src="/share/resources/logo_black.svg" alt="EntityDB" class="logo logo-dark" />
+                </div>
                 <h1>EntityDB Dashboard</h1>
+            </div>
+            <div class="header-right">
+                <button @click="toggleTheme()" class="theme-toggle" title="Toggle theme">
+                    <span x-show="!isDarkMode">🌙</span>
+                    <span x-show="isDarkMode">☀️</span>
+                </button>
             </div>
             <div class="header-actions">
                 <div x-show="user" class="nav-links">
@@ -46,6 +56,10 @@
         <!-- Login Form -->
         <div x-show="!user" class="main-content">
             <div class="login-form">
+                <div class="login-logo">
+                    <img src="/share/resources/logo_black.svg" alt="EntityDB" class="logo logo-light" />
+                    <img src="/share/resources/logo_white.svg" alt="EntityDB" class="logo logo-dark" />
+                </div>
                 <h2>EntityDB Login</h2>
                 <p class="login-hint">Default credentials: admin / admin</p>
                 <form @submit.prevent="login">
