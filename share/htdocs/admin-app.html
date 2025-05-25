@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EntityDB Admin</title>
+    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.12.3/dist/cdn.min.js" defer></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'SF Pro Display', sans-serif;
+            background: #f8f9fa;
+            color: #2c3e50;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .app-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        /* Header */
+        .app-header {
+            background: #ffffff;
+            border-bottom: 1px solid #e9ecef;
+            padding: 0 24px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .app-logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-weight: 600;
+            font-size: 18px;
+            color: #2c3e50;
+        }
+
+        .app-logo img {
+            height: 32px;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .logout-btn {
+            background: none;
+            border: 1px solid #dee2e6;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            color: #6c757d;
+            transition: all 0.2s;
+        }
+
+        .logout-btn:hover {
+            background: #e9ecef;
+            border-color: #adb5bd;
+        }
+
+        /* Tab Navigation */
+        .tab-nav {
+            background: #ffffff;
+            border-bottom: 1px solid #e9ecef;
+            padding: 0 24px;
+            display: flex;
+            align-items: center;
+            height: 48px;
+            overflow-x: auto;
+        }
+
+        .tab-btn {
+            background: none;
+            border: none;
+            padding: 12px 20px;
+            margin: 0 4px;
+            cursor: pointer;
+            font-size: 14px;
+            color: #6c757d;
+            border-radius: 6px 6px 0 0;
+            transition: all 0.2s;
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .tab-btn.active {
+            background: #f8f9fa;
+            color: #2c3e50;
+            font-weight: 500;
+        }
+
+        .tab-btn:hover:not(.active) {
+            background: #f1f3f4;
+            color: #495057;
+        }
+
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .tab-content {
+            flex: 1;
+            overflow: auto;
+            padding: 24px;
+        }
+
+        /* Login Form */
+        .login-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255,255,255,0.95);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .login-form {
+            background: #ffffff;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+        }
+
+        .login-logo {
+            margin-bottom: 32px;
+        }
+
+        .login-logo img {
+            height: 48px;
+        }
+
+        .login-form h2 {
+            margin-bottom: 8px;
+            color: #2c3e50;
+            font-weight: 600;
+        }
+
+        .login-hint {
+            color: #6c757d;
+            margin-bottom: 32px;
+            font-size: 14px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #495057;
+            font-size: 14px;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.2s;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: #007bff;
+            box-shadow: 0 0 0 3px rgba(0,123,255,0.1);
+        }
+
+        .btn-primary {
+            background: #007bff;
+            border: none;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            width: 100%;
+            transition: background 0.2s;
+        }
+
+        .btn-primary:hover {
+            background: #0056b3;
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .error-message {
+            color: #dc3545;
+            font-size: 14px;
+            margin-top: 8px;
+        }
+
+        /* Content Cards */
+        .content-card {
+            background: #ffffff;
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            margin-bottom: 24px;
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+
+        .card-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #2c3e50;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 32px;
+        }
+
+        .stat-card {
+            background: #ffffff;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #007bff;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .stat-value {
+            font-size: 28px;
+            font-weight: 700;
+            color: #2c3e50;
+            margin-bottom: 4px;
+        }
+
+        .stat-label {
+            color: #6c757d;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        /* Data Table */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #ffffff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .data-table th,
+        .data-table td {
+            padding: 12px 16px;
+            text-align: left;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .data-table th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #495057;
+            font-size: 14px;
+        }
+
+        .data-table td {
+            font-size: 14px;
+            color: #495057;
+        }
+
+        .data-table tr:hover td {
+            background: #f8f9fa;
+        }
+
+        /* Status Badges */
+        .status-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+            text-transform: uppercase;
+        }
+
+        .status-online {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-offline {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .status-warning {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        /* Toolbar */
+        .toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            gap: 16px;
+        }
+
+        .search-box {
+            flex: 1;
+            max-width: 300px;
+            position: relative;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 8px 16px 8px 40px;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #6c757d;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            border: none;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-secondary:hover {
+            background: #545b62;
+        }
+
+        /* Loading State */
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+            color: #6c757d;
+        }
+
+        .spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid #e9ecef;
+            border-top: 2px solid #007bff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 12px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .app-header {
+                padding: 0 16px;
+            }
+            
+            .tab-content {
+                padding: 16px;
+            }
+            
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body x-data="entityAdmin()" x-init="init()">
+    <!-- Login Overlay -->
+    <div x-show="!isAuthenticated" class="login-overlay">
+        <div class="login-form">
+            <div class="login-logo">
+                <img src="/share/resources/logo_black.svg" alt="EntityDB">
+            </div>
+            <h2>EntityDB Admin</h2>
+            <p class="login-hint">Database Administration Console</p>
+            
+            <form @submit.prevent="login()">
+                <div class="form-group">
+                    <label class="form-label">Username</label>
+                    <input type="text" class="form-input" x-model="loginForm.username" 
+                           placeholder="Enter username" required autofocus>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Password</label>
+                    <input type="password" class="form-input" x-model="loginForm.password" 
+                           placeholder="Enter password" required>
+                </div>
+                
+                <div x-show="loginError" class="error-message" x-text="loginError"></div>
+                
+                <button type="submit" class="btn-primary" :disabled="loading">
+                    <span x-show="!loading">Login</span>
+                    <span x-show="loading">Authenticating...</span>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Main App -->
+    <div x-show="isAuthenticated" class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="app-logo">
+                <img src="/share/resources/logo_black.svg" alt="EntityDB">
+                <span>EntityDB Admin</span>
+            </div>
+            
+            <div class="header-actions">
+                <div class="user-info">
+                    <i class="fas fa-user-circle"></i>
+                    <span x-text="currentUser?.username || 'admin'"></span>
+                </div>
+                <button class="logout-btn" @click="logout()">
+                    <i class="fas fa-sign-out-alt"></i>
+                    Logout
+                </button>
+            </div>
+        </header>
+
+        <!-- Tab Navigation -->
+        <nav class="tab-nav">
+            <button class="tab-btn" :class="{ active: activeTab === 'dashboard' }" @click="setTab('dashboard')">
+                <i class="fas fa-tachometer-alt"></i>
+                Dashboard
+            </button>
+            <button class="tab-btn" :class="{ active: activeTab === 'entities' }" @click="setTab('entities')">
+                <i class="fas fa-database"></i>
+                Entities
+            </button>
+            <button class="tab-btn" :class="{ active: activeTab === 'relationships' }" @click="setTab('relationships')">
+                <i class="fas fa-project-diagram"></i>
+                Relationships
+            </button>
+            <button class="tab-btn" :class="{ active: activeTab === 'users' }" @click="setTab('users')">
+                <i class="fas fa-users"></i>
+                Users & Sessions
+            </button>
+            <button class="tab-btn" :class="{ active: activeTab === 'api' }" @click="setTab('api')">
+                <i class="fas fa-code"></i>
+                API Explorer
+            </button>
+            <button class="tab-btn" :class="{ active: activeTab === 'metrics' }" @click="setTab('metrics')">
+                <i class="fas fa-chart-line"></i>
+                Metrics
+            </button>
+            <button class="tab-btn" :class="{ active: activeTab === 'system' }" @click="setTab('system')">
+                <i class="fas fa-cogs"></i>
+                System
+            </button>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Dashboard Tab -->
+            <div x-show="activeTab === 'dashboard'" class="tab-content">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-value" x-text="stats.totalEntities || '0'"></div>
+                        <div class="stat-label">Total Entities</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" x-text="stats.activeUsers || '0'"></div>
+                        <div class="stat-label">Active Users</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" x-text="stats.apiRequests || '0'"></div>
+                        <div class="stat-label">API Requests (24h)</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" x-text="stats.storageUsed || '0 MB'"></div>
+                        <div class="stat-label">Storage Used</div>
+                    </div>
+                </div>
+
+                <div class="content-card">
+                    <div class="card-header">
+                        <h3 class="card-title">
+                            <i class="fas fa-heart"></i>
+                            System Health
+                        </h3>
+                    </div>
+                    <div x-show="loading" class="loading">
+                        <div class="spinner"></div>
+                        Loading system status...
+                    </div>
+                    <div x-show="!loading">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Component</th>
+                                    <th>Status</th>
+                                    <th>Last Check</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Database Engine</td>
+                                    <td><span class="status-badge status-online">Online</span></td>
+                                    <td>Just now</td>
+                                </tr>
+                                <tr>
+                                    <td>API Server</td>
+                                    <td><span class="status-badge status-online">Online</span></td>
+                                    <td>Just now</td>
+                                </tr>
+                                <tr>
+                                    <td>Authentication</td>
+                                    <td><span class="status-badge status-online">Online</span></td>
+                                    <td>Just now</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Entities Tab -->
+            <div x-show="activeTab === 'entities'" class="tab-content">
+                <div class="toolbar">
+                    <div class="search-box">
+                        <i class="fas fa-search search-icon"></i>
+                        <input type="text" class="search-input" placeholder="Search entities..." 
+                               x-model="entitySearch" @input="searchEntities()">
+                    </div>
+                    <button class="btn-secondary" @click="refreshEntities()">
+                        <i class="fas fa-sync-alt"></i>
+                        Refresh
+                    </button>
+                </div>
+
+                <div class="content-card">
+                    <div class="card-header">
+                        <h3 class="card-title">
+                            <i class="fas fa-database"></i>
+                            Entity Browser
+                        </h3>
+                    </div>
+                    <div x-show="loading" class="loading">
+                        <div class="spinner"></div>
+                        Loading entities...
+                    </div>
+                    <div x-show="!loading && entities.length === 0">
+                        <p style="text-align: center; color: #6c757d; padding: 40px;">No entities found</p>
+                    </div>
+                    <div x-show="!loading && entities.length > 0">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Type</th>
+                                    <th>Tags</th>
+                                    <th>Created</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <template x-for="entity in entities.slice(0, 50)" :key="entity.id">
+                                    <tr>
+                                        <td x-text="entity.id.substring(0, 8) + '...'"></td>
+                                        <td x-text="getEntityType(entity)"></td>
+                                        <td x-text="entity.tags?.length || 0"></td>
+                                        <td x-text="formatDate(entity.created_at)"></td>
+                                        <td>
+                                            <button class="btn-secondary" style="padding: 4px 8px; font-size: 12px;">
+                                                View
+                                            </button>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Other tabs placeholder -->
+            <div x-show="activeTab === 'relationships'" class="tab-content">
+                <div class="content-card">
+                    <div class="card-header">
+                        <h3 class="card-title">
+                            <i class="fas fa-project-diagram"></i>
+                            Entity Relationships
+                        </h3>
+                    </div>
+                    <p style="text-align: center; color: #6c757d; padding: 40px;">Relationship browser coming soon...</p>
+                </div>
+            </div>
+
+            <div x-show="activeTab === 'users'" class="tab-content">
+                <div class="content-card">
+                    <div class="card-header">
+                        <h3 class="card-title">
+                            <i class="fas fa-users"></i>
+                            User Management
+                        </h3>
+                    </div>
+                    <p style="text-align: center; color: #6c757d; padding: 40px;">User management coming soon...</p>
+                </div>
+            </div>
+
+            <div x-show="activeTab === 'api'" class="tab-content">
+                <div class="content-card">
+                    <div class="card-header">
+                        <h3 class="card-title">
+                            <i class="fas fa-code"></i>
+                            API Explorer
+                        </h3>
+                    </div>
+                    <p style="text-align: center; color: #6c757d; padding: 40px;">
+                        <a href="/swagger/" target="_blank" style="color: #007bff; text-decoration: none;">
+                            Open Swagger Documentation →
+                        </a>
+                    </p>
+                </div>
+            </div>
+
+            <div x-show="activeTab === 'metrics'" class="tab-content">
+                <div class="content-card">
+                    <div class="card-header">
+                        <h3 class="card-title">
+                            <i class="fas fa-chart-line"></i>
+                            Performance Metrics
+                        </h3>
+                    </div>
+                    <p style="text-align: center; color: #6c757d; padding: 40px;">Performance monitoring coming soon...</p>
+                </div>
+            </div>
+
+            <div x-show="activeTab === 'system'" class="tab-content">
+                <div class="content-card">
+                    <div class="card-header">
+                        <h3 class="card-title">
+                            <i class="fas fa-cogs"></i>
+                            System Configuration
+                        </h3>
+                    </div>
+                    <p style="text-align: center; color: #6c757d; padding: 40px;">System settings coming soon...</p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        function entityAdmin() {
+            return {
+                // Auth state
+                isAuthenticated: false,
+                currentUser: null,
+                sessionToken: null,
+                loginForm: {
+                    username: '',
+                    password: ''
+                },
+                loginError: '',
+                loading: false,
+
+                // App state
+                activeTab: 'dashboard',
+                entities: [],
+                entitySearch: '',
+                stats: {
+                    totalEntities: 0,
+                    activeUsers: 1,
+                    apiRequests: 0,
+                    storageUsed: '0 MB'
+                },
+
+                // Initialize
+                async init() {
+                    await this.checkAuth();
+                    if (this.isAuthenticated) {
+                        await this.loadDashboard();
+                    }
+                },
+
+                // Authentication
+                async checkAuth() {
+                    const token = localStorage.getItem('entitydb-admin-token');
+                    const user = localStorage.getItem('entitydb-admin-user');
+                    
+                    if (token && user) {
+                        try {
+                            this.sessionToken = token;
+                            this.currentUser = JSON.parse(user);
+                            this.isAuthenticated = true;
+                        } catch (error) {
+                            this.clearAuth();
+                        }
+                    }
+                },
+
+                async login() {
+                    this.loading = true;
+                    this.loginError = '';
+
+                    try {
+                        const response = await fetch('/api/v1/auth/login', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify(this.loginForm)
+                        });
+
+                        const data = await response.json();
+
+                        if (response.ok && data.token) {
+                            this.sessionToken = data.token;
+                            this.currentUser = data.user || { username: this.loginForm.username };
+                            this.isAuthenticated = true;
+
+                            localStorage.setItem('entitydb-admin-token', this.sessionToken);
+                            localStorage.setItem('entitydb-admin-user', JSON.stringify(this.currentUser));
+
+                            this.loginForm.username = '';
+                            this.loginForm.password = '';
+
+                            await this.loadDashboard();
+                        } else {
+                            this.loginError = data.error || 'Login failed';
+                        }
+                    } catch (error) {
+                        this.loginError = 'Connection error';
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+
+                logout() {
+                    this.clearAuth();
+                    this.isAuthenticated = false;
+                },
+
+                clearAuth() {
+                    localStorage.removeItem('entitydb-admin-token');
+                    localStorage.removeItem('entitydb-admin-user');
+                    this.sessionToken = null;
+                    this.currentUser = null;
+                },
+
+                // Navigation
+                setTab(tab) {
+                    this.activeTab = tab;
+                    if (tab === 'entities' && this.entities.length === 0) {
+                        this.loadEntities();
+                    }
+                },
+
+                // Data loading
+                async loadDashboard() {
+                    this.loading = true;
+                    try {
+                        const response = await this.apiRequest('/api/v1/dashboard/stats');
+                        this.stats.totalEntities = response.user_count || 0;
+                        this.stats.activeUsers = 1;
+                    } catch (error) {
+                        console.error('Failed to load dashboard:', error);
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+
+                async loadEntities() {
+                    this.loading = true;
+                    try {
+                        const response = await this.apiRequest('/api/v1/entities/list?limit=100');
+                        this.entities = response.entities || response || [];
+                        this.stats.totalEntities = this.entities.length;
+                    } catch (error) {
+                        console.error('Failed to load entities:', error);
+                        this.entities = [];
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+
+                async refreshEntities() {
+                    await this.loadEntities();
+                },
+
+                searchEntities() {
+                    // Implement search logic
+                    if (this.entitySearch) {
+                        // Filter entities based on search
+                    }
+                },
+
+                // API helper
+                async apiRequest(endpoint, options = {}) {
+                    const defaultOptions = {
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${this.sessionToken}`
+                        }
+                    };
+
+                    const response = await fetch(endpoint, { ...defaultOptions, ...options });
+
+                    if (!response.ok) {
+                        if (response.status === 401) {
+                            this.logout();
+                            throw new Error('Authentication required');
+                        }
+                        throw new Error(`API error: ${response.status}`);
+                    }
+
+                    return response.json();
+                },
+
+                // Utility functions
+                getEntityType(entity) {
+                    if (!entity.tags) return 'unknown';
+                    const typeTag = entity.tags.find(tag => tag.startsWith('type:'));
+                    return typeTag ? typeTag.substring(5) : 'unknown';
+                },
+
+                formatDate(dateString) {
+                    if (!dateString) return 'Unknown';
+                    return new Date(dateString).toLocaleDateString();
+                }
+            };
+        }
+    </script>
+</body>
+</html>
