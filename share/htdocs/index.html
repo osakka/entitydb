@@ -3,610 +3,896 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EntityDB - Dashboard</title>
-    <link href="css/style.css" rel="stylesheet">
+    <title>EntityDB Admin</title>
     <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.12.3/dist/cdn.min.js" defer></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
-        /* Debug styles to check rendering */
-        .loading-placeholder {
-            text-align: center;
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'SF Pro Display', sans-serif;
+            background: #f8f9fa;
+            color: #2c3e50;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .app-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        /* Header */
+        .app-header {
+            background: #ffffff;
+            border-bottom: 1px solid #e9ecef;
+            padding: 0 24px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .app-logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-weight: 600;
+            font-size: 18px;
+            color: #2c3e50;
+        }
+
+        .app-logo img {
+            height: 32px;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .logout-btn {
+            background: none;
+            border: 1px solid #dee2e6;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            color: #6c757d;
+            transition: all 0.2s;
+        }
+
+        .logout-btn:hover {
+            background: #e9ecef;
+            border-color: #adb5bd;
+        }
+
+        /* Tab Navigation */
+        .tab-nav {
+            background: #ffffff;
+            border-bottom: 1px solid #e9ecef;
+            padding: 0 24px;
+            display: flex;
+            align-items: center;
+            height: 48px;
+            overflow-x: auto;
+        }
+
+        .tab-btn {
+            background: none;
+            border: none;
+            padding: 12px 20px;
+            margin: 0 4px;
+            cursor: pointer;
+            font-size: 14px;
+            color: #6c757d;
+            border-radius: 6px 6px 0 0;
+            transition: all 0.2s;
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .tab-btn.active {
+            background: #f8f9fa;
+            color: #2c3e50;
+            font-weight: 500;
+        }
+
+        .tab-btn:hover:not(.active) {
+            background: #f1f3f4;
+            color: #495057;
+        }
+
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .tab-content {
+            flex: 1;
+            overflow: auto;
+            padding: 24px;
+        }
+
+        /* Login Form */
+        .login-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255,255,255,0.95);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .login-form {
+            background: #ffffff;
             padding: 40px;
-            font-size: 16px;
-            color: #666;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+        }
+
+        .login-logo {
+            margin-bottom: 32px;
+        }
+
+        .login-logo img {
+            height: 48px;
+        }
+
+        .login-form h2 {
+            margin-bottom: 8px;
+            color: #2c3e50;
+            font-weight: 600;
+        }
+
+        .login-hint {
+            color: #6c757d;
+            margin-bottom: 32px;
+            font-size: 14px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #495057;
+            font-size: 14px;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.2s;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: #007bff;
+            box-shadow: 0 0 0 3px rgba(0,123,255,0.1);
+        }
+
+        .btn-primary {
+            background: #007bff;
+            border: none;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            width: 100%;
+            transition: background 0.2s;
+        }
+
+        .btn-primary:hover {
+            background: #0056b3;
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .error-message {
+            color: #dc3545;
+            font-size: 14px;
+            margin-top: 8px;
+        }
+
+        /* Content Cards */
+        .content-card {
+            background: #ffffff;
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            margin-bottom: 24px;
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+
+        .card-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #2c3e50;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 32px;
+        }
+
+        .stat-card {
+            background: #ffffff;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #007bff;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .stat-value {
+            font-size: 28px;
+            font-weight: 700;
+            color: #2c3e50;
+            margin-bottom: 4px;
+        }
+
+        .stat-label {
+            color: #6c757d;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        /* Data Table */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #ffffff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .data-table th,
+        .data-table td {
+            padding: 12px 16px;
+            text-align: left;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .data-table th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #495057;
+            font-size: 14px;
+        }
+
+        .data-table td {
+            font-size: 14px;
+            color: #495057;
+        }
+
+        .data-table tr:hover td {
+            background: #f8f9fa;
+        }
+
+        /* Status Badges */
+        .status-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+            text-transform: uppercase;
+        }
+
+        .status-online {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-offline {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .status-warning {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        /* Toolbar */
+        .toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            gap: 16px;
+        }
+
+        .search-box {
+            flex: 1;
+            max-width: 300px;
+            position: relative;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 8px 16px 8px 40px;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #6c757d;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            border: none;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-secondary:hover {
+            background: #545b62;
+        }
+
+        /* Loading State */
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+            color: #6c757d;
+        }
+
+        .spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid #e9ecef;
+            border-top: 2px solid #007bff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 12px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .app-header {
+                padding: 0 16px;
+            }
+            
+            .tab-content {
+                padding: 16px;
+            }
+            
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
         }
     </style>
 </head>
-<body>
-    <!-- Initial loading message before Alpine loads -->
-    <div class="loading-placeholder" id="initialLoadingMessage">
-        Loading EntityDB Dashboard...
-    </div>
-    
-    <div x-data="entityManager" x-init="init()" x-cloak class="container">
-        <!-- Header -->
-        <header class="header">
-            <div class="header-left">
-                <div class="logo-container">
-                    <img src="/share/resources/logo_white.svg" alt="EntityDB" class="logo logo-light" />
-                    <img src="/share/resources/logo_black.svg" alt="EntityDB" class="logo logo-dark" />
-                </div>
-                <h1>EntityDB Dashboard</h1>
+<body x-data="entityAdmin()" x-init="init()">
+    <!-- Login Overlay -->
+    <div x-show="!isAuthenticated" class="login-overlay">
+        <div class="login-form">
+            <div class="login-logo">
+                <img src="logo_black.svg" alt="EntityDB">
             </div>
-            <div class="header-right">
-                <button @click="toggleTheme()" class="theme-toggle" title="Toggle theme">
-                    <span x-show="!isDarkMode">🌙</span>
-                    <span x-show="isDarkMode">☀️</span>
+            <h2>EntityDB Admin</h2>
+            <p class="login-hint">Database Administration Console</p>
+            
+            <form @submit.prevent="login()">
+                <div class="form-group">
+                    <label class="form-label">Username</label>
+                    <input type="text" class="form-input" x-model="loginForm.username" 
+                           placeholder="Enter username" required autofocus>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Password</label>
+                    <input type="password" class="form-input" x-model="loginForm.password" 
+                           placeholder="Enter password" required>
+                </div>
+                
+                <div x-show="loginError" class="error-message" x-text="loginError"></div>
+                
+                <button type="submit" class="btn-primary" :disabled="loading">
+                    <span x-show="!loading">Login</span>
+                    <span x-show="loading">Authenticating...</span>
                 </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Main App -->
+    <div x-show="isAuthenticated" class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="app-logo">
+                <img src="logo_black.svg" alt="EntityDB">
+                <span>EntityDB Admin</span>
             </div>
+            
             <div class="header-actions">
-                <div x-show="user" class="nav-links">
-                    <a href="/metrics.html" class="btn btn-secondary btn-sm">📊 Metrics</a>
-                    <a href="/sessions.html" class="btn btn-secondary btn-sm">👥 Sessions</a>
-                    <a href="/admin.html" x-show="userHasAdminRole()" class="btn btn-secondary btn-sm">⚙️ Admin</a>
-                    <a href="/api-docs.html" class="btn btn-secondary btn-sm">📚 API Docs</a>
+                <div class="user-info">
+                    <i class="fas fa-user-circle"></i>
+                    <span x-text="currentUser?.username || 'admin'"></span>
                 </div>
-                <div x-show="user" class="user-info">
-                    <span x-text="user.username"></span>
-                    <button @click="showChangePasswordModal = true" class="btn btn-primary btn-sm">Change Password</button>
-                    <button @click="logout" class="btn btn-secondary">Logout</button>
-                </div>
+                <button class="logout-btn" @click="logout()">
+                    <i class="fas fa-sign-out-alt"></i>
+                    Logout
+                </button>
             </div>
         </header>
 
-        <!-- Login Form -->
-        <div x-show="!user" class="main-content">
-            <div class="login-form">
-                <div class="login-logo">
-                    <img src="/share/resources/logo_black.svg" alt="EntityDB" class="logo logo-light" />
-                    <img src="/share/resources/logo_white.svg" alt="EntityDB" class="logo logo-dark" />
-                </div>
-                <h2>EntityDB Login</h2>
-                <p class="login-hint">Default credentials: admin / admin</p>
-                <form @submit.prevent="login">
-                    <div class="form-group">
-                        <label for="username">Username</label>
-                        <input type="text" id="username" x-model="loginForm.username" required autocomplete="username">
-                    </div>
-                    <div class="form-group">
-                        <label for="password">Password</label>
-                        <input type="password" id="password" x-model="loginForm.password" required autocomplete="current-password">
-                    </div>
-                    <button type="submit" class="btn btn-primary btn-block">Login</button>
-                    <div x-show="error" class="error" x-text="error"></div>
-                    <div class="login-debug">
-                        <button type="button" @click="logAppState()" class="btn-debug">Debug Login</button>
-                    </div>
-                </form>
-            </div>
-        </div>
+        <!-- Tab Navigation -->
+        <nav class="tab-nav">
+            <button class="tab-btn" :class="{ active: activeTab === 'dashboard' }" @click="setTab('dashboard')">
+                <i class="fas fa-tachometer-alt"></i>
+                Dashboard
+            </button>
+            <button class="tab-btn" :class="{ active: activeTab === 'entities' }" @click="setTab('entities')">
+                <i class="fas fa-database"></i>
+                Entities
+            </button>
+            <button class="tab-btn" :class="{ active: activeTab === 'relationships' }" @click="setTab('relationships')">
+                <i class="fas fa-project-diagram"></i>
+                Relationships
+            </button>
+            <button class="tab-btn" :class="{ active: activeTab === 'users' }" @click="setTab('users')">
+                <i class="fas fa-users"></i>
+                Users & Sessions
+            </button>
+            <button class="tab-btn" :class="{ active: activeTab === 'api' }" @click="setTab('api')">
+                <i class="fas fa-code"></i>
+                API Explorer
+            </button>
+            <button class="tab-btn" :class="{ active: activeTab === 'metrics' }" @click="setTab('metrics')">
+                <i class="fas fa-chart-line"></i>
+                Metrics
+            </button>
+            <button class="tab-btn" :class="{ active: activeTab === 'system' }" @click="setTab('system')">
+                <i class="fas fa-cogs"></i>
+                System
+            </button>
+        </nav>
 
         <!-- Main Content -->
-        <main x-show="user" class="main-content">
-            <!-- Navigation Tabs -->
-            <nav class="tabs-container">
-                <div class="tabs">
-                    <!-- Improved dropdown with better scope integration -->
-                    <div x-data="{ dropdownOpen: false }">
-                        <button @click="dropdownOpen = !dropdownOpen" class="tab dropdown-button active">
-                            <span x-text="getActiveTabTitle()"></span> <span x-text="dropdownOpen ? '▲' : '▼'"></span>
-                        </button>
-                        <div x-show="dropdownOpen" 
-                             @click.outside="dropdownOpen = false"
-                             style="position: absolute; background: white; border: 1px solid #ddd; padding: 10px; border-radius: 4px; width: 200px; z-index: 1000; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
-                            <!-- Always show All Entities option -->
-                            <div @click="changeTab('all'); dropdownOpen = false" 
-                                :style="activeTab === 'all' ? 'padding: 8px; cursor: pointer; margin-bottom: 5px; background: #e6f3fa; color: #3498db; font-weight: 500;' : 'padding: 8px; cursor: pointer; margin-bottom: 5px;'">
-                                All Entities
-                            </div>
-                            
-                            <!-- Show Users option if there are users -->
-                            <div x-show="hasEntitiesOfType('user')"
-                                 @click="changeTab('user'); dropdownOpen = false" 
-                                 :style="activeTab === 'user' ? 'padding: 8px; cursor: pointer; margin-bottom: 5px; background: #e6f3fa; color: #3498db; font-weight: 500;' : 'padding: 8px; cursor: pointer; margin-bottom: 5px;'">
-                                Users
-                            </div>
-                            
-                            <!-- Show Sessions option if there are sessions -->
-                            <div x-show="hasEntitiesOfType('session')"
-                                 @click="changeTab('session'); dropdownOpen = false" 
-                                 :style="activeTab === 'session' ? 'padding: 8px; cursor: pointer; margin-bottom: 5px; background: #e6f3fa; color: #3498db; font-weight: 500;' : 'padding: 8px; cursor: pointer; margin-bottom: 5px;'">
-                                Sessions
-                            </div>
-                            
-                            <!-- Dynamic options for other entity types -->
-                            <template x-for="type in availableTypes.filter(t => t !== 'user' && t !== 'session')" :key="type">
-                                <div @click="changeTab(type); dropdownOpen = false"
-                                     :style="activeTab === type ? 'padding: 8px; cursor: pointer; margin-bottom: 5px; background: #e6f3fa; color: #3498db; font-weight: 500;' : 'padding: 8px; cursor: pointer; margin-bottom: 5px;'">
-                                    <span x-text="capitalizeFirstLetter(type) + (type.endsWith('s') ? '' : 's')"></span>
-                                </div>
-                            </template>
-                            
-                            <!-- Debug option -->
-                            <div @click="logAppState(); dropdownOpen = false" 
-                                style="padding: 8px; cursor: pointer; margin-bottom: 5px; background: #ffe; color: #333; font-weight: bold; margin-top: 10px; border-top: 1px solid #eee; padding-top: 12px;">
-                                🐞 Debug Info
-                            </div>
-                        </div>
+        <main class="main-content">
+            <!-- Dashboard Tab -->
+            <div x-show="activeTab === 'dashboard'" class="tab-content">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-value" x-text="stats.totalEntities || '0'"></div>
+                        <div class="stat-label">Total Entities</div>
                     </div>
-                </div>
-            </nav>
-
-            <div class="section">
-                <div class="section-header">
-                    <h2 x-text="getActiveTabTitle()"></h2>
-                    <div class="section-actions">
-                        <template x-if="activeTab === 'user' && userHasAdminRole()">
-                            <button @click="showCreateUserForm = true" class="btn btn-primary">
-                                Create User
-                            </button>
-                        </template>
-                        <template x-if="activeTab !== 'user' && activeTab !== 'session'">
-                            <button @click="showCreateForm = true" class="btn btn-primary">
-                                Create Entity
-                            </button>
-                        </template>
-                        <button @click="logAppState()" class="btn btn-secondary" title="Log state to debug console">
-                            <span class="icon">🐞</span>
-                        </button>
+                    <div class="stat-card">
+                        <div class="stat-value" x-text="stats.activeUsers || '0'"></div>
+                        <div class="stat-label">Active Users</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" x-text="stats.apiRequests || '0'"></div>
+                        <div class="stat-label">API Requests (24h)</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" x-text="stats.storageUsed || '0 MB'"></div>
+                        <div class="stat-label">Storage Used</div>
                     </div>
                 </div>
 
-                <!-- Filter Controls -->
-                <div class="controls">
-                    <div class="filter-group">
-                        <input type="text"
-                               x-model="filters.search"
-                               placeholder="Search..."
-                               @input="filterEntities">
-                        
-                        <template x-if="activeTab === 'all'">
-                            <select x-model="filters.type" @change="filterEntities">
-                                <option value="">All Types</option>
-                                <template x-for="type in availableTypes" :key="type">
-                                    <option :value="type" x-text="type.charAt(0).toUpperCase() + type.slice(1)"></option>
-                                </template>
-                            </select>
-                        </template>
-                        
-                        <template x-if="activeTab === 'users'">
-                            <select x-model="filters.role" @change="filterEntities">
-                                <option value="">All Roles</option>
-                                <option value="admin">Admin</option>
-                                <option value="user">User</option>
-                            </select>
-                        </template>
-                        
-                        <!-- Sorting Controls -->
-                        <div class="sort-controls">
-                            <label for="sortBy">Sort by:</label>
-                            <select id="sortBy" x-model="sortConfig.field" @change="sortEntities" class="sort-select">
-                                <option value="updated_at">Last Updated</option>
-                                <option value="created_at">Creation Date</option>
-                                <option value="title">Title</option>
-                            </select>
-                            <button @click="toggleSortDirection" class="btn-icon" 
-                                    title="Toggle sort direction">
-                                <span class="icon" x-text="sortConfig.direction === 'desc' ? '↓' : '↑'"></span>
-                            </button>
-                        </div>
+                <div class="content-card">
+                    <div class="card-header">
+                        <h3 class="card-title">
+                            <i class="fas fa-heart"></i>
+                            System Health
+                        </h3>
                     </div>
-
-                    <div class="controls-right">
-                        <button @click="fetchEntities" class="btn btn-secondary">
-                            <span class="icon">↻</span> Refresh
-                        </button>
-                        
-                        <label class="checkbox">
-                            <input type="checkbox" x-model="autoRefresh" @change="autoRefresh ? startAutoRefresh() : stopAutoRefresh()">
-                            Auto-refresh
-                        </label>
+                    <div x-show="loading" class="loading">
+                        <div class="spinner"></div>
+                        Loading system status...
                     </div>
-                </div>
-
-                <!-- Entity List -->
-                <div class="entity-list">
-                    <div x-show="loading" class="loading">Loading...</div>
-                    
-                    <div class="entity-grid" x-bind:class="{'list-view': activeTab === 'users' || activeTab === 'sessions'}">
-                        <template x-for="entity in filteredEntities" :key="entity.id">
-                            <div class="entity-card" @dblclick="startEdit(entity)" :data-entity-id="entity.id">
-                                <template x-if="editingEntity && editingEntity.id === entity.id">
-                                    <div class="entity-edit-mode">
-                                        <input type="text" 
-                                               x-model="editForm.title" 
-                                               class="edit-title"
-                                               @keydown.enter="saveEdit()"
-                                               @keydown.escape="cancelEdit()">
-                                        <textarea x-model="editForm.description" 
-                                                 class="edit-description"
-                                                 @keydown.escape="cancelEdit()"
-                                                 placeholder="Description"></textarea>
-                                        <div class="tag-editor">
-                                            <div class="selected-tags">
-                                                <template x-for="(tag, index) in editForm.parsedTags" :key="index">
-                                                    <span class="tag" @click="removeEditTag(index)">
-                                                        <span x-text="tag"></span>
-                                                        <span class="remove-tag">&times;</span>
-                                                    </span>
-                                                </template>
-                                            </div>
-                                            <input type="text" 
-                                                   x-model="editForm.currentTag"
-                                                   @keydown.enter.prevent="addEditTag"
-                                                   @keydown.comma.prevent="addEditTag"
-                                                   placeholder="Add tags..."
-                                                   class="tag-input">
-                                        </div>
-                                        <div class="edit-actions">
-                                            <button @click="saveEdit()" class="btn btn-success btn-sm">Save</button>
-                                            <button @click="cancelEdit()" class="btn btn-secondary btn-sm">Cancel</button>
-                                        </div>
-                                    </div>
-                                </template>
-                                
-                                <template x-if="!editingEntity || editingEntity.id !== entity.id">
-                                    <div class="entity-content">
-                                        <div class="entity-header">
-                                            <!-- Type and Content Indicators -->
-                                            <div class="entity-indicators">
-                                                <div class="entity-type-indicator" 
-                                                     :class="getEntityTypeClass(entity)"
-                                                     :title="'Entity Type: ' + capitalizeFirstLetter(getEntityType(entity))">
-                                                    <span class="type-icon" x-html="getEntityTypeIcon(entity)"></span>
-                                                </div>
-                                                <div x-show="hasContent(entity)" 
-                                                     class="entity-content-indicator"
-                                                     :class="'content-' + getContentType(entity)"
-                                                     :title="'Content Type: ' + capitalizeFirstLetter(getContentType(entity))">
-                                                    <span class="content-icon" x-html="getContentTypeIcon(entity)"></span>
-                                                </div>
-                                            </div>
-                                            <h3 x-text="getEntityTitle(entity)"></h3>
-                                            <div class="entity-actions">
-                                                <button @click.stop="startEdit(entity)" class="btn-icon" title="Edit"><span class="icon">✎</span></button>
-                                                <button x-show="activeTab === 'user' && userHasAdminRole()" 
-                                                        @click.stop="resetUserPassword(entity)" 
-                                                        class="btn-icon" title="Reset Password">
-                                                    <span class="icon">↺</span>
-                                                </button>
-                                            </div>
-                                        </div>
-                                        <p class="entity-description" x-text="getEntityDescription(entity)" x-show="getEntityDescription(entity)"></p>
-                                        
-                                        <template x-if="activeTab === 'sessions'">
-                                            <div class="entity-attributes">
-                                                <div class="attribute">
-                                                    <span class="attribute-label">User:</span>
-                                                    <span class="attribute-value" x-text="entity.username || getEntityUsername(entity)"></span>
-                                                </div>
-                                                <div class="attribute">
-                                                    <span class="attribute-label">Expires:</span>
-                                                    <span class="attribute-value" x-text="formatDate(getEntityExpiresAt(entity))"></span>
-                                                </div>
-                                            </div>
-                                        </template>
-                                        
-                                        <template x-if="activeTab === 'users'">
-                                            <div class="entity-attributes">
-                                                <div class="attribute">
-                                                    <span class="attribute-label">Username:</span>
-                                                    <span class="attribute-value" x-text="getEntityUsername(entity)"></span>
-                                                </div>
-                                                <div class="attribute">
-                                                    <span class="attribute-label">Roles:</span>
-                                                    <span class="attribute-value" x-text="getEntityRoles(entity)"></span>
-                                                </div>
-                                            </div>
-                                        </template>
-                                        
-                                        <div class="entity-tags" x-show="entity.tags && Array.isArray(entity.tags) && entity.tags.length > 0">
-                                            <template x-for="(tag, index) in entity.tags" :key="index">
-                                                <span class="tag" :data-tag="tag" x-text="tag"
-                                                      @click.stop="addTagFilter(tag)"></span>
-                                            </template>
-                                        
-                                        <!-- Relationships -->
-                                        <template x-if="hasRelationships(entity)">
-                                            <div class="relationships">
-                                                <div class="relationships-title">Relationships:</div>
-                                                <div class="relationship-links">
-                                                    <template x-for="rel in getEntityRelationships(entity)" :key="rel.id">
-                                                        <div class="relationship-link" @click.stop="viewRelatedEntity(rel)">
-                                                            <template x-if="rel.is_incoming">
-                                                                <span class="relationship-direction">⬅️</span>
-                                                            </template>
-                                                            <template x-if="!rel.is_incoming">
-                                                                <span class="relationship-direction">➡️</span>
-                                                            </template>
-                                                            <span class="relationship-type" x-text="rel.relationship_type || rel.type || 'related'"></span>
-                                                            <span x-text="truncateId(rel.is_incoming ? rel.source_id : rel.target_id)"></span>
-                                                        </div>
-                                                    </template>
-                                                </div>
-                                            </div>
-                                        </template>
-                                        
-                                        <!-- Download button - positioned at bottom right -->
-                                        <button x-show="hasContent(entity)" 
-                                                @click.stop="downloadEntityContent(entity)" 
-                                                class="download-button" 
-                                                title="Download content">
-                                            <span class="download-icon">💾</span>
-                                        </button>
-                                        
-                                        <!-- Entity metadata - positioned at bottom left -->
-                                        <div class="entity-metadata">
-                                            <div class="entity-id-display">
-                                                <span class="id-label">ID:</span>
-                                                <span class="id-value" x-text="truncateId(entity.id)" @click.stop="copyToClipboard(entity.id)" title="Click to copy full ID"></span>
-                                            </div>
-                                            
-                                            <div class="entity-date-display" x-show="entity.created_at">
-                                                <span class="date-icon">📅</span>
-                                                <span class="date-value" x-text="formatDate(entity.created_at)"></span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </template>
-                            </div>
-                        </template>
-                    </div>
-
-                    <div x-show="!loading && filteredEntities.length === 0" class="empty-state">
-                        <p>No entities found.</p>
-                        <template x-if="activeTab !== 'users' && activeTab !== 'sessions'">
-                            <button @click="showCreateForm = true" class="btn btn-primary">
-                                Create New
-                            </button>
-                        </template>
+                    <div x-show="!loading">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Component</th>
+                                    <th>Status</th>
+                                    <th>Last Check</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Database Engine</td>
+                                    <td><span class="status-badge status-online">Online</span></td>
+                                    <td>Just now</td>
+                                </tr>
+                                <tr>
+                                    <td>API Server</td>
+                                    <td><span class="status-badge status-online">Online</span></td>
+                                    <td>Just now</td>
+                                </tr>
+                                <tr>
+                                    <td>Authentication</td>
+                                    <td><span class="status-badge status-online">Online</span></td>
+                                    <td>Just now</td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
 
-            <!-- Create Entity Form -->
-            <div x-show="showCreateForm" class="modal" @click.self="cancelCreate">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h2>Create New Entity</h2>
-                        <button @click="cancelCreate" class="close-btn">&times;</button>
+            <!-- Entities Tab -->
+            <div x-show="activeTab === 'entities'" class="tab-content">
+                <div class="toolbar">
+                    <div class="search-box">
+                        <i class="fas fa-search search-icon"></i>
+                        <input type="text" class="search-input" placeholder="Search entities..." 
+                               x-model="entitySearch" @input="searchEntities()">
                     </div>
-                    <form @submit.prevent="createEntity">
-                        <div class="form-group">
-                            <label for="title">Title</label>
-                            <input type="text" id="title" x-model="createForm.title" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="description">Description</label>
-                            <textarea id="description" x-model="createForm.description"></textarea>
-                        </div>
-                        <div class="form-group">
-                            <label>Type</label>
-                            <select x-model="createForm.type" required>
-                                <option value="">Select Type</option>
-                                <template x-for="type in availableTypes" :key="type">
-                                    <option :value="type" x-text="type.charAt(0).toUpperCase() + type.slice(1)"></option>
+                    <button class="btn-secondary" @click="refreshEntities()">
+                        <i class="fas fa-sync-alt"></i>
+                        Refresh
+                    </button>
+                </div>
+
+                <div class="content-card">
+                    <div class="card-header">
+                        <h3 class="card-title">
+                            <i class="fas fa-database"></i>
+                            Entity Browser
+                        </h3>
+                    </div>
+                    <div x-show="loading" class="loading">
+                        <div class="spinner"></div>
+                        Loading entities...
+                    </div>
+                    <div x-show="!loading && entities.length === 0">
+                        <p style="text-align: center; color: #6c757d; padding: 40px;">No entities found</p>
+                    </div>
+                    <div x-show="!loading && entities.length > 0">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Type</th>
+                                    <th>Tags</th>
+                                    <th>Created</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <template x-for="entity in entities.slice(0, 50)" :key="entity.id">
+                                    <tr>
+                                        <td x-text="entity.id.substring(0, 8) + '...'"></td>
+                                        <td x-text="getEntityType(entity)"></td>
+                                        <td x-text="entity.tags?.length || 0"></td>
+                                        <td x-text="formatDate(entity.created_at)"></td>
+                                        <td>
+                                            <button class="btn-secondary" style="padding: 4px 8px; font-size: 12px;">
+                                                View
+                                            </button>
+                                        </td>
+                                    </tr>
                                 </template>
-                                <option value="custom">Custom Type...</option>
-                            </select>
-                            <div x-show="createForm.type === 'custom'" class="mt-2">
-                                <input type="text" x-model="createForm.customType" placeholder="Enter custom type">
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label>Tags</label>
-                            <div class="tag-editor">
-                                <div class="selected-tags">
-                                    <template x-for="(tag, index) in createForm.parsedTags" :key="index">
-                                        <span class="tag" @click="removeTag(index)">
-                                            <span x-text="tag"></span>
-                                            <span class="remove-tag">&times;</span>
-                                        </span>
-                                    </template>
-                                </div>
-                                <div class="tag-input-wrapper">
-                                    <input type="text" 
-                                           x-model="createForm.currentTag"
-                                           @keydown.enter.prevent="addTag"
-                                           @keydown.comma.prevent="addTag"
-                                           @input="updateTagSuggestions"
-                                           placeholder="Type to add tags..."
-                                           class="tag-input">
-                                    <div x-show="tagSuggestions.length > 0" class="tag-suggestions">
-                                        <template x-for="suggestion in tagSuggestions" :key="suggestion">
-                                            <div @click="selectSuggestion(suggestion)" class="tag-suggestion" x-text="suggestion"></div>
-                                        </template>
-                                    </div>
-                                </div>
-                            </div>
-                            <small>Common tags: status:active, priority:high, category:feature</small>
-                        </div>
-                        <div class="modal-footer">
-                            <button type="button" @click="cancelCreate" class="btn btn-secondary">Cancel</button>
-                            <button type="submit" class="btn btn-primary">Create</button>
-                        </div>
-                    </form>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
 
-            <!-- Create User Form -->
-            <div x-show="showCreateUserForm" class="modal" @click.self="cancelCreateUser">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h2>Create New User</h2>
-                        <button @click="cancelCreateUser" class="close-btn">&times;</button>
+            <!-- Other tabs placeholder -->
+            <div x-show="activeTab === 'relationships'" class="tab-content">
+                <div class="content-card">
+                    <div class="card-header">
+                        <h3 class="card-title">
+                            <i class="fas fa-project-diagram"></i>
+                            Entity Relationships
+                        </h3>
                     </div>
-                    <form @submit.prevent="createUser">
-                        <div class="form-group">
-                            <label for="username">Username</label>
-                            <input type="text" id="username" x-model="createUserForm.username" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="displayName">Display Name</label>
-                            <input type="text" id="displayName" x-model="createUserForm.display_name">
-                        </div>
-                        <div class="form-group">
-                            <label for="password">Password</label>
-                            <input type="password" id="password" x-model="createUserForm.password" @input="checkPasswordStrength()" required>
-                            <div class="password-strength-meter">
-                                <div class="strength-bar" :style="{ width: passwordStrength + '%', backgroundColor: getPasswordStrengthColor() }"></div>
-                            </div>
-                            <small x-text="getPasswordStrengthText()"></small>
-                        </div>
-                        <div class="form-group">
-                            <label>Roles</label>
-                            <div class="checkbox-group">
-                                <label class="checkbox">
-                                    <input type="checkbox" x-model="createUserForm.roles" value="user">
-                                    User
-                                </label>
-                                <label class="checkbox">
-                                    <input type="checkbox" x-model="createUserForm.roles" value="admin">
-                                    Administrator
-                                </label>
-                            </div>
-                        </div>
-                        <div class="modal-footer">
-                            <button type="button" @click="cancelCreateUser" class="btn btn-secondary">Cancel</button>
-                            <button type="submit" class="btn btn-primary">Create User</button>
-                        </div>
-                    </form>
+                    <p style="text-align: center; color: #6c757d; padding: 40px;">Relationship browser coming soon...</p>
+                </div>
+            </div>
+
+            <div x-show="activeTab === 'users'" class="tab-content">
+                <div class="content-card">
+                    <div class="card-header">
+                        <h3 class="card-title">
+                            <i class="fas fa-users"></i>
+                            User Management
+                        </h3>
+                    </div>
+                    <p style="text-align: center; color: #6c757d; padding: 40px;">User management coming soon...</p>
+                </div>
+            </div>
+
+            <div x-show="activeTab === 'api'" class="tab-content">
+                <div class="content-card">
+                    <div class="card-header">
+                        <h3 class="card-title">
+                            <i class="fas fa-code"></i>
+                            API Explorer
+                        </h3>
+                    </div>
+                    <p style="text-align: center; color: #6c757d; padding: 40px;">
+                        <a href="/swagger/" target="_blank" style="color: #007bff; text-decoration: none;">
+                            Open Swagger Documentation →
+                        </a>
+                    </p>
+                </div>
+            </div>
+
+            <div x-show="activeTab === 'metrics'" class="tab-content">
+                <div class="content-card">
+                    <div class="card-header">
+                        <h3 class="card-title">
+                            <i class="fas fa-chart-line"></i>
+                            Performance Metrics
+                        </h3>
+                    </div>
+                    <p style="text-align: center; color: #6c757d; padding: 40px;">Performance monitoring coming soon...</p>
+                </div>
+            </div>
+
+            <div x-show="activeTab === 'system'" class="tab-content">
+                <div class="content-card">
+                    <div class="card-header">
+                        <h3 class="card-title">
+                            <i class="fas fa-cogs"></i>
+                            System Configuration
+                        </h3>
+                    </div>
+                    <p style="text-align: center; color: #6c757d; padding: 40px;">System settings coming soon...</p>
                 </div>
             </div>
         </main>
-
-        <!-- Footer -->
-        <footer class="footer">
-            <div>EntityDB v2.13.0</div>
-            <div>High-Performance Temporal Database</div>
-        </footer>
-
-        <!-- Change Password Modal -->
-        <div x-show="showChangePasswordModal" class="modal" @click.self="showChangePasswordModal = false">
-            <div class="modal-content" style="max-width: 400px;">
-                <div class="modal-header">
-                    <h2>Change Your Password</h2>
-                    <button @click="showChangePasswordModal = false" class="close-btn">&times;</button>
-                </div>
-                <form @submit.prevent="changeCurrentUserPassword">
-                    <div class="form-group">
-                        <label for="currentPassword">Current Password</label>
-                        <input type="password" id="currentPassword" x-model="changePasswordForm.currentPassword" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="newPassword">New Password</label>
-                        <input type="password" id="newPassword" x-model="changePasswordForm.newPassword" @input="checkChangePasswordStrength()" required>
-                        <div class="password-strength-meter">
-                            <div class="strength-bar" :style="{ width: passwordStrength + '%', backgroundColor: getPasswordStrengthColor() }"></div>
-                        </div>
-                        <small x-text="getPasswordStrengthText()"></small>
-                    </div>
-                    <div class="form-group">
-                        <label for="confirmPassword">Confirm Password</label>
-                        <input type="password" id="confirmPassword" x-model="changePasswordForm.confirmPassword" required>
-                    </div>
-                    <div x-show="passwordError" class="error" x-text="passwordError"></div>
-                    <div class="modal-footer">
-                        <button type="button" @click="showChangePasswordModal = false" class="btn btn-secondary">Cancel</button>
-                        <button type="submit" class="btn btn-primary">Change Password</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Debug Console -->
-    <div x-data="debugConsole" class="debug-console" :class="{'expanded': isExpanded}">
-        <div class="debug-console-header" @click="toggleConsole">
-            Debug Console <span class="console-count" x-text="logs.length"></span>
-            <button class="console-clear" @click.stop="clearLogs">Clear</button>
-        </div>
-        <div class="debug-console-content">
-            <template x-for="(log, index) in logs" :key="index">
-                <div class="console-log" :class="log.type">
-                    <div class="log-time" x-text="log.time"></div>
-                    <div class="log-message" x-text="log.message"></div>
-                </div>
-            </template>
-        </div>
     </div>
 
     <script>
-    // Debug console component
-    function debugConsole() {
-        return {
-            logs: [],
-            isExpanded: false,
-            
-            init() {
-                // Capture console logs
-                const originalConsoleLog = console.log;
-                const originalConsoleError = console.error;
-                const originalConsoleWarn = console.warn;
-                const self = this;
-                
-                console.log = function() {
-                    originalConsoleLog.apply(console, arguments);
-                    self.addLog('log', Array.from(arguments).join(' '));
-                };
-                
-                console.error = function() {
-                    originalConsoleError.apply(console, arguments);
-                    self.addLog('error', Array.from(arguments).join(' '));
-                };
-                
-                console.warn = function() {
-                    originalConsoleWarn.apply(console, arguments);
-                    self.addLog('warning', Array.from(arguments).join(' '));
-                };
-                
-                // Initial log
-                this.addLog('info', 'Debug console initialized');
-                
-                // Log Alpine.js version
-                if (window.Alpine) {
-                    this.addLog('info', 'Alpine.js version: ' + window.Alpine.version);
-                }
-            },
-            
-            addLog(type, message) {
-                const now = new Date();
-                const time = now.toLocaleTimeString() + '.' + now.getMilliseconds().toString().padStart(3, '0');
-                this.logs.push({ type, message, time });
-                
-                // Auto-expand on errors
-                if (type === 'error') {
-                    this.isExpanded = true;
-                }
-                
-                // Limit logs to prevent memory issues
-                if (this.logs.length > 100) {
-                    this.logs.shift();
-                }
-            },
-            
-            toggleConsole() {
-                this.isExpanded = !this.isExpanded;
-            },
-            
-            clearLogs() {
-                this.logs = [];
-                this.addLog('info', 'Logs cleared');
-            }
-        };
-    }
-    </script>
+        function entityAdmin() {
+            return {
+                // Auth state
+                isAuthenticated: false,
+                currentUser: null,
+                sessionToken: null,
+                loginForm: {
+                    username: '',
+                    password: ''
+                },
+                loginError: '',
+                loading: false,
 
-    <script src="js/app.js"></script>
-    
-    <script>
-    // Remove the loading message once Alpine.js is ready
-    document.addEventListener('alpine:initialized', () => {
-        const loadingMessage = document.getElementById('initialLoadingMessage');
-        if (loadingMessage) {
-            loadingMessage.style.display = 'none';
+                // App state
+                activeTab: 'dashboard',
+                entities: [],
+                entitySearch: '',
+                stats: {
+                    totalEntities: 0,
+                    activeUsers: 1,
+                    apiRequests: 0,
+                    storageUsed: '0 MB'
+                },
+
+                // Initialize
+                async init() {
+                    await this.checkAuth();
+                    if (this.isAuthenticated) {
+                        await this.loadDashboard();
+                    }
+                },
+
+                // Authentication
+                async checkAuth() {
+                    const token = localStorage.getItem('entitydb-admin-token');
+                    const user = localStorage.getItem('entitydb-admin-user');
+                    
+                    if (token && user) {
+                        try {
+                            this.sessionToken = token;
+                            this.currentUser = JSON.parse(user);
+                            this.isAuthenticated = true;
+                        } catch (error) {
+                            this.clearAuth();
+                        }
+                    }
+                },
+
+                async login() {
+                    this.loading = true;
+                    this.loginError = '';
+
+                    try {
+                        const response = await fetch('/api/v1/auth/login', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify(this.loginForm)
+                        });
+
+                        const data = await response.json();
+
+                        if (response.ok && data.token) {
+                            this.sessionToken = data.token;
+                            this.currentUser = data.user || { username: this.loginForm.username };
+                            this.isAuthenticated = true;
+
+                            localStorage.setItem('entitydb-admin-token', this.sessionToken);
+                            localStorage.setItem('entitydb-admin-user', JSON.stringify(this.currentUser));
+
+                            this.loginForm.username = '';
+                            this.loginForm.password = '';
+
+                            await this.loadDashboard();
+                        } else {
+                            this.loginError = data.error || 'Login failed';
+                        }
+                    } catch (error) {
+                        this.loginError = 'Connection error';
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+
+                logout() {
+                    this.clearAuth();
+                    this.isAuthenticated = false;
+                },
+
+                clearAuth() {
+                    localStorage.removeItem('entitydb-admin-token');
+                    localStorage.removeItem('entitydb-admin-user');
+                    this.sessionToken = null;
+                    this.currentUser = null;
+                },
+
+                // Navigation
+                setTab(tab) {
+                    this.activeTab = tab;
+                    if (tab === 'entities' && this.entities.length === 0) {
+                        this.loadEntities();
+                    }
+                },
+
+                // Data loading
+                async loadDashboard() {
+                    this.loading = true;
+                    try {
+                        const response = await this.apiRequest('/api/v1/dashboard/stats');
+                        this.stats.totalEntities = response.user_count || 0;
+                        this.stats.activeUsers = 1;
+                    } catch (error) {
+                        console.error('Failed to load dashboard:', error);
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+
+                async loadEntities() {
+                    this.loading = true;
+                    try {
+                        const response = await this.apiRequest('/api/v1/entities/list?limit=100');
+                        this.entities = response.entities || response || [];
+                        this.stats.totalEntities = this.entities.length;
+                    } catch (error) {
+                        console.error('Failed to load entities:', error);
+                        this.entities = [];
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+
+                async refreshEntities() {
+                    await this.loadEntities();
+                },
+
+                searchEntities() {
+                    // Implement search logic
+                    if (this.entitySearch) {
+                        // Filter entities based on search
+                    }
+                },
+
+                // API helper
+                async apiRequest(endpoint, options = {}) {
+                    const defaultOptions = {
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${this.sessionToken}`
+                        }
+                    };
+
+                    const response = await fetch(endpoint, { ...defaultOptions, ...options });
+
+                    if (!response.ok) {
+                        if (response.status === 401) {
+                            this.logout();
+                            throw new Error('Authentication required');
+                        }
+                        throw new Error(`API error: ${response.status}`);
+                    }
+
+                    return response.json();
+                },
+
+                // Utility functions
+                getEntityType(entity) {
+                    if (!entity.tags) return 'unknown';
+                    const typeTag = entity.tags.find(tag => tag.startsWith('type:'));
+                    return typeTag ? typeTag.substring(5) : 'unknown';
+                },
+
+                formatDate(dateString) {
+                    if (!dateString) return 'Unknown';
+                    return new Date(dateString).toLocaleDateString();
+                }
+            };
         }
-        console.log('Alpine.js initialized, loading message removed');
-    });
     </script>
 </body>
 </html>
