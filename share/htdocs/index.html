@@ -3224,10 +3224,10 @@
                     <i class="fas fa-users text-blue"></i>
                     <span>Total Users</span>
                 </div>
-                <div class="metric-value" x-text="rbacMetrics?.users?.total_users || '0'"></div>
+                <div class="metric-value" x-text="rbacMetrics.users.total_users || '0'"></div>
                 <div class="metric-details">
-                    <div>Active: <span x-text="rbacMetrics?.users?.active_users || '0'"></span></div>
-                    <div>Admins: <span x-text="rbacMetrics?.users?.admin_users || '0'"></span></div>
+                    <div>Active: <span x-text="rbacMetrics.users.active_users || '0'"></span></div>
+                    <div>Admins: <span x-text="rbacMetrics.users.admin_users || '0'"></span></div>
                 </div>
             </div>
 
@@ -3236,10 +3236,10 @@
                     <i class="fas fa-key text-green"></i>
                     <span>Active Sessions</span>
                 </div>
-                <div class="metric-value" x-text="rbacMetrics?.sessions?.total_active_sessions || '0'"></div>
+                <div class="metric-value" x-text="rbacMetrics.sessions.total_active_sessions || '0'"></div>
                 <div class="metric-details">
-                    <div>Avg Duration: <span x-text="Math.round(rbacMetrics?.sessions?.average_session_duration_minutes || 0) + 'm'"></span></div>
-                    <div>Peak Concurrent: <span x-text="rbacMetrics?.sessions?.peak_concurrent_sessions || '0'"></span></div>
+                    <div>Avg Duration: <span x-text="Math.round(rbacMetrics.sessions.average_session_duration_minutes || 0) + 'm'"></span></div>
+                    <div>Peak Concurrent: <span x-text="rbacMetrics.sessions.peak_concurrent_sessions || '0'"></span></div>
                 </div>
             </div>
 
@@ -3248,10 +3248,10 @@
                     <i class="fas fa-sign-in-alt text-orange"></i>
                     <span>Auth Success Rate</span>
                 </div>
-                <div class="metric-value" x-text="Math.round(rbacMetrics?.authentication?.success_rate || 0) + '%'"></div>
+                <div class="metric-value" x-text="Math.round(rbacMetrics.authentication.success_rate || 0) + '%'"></div>
                 <div class="metric-details">
-                    <div>Successful: <span x-text="rbacMetrics?.authentication?.successful_logins || '0'"></span></div>
-                    <div>Failed: <span x-text="rbacMetrics?.authentication?.failed_logins || '0'"></span></div>
+                    <div>Successful: <span x-text="rbacMetrics.authentication.successful_logins || '0'"></span></div>
+                    <div>Failed: <span x-text="rbacMetrics.authentication.failed_logins || '0'"></span></div>
                 </div>
             </div>
 
@@ -3260,10 +3260,10 @@
                     <i class="fas fa-shield-alt text-purple"></i>
                     <span>Security Score</span>
                 </div>
-                <div class="metric-value" x-text="Math.round(rbacMetrics?.summary?.security_score || 0) + '%'"></div>
+                <div class="metric-value" x-text="Math.round(rbacMetrics.summary.security_score || 0) + '%'"></div>
                 <div class="metric-details">
-                    <div>Admin Ratio: <span x-text="Math.round(rbacMetrics?.summary?.admin_ratio || 0) + '%'"></span></div>
-                    <div>Session Rate: <span x-text="Math.round(rbacMetrics?.summary?.active_session_rate || 0) + '%'"></span></div>
+                    <div>Admin Ratio: <span x-text="Math.round(rbacMetrics.summary.admin_ratio || 0) + '%'"></span></div>
+                    <div>Session Rate: <span x-text="Math.round(rbacMetrics.summary.active_session_rate || 0) + '%'"></span></div>
                 </div>
             </div>
         </div>
@@ -3316,7 +3316,7 @@
                         <canvas id="rbacRoleChart" width="300" height="200"></canvas>
                     </div>
                     <div style="margin-top: 16px;">
-                        <template x-for="(count, role) in rbacMetrics?.users?.users_by_role || {}" :key="role">
+                        <template x-for="(count, role) in rbacMetrics.users.users_by_role || {}" :key="role">
                             <div class="stat-item">
                                 <span class="stat-label" x-text="role + ':'"></span>
                                 <span class="stat-value" x-text="count"></span>
@@ -3348,7 +3348,7 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                <template x-for="session in rbacMetrics?.active_sessions || []" :key="session.token">
+                                <template x-for="session in rbacMetrics.active_sessions" :key="session.token || $index">
                                     <tr>
                                         <td x-text="session.username"></td>
                                         <td>
@@ -3392,7 +3392,7 @@
                             </tr>
                         </thead>
                         <tbody>
-                            <template x-for="activity in rbacMetrics?.recent_activity || []" :key="activity.timestamp">
+                            <template x-for="activity in rbacMetrics.recent_activity" :key="activity.timestamp || $index">
                                 <tr>
                                     <td x-text="activity.username"></td>
                                     <td>
@@ -3500,7 +3500,33 @@
                 currentMetrics: null,
 
                 // RBAC metrics data
-                rbacMetrics: null,
+                rbacMetrics: {
+                    users: {
+                        total_users: 0,
+                        active_users: 0,
+                        admin_users: 0,
+                        regular_users: 0,
+                        users_by_role: {}
+                    },
+                    sessions: {
+                        total_active_sessions: 0,
+                        average_session_duration_minutes: 0,
+                        peak_concurrent_sessions: 0
+                    },
+                    authentication: {
+                        success_rate: 0,
+                        successful_logins: 0,
+                        failed_logins: 0
+                    },
+                    summary: {
+                        security_score: 0,
+                        admin_ratio: 0,
+                        active_session_rate: 0,
+                        auth_success_rate: 0
+                    },
+                    active_sessions: [],
+                    recent_activity: []
+                },
 
                 // Storage stats
                 storageStats: {
@@ -5225,7 +5251,7 @@
                 // RBAC Chart Functions
                 initRBACCharts() {
                     console.log('Initializing RBAC charts...');
-                    if (!this.rbacMetrics) {
+                    if (!this.rbacMetrics || !this.rbacMetrics.authentication.timeline) {
                         console.warn('No RBAC metrics data available for charts');
                         return;
                     }
@@ -5252,7 +5278,7 @@
                             this.chartInstances.rbacAuthChart.destroy();
                         }
 
-                        const timeline = this.rbacMetrics?.authentication?.timeline || [];
+                        const timeline = this.rbacMetrics.authentication.timeline || [];
                         
                         this.chartInstances.rbacAuthChart = new Chart(ctx, {
                             type: 'line',
@@ -5316,7 +5342,7 @@
                             this.chartInstances.rbacSessionChart.destroy();
                         }
 
-                        const timeline = this.rbacMetrics?.sessions?.session_timeline || [];
+                        const timeline = this.rbacMetrics.sessions.session_timeline || [];
                         
                         this.chartInstances.rbacSessionChart = new Chart(ctx, {
                             type: 'line',
@@ -5387,7 +5413,7 @@
                             this.chartInstances.rbacRoleChart.destroy();
                         }
 
-                        const roleData = this.rbacMetrics?.users?.users_by_role || {};
+                        const roleData = this.rbacMetrics.users.users_by_role || {};
                         const labels = Object.keys(roleData);
                         const data = Object.values(roleData);
                         
