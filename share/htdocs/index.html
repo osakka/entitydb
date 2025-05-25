@@ -3347,8 +3347,8 @@
                                     <th>Status</th>
                                 </tr>
                             </thead>
-                            <tbody>
-                                <template x-for="session in rbacMetrics.active_sessions" :key="session.token || $index">
+                            <tbody x-show="rbacMetrics.active_sessions && rbacMetrics.active_sessions.length > 0">
+                                <template x-for="(session, index) in rbacMetrics.active_sessions" :key="session.token || 'session-' + index">
                                     <tr>
                                         <td x-text="session.username"></td>
                                         <td>
@@ -3365,6 +3365,14 @@
                                         </td>
                                     </tr>
                                 </template>
+                            </tbody>
+                            <tbody x-show="!rbacMetrics.active_sessions || rbacMetrics.active_sessions.length === 0">
+                                <tr>
+                                    <td colspan="6" class="text-center" style="padding: 20px; color: #666;">
+                                        <i class="fas fa-info-circle"></i>
+                                        No active sessions found
+                                    </td>
+                                </tr>
                             </tbody>
                         </table>
                     </div>
@@ -3391,8 +3399,8 @@
                                 <th>Details</th>
                             </tr>
                         </thead>
-                        <tbody>
-                            <template x-for="activity in rbacMetrics.recent_activity" :key="activity.timestamp || $index">
+                        <tbody x-show="rbacMetrics.recent_activity && rbacMetrics.recent_activity.length > 0">
+                            <template x-for="(activity, index) in rbacMetrics.recent_activity" :key="activity.timestamp || 'activity-' + index">
                                 <tr>
                                     <td x-text="activity.username"></td>
                                     <td>
@@ -3402,6 +3410,14 @@
                                     <td x-text="activity.details"></td>
                                 </tr>
                             </template>
+                        </tbody>
+                        <tbody x-show="!rbacMetrics.recent_activity || rbacMetrics.recent_activity.length === 0">
+                            <tr>
+                                <td colspan="4" class="text-center" style="padding: 20px; color: #666;">
+                                    <i class="fas fa-info-circle"></i>
+                                    No recent activity found
+                                </td>
+                            </tr>
                         </tbody>
                     </table>
                 </div>
