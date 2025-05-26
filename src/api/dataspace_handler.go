@@ -220,8 +220,8 @@ func (h *DataspaceHandler) marshalDataspaceContent(req DataspaceRequest) []byte 
 
 func (h *DataspaceHandler) entityToDataspaceResponse(entity *models.Entity) DataspaceResponse {
 	// Parse timestamps
-	createdAt, _ := time.Parse(time.RFC3339, entity.CreatedAt)
-	updatedAt, _ := time.Parse(time.RFC3339, entity.UpdatedAt)
+	createdAt := time.Unix(0, entity.CreatedAt)
+	updatedAt := time.Unix(0, entity.UpdatedAt)
 	
 	resp := DataspaceResponse{
 		ID:        entity.ID,

@@ -139,7 +139,7 @@ func (h *DashboardHandler) DashboardStats(w http.ResponseWriter, r *http.Request
 				}
 			}
 			
-			createdAt, _ := time.Parse(time.RFC3339, entity.CreatedAt)
+			createdAt := time.Unix(0, entity.CreatedAt)
 			activity := ActivityItem{
 				Timestamp:   createdAt,
 				Type:        entityType,

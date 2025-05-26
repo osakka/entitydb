@@ -4,7 +4,6 @@ import (
 	"entitydb/models"
 	"fmt"
 	"strings"
-	"time"
 	"encoding/json"
 )
 
@@ -33,8 +32,8 @@ func (r *RelationshipRepository) Create(rel *models.EntityRelationship) error {
 	}
 	
 	// Set creation time
-	if rel.CreatedAt.IsZero() {
-		rel.CreatedAt = time.Now()
+	if rel.CreatedAt == 0 {
+		rel.CreatedAt = models.Now()
 	}
 	
 	// Set default creator
@@ -264,8 +263,8 @@ func (r *RelationshipRepository) relationshipToEntity(rel *models.EntityRelation
 	entity := &models.Entity{
 		ID:        rel.ID,
 		Tags:      []string{},
-		CreatedAt: time.Now().UTC().Format(time.RFC3339),
-		UpdatedAt: time.Now().UTC().Format(time.RFC3339),
+		CreatedAt: models.Now(),
+		UpdatedAt: models.Now(),
 	}
 	
 	// Add relationship tags
@@ -274,15 +273,15 @@ func (r *RelationshipRepository) relationshipToEntity(rel *models.EntityRelation
 	entity.AddTagWithValue("target_id", rel.TargetID)
 	entity.AddTagWithValue("relationship_type", rel.RelationshipType)
 	entity.AddTagWithValue("created_by", rel.CreatedBy)
-	entity.AddTagWithValue("created_at", rel.CreatedAt.Format(time.RFC3339))
+	entity.AddTagWithValue("created_at", fmt.Sprintf("%d", rel.CreatedAt))
 	
 	if rel.Metadata != "" {
 		entity.AddTagWithValue("metadata", rel.Metadata)
 	}
 	
 	// Store metadata as content
-	contentData := map[string]string{
-		"created_at": rel.CreatedAt.Format(time.RFC3339),
+	contentData := map[string]interface{}{
+		"created_at": rel.CreatedAt,
 		"metadata":   rel.Metadata,
 	}
 	jsonData, _ := json.Marshal(contentData)
@@ -323,10 +322,10 @@ func (r *RelationshipRepository) entityToRelationship(entity *models.Entity) (*m
 	if len(entity.Content) > 0 {
 		var contentData map[string]interface{}
 		if err := json.Unmarshal(entity.Content, &contentData); err == nil {
-			if createdAt, ok := contentData["created_at"].(string); ok {
-				if t, err := time.Parse(time.RFC3339, createdAt); err == nil {
-					rel.CreatedAt = t
-				}
+			if createdAt, ok := contentData["created_at"].(int64); ok {
+				rel.CreatedAt = createdAt
+			} else if createdAtFloat, ok := contentData["created_at"].(float64); ok {
+				rel.CreatedAt = int64(createdAtFloat)
 			}
 			if metadata, ok := contentData["metadata"].(string); ok {
 				rel.Metadata = metadata

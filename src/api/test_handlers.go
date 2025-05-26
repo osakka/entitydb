@@ -7,6 +7,7 @@ import (
 	"time"
 	
 	"entitydb/models"
+	"entitydb/logger"
 )
 
 // TestHandlers provides test endpoints that bypass authentication
@@ -170,15 +171,16 @@ func (h *TestHandlers) TestCreateEntity(w http.ResponseWriter, r *http.Request) 
 	}
 	
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		logger.Error("[TestCreateEntity] Failed to decode request: %v", err)
+		http.Error(w, "Invalid request body: " + err.Error(), http.StatusBadRequest)
 		return
 	}
 	
 	entity := &models.Entity{
 		ID:        req.ID,
 		Tags:      []string{},
-		CreatedAt: time.Now().UTC().Format(time.RFC3339),
-		UpdatedAt: time.Now().UTC().Format(time.RFC3339),
+		CreatedAt: models.Now(),
+		UpdatedAt: models.Now(),
 	}
 	
 	// Add tags

@@ -4,7 +4,6 @@ import (
 	"entitydb/models"
 	"encoding/json"
 	"net/http"
-	"time"
 )
 
 // EntityConfigHandler handles configuration and feature flag requests via entities
@@ -100,11 +99,11 @@ func (h *EntityConfigHandler) SetConfig(w http.ResponseWriter, r *http.Request) 
 			"content:type:json",
 			"key:" + req.Key,
 			"namespace:" + req.Namespace,
-			"updated_at:" + time.Now().UTC().Format(time.RFC3339),
+			"updated_at:" + models.NowString(),
 		),
 		Content:   valueBytes, // Store value directly as bytes
-		CreatedAt: time.Now().UTC().Format(time.RFC3339),
-		UpdatedAt: time.Now().UTC().Format(time.RFC3339),
+		CreatedAt: models.Now(),
+		UpdatedAt: models.Now(),
 	}
 	
 	// Check if exists
@@ -213,11 +212,11 @@ func (h *EntityConfigHandler) SetFeatureFlag(w http.ResponseWriter, r *http.Requ
 			"content:type:json",
 			"flag:" + req.Flag,
 			"stage:" + req.Stage,
-			"updated_at:" + time.Now().UTC().Format(time.RFC3339),
+			"updated_at:" + models.NowString(),
 		),
 		Content:   flagData, // Store as JSON bytes
-		CreatedAt: time.Now().UTC().Format(time.RFC3339),
-		UpdatedAt: time.Now().UTC().Format(time.RFC3339),
+		CreatedAt: models.Now(),
+		UpdatedAt: models.Now(),
 	}
 	
 	// Check if exists

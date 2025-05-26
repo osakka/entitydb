@@ -458,7 +458,8 @@ func (h *SystemMetricsHandler) calculateEntityStats(entities []*models.Entity) E
 	
 	for _, entity := range entities {
 		// Parse creation time
-		if createdAt, err := time.Parse(time.RFC3339, entity.CreatedAt); err == nil {
+		createdAt := time.Unix(0, entity.CreatedAt)
+		if true { // Always valid timestamp
 			if createdAt.After(today) {
 				createdToday++
 			}
@@ -471,7 +472,8 @@ func (h *SystemMetricsHandler) calculateEntityStats(entities []*models.Entity) E
 		}
 		
 		// Parse update time
-		if updatedAt, err := time.Parse(time.RFC3339, entity.UpdatedAt); err == nil {
+		updatedAt := time.Unix(0, entity.UpdatedAt)
+		if true { // Always valid timestamp
 			if updatedAt.After(today) {
 				updatedToday++
 			}

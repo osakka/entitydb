@@ -738,8 +738,8 @@ definitions:
           type: integer
         type: array
       created_at:
-        description: Timestamps for compatibility (we'll store these in tags)
-        type: string
+        description: Timestamps as nanosecond epoch for efficiency
+        type: integer
       id:
         type: string
       tags:
@@ -747,7 +747,7 @@ definitions:
           type: string
         type: array
       updated_at:
-        type: string
+        type: integer
     type: object
 host: localhost:8085
 info:
@@ -762,6 +762,114 @@ info:
   title: EntityDB API
   version: 2.12.0
 paths:
+  /api/v1/auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Authenticate user with username and password using relationship-based
+        security
+      parameters:
+      - description: Login credentials
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/api.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.LoginResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      summary: Authenticate user
+      tags:
+      - authentication
+  /api/v1/auth/logout:
+    post:
+      consumes:
+      - application/json
+      description: Logout user by invalidating the current session
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Logout user
+      tags:
+      - authentication
+  /api/v1/auth/refresh:
+    post:
+      consumes:
+      - application/json
+      description: Refresh the current session token to extend expiration
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.LoginResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Refresh session token
+      tags:
+      - authentication
+  /api/v1/auth/whoami:
+    get:
+      consumes:
+      - application/json
+      description: Get information about the currently authenticated user
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.UserInfo'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get current user information
+      tags:
+      - authentication
   /api/v1/config:
     get:
       consumes:

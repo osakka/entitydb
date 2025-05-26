@@ -116,27 +116,32 @@ type User struct {
 
 // EntityDBServer represents the main server
 type EntityDBServer struct {
-	entityRepo       models.EntityRepository
-	relationRepo     models.EntityRelationshipRepository
-	sessionManager   *models.SessionManager
-	users           map[string]*User
-	port            int
-	mu              sync.RWMutex
-	server          *http.Server
-	entityHandler   *api.EntityHandler
-	relationHandler *api.EntityRelationshipHandler
-	userHandler     *api.UserHandler
-	config          *Config
+	entityRepo        models.EntityRepository
+	relationRepo      models.EntityRelationshipRepository
+	sessionManager    *models.SessionManager
+	securityManager   *models.SecurityManager
+	securityInit      *models.SecurityInitializer
+	users            map[string]*User // Legacy - will be removed
+	port             int
+	mu               sync.RWMutex
+	server           *http.Server
+	entityHandler    *api.EntityHandler
+	relationHandler  *api.EntityRelationshipHandler
+	userHandler      *api.UserHandler
+	authHandler      *api.AuthHandler
+	securityMiddleware *api.SecurityMiddleware
+	config           *Config
 }
 
 // NewEntityDBServer creates a new server instance
 func NewEntityDBServer(config *Config) *EntityDBServer {
-	return &EntityDBServer{
-		users:          make(map[string]*User),
+	server := &EntityDBServer{
+		users:          make(map[string]*User), // Legacy - will be removed
 		sessionManager: models.NewSessionManager(config.SessionTTL),
 		port:           config.Port,
 		config:         config,
 	}
+	return server
 }
 
 func init() {
@@ -242,10 +247,16 @@ func main() {
 	server.entityRepo = entityRepo
 	server.relationRepo = relationRepo
 	
+	// Initialize security system
+	server.securityManager = models.NewSecurityManager(entityRepo)
+	server.securityInit = models.NewSecurityInitializer(server.securityManager, entityRepo)
+	
 	// Create handlers
 	server.entityHandler = api.NewEntityHandler(entityRepo)
 	server.relationHandler = api.NewEntityRelationshipHandler(relationRepo)
 	server.userHandler = api.NewUserHandler(entityRepo)
+	server.authHandler = api.NewAuthHandler(server.securityManager)
+	server.securityMiddleware = api.NewSecurityMiddleware(server.securityManager)
 	
 	// Initialize with default entities
 	server.initializeEntities()
@@ -361,11 +372,14 @@ func main() {
 	// Entity relationship routes
 	apiRouter.HandleFunc("/entity-relationships", server.handleEntityRelationships).Methods("GET", "POST")
 	
-	// Auth routes
-	apiRouter.HandleFunc("/auth/login", server.handleLogin).Methods("POST")
-	apiRouter.HandleFunc("/auth/logout", server.handleLogout).Methods("POST")
+	// Auth routes - New relationship-based security
+	apiRouter.HandleFunc("/auth/login", server.authHandler.Login).Methods("POST")
+	apiRouter.HandleFunc("/auth/logout", server.securityMiddleware.RequireAuthentication(server.authHandler.Logout)).Methods("POST")
+	apiRouter.HandleFunc("/auth/whoami", server.securityMiddleware.RequireAuthentication(server.authHandler.WhoAmI)).Methods("GET")
+	apiRouter.HandleFunc("/auth/refresh", server.securityMiddleware.RequireAuthentication(server.authHandler.RefreshToken)).Methods("POST")
+	
+	// Legacy auth routes (backward compatibility) - TODO: Remove these after migration
 	apiRouter.HandleFunc("/auth/status", server.handleAuthStatus).Methods("GET")
-	apiRouter.HandleFunc("/auth/refresh", server.handleRefreshToken).Methods("POST")
 	
 	// User management routes with RBAC
 	userHandlerRBAC := api.NewUserHandlerRBAC(server.userHandler, server.entityRepo, server.sessionManager)
@@ -574,67 +588,15 @@ func redirectToHTTPS(w http.ResponseWriter, r *http.Request) {
 
 // initializeEntities creates default entities if they don't exist
 func (s *EntityDBServer) initializeEntities() {
-	logger.Info("Initializing default entities...")
+	logger.Info("Initializing relationship-based security system...")
 	
-	// Check if any admin user exists
-	// First check by tag
-	entities, err := s.entityRepo.ListByTag("id:username:admin")
-	if err != nil {
-		logger.Error("Failed to check for admin user by tag: %v", err)
-		// Don't return, continue with creation check
-		entities = []*models.Entity{}
+	// Initialize default security entities (roles, permissions, groups)
+	if err := s.securityInit.InitializeDefaultSecurityEntities(); err != nil {
+		logger.Error("Failed to initialize security entities: %v", err)
+		return
 	}
 	
-	// Also check by content to avoid duplicates
-	userEntities, err := s.entityRepo.ListByTag("type:user")
-	if err == nil {
-		for _, entity := range userEntities {
-			username := entity.GetContentValue("username")
-			if username == "admin" {
-				logger.Info("Admin user already exists with ID %s", entity.ID)
-				return
-			}
-		}
-	}
-	
-	if len(entities) == 0 {
-		// Admin user doesn't exist, create it
-		logger.Info("Creating default admin user...")
-		
-		// Hash the default password
-		hashedPassword, err := bcrypt.GenerateFromPassword([]byte("admin"), bcrypt.DefaultCost)
-		if err != nil {
-			logger.Error("Failed to hash default admin password: %v", err)
-			return
-		}
-		
-		adminUser := models.NewEntity()
-		adminUser.Tags = []string{
-			"type:user",
-			"id:username:admin",
-			"rbac:role:admin",
-			"rbac:perm:*",
-			"status:active",
-		}
-		// Store user info as JSON content
-		userData := map[string]string{
-			"username":      "admin",
-			"password_hash": string(hashedPassword),
-			"display_name":  "Administrator",
-		}
-		contentJSON, _ := json.Marshal(userData)
-		adminUser.Content = contentJSON
-		adminUser.AddTag("content:type:application/json")
-		
-		err = s.entityRepo.Create(adminUser)
-		if err != nil {
-			logger.Error("Failed to create default admin user: %v", err)
-		} else {
-			logger.Info("Default admin user created successfully")
-		}
-	} else {
-		logger.Info("Admin user already exists (%d found)", len(entities))
-	}
+	logger.Info("Security system initialized successfully")
 }
 
 // handleEntities is a legacy endpoint handler

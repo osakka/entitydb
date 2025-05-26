@@ -136,13 +136,13 @@ func CompareEntityStates(before, after *Entity) []EntityChange {
 		if !existed {
 			changes = append(changes, EntityChange{
 				Type:      "added",
-				Timestamp: time.Now(),
+				Timestamp: Now(),
 				NewValue:  afterValue,
 			})
 		} else if beforeValue != afterValue {
 			changes = append(changes, EntityChange{
 				Type:      "modified",
-				Timestamp: time.Now(),
+				Timestamp: Now(),
 				OldValue:  beforeValue,
 				NewValue:  afterValue,
 			})
@@ -154,7 +154,7 @@ func CompareEntityStates(before, after *Entity) []EntityChange {
 		if _, exists := afterTags[namespace]; !exists {
 			changes = append(changes, EntityChange{
 				Type:      "removed",
-				Timestamp: time.Now(),
+				Timestamp: Now(),
 				OldValue:  beforeValue,
 			})
 		}

@@ -87,8 +87,8 @@ func (h *EntityHandler) CreateEntity(w http.ResponseWriter, r *http.Request) {
 	entity := &models.Entity{
 		ID:        req.ID,
 		Tags:      []string{},
-		CreatedAt: time.Now().UTC().Format(time.RFC3339),
-		UpdatedAt: time.Now().UTC().Format(time.RFC3339),
+		CreatedAt: models.Now(),
+		UpdatedAt: models.Now(),
 	}
 
 	// Add tags with timestamps 
@@ -574,8 +574,8 @@ func (h *EntityHandler) TestCreateEntity(w http.ResponseWriter, r *http.Request)
 	entity := &models.Entity{
 		ID:        models.GenerateUUID(),
 		Tags:      []string{},
-		CreatedAt: time.Now().UTC().Format(time.RFC3339),
-		UpdatedAt: time.Now().UTC().Format(time.RFC3339),
+		CreatedAt: models.Now(),
+		UpdatedAt: models.Now(),
 	}
 
 	// Handle title/description format
@@ -696,8 +696,8 @@ func (h *EntityHandler) SimpleCreateEntity(w http.ResponseWriter, r *http.Reques
 	entity := &models.Entity{
 		ID:        entityID,
 		Tags:      []string{},
-		CreatedAt: time.Now().UTC().Format(time.RFC3339),
-		UpdatedAt: time.Now().UTC().Format(time.RFC3339),
+		CreatedAt: models.Now(),
+		UpdatedAt: models.Now(),
 	}
 
 	// Add title and description as content

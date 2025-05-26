@@ -92,8 +92,8 @@ func (h *DataspaceManagementHandler) CreateDataspace(w http.ResponseWriter, r *h
 	// Create hub configuration entity
 	hubEntity := &models.Entity{
 		Tags:      []string{},
-		CreatedAt: time.Now().UTC().Format(time.RFC3339),
-		UpdatedAt: time.Now().UTC().Format(time.RFC3339),
+		CreatedAt: models.Now(),
+		UpdatedAt: models.Now(),
 	}
 
 	// Add hub metadata tags
@@ -141,7 +141,7 @@ func (h *DataspaceManagementHandler) CreateDataspace(w http.ResponseWriter, r *h
 		Hub: DataspaceInfo{
 			Name:        req.Name,
 			Description: req.Description,
-			CreatedAt:   hubEntity.CreatedAt,
+			CreatedAt:   time.Unix(0, hubEntity.CreatedAt).Format(time.RFC3339),
 			AdminUser:   req.AdminUser,
 		},
 		Message: fmt.Sprintf("Hub '%s' created successfully", req.Name),
@@ -300,7 +300,7 @@ func (h *DataspaceManagementHandler) extractDataspaceName(entity *models.Entity)
 // entityToDataspaceInfo converts entity to hub info
 func (h *DataspaceManagementHandler) entityToDataspaceInfo(entity *models.Entity) DataspaceInfo {
 	info := DataspaceInfo{
-		CreatedAt: entity.CreatedAt,
+		CreatedAt: time.Unix(0, entity.CreatedAt).Format(time.RFC3339),
 	}
 
 	// Parse tags for hub information

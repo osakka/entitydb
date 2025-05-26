@@ -84,7 +84,7 @@ func (h *AdminHandler) HealthCheckHandler(w http.ResponseWriter, r *http.Request
 	// Get basic health from repository
 	health := map[string]interface{}{
 		"status": "ok",
-		"timestamp": time.Now().UTC().Format(time.RFC3339),
+		"timestamp": models.Now(),
 	}
 	
 	// Add index health if supported

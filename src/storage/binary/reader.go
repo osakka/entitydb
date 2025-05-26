@@ -6,6 +6,7 @@ import (
 	"entitydb/models"
 	"entitydb/logger"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"strings"
@@ -84,24 +85,51 @@ func NewReader(filename string) (*Reader, error) {
 	
 	// Read index
 	if r.header.EntityIndexOffset > 0 {
-		logger.Debug("Reading index from offset %d, expecting %d entries", 
+		logger.Info("[Reader] Reading index from offset %d, expecting %d entries", 
 			r.header.EntityIndexOffset, r.header.EntityCount)
 		
+		// Validate index location
+		if int64(r.header.EntityIndexOffset) > stat.Size() {
+			logger.Error("[Reader] Index offset %d exceeds file size %d", 
+				r.header.EntityIndexOffset, stat.Size())
+			return r, nil // Return partial reader
+		}
+		
 		if _, err := file.Seek(int64(r.header.EntityIndexOffset), os.SEEK_SET); err != nil {
-			logger.Error("Failed to seek to index: %v", err)
+			logger.Error("[Reader] Failed to seek to index: %v", err)
 			return nil, err
 		}
 		
+		// Calculate how many entries we can actually read
+		indexStartPos := int64(r.header.EntityIndexOffset)
+		remainingFileSize := stat.Size() - indexStartPos
+		entrySize := int64(binary.Size(IndexEntry{}))
+		maxPossibleEntries := uint64(remainingFileSize / entrySize)
+		
+		if maxPossibleEntries < r.header.EntityCount {
+			logger.Warn("[Reader] File can only hold %d index entries but header claims %d",
+				maxPossibleEntries, r.header.EntityCount)
+		}
+		
+		entriesRead := uint64(0)
 		for i := uint64(0); i < r.header.EntityCount; i++ {
+			// Check if we have enough bytes remaining
+			currentPos, _ := file.Seek(0, os.SEEK_CUR)
+			if currentPos+entrySize > stat.Size() {
+				logger.Warn("[Reader] Not enough data for index entry %d (pos=%d, need %d bytes, file_size=%d)",
+					i, currentPos, entrySize, stat.Size())
+				break
+			}
+			
 			entry := &IndexEntry{}
 			if err := binary.Read(file, binary.LittleEndian, &entry.EntityID); err != nil {
 				// Stop reading if we hit EOF
 				if err == io.EOF {
-					logger.Warn("Hit EOF at index entry %d", i)
+					logger.Warn("[Reader] Hit EOF at index entry %d (reading EntityID)", i)
 					break
 				}
-				logger.Error("Failed to read index entry %d: %v", i, err)
-				return nil, err
+				logger.Error("[Reader] Failed to read index entry %d: %v", i, err)
+				break // Don't fail entirely, just stop reading index
 			}
 			if err := binary.Read(file, binary.LittleEndian, &entry.Offset); err != nil {
 				if err == io.EOF {
@@ -133,10 +161,16 @@ func NewReader(filename string) (*Reader, error) {
 				continue
 			}
 			r.index[id] = entry
-			logger.Debug("Loaded index entry %d: ID=%s, Offset=%d, Size=%d", i, id, entry.Offset, entry.Size)
+			entriesRead++
+			logger.Debug("[Reader] Loaded index entry %d: ID=%s, Offset=%d, Size=%d", i, id, entry.Offset, entry.Size)
 		}
 		
-		logger.Debug("Loaded %d index entries", len(r.index))
+		logger.Info("[Reader] Index loading complete: read %d entries, loaded %d into index (expected %d)",
+			entriesRead, len(r.index), r.header.EntityCount)
+		
+		if entriesRead < r.header.EntityCount {
+			logger.Warn("[Reader] Index is incomplete: missing %d entries", r.header.EntityCount - entriesRead)
+		}
 	}
 	
 	return r, nil
@@ -144,11 +178,23 @@ func NewReader(filename string) (*Reader, error) {
 
 // GetEntity reads an entity by ID
 func (r *Reader) GetEntity(id string) (*models.Entity, error) {
-	logger.Debug("GetEntity called for ID: %s", id)
+	// Start operation tracking
+	op := models.StartOperation(models.OpTypeRead, id, map[string]interface{}{
+		"index_size": len(r.index),
+	})
+	defer func() {
+		if op != nil {
+			op.Complete()
+		}
+	}()
+	
+	logger.Debug("[Reader] GetEntity called for ID: %s", id)
 	
 	entry, exists := r.index[id]
 	if !exists {
-		logger.Debug("Entity %s not found in index", id)
+		err := fmt.Errorf("entity %s not found in index", id)
+		op.Fail(err)
+		logger.Debug("[Reader] Entity %s not found in index", id)
 		return nil, ErrNotFound
 	}
 	

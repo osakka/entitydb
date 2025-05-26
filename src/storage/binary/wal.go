@@ -64,31 +64,86 @@ func NewWAL(dataPath string) (*WAL, error) {
 
 // LogCreate logs an entity creation
 func (w *WAL) LogCreate(entity *models.Entity) error {
-	return w.logEntry(WALEntry{
+	op := models.StartOperation(models.OpTypeWAL, entity.ID, map[string]interface{}{
+		"wal_operation": "create",
+		"entity_size": len(entity.Content),
+		"tag_count": len(entity.Tags),
+	})
+	defer op.Complete()
+	
+	logger.Info("[WAL] Logging CREATE operation for entity %s", entity.ID)
+	
+	err := w.logEntry(WALEntry{
 		OpType:    WALOpCreate,
 		EntityID:  entity.ID,
 		Entity:    entity,
 		Timestamp: time.Now(),
 	})
+	
+	if err != nil {
+		op.Fail(err)
+		logger.Error("[WAL] Failed to log CREATE for entity %s: %v", entity.ID, err)
+		return err
+	}
+	
+	op.SetMetadata("sequence", w.sequence)
+	logger.Debug("[WAL] Successfully logged CREATE for entity %s at sequence %d", entity.ID, w.sequence)
+	return nil
 }
 
 // LogUpdate logs an entity update
 func (w *WAL) LogUpdate(entity *models.Entity) error {
-	return w.logEntry(WALEntry{
+	op := models.StartOperation(models.OpTypeWAL, entity.ID, map[string]interface{}{
+		"wal_operation": "update",
+		"entity_size": len(entity.Content),
+		"tag_count": len(entity.Tags),
+	})
+	defer op.Complete()
+	
+	logger.Info("[WAL] Logging UPDATE operation for entity %s", entity.ID)
+	
+	err := w.logEntry(WALEntry{
 		OpType:    WALOpUpdate,
 		EntityID:  entity.ID,
 		Entity:    entity,
 		Timestamp: time.Now(),
 	})
+	
+	if err != nil {
+		op.Fail(err)
+		logger.Error("[WAL] Failed to log UPDATE for entity %s: %v", entity.ID, err)
+		return err
+	}
+	
+	op.SetMetadata("sequence", w.sequence)
+	logger.Debug("[WAL] Successfully logged UPDATE for entity %s at sequence %d", entity.ID, w.sequence)
+	return nil
 }
 
 // LogDelete logs an entity deletion
 func (w *WAL) LogDelete(entityID string) error {
-	return w.logEntry(WALEntry{
+	op := models.StartOperation(models.OpTypeWAL, entityID, map[string]interface{}{
+		"wal_operation": "delete",
+	})
+	defer op.Complete()
+	
+	logger.Info("[WAL] Logging DELETE operation for entity %s", entityID)
+	
+	err := w.logEntry(WALEntry{
 		OpType:    WALOpDelete,
 		EntityID:  entityID,
 		Timestamp: time.Now(),
 	})
+	
+	if err != nil {
+		op.Fail(err)
+		logger.Error("[WAL] Failed to log DELETE for entity %s: %v", entityID, err)
+		return err
+	}
+	
+	op.SetMetadata("sequence", w.sequence)
+	logger.Debug("[WAL] Successfully logged DELETE for entity %s at sequence %d", entityID, w.sequence)
+	return nil
 }
 
 // LogCheckpoint logs a checkpoint
@@ -171,10 +226,23 @@ func (w *WAL) serializeEntry(entry WALEntry) ([]byte, error) {
 
 // Replay replays the WAL entries
 func (w *WAL) Replay(callback func(entry WALEntry) error) error {
+	op := models.StartOperation(models.OpTypeWAL, "replay", map[string]interface{}{
+		"wal_operation": "replay",
+		"wal_path": w.path,
+	})
+	defer op.Complete()
+	
+	logger.Info("[WAL] Starting WAL replay from %s", w.path)
+	
 	// Seek to the beginning
 	if _, err := w.file.Seek(0, io.SeekStart); err != nil {
+		op.Fail(err)
+		logger.Error("[WAL] Failed to seek to beginning: %v", err)
 		return err
 	}
+	
+	entriesProcessed := 0
+	entriesFailed := 0
 	
 	for {
 		// Read length prefix
@@ -183,26 +251,43 @@ func (w *WAL) Replay(callback func(entry WALEntry) error) error {
 			if err == io.EOF {
 				break
 			}
+			op.Fail(err)
+			logger.Error("[WAL] Failed to read entry length: %v", err)
 			return err
 		}
 		
 		// Read data
 		data := make([]byte, length)
 		if _, err := io.ReadFull(w.file, data); err != nil {
+			op.Fail(err)
+			logger.Error("[WAL] Failed to read entry data (length=%d): %v", length, err)
 			return err
 		}
 		
 		// Deserialize entry
 		entry, err := w.deserializeEntry(data)
 		if err != nil {
-			return err
+			entriesFailed++
+			logger.Error("[WAL] Failed to deserialize entry: %v", err)
+			continue // Skip bad entries during replay
 		}
+		
+		logger.Debug("[WAL] Replaying %v operation for entity %s", entry.OpType, entry.EntityID)
 		
 		// Process entry
 		if err := callback(*entry); err != nil {
-			return err
+			entriesFailed++
+			logger.Error("[WAL] Failed to process entry for entity %s: %v", entry.EntityID, err)
+			continue // Continue with other entries
 		}
+		
+		entriesProcessed++
 	}
+	
+	op.SetMetadata("entries_processed", entriesProcessed)
+	op.SetMetadata("entries_failed", entriesFailed)
+	
+	logger.Info("[WAL] WAL replay completed: %d entries processed, %d failed", entriesProcessed, entriesFailed)
 	
 	return nil
 }

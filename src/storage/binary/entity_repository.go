@@ -338,11 +338,12 @@ func (r *EntityRepository) updateIndexes(entity *models.Entity) {
 
 // Create creates a new entity with strong durability guarantees
 func (r *EntityRepository) Create(entity *models.Entity) error {
-	// Always generate a new UUID for entities
-	entity.ID = models.GenerateUUID()
+	// Generate UUID only if no ID is provided
+	if entity.ID == "" {
+		entity.ID = models.GenerateUUID()
+	}
 	
-	timestamp := time.Now()
-	entity.CreatedAt = timestamp.Format(time.RFC3339Nano)
+	entity.CreatedAt = models.Now()
 	entity.UpdatedAt = entity.CreatedAt
 	
 	// Ensure all tags have timestamps (temporal-only system)
@@ -350,7 +351,7 @@ func (r *EntityRepository) Create(entity *models.Entity) error {
 	for _, tag := range entity.Tags {
 		if !strings.Contains(tag, "|") {
 			// Add timestamp if not present (temporal-only system requires all tags to have timestamps)
-			timestampedTags = append(timestampedTags, fmt.Sprintf("%s|%s", timestamp.Format(time.RFC3339Nano), tag))
+			timestampedTags = append(timestampedTags, fmt.Sprintf("%s|%s", models.NowString(), tag))
 		} else {
 			// Keep existing timestamped tags
 			timestampedTags = append(timestampedTags, tag)
@@ -527,15 +528,14 @@ func (r *EntityRepository) Update(entity *models.Entity) error {
 	entity.ID = existingEntity.ID
 	entity.CreatedAt = existingEntity.CreatedAt // Also preserve creation time
 	
-	timestamp := time.Now()
-	entity.UpdatedAt = timestamp.Format(time.RFC3339Nano)
+	entity.UpdatedAt = models.Now()
 	
 	// Ensure all tags have timestamps (temporal-only system)
 	timestampedTags := []string{}
 	for _, tag := range entity.Tags {
 		if !strings.Contains(tag, "|") {
 			// Add timestamp if not present (temporal-only system requires all tags to have timestamps)
-			timestampedTags = append(timestampedTags, fmt.Sprintf("%s|%s", timestamp.Format(time.RFC3339Nano), tag))
+			timestampedTags = append(timestampedTags, fmt.Sprintf("%s|%s", models.NowString(), tag))
 		} else {
 			// Keep existing timestamped tags
 			timestampedTags = append(timestampedTags, tag)
@@ -1269,14 +1269,14 @@ func (r *EntityRepository) CreateRelationship(rel interface{}) error {
 	if relationship.ID == "" {
 		relationship.ID = "rel_" + models.GenerateUUID()
 	}
-	relationship.CreatedAt = time.Now()
+	relationship.CreatedAt = models.Now()
 	
 	// Store as special entity
 	entity := &models.Entity{
 		ID:        relationship.ID,
 		Tags:      []string{},
-		CreatedAt: time.Now().UTC().Format(time.RFC3339),
-		UpdatedAt: time.Now().UTC().Format(time.RFC3339),
+		CreatedAt: models.Now(),
+		UpdatedAt: models.Now(),
 	}
 	entity.AddTagWithValue("_relationship", relationship.RelationshipType)
 	entity.AddTagWithValue("_source", relationship.SourceID)
@@ -1466,7 +1466,7 @@ func (r *EntityRepository) GetEntityHistory(id string, limit int) ([]*models.Ent
 		
 		change := &models.EntityChange{
 			Type:      "tag_change",
-			Timestamp: entry.Timestamp,
+			Timestamp: models.Now(),
 			NewValue:  entry.Tag,
 		}
 		
@@ -1507,7 +1507,7 @@ func (r *EntityRepository) GetRecentChanges(limit int) ([]*models.EntityChange, 
 			entry := entries[len(entries)-1]
 			change := &models.EntityChange{
 				Type:      "tag_change",
-				Timestamp: entry.Timestamp,
+				Timestamp: models.Now(),
 				NewValue:  entry.Tag,
 			}
 			changes = append(changes, change)

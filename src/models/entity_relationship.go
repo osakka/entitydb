@@ -3,20 +3,21 @@ package models
 import (
 	"encoding/json"
 	"strings"
-	"time"
 )
 
 // EntityRelationship represents a typed relationship between two entities
 type EntityRelationship struct {
-	ID               string    `json:"id,omitempty"`
-	SourceID         string    `json:"source_id"`
-	RelationshipType string    `json:"relationship_type"`
-	TargetID         string    `json:"target_id"`
-	CreatedAt        time.Time `json:"created_at"`
-	UpdatedAt        time.Time `json:"updated_at,omitempty"`
-	CreatedBy        string    `json:"created_by,omitempty"`
-	UpdatedBy        string    `json:"updated_by,omitempty"`
-	Metadata         string    `json:"metadata,omitempty"` // JSON string for additional data
+	ID               string            `json:"id,omitempty"`
+	SourceID         string            `json:"source_id"`
+	RelationshipType string            `json:"relationship_type"`
+	Type             string            `json:"type"` // Alias for RelationshipType for consistency
+	TargetID         string            `json:"target_id"`
+	Properties       map[string]string `json:"properties,omitempty"` // Simple key-value properties
+	CreatedAt        int64             `json:"created_at"`           // Nanosecond epoch timestamp
+	UpdatedAt        int64             `json:"updated_at,omitempty"`
+	CreatedBy        string            `json:"created_by,omitempty"`
+	UpdatedBy        string            `json:"updated_by,omitempty"`
+	Metadata         string            `json:"metadata,omitempty"` // JSON string for additional data
 }
 
 // Common relationship types
@@ -32,16 +33,27 @@ const (
 	RelationshipTypeCreatedBy     = "created_by"
 	RelationshipTypeUpdatedBy     = "updated_by"
 	RelationshipTypeLinkedTo      = "linked_to"
+	
+	// Security relationship types
+	RelationshipTypeHasCredential   = "has_credential"
+	RelationshipTypeAuthenticatedAs = "authenticated_as"
+	RelationshipTypeMemberOf        = "member_of"
+	RelationshipTypeHasRole         = "has_role"
+	RelationshipTypeGrants          = "grants"
+	RelationshipTypeOwns            = "owns"
+	RelationshipTypeCanAccess       = "can_access"
 )
 
 // NewEntityRelationship creates a new entity relationship
 func NewEntityRelationship(sourceID, relationshipType, targetID string) *EntityRelationship {
-	now := time.Now()
+	now := Now()
 	return &EntityRelationship{
 		ID:               sourceID + "_" + relationshipType + "_" + targetID,
 		SourceID:         sourceID,
 		RelationshipType: relationshipType,
+		Type:             relationshipType, // Set both for compatibility
 		TargetID:         targetID,
+		Properties:       make(map[string]string),
 		CreatedAt:        now,
 		UpdatedAt:        now,
 	}

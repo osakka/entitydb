@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Data Integrity System**: Comprehensive operation tracking and logging infrastructure
+  - Operation ID generation for all data operations (READ, WRITE, DELETE, INDEX, WAL)
+  - Enhanced logging in Writer with SHA256 checksums and write verification
+  - Enhanced logging in Reader with better bounds checking and EOF handling
+  - WAL operation tracking with detailed replay logging
+  - Created `/opt/entitydb/src/models/operation_tracking.go` for centralized tracking
 - **RBAC Metrics Dashboard**: Comprehensive real-time monitoring system for authentication, sessions, and access control
   - `/api/v1/rbac/metrics` endpoint with detailed session analytics
   - Authentication success/failure timeline with visual charts
@@ -24,10 +30,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Summary cards showing key security metrics and statistics
 
 ### Changed
+- **Time Format Standardization**: All timestamps now use int64 nanoseconds since Unix epoch
+  - Created `/opt/entitydb/src/models/time_utils.go` with standardized time functions
+  - Removed duplicate temporal tag implementations (maintaining single source of truth)
+  - Deprecated `temporal_format.go` and consolidated to `time_utils.go`
+- **Fixed Index Corruption**: Binary writer now writes index entries in sorted order
+  - Fixed map iteration causing random index order
+  - Added verification that written entries match header count
+  - Auto-correction of header count if mismatch detected
 - **System Metrics Enhancement**: Added environment variables to `/api/v1/system/metrics` response
 - **Fixed Index Health Metrics**: Updated Storage Engine page to show real index metrics instead of placeholders
 - **Storage Components Display**: Replaced non-functional "File System Analysis" with real storage component breakdown
 - **API Documentation**: Updated Swagger specifications to include new RBAC metrics structures
+
+### Fixed
+- **Index Write Operations**: Fixed critical bug where index entries were written in random order
+- **Authentication Failures**: Fixed admin user creation in startup script
+- **Build Errors**: Moved debug_auth.go to tools directory to avoid duplicate main
+- **Single Source of Truth**: Removed duplicate temporal tag parsing implementations
 
 ## [v2.14.0] - 2025-05-20
 

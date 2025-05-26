@@ -10,8 +10,34 @@ import (
 	"sync/atomic"
 	"fmt"
 	"strconv"
-	"strings"
-	"errors"
+)
+
+// TimeBucket represents a time bucket for temporal indexing
+type TimeBucket struct {
+	BucketSize int64
+}
+
+// GetBucket returns the bucket ID for a given timestamp
+func (tb TimeBucket) GetBucket(timestamp int64) int64 {
+	return (timestamp / tb.BucketSize) * tb.BucketSize
+}
+
+// BucketConfig defines bucket sizes for temporal indexing
+type BucketConfig struct {
+	BucketSize int64
+	Name       string
+}
+
+var (
+	// Predefined bucket configurations
+	HourBucket = BucketConfig{
+		BucketSize: int64(time.Hour),
+		Name:       "hour",
+	}
+	DayBucket = BucketConfig{
+		BucketSize: int64(24 * time.Hour),
+		Name:       "day",
+	}
 )
 
 // TemporalRepository extends HighPerformanceRepository with temporal features
@@ -200,49 +226,16 @@ func (r *TemporalRepository) GetByID(id string) (*models.Entity, error) {
 	return entity, err
 }
 
-// ParseTemporalTagImproved parses a tag with timestamp prefix (enhanced version)
-// Format can be either:
-// 1. "2025-05-20T20:02:48.098692124+01:00|type:test" (pipe format)
-// 2. "2025-05-20T20:02:48.098692124.type:test" (dot format, deprecated)
+// ParseTemporalTagImproved is a wrapper around models.ParseTemporalTag for backward compatibility
+// DEPRECATED: Use models.ParseTemporalTag directly
 func ParseTemporalTagImproved(tag string) (int64, string, error) {
-	// Try pipe format first (current standard)
-	parts := strings.SplitN(tag, "|", 2)
-	if len(parts) == 2 {
-		// Parse timestamp
-		t, err := time.Parse(time.RFC3339Nano, parts[0])
-		if err != nil {
-			return 0, "", fmt.Errorf("invalid timestamp in tag: %v", err)
-		}
-		return t.UnixNano(), parts[1], nil
-	}
-	
-	// Try dot format (legacy)
-	parts = strings.SplitN(tag, ".", 2)
-	if len(parts) == 2 {
-		// Parse timestamp
-		t, err := time.Parse("2006-01-02T15:04:05.999999999", parts[0])
-		if err != nil {
-			return 0, "", fmt.Errorf("invalid timestamp in tag: %v", err)
-		}
-		return t.UnixNano(), parts[1], nil
-	}
-	
-	// Special case: Unix timestamp format (numeric only)
-	if parts := strings.SplitN(tag, "|", 2); len(parts) == 2 {
-		if ts, err := strconv.ParseInt(parts[0], 10, 64); err == nil {
-			return ts, parts[1], nil
-		}
-	}
-	
-	return 0, "", errors.New("not a temporal tag")
+	return models.ParseTemporalTag(tag)
 }
 
-// FormatTagWithTimestampImproved formats a tag with its timestamp (enhanced version)
+// FormatTagWithTimestampImproved is a wrapper around models.FormatTemporalTagAt for backward compatibility
+// DEPRECATED: Use models.FormatTemporalTagAt directly
 func FormatTagWithTimestampImproved(tag string, timestamp int64) string {
-	// Convert nanosecond timestamp to RFC3339Nano format
-	t := time.Unix(0, timestamp)
-	timeStr := t.Format(time.RFC3339Nano)
-	return timeStr + "|" + tag
+	return models.FormatTemporalTagAt(tag, timestamp)
 }
 
 // GetEntityAsOf implements temporal query interface with improved error handling and timestamp parsing
@@ -453,7 +446,7 @@ func (r *TemporalRepository) GetEntityHistory(entityID string, limit int) ([]*mo
 		entry := tagHistory[i]
 		change := &models.EntityChange{
 			Type:      "tag_added",
-			Timestamp: time.Unix(0, entry.Timestamp),
+			Timestamp: entry.Timestamp,
 			NewValue:  entry.Tag,
 			EntityID:  entityID,
 		}
@@ -561,7 +554,7 @@ func (r *TemporalRepository) GetRecentChanges(limit int) ([]*models.EntityChange
 		for _, tag := range change.Tags {
 			changes = append(changes, &models.EntityChange{
 				Type:      "tag_added",
-				Timestamp: time.Unix(0, change.Timestamp),
+				Timestamp: change.Timestamp,
 				NewValue:  tag,
 				EntityID:  change.EntityID,
 			})

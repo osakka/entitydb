@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-	"time"
 	"entitydb/logger"
 	
 	"golang.org/x/crypto/bcrypt"
@@ -111,7 +110,7 @@ func (h *UserHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 		"email":        req.Email,
 		"full_name":    req.FullName,
 		"password_hash": passwordHash,
-		"created_at":   time.Now().UTC().Format(time.RFC3339),
+		"created_at":   models.NowString(),
 	}
 	jsonData, _ := json.Marshal(contentData)
 
@@ -120,8 +119,8 @@ func (h *UserHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 		ID:        "user_" + req.Username,
 		Tags:      append(tags, "content:type:json"),
 		Content:   jsonData,
-		CreatedAt: time.Now().UTC().Format(time.RFC3339),
-		UpdatedAt: time.Now().UTC().Format(time.RFC3339),
+		CreatedAt: models.Now(),
+		UpdatedAt: models.Now(),
 	}
 
 	// Save to repository
@@ -230,7 +229,7 @@ func (h *UserHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 	
 	// Update password in user data
 	userData["password_hash"] = string(hashedPassword)
-	userData["updated_at"] = time.Now().UTC().Format(time.RFC3339)
+	userData["updated_at"] = models.NowString()
 	
 	// Marshal updated user data
 	updatedContent, err := json.Marshal(userData)
@@ -241,7 +240,7 @@ func (h *UserHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 	
 	// Update entity
 	userEntity.Content = updatedContent
-	userEntity.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
+	userEntity.UpdatedAt = models.Now()
 	
 	// Save to repository
 	if err := h.entityRepo.Update(userEntity); err != nil {
@@ -354,7 +353,7 @@ func (h *UserHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 	
 	// Update password in user data
 	userData["password_hash"] = string(hashedPassword)
-	userData["updated_at"] = time.Now().UTC().Format(time.RFC3339)
+	userData["updated_at"] = models.NowString()
 	
 	// Marshal updated user data
 	updatedContent, err := json.Marshal(userData)
@@ -365,7 +364,7 @@ func (h *UserHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 	
 	// Update entity
 	userEntity.Content = updatedContent
-	userEntity.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
+	userEntity.UpdatedAt = models.Now()
 	
 	// Save to repository
 	if err := h.entityRepo.Update(userEntity); err != nil {

@@ -97,7 +97,7 @@ EOF
     cd - > /dev/null
     
     # Create admin user using test endpoint (without fixed ID)
-    # Using the new entity format with single content field
+    # Using the test handler format with content array
     USER_DATA="{\"username\":\"admin\",\"password_hash\":\"$HASH\",\"display_name\":\"Administrator\"}"
     ENCODED_DATA=$(echo -n "$USER_DATA" | base64 -w0)
     
@@ -106,15 +106,17 @@ EOF
       -d "{
         \"tags\": [
           \"type:user\",
-          \"id:username:admin\",
+          \"identity:username:admin\",
           \"rbac:role:admin\",
           \"rbac:perm:*\",
           \"status:active\"
         ],
-        \"content\": {
-          \"data\": \"$ENCODED_DATA\",
-          \"type\": \"application/json\"
-        }
+        \"content\": [
+          {
+            \"type\": \"application/json\",
+            \"value\": \"$ENCODED_DATA\"
+          }
+        ]
       }")
     
     # Verify creation

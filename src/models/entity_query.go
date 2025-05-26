@@ -242,7 +242,7 @@ func sortByCreatedAt(entities []*Entity) {
 	// Simple bubble sort for simplicity
 	for i := 0; i < len(entities)-1; i++ {
 		for j := 0; j < len(entities)-i-1; j++ {
-			if compareTimestamps(entities[j].CreatedAt, entities[j+1].CreatedAt) > 0 {
+			if entities[j].CreatedAt > entities[j+1].CreatedAt {
 				entities[j], entities[j+1] = entities[j+1], entities[j]
 			}
 		}
@@ -253,7 +253,7 @@ func sortByCreatedAtDesc(entities []*Entity) {
 	// Simple bubble sort for simplicity
 	for i := 0; i < len(entities)-1; i++ {
 		for j := 0; j < len(entities)-i-1; j++ {
-			if compareTimestamps(entities[j].CreatedAt, entities[j+1].CreatedAt) < 0 {
+			if entities[j].CreatedAt < entities[j+1].CreatedAt {
 				entities[j], entities[j+1] = entities[j+1], entities[j]
 			}
 		}
@@ -299,9 +299,9 @@ func (q *EntityQuery) applyFilters(entities []*Entity) []*Entity {
 func (q *EntityQuery) evaluateFilter(entity *Entity, filter Filter) bool {
 	switch filter.Field {
 	case "created_at":
-		return q.evaluateTimeStringFilter(entity.CreatedAt, filter)
+		return q.evaluateTimeFilter(entity.CreatedAt, filter)
 	case "updated_at":
-		return q.evaluateTimeStringFilter(entity.UpdatedAt, filter)
+		return q.evaluateTimeFilter(entity.UpdatedAt, filter)
 	case "id":
 		return q.evaluateStringFilter(entity.ID, filter)
 	case "tag_count":
@@ -408,21 +408,9 @@ func (q *EntityQuery) evaluateNumericFilter(value float64, filter Filter) bool {
 	}
 }
 
-// evaluateTimeStringFilter evaluates a time-based filter for string timestamps
-func (q *EntityQuery) evaluateTimeStringFilter(value string, filter Filter) bool {
-	// Parse the stored timestamp string
-	var valueTime int64
-	t, err := time.Parse(time.RFC3339Nano, value)
-	if err != nil {
-		// Try other formats
-		t, err = time.Parse(time.RFC3339, value)
-		if err != nil {
-			return false
-		}
-	}
-	valueTime = t.UnixNano()
-	
-	return q.evaluateTimeFilter(valueTime, filter)
+// evaluateTimeNanoFilter evaluates a time-based filter for nanosecond epoch timestamps
+func (q *EntityQuery) evaluateTimeNanoFilter(value int64, filter Filter) bool {
+	return q.evaluateTimeFilter(value, filter)
 }
 
 // evaluateTimeFilter evaluates a time-based filter
@@ -514,7 +502,7 @@ func (q *EntityQuery) applySorting(entities []*Entity) []*Entity {
 func sortByUpdatedAt(entities []*Entity) {
 	for i := 0; i < len(entities)-1; i++ {
 		for j := 0; j < len(entities)-i-1; j++ {
-			if compareTimestamps(entities[j].UpdatedAt, entities[j+1].UpdatedAt) > 0 {
+			if entities[j].UpdatedAt > entities[j+1].UpdatedAt {
 				entities[j], entities[j+1] = entities[j+1], entities[j]
 			}
 		}
@@ -524,7 +512,7 @@ func sortByUpdatedAt(entities []*Entity) {
 func sortByUpdatedAtDesc(entities []*Entity) {
 	for i := 0; i < len(entities)-1; i++ {
 		for j := 0; j < len(entities)-i-1; j++ {
-			if compareTimestamps(entities[j].UpdatedAt, entities[j+1].UpdatedAt) < 0 {
+			if entities[j].UpdatedAt < entities[j+1].UpdatedAt {
 				entities[j], entities[j+1] = entities[j+1], entities[j]
 			}
 		}
@@ -571,27 +559,11 @@ func sortByTagCountDesc(entities []*Entity) {
 	}
 }
 
-// compareTimestamps compares two timestamp strings
-func compareTimestamps(t1, t2 string) int {
-	time1, err1 := time.Parse(time.RFC3339Nano, t1)
-	if err1 != nil {
-		time1, err1 = time.Parse(time.RFC3339, t1)
-		if err1 != nil {
-			return 0
-		}
-	}
-	
-	time2, err2 := time.Parse(time.RFC3339Nano, t2)
-	if err2 != nil {
-		time2, err2 = time.Parse(time.RFC3339, t2)
-		if err2 != nil {
-			return 0
-		}
-	}
-	
-	if time1.Before(time2) {
+// compareNanoTimestamps compares two nanosecond epoch timestamps
+func compareNanoTimestamps(t1, t2 int64) int {
+	if t1 < t2 {
 		return -1
-	} else if time1.After(time2) {
+	} else if t1 > t2 {
 		return 1
 	}
 	return 0

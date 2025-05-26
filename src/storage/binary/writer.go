@@ -2,9 +2,13 @@ package binary
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/binary"
+	"encoding/hex"
 	"entitydb/models"
+	"fmt"
 	"os"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -19,6 +23,15 @@ type Writer struct {
 	index    map[string]*IndexEntry
 	buffer   *bytes.Buffer
 	mu       sync.Mutex
+}
+
+// getFilePosition returns the current file position
+func (w *Writer) getFilePosition() int64 {
+	pos, err := w.file.Seek(0, os.SEEK_CUR)
+	if err != nil {
+		return -1
+	}
+	return pos
 }
 
 // NewWriter creates a new writer for the given file
@@ -67,12 +80,39 @@ func NewWriter(filename string) (*Writer, error) {
 
 // WriteEntity writes an entity to the file
 func (w *Writer) WriteEntity(entity *models.Entity) error {
+	// Start operation tracking
+	op := models.StartOperation(models.OpTypeWrite, entity.ID, map[string]interface{}{
+		"tags_count":    len(entity.Tags),
+		"content_size":  len(entity.Content),
+		"file_position": w.getFilePosition(),
+		"entity_count":  w.header.EntityCount,
+	})
+	defer func() {
+		if op != nil {
+			op.Complete()
+		}
+	}()
+	
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	
-	logger.Debug("WriteEntity called for entity %s", entity.ID)
-	logger.Debug("Current file position before write: %d", w.getFilePosition())
-	logger.Debug("Current entity count: %d", w.header.EntityCount)
+	// Log write intent
+	logger.Info("[Writer] Starting write for entity %s (tags=%d, content=%d bytes)", 
+		entity.ID, len(entity.Tags), len(entity.Content))
+	
+	// Validate entity
+	if entity.ID == "" {
+		err := fmt.Errorf("entity ID cannot be empty")
+		op.Fail(err)
+		logger.Error("[Writer] Validation failed: %v", err)
+		return err
+	}
+	
+	// Calculate content checksum before write
+	contentChecksum := sha256.Sum256(entity.Content)
+	op.SetMetadata("content_checksum", hex.EncodeToString(contentChecksum[:]))
+	
+	logger.Debug("[Writer] Entity %s content checksum: %x", entity.ID, contentChecksum)
 	
 	// Prepare entity data
 	w.buffer.Reset()
@@ -158,20 +198,36 @@ func (w *Writer) WriteEntity(entity *models.Entity) error {
 	// Get current file position
 	offset, err := w.file.Seek(0, os.SEEK_END)
 	if err != nil {
-		logger.Error("Failed to seek to end: %v", err)
+		op.Fail(err)
+		logger.Error("[Writer] Failed to seek to end for entity %s: %v", entity.ID, err)
 		return err
 	}
 	
-	logger.Debug("Writing %d bytes at offset %d", w.buffer.Len(), offset)
+	// Calculate buffer checksum
+	bufferChecksum := sha256.Sum256(w.buffer.Bytes())
+	op.SetMetadata("buffer_checksum", hex.EncodeToString(bufferChecksum[:]))
+	op.SetMetadata("write_offset", offset)
+	op.SetMetadata("buffer_size", w.buffer.Len())
+	
+	logger.Info("[Writer] Writing entity %s: %d bytes at offset %d", entity.ID, w.buffer.Len(), offset)
 	
 	// Write to file
 	n, err := w.file.Write(w.buffer.Bytes())
 	if err != nil {
-		logger.Error("Failed to write data: %v", err)
+		op.Fail(err)
+		logger.Error("[Writer] Failed to write entity %s data: %v", entity.ID, err)
 		return err
 	}
 	
-	logger.Debug("Actually wrote %d bytes", n)
+	if n != w.buffer.Len() {
+		err := fmt.Errorf("incomplete write: expected %d bytes, wrote %d", w.buffer.Len(), n)
+		op.Fail(err)
+		logger.Error("[Writer] %v for entity %s", err, entity.ID)
+		return err
+	}
+	
+	op.SetMetadata("bytes_written", n)
+	logger.Info("[Writer] Successfully wrote %d bytes for entity %s", n, entity.ID)
 	
 	// Update index
 	entry := &IndexEntry{
@@ -190,14 +246,32 @@ func (w *Writer) WriteEntity(entity *models.Entity) error {
 	copy(entry.EntityID[:], idBytes)
 	w.index[entity.ID] = entry
 	
-	logger.Debug("Added index entry for %s: offset=%d, size=%d", entity.ID, entry.Offset, entry.Size)
+	logger.Info("[Writer] Added index entry for %s: offset=%d, size=%d", entity.ID, entry.Offset, entry.Size)
+	op.SetMetadata("index_offset", entry.Offset)
+	op.SetMetadata("index_size", entry.Size)
+	
+	// Verify we can read back what we wrote
+	verifyBuffer := make([]byte, n)
+	if _, err := w.file.ReadAt(verifyBuffer, int64(offset)); err != nil {
+		logger.Error("[Writer] Failed to verify write for entity %s: %v", entity.ID, err)
+		// Don't fail the operation, but log the issue
+	} else {
+		verifyChecksum := sha256.Sum256(verifyBuffer)
+		if hex.EncodeToString(verifyChecksum[:]) != hex.EncodeToString(bufferChecksum[:]) {
+			logger.Error("[Writer] Checksum mismatch after write for entity %s", entity.ID)
+		} else {
+			logger.Debug("[Writer] Write verification successful for entity %s", entity.ID)
+		}
+	}
 	
 	// Update header
 	w.header.EntityCount++
 	w.header.FileSize = uint64(offset) + uint64(n)
 	w.header.LastModified = time.Now().Unix()
 	
-	logger.Debug("Updated header: EntityCount=%d, FileSize=%d", w.header.EntityCount, w.header.FileSize)
+	logger.Info("[Writer] Updated header: EntityCount=%d, FileSize=%d", w.header.EntityCount, w.header.FileSize)
+	op.SetMetadata("final_entity_count", w.header.EntityCount)
+	op.SetMetadata("final_file_size", w.header.FileSize)
 	
 	// Write updated header back to file
 	currentPos, err := w.file.Seek(0, os.SEEK_CUR)
@@ -238,11 +312,6 @@ func (w *Writer) WriteEntity(entity *models.Entity) error {
 	return nil
 }
 
-// getFilePosition returns current file position for debugging
-func (w *Writer) getFilePosition() int64 {
-	pos, _ := w.file.Seek(0, os.SEEK_CUR)
-	return pos
-}
 
 // Close flushes and closes the writer
 func (w *Writer) Close() error {
@@ -276,19 +345,51 @@ func (w *Writer) Close() error {
 	}
 	logger.Debug("Writing index at offset %d with %d entries", indexOffset, len(w.index))
 	
-	for id, entry := range w.index {
-		logger.Debug("Writing index entry for %s: offset=%d, size=%d", id, entry.Offset, entry.Size)
-		binary.Write(w.file, binary.LittleEndian, entry.EntityID)
-		binary.Write(w.file, binary.LittleEndian, entry.Offset)
-		binary.Write(w.file, binary.LittleEndian, entry.Size)
-		binary.Write(w.file, binary.LittleEndian, entry.Flags)
+	// Collect all entity IDs and sort them to ensure deterministic order
+	entityIDs := make([]string, 0, len(w.index))
+	for id := range w.index {
+		entityIDs = append(entityIDs, id)
+	}
+	sort.Strings(entityIDs)
+	
+	// Write index entries in sorted order
+	writtenCount := 0
+	for _, id := range entityIDs {
+		entry := w.index[id]
+		logger.Debug("Writing index entry %d for %s: offset=%d, size=%d", writtenCount, id, entry.Offset, entry.Size)
+		if err := binary.Write(w.file, binary.LittleEndian, entry.EntityID); err != nil {
+			logger.Error("Failed to write EntityID for %s: %v", id, err)
+			return err
+		}
+		if err := binary.Write(w.file, binary.LittleEndian, entry.Offset); err != nil {
+			logger.Error("Failed to write Offset for %s: %v", id, err)
+			return err
+		}
+		if err := binary.Write(w.file, binary.LittleEndian, entry.Size); err != nil {
+			logger.Error("Failed to write Size for %s: %v", id, err)
+			return err
+		}
+		if err := binary.Write(w.file, binary.LittleEndian, entry.Flags); err != nil {
+			logger.Error("Failed to write Flags for %s: %v", id, err)
+			return err
+		}
+		writtenCount++
+	}
+	logger.Info("Wrote %d index entries (header claims %d)", writtenCount, w.header.EntityCount)
+	
+	// Verify index count matches header
+	if writtenCount != int(w.header.EntityCount) {
+		logger.Error("Index entry count mismatch: wrote %d entries but header claims %d", writtenCount, w.header.EntityCount)
+		// Update header to match actual count
+		w.header.EntityCount = uint64(writtenCount)
+		logger.Info("Updated header EntityCount to match actual index: %d", w.header.EntityCount)
 	}
 	
 	// Update header
 	w.header.TagDictOffset = uint64(dictOffset)
 	w.header.TagDictSize = uint64(dictBuf.Len())
 	w.header.EntityIndexOffset = uint64(indexOffset)
-	w.header.EntityIndexSize = uint64(len(w.index) * IndexEntrySize)
+	w.header.EntityIndexSize = uint64(writtenCount * IndexEntrySize)
 	
 	logger.Debug("Updated header: TagDictOffset=%d, TagDictSize=%d, EntityIndexOffset=%d, EntityIndexSize=%d",
 		w.header.TagDictOffset, w.header.TagDictSize, w.header.EntityIndexOffset, w.header.EntityIndexSize)

@@ -69,26 +69,26 @@ type Entity struct {
 	Tags    []string `json:"tags"`
 	Content []byte   `json:"content,omitempty"`
 	
-	// Timestamps for compatibility (we'll store these in tags)
-	CreatedAt string `json:"created_at,omitempty"`
-	UpdatedAt string `json:"updated_at,omitempty"`
+	// Timestamps as nanosecond epoch for efficiency
+	CreatedAt int64 `json:"created_at,omitempty"`
+	UpdatedAt int64 `json:"updated_at,omitempty"`
 }
 
 // ContentItem for backward compatibility - will be removed
 // Deprecated: Use Content []byte directly
 type ContentItem struct {
-	Timestamp string `json:"timestamp"` 
+	Timestamp int64  `json:"timestamp"` // Now using nanosecond epoch
 	Type      string `json:"type"`
 	Value     string `json:"value"`
 }
 
 // EntityChange represents a change to an entity
 type EntityChange struct {
-	Type      string    `json:"type"`
-	Timestamp time.Time `json:"timestamp"`
-	OldValue  string    `json:"old_value,omitempty"`
-	NewValue  string    `json:"new_value,omitempty"`
-	EntityID  string    `json:"entity_id,omitempty"`  // Reference to the entity this change belongs to
+	Type      string `json:"type"`
+	Timestamp int64  `json:"timestamp"` // Nanosecond epoch for consistency
+	OldValue  string `json:"old_value,omitempty"`
+	NewValue  string `json:"new_value,omitempty"`
+	EntityID  string `json:"entity_id,omitempty"`  // Reference to the entity this change belongs to
 }
 
 // ChunkConfig configures autochunking behavior
@@ -107,7 +107,7 @@ func DefaultChunkConfig() ChunkConfig {
 
 // NewEntity creates a new entity with auto-generated UUID
 func NewEntity() *Entity {
-	timestamp := time.Now().Format(time.RFC3339Nano)
+	timestamp := Now()
 	return &Entity{
 		ID:        GenerateUUID(),
 		Tags:      []string{},
@@ -119,16 +119,15 @@ func NewEntity() *Entity {
 // GenerateUUID generates a unique identifier for entities
 func GenerateUUID() string {
 	// Simple implementation - in production use crypto/rand
-	timestamp := fmt.Sprintf("%d", time.Now().UnixNano())
+	timestamp := fmt.Sprintf("%d", Now())
 	hash := sha256.Sum256([]byte(timestamp))
 	return hex.EncodeToString(hash[:16])
 }
 
 // AddTag adds a tag with automatic timestamping
 func (e *Entity) AddTag(tag string) {
-	timestamp := time.Now().Format(time.RFC3339Nano)
-	// Use | as delimiter to avoid conflict with timestamp nanoseconds
-	e.Tags = append(e.Tags, fmt.Sprintf("%s|%s", timestamp, tag))
+	// Use our centralized temporal tag formatting
+	e.Tags = append(e.Tags, FormatTemporalTag(tag))
 }
 
 // AddTagWithValue adds a key:value tag with automatic timestamping  
