@@ -117,9 +117,27 @@ func (w *Writer) WriteEntity(entity *models.Entity) error {
 	// Prepare entity data
 	w.buffer.Reset()
 	
+	// Add checksum tag if not already present
+	checksumTag := fmt.Sprintf("%d|checksum:sha256:%s", time.Now().UnixNano(), hex.EncodeToString(contentChecksum[:]))
+	hasChecksum := false
+	for _, tag := range entity.Tags {
+		if strings.Contains(tag, "|checksum:sha256:") {
+			hasChecksum = true
+			break
+		}
+	}
+	
+	// Create a new tags slice with checksum if needed
+	tags := entity.Tags
+	if !hasChecksum {
+		tags = append([]string{}, entity.Tags...)
+		tags = append(tags, checksumTag)
+		logger.Info("[Writer] Added checksum tag for entity %s: %s", entity.ID, checksumTag)
+	}
+	
 	// Convert tags to IDs
-	tagIDs := make([]uint32, len(entity.Tags))
-	for i, tag := range entity.Tags {
+	tagIDs := make([]uint32, len(tags))
+	for i, tag := range tags {
 		tagIDs[i] = w.tagDict.GetOrCreateID(tag)
 		logger.Debug("Tag '%s' assigned ID %d", tag, tagIDs[i])
 	}

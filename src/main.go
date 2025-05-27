@@ -431,6 +431,10 @@ func main() {
 	rbacMetricsHandler := api.NewRBACMetricsHandler(server.entityRepo, server.sessionManager)
 	apiRouter.HandleFunc("/rbac/metrics", api.RBACMiddleware(server.entityRepo, server.sessionManager, api.RBACPermission{Resource: "admin", Action: "view"})(rbacMetricsHandler.GetRBACMetrics)).Methods("GET")
 	
+	// Integrity metrics endpoint (requires admin permission)
+	integrityHandler := api.IntegrityMetricsHandler(server.entityRepo)
+	apiRouter.HandleFunc("/integrity/metrics", api.RBACMiddleware(server.entityRepo, server.sessionManager, api.RBACPermission{Resource: "admin", Action: "view"})(integrityHandler)).Methods("GET")
+	
 	// Add patch status endpoint for compatibility with tests
 	apiRouter.HandleFunc("/patches/status", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")

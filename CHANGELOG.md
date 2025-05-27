@@ -48,6 +48,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Authentication Failures**: Fixed admin user creation in startup script
 - **Build Errors**: Moved debug_auth.go to tools directory to avoid duplicate main
 - **Single Source of Truth**: Removed duplicate temporal tag parsing implementations
+- **Tag Indexing**: Fixed critical bug where non-timestamped versions of temporal tags weren't indexed
+  - Authentication lookups now work correctly with temporal tags
+  - Tag index properly handles both timestamped and non-timestamped queries
+- **Relationship Storage**: Fixed EntityRelationship to set both Type and RelationshipType fields
+- **Password Hashing**: Ensured consistent bcrypt+salt hashing across all authentication paths
 
 ## [v2.14.0] - 2025-05-20
 

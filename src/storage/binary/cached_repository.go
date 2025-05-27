@@ -296,3 +296,8 @@ func (r *CachedRepository) Close() error {
 	close(r.done)
 	return nil
 }
+
+// GetUnderlying returns the underlying repository
+func (r *CachedRepository) GetUnderlying() models.EntityRepository {
+	return r.EntityRepository
+}

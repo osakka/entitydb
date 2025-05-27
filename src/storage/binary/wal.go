@@ -1,7 +1,9 @@
 package binary
 
 import (
+	"crypto/sha256"
 	"encoding/binary"
+	"encoding/hex"
 	"entitydb/models"
 	"entitydb/logger"
 	"fmt"
@@ -18,7 +20,7 @@ type WALEntry struct {
 	EntityID  string
 	Entity    *models.Entity
 	Timestamp time.Time
-	Checksum  uint32
+	Checksum  string // SHA256 hex string
 }
 
 // WALOpType defines the type of operation in the WAL
@@ -187,11 +189,8 @@ func (w *WAL) logEntry(entry WALEntry) error {
 
 // serializeEntry serializes a WAL entry
 func (w *WAL) serializeEntry(entry WALEntry) ([]byte, error) {
-	// This is a simplified serialization
-	// In production, you'd use a proper format like protobuf
-	
-	// For now, we'll use a simple format:
-	// [OpType:1][TimestampNano:8][EntityIDLen:2][EntityID:var][EntityData:var]
+	// Enhanced format with checksum:
+	// [OpType:1][TimestampNano:8][EntityIDLen:2][EntityID:var][ChecksumLen:2][Checksum:var][EntityData:var]
 	
 	buf := make([]byte, 0, 1024)
 	buf = append(buf, byte(entry.OpType))
@@ -209,16 +208,62 @@ func (w *WAL) serializeEntry(entry WALEntry) ([]byte, error) {
 	buf = append(buf, idLenBuf...)
 	buf = append(buf, []byte(entry.EntityID)...)
 	
+	// Calculate and add checksum if entity present
+	checksumStr := ""
+	if entry.Entity != nil && len(entry.Entity.Content) > 0 {
+		checksum := sha256.Sum256(entry.Entity.Content)
+		checksumStr = hex.EncodeToString(checksum[:])
+	}
+	
+	// Add checksum
+	checksumLen := uint16(len(checksumStr))
+	checksumLenBuf := make([]byte, 2)
+	binary.LittleEndian.PutUint16(checksumLenBuf, checksumLen)
+	buf = append(buf, checksumLenBuf...)
+	if checksumLen > 0 {
+		buf = append(buf, []byte(checksumStr)...)
+	}
+	
 	// Add entity data if present
 	if entry.Entity != nil {
-		// Simplified: just store the entity ID, tags, and content
-		// In production, you'd use a proper serialization format
-		entityBuf := fmt.Sprintf("%v", entry.Entity)
+		// Store entity data in a more structured format
+		entityBuf := make([]byte, 0, 256)
+		
+		// Store tag count
+		tagCount := uint16(len(entry.Entity.Tags))
+		tagCountBuf := make([]byte, 2)
+		binary.LittleEndian.PutUint16(tagCountBuf, tagCount)
+		entityBuf = append(entityBuf, tagCountBuf...)
+		
+		// Store tags
+		for _, tag := range entry.Entity.Tags {
+			tagLen := uint16(len(tag))
+			tagLenBuf := make([]byte, 2)
+			binary.LittleEndian.PutUint16(tagLenBuf, tagLen)
+			entityBuf = append(entityBuf, tagLenBuf...)
+			entityBuf = append(entityBuf, []byte(tag)...)
+		}
+		
+		// Store content length and content
+		contentLen := uint32(len(entry.Entity.Content))
+		contentLenBuf := make([]byte, 4)
+		binary.LittleEndian.PutUint32(contentLenBuf, contentLen)
+		entityBuf = append(entityBuf, contentLenBuf...)
+		entityBuf = append(entityBuf, entry.Entity.Content...)
+		
+		// Write entity buffer length and data
 		entityLen := uint32(len(entityBuf))
 		entityLenBuf := make([]byte, 4)
 		binary.LittleEndian.PutUint32(entityLenBuf, entityLen)
 		buf = append(buf, entityLenBuf...)
-		buf = append(buf, []byte(entityBuf)...)
+		buf = append(buf, entityBuf...)
+		
+		logger.Debug("[WAL] Serialized entity %s with checksum %s", entry.EntityID, checksumStr)
+	} else {
+		// No entity data
+		entityLenBuf := make([]byte, 4)
+		binary.LittleEndian.PutUint32(entityLenBuf, 0)
+		buf = append(buf, entityLenBuf...)
 	}
 	
 	return buf, nil

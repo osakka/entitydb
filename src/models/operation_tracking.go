@@ -270,3 +270,87 @@ func GetOperationSummary() *OperationSummary {
 	summary.RecentOps = recent
 	return summary
 }
+
+// OperationStats holds aggregated operation statistics
+type OperationStats struct {
+	TotalOperations      int64
+	SuccessfulOperations int64
+	FailedOperations     int64
+	ActiveOperations     int
+	ByType               map[OperationType]int64
+}
+
+// RecoveryStats holds recovery operation statistics
+type RecoveryStats struct {
+	TotalAttempts    int
+	Successful       int
+	Failed           int
+	LastRecoveryTime time.Time
+}
+
+// Global stats trackers
+var (
+	globalOpStats = &OperationStats{
+		ByType: make(map[OperationType]int64),
+	}
+	globalRecoveryStats = &RecoveryStats{}
+	statsMu sync.RWMutex
+)
+
+// GetOperationStats returns global operation statistics
+func GetOperationStats() OperationStats {
+	statsMu.RLock()
+	defer statsMu.RUnlock()
+	
+	// Calculate from current operations
+	operationTracker.mu.RLock()
+	defer operationTracker.mu.RUnlock()
+	
+	stats := OperationStats{
+		ByType: make(map[OperationType]int64),
+	}
+	
+	for _, op := range operationTracker.operations {
+		stats.TotalOperations++
+		stats.ByType[op.Type]++
+		
+		switch op.Status {
+		case "started":
+			stats.ActiveOperations++
+		case "completed":
+			stats.SuccessfulOperations++
+		case "failed":
+			stats.FailedOperations++
+		}
+	}
+	
+	return stats
+}
+
+// GetRecoveryStats returns global recovery statistics
+func GetRecoveryStats() RecoveryStats {
+	statsMu.RLock()
+	defer statsMu.RUnlock()
+	
+	// Count recovery operations
+	operationTracker.mu.RLock()
+	defer operationTracker.mu.RUnlock()
+	
+	stats := RecoveryStats{}
+	
+	for _, op := range operationTracker.operations {
+		if op.Type == OpTypeRecovery {
+			stats.TotalAttempts++
+			if op.Status == "completed" {
+				stats.Successful++
+				if op.EndTime.After(stats.LastRecoveryTime) {
+					stats.LastRecoveryTime = op.EndTime
+				}
+			} else if op.Status == "failed" {
+				stats.Failed++
+			}
+		}
+	}
+	
+	return stats
+}

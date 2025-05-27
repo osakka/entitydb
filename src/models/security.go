@@ -145,12 +145,13 @@ func (sm *SecurityManager) CreateUser(username, password, email string) (*Securi
 	
 	// Create relationship between user and credential
 	relationship := &EntityRelationship{
-		ID:         "rel_" + generateSecureUUID(),
-		SourceID:   userID,
-		TargetID:   credentialID,
-		Type:       RelationshipHasCredential,
-		Properties: map[string]string{"primary": "true"},
-		CreatedAt:  Now(),
+		ID:               "rel_" + generateSecureUUID(),
+		SourceID:         userID,
+		TargetID:         credentialID,
+		Type:             RelationshipHasCredential,
+		RelationshipType: RelationshipHasCredential,
+		Properties:       map[string]string{"primary": "true"},
+		CreatedAt:        Now(),
 	}
 	
 	if err := sm.entityRepo.CreateRelationship(relationship); err != nil {
@@ -198,19 +199,27 @@ func (sm *SecurityManager) AuthenticateUser(username, password string) (*Securit
 	}
 	
 	// Get credential entity via relationship
+	logger.Debug("[SecurityManager] Getting relationships for user ID: %s", userEntity.ID)
 	credentialEntities, err := sm.entityRepo.GetRelationshipsBySource(userEntity.ID)
 	if err != nil {
+		logger.Error("[SecurityManager] Failed to get relationships for user %s: %v", userEntity.ID, err)
 		return nil, fmt.Errorf("failed to get user credentials: %v", err)
 	}
+	logger.Debug("[SecurityManager] Found %d relationships for user %s", len(credentialEntities), userEntity.ID)
 	
 	var credentialEntity *Entity
 	for _, rel := range credentialEntities {
 		if relationship, ok := rel.(*EntityRelationship); ok {
-			if relationship.Type == RelationshipHasCredential {
+			logger.Debug("[SecurityManager] Checking relationship %s of type %s/%s", relationship.ID, relationship.Type, relationship.RelationshipType)
+			if relationship.Type == RelationshipHasCredential || relationship.RelationshipType == RelationshipHasCredential {
+				logger.Debug("[SecurityManager] Found has_credential relationship, fetching credential entity %s", relationship.TargetID)
 				credEntity, err := sm.entityRepo.GetByID(relationship.TargetID)
 				if err == nil {
 					credentialEntity = credEntity
+					logger.Debug("[SecurityManager] Successfully fetched credential entity %s", relationship.TargetID)
 					break
+				} else {
+					logger.Error("[SecurityManager] Failed to fetch credential entity %s: %v", relationship.TargetID, err)
 				}
 			}
 		}

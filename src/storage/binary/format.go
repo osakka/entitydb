@@ -17,8 +17,8 @@ const (
 	// Header size in bytes
 	HeaderSize = 64
 	
-	// Index entry size (36-byte ID + 8-byte offset + 4-byte size + 4-byte flags)
-	IndexEntrySize = 52
+	// Index entry size (64-byte ID + 8-byte offset + 4-byte size + 4-byte flags)
+	IndexEntrySize = 80
 )
 
 var (
@@ -106,7 +106,7 @@ func (h *Header) Read(r io.Reader) error {
 
 // IndexEntry represents an entry in the entity index
 type IndexEntry struct {
-	EntityID [36]byte  // UUID format (36 bytes)
+	EntityID [64]byte  // UUID with prefix (up to 64 bytes)
 	Offset   uint64
 	Size     uint32
 	Flags    uint32

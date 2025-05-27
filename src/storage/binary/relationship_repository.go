@@ -2,6 +2,7 @@ package binary
 
 import (
 	"entitydb/models"
+	"entitydb/logger"
 	"fmt"
 	"strings"
 	"encoding/json"
@@ -78,15 +79,22 @@ func (r *RelationshipRepository) GetByID(id string) (*models.EntityRelationship,
 
 // GetBySourceID gets all relationships for a source entity
 func (r *RelationshipRepository) GetBySource(sourceID string) ([]*models.EntityRelationship, error) {
-	// Query entities with source_id tag
-	entities, err := r.entityRepo.ListByTag("source_id:" + sourceID)
+	// Query entities with _source tag (underscore prefix for consistency)
+	searchTag := "_source:" + sourceID
+	logger.Debug("RelationshipRepository.GetBySource: searching for tag '%s'", searchTag)
+	
+	entities, err := r.entityRepo.ListByTag(searchTag)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query relationships by source: %w", err)
 	}
 	
+	logger.Debug("RelationshipRepository.GetBySource: found %d entities with tag '%s'", len(entities), searchTag)
+	
 	// Convert to relationships
 	relationships := make([]*models.EntityRelationship, 0, len(entities))
 	for _, entity := range entities {
+		logger.Debug("RelationshipRepository.GetBySource: processing entity %s with tags: %v", entity.ID, entity.Tags)
+		
 		// Only process relationship entities
 		isRelationship := false
 		for _, tag := range entity.Tags {
@@ -99,10 +107,16 @@ func (r *RelationshipRepository) GetBySource(sourceID string) ([]*models.EntityR
 		if isRelationship {
 			if rel, err := r.entityToRelationship(entity); err == nil {
 				relationships = append(relationships, rel)
+				logger.Debug("RelationshipRepository.GetBySource: successfully converted entity %s to relationship", entity.ID)
+			} else {
+				logger.Debug("RelationshipRepository.GetBySource: failed to convert entity %s to relationship: %v", entity.ID, err)
 			}
+		} else {
+			logger.Debug("RelationshipRepository.GetBySource: entity %s is not a relationship (missing type:relationship tag)", entity.ID)
 		}
 	}
 	
+	logger.Debug("RelationshipRepository.GetBySource: returning %d relationships for source %s", len(relationships), sourceID)
 	return relationships, nil
 }
 
@@ -111,8 +125,8 @@ func (r *RelationshipRepository) GetBySourceAndType(sourceID, relationshipType s
 	// Get all entities with both source tag and relationship type tag
 	entities, err := r.entityRepo.ListByTags([]string{
 		"type:relationship",
-		fmt.Sprintf("rel:source:%s", sourceID),
-		fmt.Sprintf("rel:type:%s", relationshipType),
+		fmt.Sprintf("_source:%s", sourceID),
+		fmt.Sprintf("_relationship:%s", relationshipType),
 	}, true)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query relationships: %w", err)
@@ -133,8 +147,8 @@ func (r *RelationshipRepository) GetBySourceAndType(sourceID, relationshipType s
 
 // GetByTarget gets all relationships for a target entity
 func (r *RelationshipRepository) GetByTarget(targetID string) ([]*models.EntityRelationship, error) {
-	// Query entities with target_id tag
-	entities, err := r.entityRepo.ListByTag("target_id:" + targetID)
+	// Query entities with _target tag (underscore prefix for consistency)
+	entities, err := r.entityRepo.ListByTag("_target:" + targetID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query relationships by target: %w", err)
 	}
@@ -166,8 +180,8 @@ func (r *RelationshipRepository) GetByTargetAndType(targetID, relationshipType s
 	// Get all entities with both target tag and relationship type tag
 	entities, err := r.entityRepo.ListByTags([]string{
 		"type:relationship",
-		fmt.Sprintf("rel:target:%s", targetID),
-		fmt.Sprintf("rel:type:%s", relationshipType),
+		fmt.Sprintf("_target:%s", targetID),
+		fmt.Sprintf("_relationship:%s", relationshipType),
 	}, true)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query relationships: %w", err)
@@ -188,8 +202,8 @@ func (r *RelationshipRepository) GetByTargetAndType(targetID, relationshipType s
 
 // GetByType gets all relationships of a specific type
 func (r *RelationshipRepository) GetByType(relType string) ([]*models.EntityRelationship, error) {
-	// Query entities with relationship_type tag
-	entities, err := r.entityRepo.ListByTag("relationship_type:" + relType)
+	// Query entities with _relationship tag (underscore prefix for consistency)
+	entities, err := r.entityRepo.ListByTag("_relationship:" + relType)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query relationships by type: %w", err)
 	}
@@ -267,11 +281,11 @@ func (r *RelationshipRepository) relationshipToEntity(rel *models.EntityRelation
 		UpdatedAt: models.Now(),
 	}
 	
-	// Add relationship tags
-	entity.AddTagWithValue("type", "relationship")
-	entity.AddTagWithValue("source_id", rel.SourceID)
-	entity.AddTagWithValue("target_id", rel.TargetID)
-	entity.AddTagWithValue("relationship_type", rel.RelationshipType)
+	// Add relationship tags - use underscore prefix for consistency with entity_repository.go
+	entity.AddTag("type:relationship")
+	entity.AddTag("_relationship:" + rel.RelationshipType)
+	entity.AddTag("_source:" + rel.SourceID)
+	entity.AddTag("_target:" + rel.TargetID)
 	entity.AddTagWithValue("created_by", rel.CreatedBy)
 	entity.AddTagWithValue("created_at", fmt.Sprintf("%d", rel.CreatedAt))
 	
@@ -307,11 +321,11 @@ func (r *RelationshipRepository) entityToRelationship(entity *models.Entity) (*m
 		value := strings.Join(parts[1:], ":")
 		
 		switch key {
-		case "source_id":
+		case "_source":
 			rel.SourceID = value
-		case "target_id":
+		case "_target":
 			rel.TargetID = value
-		case "relationship_type":
+		case "_relationship":
 			rel.RelationshipType = value
 		case "created_by":
 			rel.CreatedBy = value

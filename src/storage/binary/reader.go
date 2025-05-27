@@ -2,7 +2,9 @@ package binary
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/binary"
+	"encoding/hex"
 	"entitydb/models"
 	"entitydb/logger"
 	"errors"
@@ -318,6 +320,33 @@ func (r *Reader) parseEntity(data []byte, id string) (*models.Entity, error) {
 		}
 		if !hasContentTypeTag {
 			entity.AddTag("content:type:" + contentType)
+		}
+		
+		// Verify checksum if present
+		actualChecksum := sha256.Sum256(contentBytes)
+		actualChecksumHex := hex.EncodeToString(actualChecksum[:])
+		
+		checksumValid := false
+		for _, tag := range entity.Tags {
+			if strings.Contains(tag, "|checksum:sha256:") {
+				// Extract checksum from tag
+				parts := strings.Split(tag, "|checksum:sha256:")
+				if len(parts) == 2 {
+					expectedChecksum := parts[1]
+					if expectedChecksum == actualChecksumHex {
+						checksumValid = true
+						logger.Debug("[Reader] Checksum verification passed for entity %s", id)
+					} else {
+						logger.Error("[Reader] Checksum mismatch for entity %s: expected %s, got %s", 
+							id, expectedChecksum, actualChecksumHex)
+					}
+					break
+				}
+			}
+		}
+		
+		if !checksumValid {
+			logger.Warn("[Reader] No checksum found for entity %s, content integrity not verified", id)
 		}
 	}
 	

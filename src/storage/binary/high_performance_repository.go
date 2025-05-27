@@ -295,3 +295,8 @@ func (r *HighPerformanceRepository) ReindexTags() error {
 func (r *HighPerformanceRepository) VerifyIndexHealth() error {
 	return r.EntityRepository.VerifyIndexHealth()
 }
+
+// GetBaseRepository returns the underlying EntityRepository
+func (r *HighPerformanceRepository) GetBaseRepository() *EntityRepository {
+	return r.EntityRepository
+}

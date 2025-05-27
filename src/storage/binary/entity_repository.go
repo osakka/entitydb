@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -47,6 +48,9 @@ type EntityRepository struct {
 	tagIndexDirty         bool        // Whether tag index needs to be saved
 	lastIndexSave         time.Time   // Last time index was saved
 	persistentIndexLoaded bool        // Whether persistent index was loaded successfully
+	
+	// Recovery manager
+	recovery *RecoveryManager
 }
 
 // NewEntityRepository creates a new binary entity repository
@@ -103,6 +107,9 @@ func NewEntityRepository(dataPath string) (*EntityRepository, error) {
 	}
 	repo.wal = wal
 	
+	// Initialize recovery manager
+	repo.recovery = NewRecoveryManager(dataPath)
+	
 	// Ensure data file exists before building indexes
 	if _, err := os.Stat(repo.getDataFile()); os.IsNotExist(err) {
 		logger.Debug("Data file doesn't exist, creating initial file...")
@@ -120,6 +127,10 @@ func NewEntityRepository(dataPath string) (*EntityRepository, error) {
 		// Don't fail initialization - we can still write entities
 	}
 	
+	// Log entity count after building indexes
+	logger.Info("After buildIndexes: %d entities in memory cache, %d entries in tag index", 
+		len(repo.entities), len(repo.tagIndex))
+	
 	// Replay WAL to catch any entries not yet in the data file
 	// Skip WAL replay if we successfully loaded a persistent index
 	if repo.persistentIndexLoaded {
@@ -130,6 +141,10 @@ func NewEntityRepository(dataPath string) (*EntityRepository, error) {
 			logger.Error("Failed to replay WAL: %v", err)
 			// Continue anyway - we may have partial data
 		}
+		
+		// Log entity count after WAL replay
+		logger.Info("After WAL replay: %d entities in memory cache, %d entries in tag index", 
+			len(repo.entities), len(repo.tagIndex))
 	}
 	
 	// Verify index health
@@ -162,64 +177,10 @@ func (r *EntityRepository) buildIndexes() error {
 	r.temporalIndex = NewTemporalIndex()
 	r.namespaceIndex = NewNamespaceIndex()
 	
-	// Try to load tag index from persistent storage first
-	startTime := time.Now()
-	if tagIndex, err := LoadTagIndexV2(r.getDataFile()); err == nil {
-		logger.Info("Loading tag index from persistent storage...")
-		r.tagIndex = tagIndex
-		r.persistentIndexLoaded = true
-		logger.Info("Loaded %d tags from persistent index in %v", len(tagIndex), time.Since(startTime))
-		
-		// Still need to load entities and build other indexes
-		reader, err := NewReader(r.getDataFile())
-		if err != nil {
-			return err
-		}
-		defer reader.Close()
-		
-		// Read all entities to populate entity cache and other indexes
-		entities, err := reader.GetAllEntities()
-		if err != nil {
-			return err
-		}
-		
-		for _, entity := range entities {
-			// Add to entity cache
-			r.entities[entity.ID] = entity
-			
-			// Build temporal index
-			for _, tag := range entity.Tags {
-				parts := strings.SplitN(tag, "|", 2)
-				if len(parts) == 2 {
-					if ts, err := time.Parse(time.RFC3339Nano, parts[0]); err == nil {
-						r.temporalIndex.AddEntry(entity.ID, parts[1], ts)
-					}
-				}
-			}
-			
-			// Build namespace index
-			for _, tag := range entity.Tags {
-				r.namespaceIndex.AddTag(entity.ID, tag)
-			}
-			
-			// Build content index
-			if len(entity.Content) > 0 {
-				contentStr := string(entity.Content)
-				// Index first 100 chars for search
-				if len(contentStr) > 100 {
-					contentStr = contentStr[:100]
-				}
-				r.contentIndex[contentStr] = append(r.contentIndex[contentStr], entity.ID)
-			}
-		}
-		
-		logger.Info("Loaded %d entities and built supplementary indexes", len(entities))
-		logger.Debug("After loading from persistent index: %d tags in index, %d entities in cache", len(r.tagIndex), len(r.entities))
-		return nil
-	} else {
-		logger.Info("No persistent tag index found or error loading: %v. Building from scratch...", err)
-		r.persistentIndexLoaded = false
-	}
+	// Always rebuild tag index from entities to ensure consistency
+	// The persistent index can become corrupted, so we rebuild from source of truth
+	logger.Info("Building tag index from entities...")
+	r.persistentIndexLoaded = false
 	
 	reader, err := NewReader(r.getDataFile())
 	if err != nil {
@@ -234,9 +195,15 @@ func (r *EntityRepository) buildIndexes() error {
 	}
 	
 	// Build indexes and load entities
+	logger.Info("Building indexes for %d entities", len(entities))
 	for _, entity := range entities {
 		// Add to entity cache
 		r.entities[entity.ID] = entity
+		
+		// Log entity details for debugging
+		if strings.HasPrefix(entity.ID, "rel_") {
+			logger.Debug("Indexing relationship entity %s with tags: %v", entity.ID, entity.Tags)
+		}
 		
 		// Update tag index
 		for _, tag := range entity.Tags {
@@ -246,9 +213,20 @@ func (r *EntityRepository) buildIndexes() error {
 			if strings.Contains(tag, "|") {
 				parts := strings.SplitN(tag, "|", 2)
 				if len(parts) == 2 {
-					// Try to parse timestamp
-					if timestamp, err := time.Parse(time.RFC3339Nano, parts[0]); err == nil {
+					// Try to parse timestamp - it's stored as Unix nanoseconds
+					if timestampNanos, err := strconv.ParseInt(parts[0], 10, 64); err == nil {
+						timestamp := time.Unix(0, timestampNanos)
 						r.temporalIndex.AddEntry(entity.ID, tag, timestamp)
+					}
+					
+					// ALSO index the non-timestamped version for easier searching
+					// This is critical for authentication and tag lookups
+					actualTag := parts[1]
+					r.tagIndex[actualTag] = append(r.tagIndex[actualTag], entity.ID)
+					
+					// Log relationship tag indexing
+					if strings.HasPrefix(actualTag, "_source:") || strings.HasPrefix(actualTag, "_target:") || strings.HasPrefix(actualTag, "_relationship:") {
+						logger.Debug("Indexed relationship tag %s -> %s for entity %s", tag, actualTag, entity.ID)
 					}
 				}
 			}
@@ -472,6 +450,20 @@ func (r *EntityRepository) GetByID(id string) (*models.Entity, error) {
 		entity, err := reader.GetEntity(id)
 		if err != nil {
 			logger.Error("EntityRepository.GetByID: Failed to get entity %s from new reader: %v", id, err)
+			
+			// Try recovery if read failed
+			logger.Info("EntityRepository.GetByID: Attempting recovery for entity %s", id)
+			if recoveredEntity, recErr := r.recovery.RecoverCorruptedEntity(r, id); recErr == nil {
+				logger.Info("EntityRepository.GetByID: Successfully recovered entity %s", id)
+				// Store recovered entity
+				r.mu.Lock()
+				r.entities[id] = recoveredEntity
+				r.mu.Unlock()
+				return recoveredEntity, nil
+			} else {
+				logger.Error("EntityRepository.GetByID: Recovery failed for entity %s: %v", id, recErr)
+			}
+			
 			return nil, err
 		}
 		
@@ -494,6 +486,20 @@ func (r *EntityRepository) GetByID(id string) (*models.Entity, error) {
 	entity, err := reader.GetEntity(id)
 	if err != nil {
 		logger.Error("EntityRepository.GetByID: Failed to get entity %s from pooled reader: %v", id, err)
+		
+		// Try recovery if read failed
+		logger.Info("EntityRepository.GetByID: Attempting recovery for entity %s", id)
+		if recoveredEntity, recErr := r.recovery.RecoverCorruptedEntity(r, id); recErr == nil {
+			logger.Info("EntityRepository.GetByID: Successfully recovered entity %s", id)
+			// Store recovered entity
+			r.mu.Lock()
+			r.entities[id] = recoveredEntity
+			r.mu.Unlock()
+			return recoveredEntity, nil
+		} else {
+			logger.Error("EntityRepository.GetByID: Recovery failed for entity %s: %v", id, recErr)
+		}
+		
 		return nil, err
 	}
 	
@@ -612,6 +618,137 @@ func (r *EntityRepository) Update(entity *models.Entity) error {
 	}
 	
 	return nil
+}
+
+// VerifyIndexIntegrity checks for index consistency issues
+func (r *EntityRepository) VerifyIndexIntegrity() []error {
+	var errors []error
+	
+	reader, err := NewReader(r.getDataFile())
+	if err != nil {
+		errors = append(errors, fmt.Errorf("failed to open reader: %v", err))
+		return errors
+	}
+	defer reader.Close()
+	
+	// Check 1: Every index entry points to valid data
+	for id, entry := range reader.index {
+		// Try to read the entity
+		entity, err := reader.GetEntity(id)
+		if err != nil {
+			errors = append(errors, fmt.Errorf("index entry %s points to unreadable data: %v", id, err))
+			continue
+		}
+		
+		// Verify ID matches
+		if entity.ID != id {
+			errors = append(errors, fmt.Errorf("index entry %s points to entity with ID %s", id, entity.ID))
+		}
+		
+		// Verify offset and size are reasonable
+		if entry.Offset == 0 || entry.Size == 0 {
+			errors = append(errors, fmt.Errorf("index entry %s has invalid offset/size: %d/%d", id, entry.Offset, entry.Size))
+		}
+	}
+	
+	// Check 2: Header count matches index entries
+	actualCount := len(reader.index)
+	if uint64(actualCount) != reader.header.EntityCount {
+		errors = append(errors, fmt.Errorf("header claims %d entities but index has %d", reader.header.EntityCount, actualCount))
+	}
+	
+	return errors
+}
+
+// FindOrphanedEntries finds entries in index that don't exist in data
+func (r *EntityRepository) FindOrphanedEntries() []string {
+	var orphaned []string
+	
+	reader, err := NewReader(r.getDataFile())
+	if err != nil {
+		return orphaned
+	}
+	defer reader.Close()
+	
+	// Check each index entry
+	for id := range reader.index {
+		_, err := reader.GetEntity(id)
+		if err != nil {
+			orphaned = append(orphaned, id)
+		}
+	}
+	
+	return orphaned
+}
+
+// RebuildIndex rebuilds the index from scratch
+func (r *EntityRepository) RebuildIndex() error {
+	logger.Info("Rebuilding index from data file...")
+	
+	// Create a new temporary file
+	tempPath := r.getDataFile() + ".rebuild"
+	newWriter, err := NewWriter(tempPath)
+	if err != nil {
+		return fmt.Errorf("failed to create temp writer: %v", err)
+	}
+	
+	// Read all valid entities
+	reader, err := NewReader(r.getDataFile())
+	if err != nil {
+		newWriter.Close()
+		os.Remove(tempPath)
+		return fmt.Errorf("failed to create reader: %v", err)
+	}
+	
+	validCount := 0
+	allEntities, _ := reader.GetAllEntities()
+	for _, entity := range allEntities {
+		// Try to read each entity
+		if entity != nil && entity.ID != "" {
+			if err := newWriter.WriteEntity(entity); err != nil {
+				logger.Warn("Failed to write entity %s during rebuild: %v", entity.ID, err)
+			} else {
+				validCount++
+			}
+		}
+	}
+	
+	reader.Close()
+	newWriter.Close()
+	
+	// Backup old file
+	backupPath := r.getDataFile() + ".backup." + time.Now().Format("20060102150405")
+	if err := os.Rename(r.getDataFile(), backupPath); err != nil {
+		os.Remove(tempPath)
+		return fmt.Errorf("failed to backup old file: %v", err)
+	}
+	
+	// Move new file into place
+	if err := os.Rename(tempPath, r.getDataFile()); err != nil {
+		// Try to restore backup
+		os.Rename(backupPath, r.getDataFile())
+		return fmt.Errorf("failed to move rebuilt file: %v", err)
+	}
+	
+	logger.Info("Index rebuilt successfully with %d valid entities", validCount)
+	
+	// Rebuild in-memory indexes
+	r.buildIndexes()
+	
+	return nil
+}
+
+// RemoveFromIndex removes an entry from the index
+func (r *EntityRepository) RemoveFromIndex(id string) error {
+	// This would require modifying the Writer to support index removal
+	// For now, we'll need to rebuild the entire index
+	logger.Warn("RemoveFromIndex called for %s, triggering full rebuild", id)
+	return r.RebuildIndex()
+}
+
+// GetBaseRepository returns the underlying EntityRepository (for high-performance wrapper)
+func (r *EntityRepository) GetBaseRepository() *EntityRepository {
+	return r
 }
 
 // Delete deletes an entity
@@ -1278,6 +1415,7 @@ func (r *EntityRepository) CreateRelationship(rel interface{}) error {
 		CreatedAt: models.Now(),
 		UpdatedAt: models.Now(),
 	}
+	entity.AddTag("type:relationship")
 	entity.AddTagWithValue("_relationship", relationship.RelationshipType)
 	entity.AddTagWithValue("_source", relationship.SourceID)
 	entity.AddTagWithValue("_target", relationship.TargetID)
@@ -1297,12 +1435,24 @@ func (r *EntityRepository) CreateRelationship(rel interface{}) error {
 }
 
 func (r *EntityRepository) GetRelationshipByID(id string) (interface{}, error) {
+	logger.Debug("GetRelationshipByID called for: %s", id)
 	entity, err := r.GetByID(id)
 	if err != nil {
+		logger.Debug("GetRelationshipByID: failed to get entity: %v", err)
 		return nil, err
 	}
 	
-	if !r.hasTag(entity, "_relationship:*") {
+	logger.Debug("GetRelationshipByID: entity %s has %d tags", id, len(entity.Tags))
+	for i, tag := range entity.Tags {
+		logger.Debug("GetRelationshipByID: tag[%d]: %s", i, tag)
+	}
+	
+	hasTypeRelationship := r.hasTag(entity, "type:relationship")
+	hasRelationshipWildcard := r.hasTag(entity, "_relationship:*")
+	logger.Debug("GetRelationshipByID: hasTypeRelationship=%v, hasRelationshipWildcard=%v", hasTypeRelationship, hasRelationshipWildcard)
+	
+	if !hasTypeRelationship && !hasRelationshipWildcard {
+		logger.Debug("GetRelationshipByID: entity is not a relationship (missing type:relationship or _relationship:* tag)")
 		return nil, fmt.Errorf("entity is not a relationship")
 	}
 	
@@ -1312,32 +1462,58 @@ func (r *EntityRepository) GetRelationshipByID(id string) (interface{}, error) {
 	
 	// Extract relationship data from entity
 	for _, tag := range entity.Tags {
-		if strings.HasPrefix(tag, "_relationship:") {
-			rel.RelationshipType = strings.TrimPrefix(tag, "_relationship:")
-		} else if strings.HasPrefix(tag, "_source:") {
-			rel.SourceID = strings.TrimPrefix(tag, "_source:")
-		} else if strings.HasPrefix(tag, "_target:") {
-			rel.TargetID = strings.TrimPrefix(tag, "_target:")
+		// Handle temporal tags by extracting the actual tag part
+		actualTag := tag
+		parts := strings.SplitN(tag, "|", 2)
+		if len(parts) == 2 {
+			actualTag = parts[1]
 		}
+		
+		if strings.HasPrefix(actualTag, "_relationship:") {
+			rel.RelationshipType = strings.TrimPrefix(actualTag, "_relationship:")
+		} else if strings.HasPrefix(actualTag, "_source:") {
+			rel.SourceID = strings.TrimPrefix(actualTag, "_source:")
+		} else if strings.HasPrefix(actualTag, "_target:") {
+			rel.TargetID = strings.TrimPrefix(actualTag, "_target:")
+		}
+	}
+	
+	logger.Debug("GetRelationshipByID: successfully converted to relationship: Type=%s, Source=%s, Target=%s", 
+		rel.RelationshipType, rel.SourceID, rel.TargetID)
+	
+	// Set the Type field as well (for compatibility)
+	if rel.Type == "" {
+		rel.Type = rel.RelationshipType
 	}
 	
 	return rel, nil
 }
 
 func (r *EntityRepository) GetRelationshipsBySource(sourceID string) ([]interface{}, error) {
-	entities, err := r.ListByTag("_source:" + sourceID)
+	searchTag := "_source:" + sourceID
+	logger.Info("EntityRepository.GetRelationshipsBySource: searching for tag '%s'", searchTag)
+	
+	entities, err := r.ListByTag(searchTag)
 	if err != nil {
+		logger.Error("EntityRepository.GetRelationshipsBySource: ListByTag failed: %v", err)
 		return nil, err
 	}
 	
+	logger.Info("EntityRepository.GetRelationshipsBySource: found %d entities with tag '%s'", len(entities), searchTag)
+	
 	relationships := make([]interface{}, 0)
 	for _, entity := range entities {
+		logger.Debug("EntityRepository.GetRelationshipsBySource: processing entity %s", entity.ID)
 		rel, err := r.GetRelationshipByID(entity.ID)
 		if err == nil {
 			relationships = append(relationships, rel)
+			logger.Debug("EntityRepository.GetRelationshipsBySource: successfully converted entity %s to relationship", entity.ID)
+		} else {
+			logger.Debug("EntityRepository.GetRelationshipsBySource: failed to convert entity %s: %v", entity.ID, err)
 		}
 	}
 	
+	logger.Debug("EntityRepository.GetRelationshipsBySource: returning %d relationships for source %s", len(relationships), sourceID)
 	return relationships, nil
 }
 
@@ -1807,8 +1983,19 @@ func (r *EntityRepository) VerifyIndexHealth() error {
 	entityCount := len(r.entities)
 	indexCount := len(indexedEntities)
 	
-	logger.Info("Index health check: %d entities in repository, %d entities in tag index, %d total tag entries", 
+	logger.Info("Index health check: %d entities in repository (r.entities), %d entities in tag index, %d total tag entries", 
 		entityCount, indexCount, totalTagEntries)
+		
+	// Debug: Show first few entities in memory
+	debugCount := 0
+	for id := range r.entities {
+		if debugCount < 5 {
+			logger.Debug("Entity in memory: %s", id)
+			debugCount++
+		} else {
+			break
+		}
+	}
 	
 	if entityCount != indexCount {
 		logger.Error("Index mismatch details:")
@@ -1972,4 +2159,19 @@ func (r *EntityRepository) removeFromTagIndex(tag, entityID string) {
 			delete(r.tagIndex, tag)
 		}
 	}
+}
+
+// RepairWAL repairs the WAL using the recovery manager
+func (r *EntityRepository) RepairWAL() error {
+	return r.recovery.RepairWAL()
+}
+
+// ValidateEntityChecksum validates the checksum of an entity
+func (r *EntityRepository) ValidateEntityChecksum(entity *models.Entity) (bool, string) {
+	return r.recovery.ValidateChecksum(entity)
+}
+
+// CreateEntityBackup creates a backup of an entity
+func (r *EntityRepository) CreateEntityBackup(entity *models.Entity) error {
+	return r.recovery.CreateBackup(entity)
 }
