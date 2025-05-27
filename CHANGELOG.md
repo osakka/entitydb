@@ -44,6 +44,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **API Documentation**: Updated Swagger specifications to include new RBAC metrics structures
 
 ### Fixed
+- **UUID Storage Format**: Fixed critical authentication bug by increasing EntityID storage from 36 to 64 bytes
+  - Resolved login failures caused by truncated UUID values in binary format
+  - Updated all entity operations to handle full UUID strings correctly
+  - Fixed user authentication and session management issues
 - **Index Write Operations**: Fixed critical bug where index entries were written in random order
 - **Authentication Failures**: Fixed admin user creation in startup script
 - **Build Errors**: Moved debug_auth.go to tools directory to avoid duplicate main

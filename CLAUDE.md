@@ -164,6 +164,13 @@ The server automatically creates a default admin user if none exists:
 - Audit logging
 - Aggregation queries (beyond sorting/filtering)
 
+## Recent Changes (v2.16.0)
+
+- **UUID Storage Fix**: Fixed critical authentication bug by increasing EntityID from 36 to 64 bytes
+  - Resolved login failures due to truncated UUIDs in binary format
+  - All entity operations now correctly handle full UUID strings
+  - Fixed user authentication and session management
+
 ## Recent Changes (v2.13.0)
 
 - **Configuration System Overhaul**: Environment-based configuration with no hardcoded values
