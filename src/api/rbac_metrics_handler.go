@@ -24,14 +24,49 @@ func NewRBACMetricsHandler(entityRepo models.EntityRepository, sessionManager *m
 
 // RBACMetricsResponse represents the complete RBAC metrics response
 type RBACMetricsResponse struct {
-	Users           UserMetrics           `json:"users"`
-	Roles           RoleMetrics           `json:"roles"`
-	Sessions        SessionMetrics        `json:"sessions"`
-	Authentication  AuthenticationMetrics `json:"authentication"`
-	ActiveSessions  []SessionInfo         `json:"active_sessions"`
-	RecentActivity  []ActivityInfo        `json:"recent_activity"`
-	Summary         RBACMetricsSummary    `json:"summary"`
-	Timestamp       string                `json:"timestamp"`
+	Users           *SimplifiedUserMetrics        `json:"users"`
+	Sessions        *SimplifiedSessionMetrics     `json:"sessions"`
+	Auth            *SimplifiedAuthMetrics        `json:"auth"`
+	Permissions     *SimplifiedPermissionMetrics  `json:"permissions"`
+	SecurityEvents  []SecurityEvent               `json:"security_events"`
+	Timestamp       string                        `json:"timestamp"`
+}
+
+// SimplifiedUserMetrics for frontend compatibility
+type SimplifiedUserMetrics struct {
+	TotalUsers  int `json:"total_users"`
+	AdminCount  int `json:"admin_count"`
+}
+
+// SimplifiedSessionMetrics for frontend compatibility  
+type SimplifiedSessionMetrics struct {
+	ActiveCount    int     `json:"active_count"`
+	TotalToday     int     `json:"total_today"`
+	AvgDurationMs  float64 `json:"avg_duration_ms"`
+}
+
+// SimplifiedAuthMetrics for frontend compatibility
+type SimplifiedAuthMetrics struct {
+	SuccessfulLogins int     `json:"successful_logins"`
+	FailedLogins     int     `json:"failed_logins"`
+	SuccessRate      float64 `json:"success_rate"`
+}
+
+// SimplifiedPermissionMetrics for frontend compatibility
+type SimplifiedPermissionMetrics struct {
+	ChecksPerSecond float64 `json:"checks_per_second"`
+	TotalChecks     int     `json:"total_checks"`
+	CacheHitRate    float64 `json:"cache_hit_rate"`
+}
+
+// SecurityEvent represents a security event
+type SecurityEvent struct {
+	ID        string    `json:"id"`
+	Timestamp time.Time `json:"timestamp"`
+	Type      string    `json:"type"`
+	Username  string    `json:"username"`
+	Details   string    `json:"details"`
+	Status    string    `json:"status"`
 }
 
 // UserMetrics contains user-related statistics
@@ -148,30 +183,35 @@ func (h *RBACMetricsHandler) GetRBACMetrics(w http.ResponseWriter, r *http.Reque
 	// Calculate user metrics
 	userMetrics := h.calculateUserMetrics(userEntities)
 	
-	// Calculate role metrics
-	roleMetrics := h.calculateRoleMetrics(userEntities)
-	
 	// Calculate session metrics
 	sessionMetrics := h.calculateSessionMetrics(activeSessions)
 	
 	// Generate mock authentication metrics (since we don't track this yet)
 	authMetrics := h.generateAuthenticationMetrics()
-	
-	// Generate recent activity
-	recentActivity := h.generateRecentActivity(activeSessions)
-	
-	// Calculate summary metrics
-	summary := h.calculateSummary(userMetrics, sessionMetrics, authMetrics)
 
+	// Create simplified response that matches frontend expectations
 	response := RBACMetricsResponse{
-		Users:           userMetrics,
-		Roles:           roleMetrics,
-		Sessions:        sessionMetrics,
-		Authentication:  authMetrics,
-		ActiveSessions:  activeSessions,
-		RecentActivity:  recentActivity,
-		Summary:         summary,
-		Timestamp:       time.Now().Format(time.RFC3339),
+		Users: &SimplifiedUserMetrics{
+			TotalUsers: userMetrics.TotalUsers,
+			AdminCount: userMetrics.AdminUsers,
+		},
+		Sessions: &SimplifiedSessionMetrics{
+			ActiveCount:   h.sessionManager.GetActiveSessions(),
+			TotalToday:    sessionMetrics.TotalActiveSessions * 10, // Mock data
+			AvgDurationMs: sessionMetrics.AverageSessionTime * 60 * 1000, // Convert to milliseconds
+		},
+		Auth: &SimplifiedAuthMetrics{
+			SuccessfulLogins: authMetrics.SuccessfulLogins,
+			FailedLogins:     authMetrics.FailedLogins,
+			SuccessRate:      authMetrics.SuccessRate,
+		},
+		Permissions: &SimplifiedPermissionMetrics{
+			ChecksPerSecond: 42.5, // Mock data
+			TotalChecks:     150000, // Mock data  
+			CacheHitRate:    0.95, // 95% cache hit rate
+		},
+		SecurityEvents: h.generateSecurityEvents(),
+		Timestamp:      time.Now().Format(time.RFC3339),
 	}
 
 	RespondJSON(w, http.StatusOK, response)
@@ -398,6 +438,54 @@ func (h *RBACMetricsHandler) calculateSummary(users UserMetrics, sessions Sessio
 		AuthSuccessRate:   auth.SuccessRate,
 		AdminRatio:        adminRatio,
 	}
+}
+
+// generateSecurityEvents creates mock security events
+func (h *RBACMetricsHandler) generateSecurityEvents() []SecurityEvent {
+	events := []SecurityEvent{
+		{
+			ID:        "evt_001",
+			Timestamp: time.Now().Add(-2 * time.Hour),
+			Type:      "login_success",
+			Username:  "admin",
+			Details:   "Successful login from IP 192.168.1.100",
+			Status:    "success",
+		},
+		{
+			ID:        "evt_002",
+			Timestamp: time.Now().Add(-90 * time.Minute),
+			Type:      "login_failed",
+			Username:  "unknown",
+			Details:   "Failed login attempt - invalid credentials",
+			Status:    "failed",
+		},
+		{
+			ID:        "evt_003",
+			Timestamp: time.Now().Add(-45 * time.Minute),
+			Type:      "permission_denied",
+			Username:  "user123",
+			Details:   "Access denied to admin resources",
+			Status:    "blocked",
+		},
+		{
+			ID:        "evt_004",
+			Timestamp: time.Now().Add(-30 * time.Minute),
+			Type:      "session_expired",
+			Username:  "developer",
+			Details:   "Session expired after 2 hours",
+			Status:    "info",
+		},
+		{
+			ID:        "evt_005",
+			Timestamp: time.Now().Add(-15 * time.Minute),
+			Type:      "login_success",
+			Username:  "user456",
+			Details:   "Successful login from mobile device",
+			Status:    "success",
+		},
+	}
+	
+	return events
 }
 
 // Helper functions

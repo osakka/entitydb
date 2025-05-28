@@ -1,16 +1,5 @@
 basePath: /api/v1
 definitions:
-  api.ActivityInfo:
-    properties:
-      action:
-        type: string
-      details:
-        type: string
-      timestamp:
-        type: string
-      username:
-        type: string
-    type: object
   api.ActivityItem:
     properties:
       description:
@@ -53,34 +42,6 @@ definitions:
         type: string
       user:
         $ref: '#/definitions/api.UserInfo'
-    type: object
-  api.AuthTimePoint:
-    properties:
-      failed:
-        type: integer
-      success:
-        type: integer
-      time:
-        type: string
-    type: object
-  api.AuthenticationMetrics:
-    properties:
-      failed_logins:
-        type: integer
-      failure_reasons:
-        additionalProperties:
-          type: integer
-        type: object
-      success_rate:
-        type: number
-      successful_logins:
-        type: integer
-      timeline:
-        items:
-          $ref: '#/definitions/api.AuthTimePoint'
-        type: array
-      total_attempts:
-        type: integer
     type: object
   api.ChangePasswordRequest:
     properties:
@@ -408,15 +369,6 @@ definitions:
         example: 236206
         type: integer
     type: object
-  api.PermissionInfo:
-    properties:
-      usage_count:
-        type: integer
-      users:
-        items:
-          type: string
-        type: array
-    type: object
   api.QueryEntityResponse:
     properties:
       entities:
@@ -432,37 +384,20 @@ definitions:
     type: object
   api.RBACMetricsResponse:
     properties:
-      active_sessions:
+      auth:
+        $ref: '#/definitions/api.SimplifiedAuthMetrics'
+      permissions:
+        $ref: '#/definitions/api.SimplifiedPermissionMetrics'
+      security_events:
         items:
-          $ref: '#/definitions/api.SessionInfo'
+          $ref: '#/definitions/api.SecurityEvent'
         type: array
-      authentication:
-        $ref: '#/definitions/api.AuthenticationMetrics'
-      recent_activity:
-        items:
-          $ref: '#/definitions/api.ActivityInfo'
-        type: array
-      roles:
-        $ref: '#/definitions/api.RoleMetrics'
       sessions:
-        $ref: '#/definitions/api.SessionMetrics'
-      summary:
-        $ref: '#/definitions/api.RBACMetricsSummary'
+        $ref: '#/definitions/api.SimplifiedSessionMetrics'
       timestamp:
         type: string
       users:
-        $ref: '#/definitions/api.UserMetrics'
-    type: object
-  api.RBACMetricsSummary:
-    properties:
-      active_session_rate:
-        type: number
-      admin_ratio:
-        type: number
-      auth_success_rate:
-        type: number
-      security_score:
-        type: number
+        $ref: '#/definitions/api.SimplifiedUserMetrics'
     type: object
   api.RefreshResponse:
     description: Refreshed session information
@@ -526,73 +461,54 @@ definitions:
       username:
         type: string
     type: object
-  api.RoleMetrics:
+  api.SecurityEvent:
     properties:
-      permissions:
-        additionalProperties:
-          $ref: '#/definitions/api.PermissionInfo'
-        type: object
-      role_distribution:
-        additionalProperties:
-          type: integer
-        type: object
-      total_roles:
-        type: integer
-    type: object
-  api.SessionInfo:
-    properties:
-      created_at:
+      details:
         type: string
-      duration:
+      id:
         type: string
-      expires_at:
-        type: string
-      last_used:
-        type: string
-      roles:
-        items:
-          type: string
-        type: array
       status:
         type: string
-      token:
+      timestamp:
         type: string
-      user_id:
+      type:
         type: string
       username:
         type: string
     type: object
-  api.SessionMetrics:
+  api.SimplifiedAuthMetrics:
     properties:
-      average_session_duration_minutes:
-        type: number
-      peak_concurrent_sessions:
+      failed_logins:
         type: integer
-      session_timeline:
-        items:
-          $ref: '#/definitions/api.SessionTimePoint'
-        type: array
-      sessions_by_duration:
-        additionalProperties:
-          type: integer
-        type: object
-      sessions_per_user:
-        additionalProperties:
-          type: integer
-        type: object
-      total_active_sessions:
+      success_rate:
+        type: number
+      successful_logins:
         type: integer
     type: object
-  api.SessionTimePoint:
+  api.SimplifiedPermissionMetrics:
     properties:
-      active:
+      cache_hit_rate:
+        type: number
+      checks_per_second:
+        type: number
+      total_checks:
         type: integer
-      created:
+    type: object
+  api.SimplifiedSessionMetrics:
+    properties:
+      active_count:
         type: integer
-      expired:
+      avg_duration_ms:
+        type: number
+      total_today:
         type: integer
-      time:
-        type: string
+    type: object
+  api.SimplifiedUserMetrics:
+    properties:
+      admin_count:
+        type: integer
+      total_users:
+        type: integer
     type: object
   api.StatusResponse:
     description: Status message
@@ -688,13 +604,6 @@ definitions:
       time_range_start:
         type: string
     type: object
-  api.UserCreationPoint:
-    properties:
-      count:
-        type: integer
-      date:
-        type: string
-    type: object
   api.UserInfo:
     description: User details
     properties:
@@ -711,25 +620,6 @@ definitions:
       username:
         example: admin
         type: string
-    type: object
-  api.UserMetrics:
-    properties:
-      active_users:
-        type: integer
-      admin_users:
-        type: integer
-      regular_users:
-        type: integer
-      total_users:
-        type: integer
-      user_creation_timeline:
-        items:
-          $ref: '#/definitions/api.UserCreationPoint'
-        type: array
-      users_by_role:
-        additionalProperties:
-          type: integer
-        type: object
     type: object
   models.Entity:
     properties:

@@ -1319,23 +1319,6 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "api.ActivityInfo": {
-            "type": "object",
-            "properties": {
-                "action": {
-                    "type": "string"
-                },
-                "details": {
-                    "type": "string"
-                },
-                "timestamp": {
-                    "type": "string"
-                },
-                "username": {
-                    "type": "string"
-                }
-            }
-        },
         "api.ActivityItem": {
             "type": "object",
             "properties": {
@@ -1398,49 +1381,6 @@ const docTemplate = `{
                 },
                 "user": {
                     "$ref": "#/definitions/api.UserInfo"
-                }
-            }
-        },
-        "api.AuthTimePoint": {
-            "type": "object",
-            "properties": {
-                "failed": {
-                    "type": "integer"
-                },
-                "success": {
-                    "type": "integer"
-                },
-                "time": {
-                    "type": "string"
-                }
-            }
-        },
-        "api.AuthenticationMetrics": {
-            "type": "object",
-            "properties": {
-                "failed_logins": {
-                    "type": "integer"
-                },
-                "failure_reasons": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "integer"
-                    }
-                },
-                "success_rate": {
-                    "type": "number"
-                },
-                "successful_logins": {
-                    "type": "integer"
-                },
-                "timeline": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/api.AuthTimePoint"
-                    }
-                },
-                "total_attempts": {
-                    "type": "integer"
                 }
             }
         },
@@ -1921,20 +1861,6 @@ const docTemplate = `{
                 }
             }
         },
-        "api.PermissionInfo": {
-            "type": "object",
-            "properties": {
-                "usage_count": {
-                    "type": "integer"
-                },
-                "users": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                }
-            }
-        },
         "api.QueryEntityResponse": {
             "type": "object",
             "properties": {
@@ -1958,52 +1884,26 @@ const docTemplate = `{
         "api.RBACMetricsResponse": {
             "type": "object",
             "properties": {
-                "active_sessions": {
+                "auth": {
+                    "$ref": "#/definitions/api.SimplifiedAuthMetrics"
+                },
+                "permissions": {
+                    "$ref": "#/definitions/api.SimplifiedPermissionMetrics"
+                },
+                "security_events": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/api.SessionInfo"
+                        "$ref": "#/definitions/api.SecurityEvent"
                     }
-                },
-                "authentication": {
-                    "$ref": "#/definitions/api.AuthenticationMetrics"
-                },
-                "recent_activity": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/api.ActivityInfo"
-                    }
-                },
-                "roles": {
-                    "$ref": "#/definitions/api.RoleMetrics"
                 },
                 "sessions": {
-                    "$ref": "#/definitions/api.SessionMetrics"
-                },
-                "summary": {
-                    "$ref": "#/definitions/api.RBACMetricsSummary"
+                    "$ref": "#/definitions/api.SimplifiedSessionMetrics"
                 },
                 "timestamp": {
                     "type": "string"
                 },
                 "users": {
-                    "$ref": "#/definitions/api.UserMetrics"
-                }
-            }
-        },
-        "api.RBACMetricsSummary": {
-            "type": "object",
-            "properties": {
-                "active_session_rate": {
-                    "type": "number"
-                },
-                "admin_ratio": {
-                    "type": "number"
-                },
-                "auth_success_rate": {
-                    "type": "number"
-                },
-                "security_score": {
-                    "type": "number"
+                    "$ref": "#/definitions/api.SimplifiedUserMetrics"
                 }
             }
         },
@@ -2095,54 +1995,22 @@ const docTemplate = `{
                 }
             }
         },
-        "api.RoleMetrics": {
+        "api.SecurityEvent": {
             "type": "object",
             "properties": {
-                "permissions": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "$ref": "#/definitions/api.PermissionInfo"
-                    }
-                },
-                "role_distribution": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "integer"
-                    }
-                },
-                "total_roles": {
-                    "type": "integer"
-                }
-            }
-        },
-        "api.SessionInfo": {
-            "type": "object",
-            "properties": {
-                "created_at": {
+                "details": {
                     "type": "string"
                 },
-                "duration": {
+                "id": {
                     "type": "string"
-                },
-                "expires_at": {
-                    "type": "string"
-                },
-                "last_used": {
-                    "type": "string"
-                },
-                "roles": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
                 },
                 "status": {
                     "type": "string"
                 },
-                "token": {
+                "timestamp": {
                     "type": "string"
                 },
-                "user_id": {
+                "type": {
                     "type": "string"
                 },
                 "username": {
@@ -2150,52 +2018,56 @@ const docTemplate = `{
                 }
             }
         },
-        "api.SessionMetrics": {
+        "api.SimplifiedAuthMetrics": {
             "type": "object",
             "properties": {
-                "average_session_duration_minutes": {
-                    "type": "number"
-                },
-                "peak_concurrent_sessions": {
+                "failed_logins": {
                     "type": "integer"
                 },
-                "session_timeline": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/api.SessionTimePoint"
-                    }
+                "success_rate": {
+                    "type": "number"
                 },
-                "sessions_by_duration": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "integer"
-                    }
-                },
-                "sessions_per_user": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "integer"
-                    }
-                },
-                "total_active_sessions": {
+                "successful_logins": {
                     "type": "integer"
                 }
             }
         },
-        "api.SessionTimePoint": {
+        "api.SimplifiedPermissionMetrics": {
             "type": "object",
             "properties": {
-                "active": {
+                "cache_hit_rate": {
+                    "type": "number"
+                },
+                "checks_per_second": {
+                    "type": "number"
+                },
+                "total_checks": {
+                    "type": "integer"
+                }
+            }
+        },
+        "api.SimplifiedSessionMetrics": {
+            "type": "object",
+            "properties": {
+                "active_count": {
                     "type": "integer"
                 },
-                "created": {
+                "avg_duration_ms": {
+                    "type": "number"
+                },
+                "total_today": {
+                    "type": "integer"
+                }
+            }
+        },
+        "api.SimplifiedUserMetrics": {
+            "type": "object",
+            "properties": {
+                "admin_count": {
                     "type": "integer"
                 },
-                "expired": {
+                "total_users": {
                     "type": "integer"
-                },
-                "time": {
-                    "type": "string"
                 }
             }
         },
@@ -2336,17 +2208,6 @@ const docTemplate = `{
                 }
             }
         },
-        "api.UserCreationPoint": {
-            "type": "object",
-            "properties": {
-                "count": {
-                    "type": "integer"
-                },
-                "date": {
-                    "type": "string"
-                }
-            }
-        },
         "api.UserInfo": {
             "description": "User details",
             "type": "object",
@@ -2368,35 +2229,6 @@ const docTemplate = `{
                 "username": {
                     "type": "string",
                     "example": "admin"
-                }
-            }
-        },
-        "api.UserMetrics": {
-            "type": "object",
-            "properties": {
-                "active_users": {
-                    "type": "integer"
-                },
-                "admin_users": {
-                    "type": "integer"
-                },
-                "regular_users": {
-                    "type": "integer"
-                },
-                "total_users": {
-                    "type": "integer"
-                },
-                "user_creation_timeline": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/api.UserCreationPoint"
-                    }
-                },
-                "users_by_role": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "integer"
-                    }
                 }
             }
         },

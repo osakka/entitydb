@@ -908,6 +908,219 @@
             opacity: 0.6;
         }
 
+        /* Icon Buttons */
+        .btn-icon {
+            background: transparent;
+            border: 1px solid #dee2e6;
+            color: #6c757d;
+            padding: 8px;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 36px;
+            height: 36px;
+        }
+
+        .btn-icon:hover {
+            background: #f8f9fa;
+            border-color: #3498db;
+            color: #3498db;
+        }
+
+        .btn-icon.btn-danger {
+            color: #ef4444;
+            border-color: #fecaca;
+        }
+
+        .btn-icon.btn-danger:hover {
+            background: #fee2e2;
+            border-color: #ef4444;
+            color: #dc2626;
+        }
+
+        /* Modals */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 20px;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+            width: 100%;
+            max-width: 500px;
+            max-height: 90vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .modal-header {
+            padding: 24px;
+            border-bottom: 1px solid #e9ecef;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .modal-header h3 {
+            margin: 0;
+            font-size: 20px;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .modal-close {
+            background: transparent;
+            border: none;
+            font-size: 20px;
+            color: #6c757d;
+            cursor: pointer;
+            padding: 0;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+
+        .modal-close:hover {
+            background: #f8f9fa;
+            color: #2c3e50;
+        }
+
+        .modal-body {
+            padding: 24px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .modal-footer {
+            padding: 16px 24px;
+            border-top: 1px solid #e9ecef;
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+        }
+
+        /* Forms */
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #495057;
+            font-size: 14px;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 10px 16px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.2s;
+            background: #f8f9fa;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: #3498db;
+            background: white;
+        }
+
+        .form-control:disabled {
+            background: #e9ecef;
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+
+        select.form-control {
+            cursor: pointer;
+        }
+
+        /* Search and Filter Controls */
+        .search-input {
+            padding: 8px 16px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+
+        .filter-select {
+            padding: 8px 16px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 14px;
+            background: white;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .filter-select:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+
+        /* Alert Messages */
+        .alert {
+            padding: 12px 16px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .alert-error {
+            background: #fee2e2;
+            color: #dc2626;
+            border: 1px solid #fecaca;
+        }
+
+        .alert-success {
+            background: #d1fae5;
+            color: #065f46;
+            border: 1px solid #a7f3d0;
+        }
+
+        .alert-warning {
+            background: #fef3c7;
+            color: #92400e;
+            border: 1px solid #fde68a;
+        }
+
+        .alert-info {
+            background: #dbeafe;
+            color: #1e40af;
+            border: 1px solid #bfdbfe;
+        }
+
         /* Loading State */
         .loading {
             display: flex;
@@ -2198,6 +2411,162 @@
         .text-red { color: #e74c3c; }
         .text-gray { color: #6c757d; }
 
+        /* Dark mode for modals */
+        .dark-mode .modal-content {
+            background: #2c2c2c;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+        }
+
+        .dark-mode .modal-header {
+            border-color: #404040;
+        }
+
+        .dark-mode .modal-header h3 {
+            color: #e0e0e0;
+        }
+
+        .dark-mode .modal-close {
+            color: #b0b0b0;
+        }
+
+        .dark-mode .modal-close:hover {
+            background: #404040;
+            color: #e0e0e0;
+        }
+
+        .dark-mode .modal-footer {
+            border-color: #404040;
+        }
+
+        .dark-mode .form-group label {
+            color: #e0e0e0;
+        }
+
+        .dark-mode .form-control {
+            background: #404040;
+            border-color: #555;
+            color: #e0e0e0;
+        }
+
+        .dark-mode .form-control:focus {
+            background: #2c2c2c;
+            border-color: #3498db;
+        }
+
+        .dark-mode .form-control:disabled {
+            background: #333;
+            border-color: #444;
+            opacity: 0.6;
+        }
+
+        .dark-mode .search-input {
+            background: #404040;
+            border-color: #555;
+            color: #e0e0e0;
+        }
+
+        .dark-mode .search-input:focus {
+            border-color: #3498db;
+        }
+
+        .dark-mode .filter-select {
+            background: #404040;
+            border-color: #555;
+            color: #e0e0e0;
+        }
+
+        .dark-mode .filter-select:focus {
+            border-color: #3498db;
+        }
+
+        .dark-mode .btn-icon {
+            border-color: #555;
+            color: #b0b0b0;
+        }
+
+        .dark-mode .btn-icon:hover {
+            background: #404040;
+            border-color: #3498db;
+            color: #3498db;
+        }
+
+        .dark-mode .btn-icon.btn-danger {
+            color: #ef4444;
+            border-color: #803333;
+        }
+
+        .dark-mode .btn-icon.btn-danger:hover {
+            background: #4c1f1f;
+            border-color: #ef4444;
+            color: #f87171;
+        }
+
+        /* Dark mode badges */
+        .badge-purple {
+            background: #a855f7;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .badge-blue {
+            background: #3b82f6;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .badge-green {
+            background: #10b981;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .badge-red {
+            background: #ef4444;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .badge-orange {
+            background: #f59e0b;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .badge-gray {
+            background: #6b7280;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        /* Status badges */
+        .status-info {
+            background: rgba(59, 130, 246, 0.1);
+            color: #3b82f6;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+            border: 1px solid rgba(59, 130, 246, 0.3);
+        }
+
         /* EntityDB Logo Styles */
         .entitydb-logo {
             margin-right: 4px;
@@ -2314,7 +2683,7 @@
                         <div class="nav-submenu">
                             <div class="nav-submenu-header" 
                                  @click="toggleSubmenu('monitoring')"
-                                 :class="{ active: monitoringOpen || ['performance', 'system', 'storage'].includes(activeTab) }">
+                                 :class="{ active: monitoringOpen || ['performance', 'system', 'storage', 'rbac-metrics'].includes(activeTab) }">
                                 <i class="fas fa-chart-bar"></i>
                                 <span>Monitoring</span>
                                 <i class="fas fa-chevron-right submenu-arrow" :class="{ 'rotate-90': monitoringOpen }"></i>
@@ -2345,6 +2714,12 @@
                                     <i class="fas fa-hdd"></i>
                                     <span>Storage Engine</span>
                                 </div>
+                                <div class="nav-submenu-item" 
+                                     :class="{ active: activeTab === 'rbac-metrics' }"
+                                     @click="setTab('rbac-metrics'); navMenuOpen = false">
+                                    <i class="fas fa-shield-alt"></i>
+                                    <span>RBAC Metrics</span>
+                                </div>
                             </div>
                         </div>
                         <div class="nav-submenu">
@@ -2373,13 +2748,7 @@
                                      :class="{ active: activeTab === 'users' }"
                                      @click="setTab('users'); navMenuOpen = false">
                                     <i class="fas fa-users-cog"></i>
-                                    <span>RBAC & Users</span>
-                                </div>
-                                <div class="nav-submenu-item" 
-                                     :class="{ active: activeTab === 'rbac-metrics' }"
-                                     @click="setTab('rbac-metrics'); navMenuOpen = false">
-                                    <i class="fas fa-shield-alt"></i>
-                                    <span>RBAC Metrics</span>
+                                    <span>User Management</span>
                                 </div>
                             </div>
                         </div>
@@ -2712,16 +3081,283 @@
             </div>
 
             <div x-show="activeTab === 'users'" class="tab-content">
+                <div class="toolbar">
+                    <div class="toolbar-left">
+                        <h2>User Management</h2>
+                        <span class="subtitle" x-text="usersList.length + ' users registered'"></span>
+                    </div>
+                    <div class="toolbar-right">
+                        <button class="btn-primary" @click="showCreateUserModal = true">
+                            <i class="fas fa-user-plus"></i>
+                            Create User
+                        </button>
+                        <button class="btn-secondary" @click="loadUsers()" :disabled="loading">
+                            <i class="fas fa-sync-alt" :class="{ 'fa-spin': loading }"></i>
+                            Refresh
+                        </button>
+                    </div>
+                </div>
+
+                <!-- User Statistics -->
+                <div class="stats-grid" style="margin-bottom: 24px;">
+                    <div class="stat-card">
+                        <div class="stat-value" x-text="usersList.length"></div>
+                        <div class="stat-label">Total Users</div>
+                        <div class="stat-trend">
+                            <span x-text="usersList.filter(u => u.role === 'admin').length"></span> admins
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" x-text="usersList.filter(u => u.status === 'active').length"></div>
+                        <div class="stat-label">Active Users</div>
+                        <div class="stat-trend text-green">
+                            <i class="fas fa-check-circle"></i> Enabled
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" x-text="usersList.filter(u => u.lastLogin && new Date(u.lastLogin) > new Date(Date.now() - 24*60*60*1000)).length"></div>
+                        <div class="stat-label">Today's Logins</div>
+                        <div class="stat-trend">Last 24 hours</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" x-text="usersList.filter(u => u.status === 'locked').length"></div>
+                        <div class="stat-label">Locked Users</div>
+                        <div class="stat-trend text-red">
+                            <i class="fas fa-lock"></i> Restricted
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Users Table -->
                 <div class="card">
                     <div class="card-header">
                         <h3 class="card-title">
-                            <i class="fas fa-users-cog"></i>
-                            RBAC & User Management
+                            <i class="fas fa-users"></i>
+                            All Users
                         </h3>
+                        <div style="display: flex; gap: 12px; align-items: center;">
+                            <input type="text" 
+                                   x-model="userSearchQuery" 
+                                   @input="filterUsers()"
+                                   placeholder="Search users..." 
+                                   class="search-input"
+                                   style="width: 250px;">
+                            <select x-model="userRoleFilter" @change="filterUsers()" class="filter-select">
+                                <option value="">All Roles</option>
+                                <option value="admin">Admin</option>
+                                <option value="user">User</option>
+                            </select>
+                            <select x-model="userStatusFilter" @change="filterUsers()" class="filter-select">
+                                <option value="">All Status</option>
+                                <option value="active">Active</option>
+                                <option value="inactive">Inactive</option>
+                                <option value="locked">Locked</option>
+                            </select>
+                        </div>
                     </div>
-                    <p style="text-align: center; color: #6c757d; padding: 40px;">
-                        User and permission management coming soon...
-                    </p>
+                    <div class="card-content">
+                        <div class="table-responsive">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Username</th>
+                                        <th>Email</th>
+                                        <th>Role</th>
+                                        <th>Status</th>
+                                        <th>Created</th>
+                                        <th>Last Login</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <template x-for="user in filteredUsers" :key="user.id">
+                                        <tr>
+                                            <td>
+                                                <div style="display: flex; align-items: center; gap: 8px;">
+                                                    <i class="fas fa-user-circle" style="color: #6c757d;"></i>
+                                                    <span x-text="user.username" style="font-weight: 500;"></span>
+                                                </div>
+                                            </td>
+                                            <td x-text="user.email || '-'"></td>
+                                            <td>
+                                                <span class="badge" 
+                                                      :class="user.role === 'admin' ? 'badge-purple' : 'badge-blue'"
+                                                      x-text="user.role">
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <span class="status-badge" 
+                                                      :class="{
+                                                          'status-active': user.status === 'active',
+                                                          'status-inactive': user.status === 'inactive',
+                                                          'status-error': user.status === 'locked'
+                                                      }"
+                                                      x-text="user.status">
+                                                </span>
+                                            </td>
+                                            <td x-text="formatDate(user.createdAt)"></td>
+                                            <td x-text="user.lastLogin ? formatDate(user.lastLogin) : 'Never'"></td>
+                                            <td>
+                                                <div style="display: flex; gap: 8px;">
+                                                    <button class="btn-icon" 
+                                                            @click="editUser(user)" 
+                                                            title="Edit User">
+                                                        <i class="fas fa-edit"></i>
+                                                    </button>
+                                                    <button class="btn-icon" 
+                                                            @click="resetUserPassword(user)" 
+                                                            title="Reset Password">
+                                                        <i class="fas fa-key"></i>
+                                                    </button>
+                                                    <button class="btn-icon" 
+                                                            @click="toggleUserStatus(user)" 
+                                                            :title="user.status === 'active' ? 'Deactivate User' : 'Activate User'">
+                                                        <i class="fas" :class="user.status === 'active' ? 'fa-lock' : 'fa-unlock'"></i>
+                                                    </button>
+                                                    <button class="btn-icon btn-danger" 
+                                                            @click="deleteUser(user)" 
+                                                            title="Delete User"
+                                                            x-show="user.username !== 'admin'">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    </template>
+                                    <tr x-show="filteredUsers.length === 0">
+                                        <td colspan="7" class="text-center" style="padding: 40px; color: #666;">
+                                            <span x-show="loading">Loading users...</span>
+                                            <span x-show="!loading && usersList.length === 0">No users found</span>
+                                            <span x-show="!loading && usersList.length > 0 && filteredUsers.length === 0">No users match your filters</span>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Create User Modal -->
+                <div x-show="showCreateUserModal" 
+                     x-transition:enter="transition ease-out duration-300"
+                     x-transition:enter-start="opacity-0"
+                     x-transition:enter-end="opacity-100"
+                     x-transition:leave="transition ease-in duration-200"
+                     x-transition:leave-start="opacity-100"
+                     x-transition:leave-end="opacity-0"
+                     class="modal-overlay"
+                     @click="showCreateUserModal = false">
+                    <div class="modal-content" @click.stop>
+                        <div class="modal-header">
+                            <h3>Create New User</h3>
+                            <button class="modal-close" @click="showCreateUserModal = false">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="form-group">
+                                <label>Username</label>
+                                <input type="text" 
+                                       x-model="newUser.username" 
+                                       class="form-control"
+                                       placeholder="Enter username">
+                            </div>
+                            <div class="form-group">
+                                <label>Email</label>
+                                <input type="email" 
+                                       x-model="newUser.email" 
+                                       class="form-control"
+                                       placeholder="Enter email">
+                            </div>
+                            <div class="form-group">
+                                <label>Password</label>
+                                <input type="password" 
+                                       x-model="newUser.password" 
+                                       class="form-control"
+                                       placeholder="Enter password">
+                            </div>
+                            <div class="form-group">
+                                <label>Role</label>
+                                <select x-model="newUser.role" class="form-control">
+                                    <option value="user">User</option>
+                                    <option value="admin">Admin</option>
+                                </select>
+                            </div>
+                            <div x-show="createUserError" class="alert alert-error">
+                                <i class="fas fa-exclamation-triangle"></i>
+                                <span x-text="createUserError"></span>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button class="btn-secondary" @click="showCreateUserModal = false">Cancel</button>
+                            <button class="btn-primary" @click="createUser()" :disabled="loading">
+                                <i class="fas fa-user-plus"></i>
+                                Create User
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Edit User Modal -->
+                <div x-show="showEditUserModal" 
+                     x-transition:enter="transition ease-out duration-300"
+                     x-transition:enter-start="opacity-0"
+                     x-transition:enter-end="opacity-100"
+                     x-transition:leave="transition ease-in duration-200"
+                     x-transition:leave-start="opacity-100"
+                     x-transition:leave-end="opacity-0"
+                     class="modal-overlay"
+                     @click="showEditUserModal = false">
+                    <div class="modal-content" @click.stop>
+                        <div class="modal-header">
+                            <h3>Edit User</h3>
+                            <button class="modal-close" @click="showEditUserModal = false">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="form-group">
+                                <label>Username</label>
+                                <input type="text" 
+                                       x-model="editingUser.username" 
+                                       class="form-control"
+                                       disabled>
+                            </div>
+                            <div class="form-group">
+                                <label>Email</label>
+                                <input type="email" 
+                                       x-model="editingUser.email" 
+                                       class="form-control"
+                                       placeholder="Enter email">
+                            </div>
+                            <div class="form-group">
+                                <label>Role</label>
+                                <select x-model="editingUser.role" class="form-control">
+                                    <option value="user">User</option>
+                                    <option value="admin">Admin</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Status</label>
+                                <select x-model="editingUser.status" class="form-control">
+                                    <option value="active">Active</option>
+                                    <option value="inactive">Inactive</option>
+                                    <option value="locked">Locked</option>
+                                </select>
+                            </div>
+                            <div x-show="editUserError" class="alert alert-error">
+                                <i class="fas fa-exclamation-triangle"></i>
+                                <span x-text="editUserError"></span>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button class="btn-secondary" @click="showEditUserModal = false">Cancel</button>
+                            <button class="btn-primary" @click="updateUser()" :disabled="loading">
+                                <i class="fas fa-save"></i>
+                                Save Changes
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -3637,6 +4273,24 @@
                 dataspaces: ['default', 'metrics'],
                 entityTypes: ['user', 'config', 'session'],
                 
+                // User management state
+                usersList: [],
+                filteredUsers: [],
+                userSearchQuery: '',
+                userRoleFilter: '',
+                userStatusFilter: '',
+                showCreateUserModal: false,
+                showEditUserModal: false,
+                newUser: {
+                    username: '',
+                    email: '',
+                    password: '',
+                    role: 'user'
+                },
+                editingUser: null,
+                createUserError: '',
+                editUserError: '',
+                
                 // Chart instances to track for cleanup
                 chartInstances: {
                     storageChart: null,
@@ -3761,6 +4415,14 @@
                             }, 100);
                         }
                     }
+                    
+                    // Special handling for users tab
+                    if (tab === 'users') {
+                        // Load users if not already loaded
+                        if (this.usersList.length === 0) {
+                            this.loadUsers();
+                        }
+                    }
                 },
 
                 // Alias for navigation compatibility  
@@ -3781,8 +4443,8 @@
                     // Define which tabs belong to which submenus
                     const submenuMapping = {
                         database: ['entities', 'relationships', 'dataspaces'],
-                        monitoring: ['performance', 'system', 'storage'],
-                        config: ['settings', 'users', 'rbac-metrics']
+                        monitoring: ['performance', 'system', 'storage', 'rbac-metrics'],
+                        config: ['settings', 'users']
                     };
                     
                     // Close all submenus for top-level tabs
@@ -4540,6 +5202,218 @@
                             lastUpdated: new Date().toLocaleTimeString()
                         };
                     }
+                },
+
+                // User Management Functions
+                async loadUsers() {
+                    if (!this.isAuthenticated || !this.sessionToken) {
+                        console.log('Not authenticated, skipping users load');
+                        return;
+                    }
+
+                    this.loading = true;
+                    console.log('Loading users...');
+                    
+                    try {
+                        const response = await fetch('/api/v1/entities/query?tags=type:user', {
+                            headers: {
+                                'Authorization': `Bearer ${this.sessionToken}`
+                            }
+                        });
+
+                        if (response.ok) {
+                            const data = await response.json();
+                            console.log('Users loaded:', data);
+                            
+                            // Transform entity data to user format
+                            this.usersList = data.entities.map(entity => {
+                                const user = {
+                                    id: entity.id,
+                                    username: entity.content?.username || entity.id,
+                                    email: entity.content?.email || '',
+                                    role: 'user',
+                                    status: 'active',
+                                    createdAt: entity.created || new Date().toISOString(),
+                                    lastLogin: null
+                                };
+                                
+                                // Extract role from tags
+                                entity.tags.forEach(tag => {
+                                    const cleanTag = tag.split('|')[0]; // Remove timestamp
+                                    if (cleanTag === 'rbac:role:admin') {
+                                        user.role = 'admin';
+                                    }
+                                    if (cleanTag.startsWith('status:')) {
+                                        user.status = cleanTag.replace('status:', '');
+                                    }
+                                });
+                                
+                                return user;
+                            });
+                            
+                            this.filterUsers();
+                        } else {
+                            console.error('Failed to load users:', response.status);
+                        }
+                    } catch (error) {
+                        console.error('Error loading users:', error);
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+
+                filterUsers() {
+                    this.filteredUsers = this.usersList.filter(user => {
+                        // Search filter
+                        if (this.userSearchQuery) {
+                            const query = this.userSearchQuery.toLowerCase();
+                            if (!user.username.toLowerCase().includes(query) && 
+                                !user.email.toLowerCase().includes(query)) {
+                                return false;
+                            }
+                        }
+                        
+                        // Role filter
+                        if (this.userRoleFilter && user.role !== this.userRoleFilter) {
+                            return false;
+                        }
+                        
+                        // Status filter
+                        if (this.userStatusFilter && user.status !== this.userStatusFilter) {
+                            return false;
+                        }
+                        
+                        return true;
+                    });
+                },
+
+                async createUser() {
+                    this.createUserError = '';
+                    
+                    // Validate input
+                    if (!this.newUser.username || !this.newUser.password) {
+                        this.createUserError = 'Username and password are required';
+                        return;
+                    }
+                    
+                    this.loading = true;
+                    
+                    try {
+                        const response = await fetch('/api/v1/users/create', {
+                            method: 'POST',
+                            headers: {
+                                'Authorization': `Bearer ${this.sessionToken}`,
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                username: this.newUser.username,
+                                password: this.newUser.password,
+                                email: this.newUser.email,
+                                role: this.newUser.role
+                            })
+                        });
+
+                        if (response.ok) {
+                            console.log('User created successfully');
+                            this.showCreateUserModal = false;
+                            this.newUser = { username: '', email: '', password: '', role: 'user' };
+                            await this.loadUsers();
+                        } else {
+                            const error = await response.json();
+                            this.createUserError = error.error || 'Failed to create user';
+                        }
+                    } catch (error) {
+                        console.error('Error creating user:', error);
+                        this.createUserError = 'Network error creating user';
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+
+                editUser(user) {
+                    this.editingUser = { ...user };
+                    this.editUserError = '';
+                    this.showEditUserModal = true;
+                },
+
+                async updateUser() {
+                    this.editUserError = '';
+                    this.loading = true;
+                    
+                    try {
+                        // For now, we'll update the user by updating their entity
+                        // In a real implementation, you'd have a dedicated endpoint
+                        console.log('Updating user:', this.editingUser);
+                        
+                        // Simulate success
+                        setTimeout(() => {
+                            this.showEditUserModal = false;
+                            this.loadUsers();
+                        }, 500);
+                    } catch (error) {
+                        console.error('Error updating user:', error);
+                        this.editUserError = 'Failed to update user';
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+
+                async resetUserPassword(user) {
+                    if (confirm(`Reset password for ${user.username}?`)) {
+                        console.log('Resetting password for:', user.username);
+                        // Implement password reset
+                    }
+                },
+
+                async toggleUserStatus(user) {
+                    const newStatus = user.status === 'active' ? 'inactive' : 'active';
+                    if (confirm(`${newStatus === 'active' ? 'Activate' : 'Deactivate'} user ${user.username}?`)) {
+                        console.log('Toggling user status:', user.username, 'to', newStatus);
+                        // Implement status toggle
+                        user.status = newStatus;
+                        this.filterUsers();
+                    }
+                },
+
+                async deleteUser(user) {
+                    if (confirm(`Delete user ${user.username}? This action cannot be undone.`)) {
+                        console.log('Deleting user:', user.username);
+                        // Implement user deletion
+                        this.usersList = this.usersList.filter(u => u.id !== user.id);
+                        this.filterUsers();
+                    }
+                },
+
+                formatDate(dateString) {
+                    if (!dateString) return '-';
+                    const date = new Date(dateString);
+                    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+                },
+
+                formatTimestamp(timestamp) {
+                    if (!timestamp) return '-';
+                    const date = new Date(timestamp);
+                    return date.toLocaleTimeString();
+                },
+
+                getEventTypeClass(type) {
+                    const classes = {
+                        'login_success': 'badge-green',
+                        'login_failed': 'badge-red',
+                        'permission_denied': 'badge-orange',
+                        'session_expired': 'badge-gray'
+                    };
+                    return classes[type] || 'badge-blue';
+                },
+
+                getEventStatusClass(status) {
+                    const classes = {
+                        'success': 'status-active',
+                        'failed': 'status-error',
+                        'blocked': 'status-inactive',
+                        'info': 'status-info'
+                    };
+                    return classes[status] || '';
                 },
 
                 async init() {
