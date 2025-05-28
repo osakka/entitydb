@@ -106,8 +106,7 @@ func (h *EntityHandler) CreateEntity(w http.ResponseWriter, r *http.Request) {
 			// String content - store directly as bytes without any wrapper or encoding
 			contentBytes = []byte(content)
 			contentType = "text/plain" // Standard MIME type for plain text
-			logger.Trace("Storing string content directly as bytes, length: %d, content: %s", 
-				len(contentBytes), truncateString(content, 50))
+			logger.Debug("Storing text content: length=%d", len(contentBytes))
 		case map[string]interface{}:
 			// JSON object
 			jsonBytes, err := json.Marshal(content)
@@ -170,7 +169,7 @@ func (h *EntityHandler) CreateEntity(w http.ResponseWriter, r *http.Request) {
 			// Add the correct content type tag
 			entity.AddTag("content:type:" + contentType)
 			
-			logger.Trace("Added content type tag: content:type:%s", contentType)
+			logger.Debug("Set content type: %s", contentType)
 		}
 	}
 
@@ -185,10 +184,10 @@ func (h *EntityHandler) CreateEntity(w http.ResponseWriter, r *http.Request) {
 	// Verify entity was saved properly
 	saved, err := h.repo.GetByID(entity.ID)
 	if err != nil {
-		logger.Error("Entity created but not retrievable: %v", err)
+		logger.Warn("Entity created but verification failed: id=%s, error=%v", entity.ID, err)
 		// Continue anyway to return what we have
 	} else {
-		logger.Info("Entity created and verified retrievable with ID: %s", entity.ID)
+		logger.Info("Entity created successfully: id=%s", entity.ID)
 		entity = saved
 	}
 
@@ -196,7 +195,7 @@ func (h *EntityHandler) CreateEntity(w http.ResponseWriter, r *http.Request) {
 	response := h.stripTimestampsFromEntity(entity, includeTimestamps)
 	// Ensure the entity is properly retrieved after creation
 	// No need to manually base64 encode - JSON marshaling handles []byte automatically
-	logger.Trace("Created entity %s with %d bytes of content", entity.ID, len(entity.Content))
+	logger.Debug("Created entity: id=%s, content_size=%d", entity.ID, len(entity.Content))
 	RespondJSON(w, http.StatusCreated, response)
 }
 
@@ -229,7 +228,7 @@ func (h *EntityHandler) GetEntityOriginal(w http.ResponseWriter, r *http.Request
 	// Get entity from repository
 	entity, err := h.repo.GetByID(id)
 	if err != nil {
-		logger.Error("Failed to get entity %s: %v", id, err)
+		logger.Warn("Entity not found: id=%s", id)
 		RespondError(w, http.StatusNotFound, "Entity not found")
 		return
 	}
@@ -242,7 +241,7 @@ func (h *EntityHandler) GetEntityOriginal(w http.ResponseWriter, r *http.Request
 		// Check if the request prefers streaming (better for large files)
 		if r.URL.Query().Get("stream") == "true" {
 			// Stream content directly to the client
-			logger.Info("Streaming chunked content for entity %s", id)
+			logger.Info("Streaming chunked content: entity_id=%s", id)
 			h.StreamChunkedEntityContent(w, r)
 			return
 		}
@@ -252,7 +251,7 @@ func (h *EntityHandler) GetEntityOriginal(w http.ResponseWriter, r *http.Request
 		if err == nil && len(reassembledContent) > 0 {
 			// Direct binary content assignment to prevent JSON serialization issues
 			entity.Content = reassembledContent
-			logger.Info("Using reassembled content for entity %s: %d bytes", entity.ID, len(entity.Content))
+			logger.Debug("Reassembled chunked content: entity_id=%s, size=%d", entity.ID, len(entity.Content))
 			
 			// Ensure that the content type tag is set correctly for binary data
 			// Find content type tag
@@ -274,8 +273,7 @@ func (h *EntityHandler) GetEntityOriginal(w http.ResponseWriter, r *http.Request
 	// Return entity
 	response := h.stripTimestampsFromEntity(entity, includeTimestamps)
 	// Log content details for debugging
-	logger.Trace("Retrieved entity %s with %d bytes of content and %d tags", 
-		entity.ID, len(entity.Content), len(entity.Tags))
+	logger.Debug("Retrieved entity: id=%s, content_size=%d, tag_count=%d", entity.ID, len(entity.Content), len(entity.Tags))
 	// No need to manually base64 encode - JSON marshaling handles []byte automatically
 	RespondJSON(w, http.StatusOK, response)
 }
@@ -292,7 +290,7 @@ func (h *EntityHandler) StreamEntity(w http.ResponseWriter, r *http.Request) {
 	// Get entity from repository
 	entity, err := h.repo.GetByID(id)
 	if err != nil {
-		logger.Error("Failed to get entity %s: %v", id, err)
+		logger.Warn("Entity not found: id=%s", id)
 		RespondError(w, http.StatusNotFound, "Entity not found")
 		return
 	}
@@ -342,7 +340,7 @@ func (h *EntityHandler) StreamEntity(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	logger.Trace("Entity %s: isChunked=%v, chunkCount=%d, chunkSize=%d, totalSize=%d",
+	logger.Debug("Entity chunk info: id=%s, is_chunked=%v, chunks=%d, chunk_size=%d, total_size=%d",
 		id, isChunked, chunkCount, chunkSize, totalSize)
 
 	// Set response headers
@@ -351,8 +349,8 @@ func (h *EntityHandler) StreamEntity(w http.ResponseWriter, r *http.Request) {
 
 	if isChunked && chunkCount > 0 {
 		// This is a chunked entity - stream chunks
-		logger.Info("Streaming chunked entity: id=%s, chunks=%d, chunkSize=%d, totalSize=%d",
-			id, chunkCount, chunkSize, totalSize)
+		logger.Info("Streaming chunked entity: id=%s, chunks=%d, total_size=%d",
+			id, chunkCount, totalSize)
 
 		if totalSize > 0 {
 			w.Header().Set("Content-Length", fmt.Sprintf("%d", totalSize))
@@ -361,7 +359,7 @@ func (h *EntityHandler) StreamEntity(w http.ResponseWriter, r *http.Request) {
 		// Stream each chunk
 		for i := 0; i < chunkCount; i++ {
 			chunkID := fmt.Sprintf("%s-chunk-%d", entity.ID, i)
-			logger.Trace("Fetching chunk %d/%d: %s", i+1, chunkCount, chunkID)
+			logger.Trace("Fetching chunk: %d/%d, id=%s", i+1, chunkCount, chunkID)
 			
 			chunkEntity, err := h.repo.GetByID(chunkID)
 			if err != nil {
@@ -369,8 +367,7 @@ func (h *EntityHandler) StreamEntity(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 			
-			logger.Trace("Retrieved chunk %d/%d with %d bytes", 
-				i+1, chunkCount, len(chunkEntity.Content))
+			logger.Trace("Retrieved chunk: %d/%d, size=%d", i+1, chunkCount, len(chunkEntity.Content))
 			
 			// Write chunk content directly to response
 			if _, err := w.Write(chunkEntity.Content); err != nil {
@@ -390,7 +387,7 @@ func (h *EntityHandler) StreamEntity(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		
-		logger.Info("Streaming non-chunked entity: id=%s, contentSize=%d bytes", 
+		logger.Info("Streaming entity content: id=%s, size=%d", 
 			id, len(entity.Content))
 		
 		w.Header().Set("Content-Length", fmt.Sprintf("%d", len(entity.Content)))

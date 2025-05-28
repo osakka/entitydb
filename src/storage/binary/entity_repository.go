@@ -55,8 +55,6 @@ type EntityRepository struct {
 
 // NewEntityRepository creates a new binary entity repository
 func NewEntityRepository(dataPath string) (*EntityRepository, error) {
-	logger.Debug("NewEntityRepository called with dataPath: %s", dataPath)
-	
 	// Ensure data directory exists
 	if err := os.MkdirAll(dataPath, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create data directory: %w", err)
@@ -77,7 +75,6 @@ func NewEntityRepository(dataPath string) (*EntityRepository, error) {
 	// Ensure the data file exists with a proper header before trying to read it
 	dataFile := repo.getDataFile()
 	if _, err := os.Stat(dataFile); os.IsNotExist(err) {
-		logger.Debug("Data file doesn't exist, creating initial file with header")
 		// Use the writerManager to create the initial file with header
 		_, err := repo.writerManager.GetWriter()
 		if err != nil {
@@ -85,7 +82,6 @@ func NewEntityRepository(dataPath string) (*EntityRepository, error) {
 		}
 		// The writer creates the file with a header when it's first created
 		repo.writerManager.ReleaseWriter()
-		logger.Debug("Initial data file created with header")
 	}
 	
 	// Initialize reader pool with binary format readers
@@ -93,7 +89,7 @@ func NewEntityRepository(dataPath string) (*EntityRepository, error) {
 		New: func() interface{} {
 			reader, err := NewReader(repo.getDataFile())
 			if err != nil {
-				logger.Debug("Error creating reader: %v", err)
+				logger.Error("Failed to create reader: %v", err)
 				return nil
 			}
 			return reader
@@ -112,13 +108,11 @@ func NewEntityRepository(dataPath string) (*EntityRepository, error) {
 	
 	// Ensure data file exists before building indexes
 	if _, err := os.Stat(repo.getDataFile()); os.IsNotExist(err) {
-		logger.Debug("Data file doesn't exist, creating initial file...")
 		_, err := repo.writerManager.GetWriter()
 		if err != nil {
 			return nil, fmt.Errorf("error creating initial data file: %w", err)
 		}
 		repo.writerManager.ReleaseWriter()
-		logger.Debug("Initial data file created")
 	}
 	
 	// Build initial indexes
@@ -128,22 +122,22 @@ func NewEntityRepository(dataPath string) (*EntityRepository, error) {
 	}
 	
 	// Log entity count after building indexes
-	logger.Info("After buildIndexes: %d entities in memory cache, %d entries in tag index", 
+	logger.Info("Initialized: %d entities, %d tag index entries", 
 		len(repo.entities), len(repo.tagIndex))
 	
 	// Replay WAL to catch any entries not yet in the data file
 	// Skip WAL replay if we successfully loaded a persistent index
 	if repo.persistentIndexLoaded {
-		logger.Info("Persistent index loaded successfully, skipping WAL replay to preserve index consistency")
+		logger.Info("Persistent index loaded, skipping WAL replay")
 	} else {
-		logger.Info("No persistent index loaded, replaying WAL to rebuild complete tag index...")
+		logger.Debug("Replaying WAL to rebuild tag index")
 		if err := repo.replayWAL(); err != nil {
 			logger.Error("Failed to replay WAL: %v", err)
 			// Continue anyway - we may have partial data
 		}
 		
 		// Log entity count after WAL replay
-		logger.Info("After WAL replay: %d entities in memory cache, %d entries in tag index", 
+		logger.Info("WAL replay complete: %d entities, %d tag entries", 
 			len(repo.entities), len(repo.tagIndex))
 	}
 	
@@ -179,7 +173,7 @@ func (r *EntityRepository) buildIndexes() error {
 	
 	// Always rebuild tag index from entities to ensure consistency
 	// The persistent index can become corrupted, so we rebuild from source of truth
-	logger.Info("Building tag index from entities...")
+	logger.Debug("Building indexes")
 	r.persistentIndexLoaded = false
 	
 	reader, err := NewReader(r.getDataFile())
@@ -195,14 +189,14 @@ func (r *EntityRepository) buildIndexes() error {
 	}
 	
 	// Build indexes and load entities
-	logger.Info("Building indexes for %d entities", len(entities))
+	logger.Info("Index rebuild: %d entities found", len(entities))
 	for _, entity := range entities {
 		// Add to entity cache
 		r.entities[entity.ID] = entity
 		
 		// Log entity details for debugging
 		if strings.HasPrefix(entity.ID, "rel_") {
-			logger.Debug("Indexing relationship entity %s with tags: %v", entity.ID, entity.Tags)
+			logger.Trace("Indexing relationship: %s", entity.ID)
 		}
 		
 		// Update tag index
@@ -226,7 +220,7 @@ func (r *EntityRepository) buildIndexes() error {
 					
 					// Log relationship tag indexing
 					if strings.HasPrefix(actualTag, "_source:") || strings.HasPrefix(actualTag, "_target:") || strings.HasPrefix(actualTag, "_relationship:") {
-						logger.Debug("Indexed relationship tag %s -> %s for entity %s", tag, actualTag, entity.ID)
+						logger.Trace("Indexed relationship tag: %s for %s", actualTag, entity.ID)
 					}
 				}
 			}
@@ -247,7 +241,7 @@ func (r *EntityRepository) buildIndexes() error {
 
 // updateIndexes updates in-memory indexes for a new or updated entity
 func (r *EntityRepository) updateIndexes(entity *models.Entity) {
-	logger.Debug("Updating indexes for entity %s with %d tags", entity.ID, len(entity.Tags))
+	logger.Trace("Updating indexes for entity %s (%d tags)", entity.ID, len(entity.Tags))
 	
 	// Helper function to add entity ID to tag if not already present
 	addEntityToTag := func(tag, entityID string) {
@@ -264,7 +258,7 @@ func (r *EntityRepository) updateIndexes(entity *models.Entity) {
 	// Update tag index
 	for _, tag := range entity.Tags {
 		// Always index the full tag (with timestamp)
-		logger.Debug("Indexing tag: '%s' for entity %s", tag, entity.ID)
+		logger.Trace("Indexing tag: %s for entity %s", tag, entity.ID)
 		addEntityToTag(tag, entity.ID)
 		
 		// Also index the non-timestamped version for easier searching
@@ -274,16 +268,14 @@ func (r *EntityRepository) updateIndexes(entity *models.Entity) {
 				// Try to parse timestamp
 				if timestamp, err := time.Parse(time.RFC3339Nano, parts[0]); err == nil {
 					r.temporalIndex.AddEntry(entity.ID, tag, timestamp)
-					logger.Debug("Added to temporal index: entity %s, tag %s, timestamp %v", 
-						entity.ID, tag, timestamp)
+					logger.Trace("Added to temporal index: %s", entity.ID)
 				} else {
-					logger.Debug("Failed to parse timestamp in tag '%s': %v", tag, err)
+					logger.Trace("Failed to parse timestamp in tag: %s", tag)
 				}
 				
 				// Index the actual tag part too
 				actualTag := parts[1]
-				logger.Debug("Also indexing non-timestamped version: '%s' for entity %s", 
-					actualTag, entity.ID)
+				logger.Trace("Indexing non-timestamped: %s for %s", actualTag, entity.ID)
 				addEntityToTag(actualTag, entity.ID)
 			}
 		}
@@ -299,19 +291,10 @@ func (r *EntityRepository) updateIndexes(entity *models.Entity) {
 	if len(entity.Content) > 0 {
 		contentStr := string(entity.Content)
 		r.contentIndex[contentStr] = append(r.contentIndex[contentStr], entity.ID)
-		logger.Debug("Indexed %d bytes of content for entity %s", len(contentStr), entity.ID)
+		logger.Trace("Indexed %d bytes of content for %s", len(contentStr), entity.ID)
 	}
 	
-	// Dump tag index for debugging
-	logger.Debug("Entity %s now indexed with following tags:", entity.ID)
-	for indexedTag, ids := range r.tagIndex {
-		for _, id := range ids {
-			if id == entity.ID {
-				logger.Debug("  - %s", indexedTag)
-				break
-			}
-		}
-	}
+	// Dump tag index for debugging - removed as too verbose
 }
 
 // Create creates a new entity with strong durability guarantees
@@ -375,7 +358,7 @@ func (r *EntityRepository) Create(entity *models.Entity) error {
 		// Don't fail the write, just log the error
 	}
 	
-	logger.Debug("Entity %s successfully created and persisted", entity.ID)
+	logger.Debug("Created entity: %s", entity.ID)
 	
 	// Save tag index periodically
 	if err := r.SaveTagIndexIfNeeded(); err != nil {
@@ -387,7 +370,7 @@ func (r *EntityRepository) Create(entity *models.Entity) error {
 
 // GetByID gets an entity by ID with improved reliability from in-memory cache
 func (r *EntityRepository) GetByID(id string) (*models.Entity, error) {
-	logger.Debug("EntityRepository.GetByID: Looking for entity %s", id)
+	logger.Trace("GetByID: %s", id)
 	
 	// First check in-memory cache for the entity
 	r.mu.RLock()
@@ -395,7 +378,7 @@ func (r *EntityRepository) GetByID(id string) (*models.Entity, error) {
 	r.mu.RUnlock()
 	
 	if exists {
-		logger.Debug("EntityRepository.GetByID: Found entity %s in memory cache", id)
+		logger.Trace("Found in memory cache: %s", id)
 		return entity, nil
 	}
 	
@@ -416,19 +399,19 @@ func (r *EntityRepository) GetByID(id string) (*models.Entity, error) {
 	r.mu.RUnlock()
 	
 	if !found {
-		logger.Debug("EntityRepository.GetByID: Entity %s not found in index, trying disk", id)
+		logger.Trace("Not found in index, checking disk: %s", id)
 	}
 	
 	// Force a flush and checkpoint of any pending writes before attempting to read
 	// This ensures that we can read immediately after writing
 	if err := r.writerManager.Flush(); err != nil {
-		logger.Error("EntityRepository.GetByID: Failed to flush writes before reading: %v", err)
+		logger.Error("Failed to flush writes: %v", err)
 		// Continue anyway as we might still find the entity
 	}
 	
 	// Also force a checkpoint to ensure index is updated
 	if err := r.writerManager.Checkpoint(); err != nil {
-		logger.Error("EntityRepository.GetByID: Failed to checkpoint: %v", err)
+		logger.Error("Failed to checkpoint: %v", err)
 		// Continue anyway as we might still find the entity
 	}
 	
@@ -439,36 +422,36 @@ func (r *EntityRepository) GetByID(id string) (*models.Entity, error) {
 	// Get a reader from the pool
 	readerInterface := r.readerPool.Get()
 	if readerInterface == nil {
-		logger.Debug("EntityRepository.GetByID: Creating new reader for %s", id)
+		logger.Trace("Creating new reader for %s", id)
 		reader, err := NewReader(r.getDataFile())
 		if err != nil {
-			logger.Error("EntityRepository.GetByID: Failed to create reader: %v", err)
+			logger.Error("Failed to create reader: %v", err)
 			return nil, err
 		}
 		defer reader.Close()
 		
 		entity, err := reader.GetEntity(id)
 		if err != nil {
-			logger.Error("EntityRepository.GetByID: Failed to get entity %s from new reader: %v", id, err)
+			logger.Error("Failed to get entity %s: %v", id, err)
 			
 			// Try recovery if read failed
-			logger.Info("EntityRepository.GetByID: Attempting recovery for entity %s", id)
+			logger.Info("Attempting recovery for entity %s", id)
 			if recoveredEntity, recErr := r.recovery.RecoverCorruptedEntity(r, id); recErr == nil {
-				logger.Info("EntityRepository.GetByID: Successfully recovered entity %s", id)
+				logger.Info("Successfully recovered entity %s", id)
 				// Store recovered entity
 				r.mu.Lock()
 				r.entities[id] = recoveredEntity
 				r.mu.Unlock()
 				return recoveredEntity, nil
 			} else {
-				logger.Error("EntityRepository.GetByID: Recovery failed for entity %s: %v", id, recErr)
+				logger.Error("Recovery failed for entity %s: %v", id, recErr)
 			}
 			
 			return nil, err
 		}
 		
 		if entity != nil {
-			logger.Debug("EntityRepository.GetByID: Found entity %s with new reader, %d bytes content, %d tags", 
+			logger.Trace("Found entity %s: %d bytes, %d tags", 
 				id, len(entity.Content), len(entity.Tags))
 			
 			// Store in memory for future fast access
@@ -479,32 +462,32 @@ func (r *EntityRepository) GetByID(id string) (*models.Entity, error) {
 		return entity, nil
 	}
 	
-	logger.Debug("EntityRepository.GetByID: Using pooled reader for %s", id)
+	logger.Trace("Using pooled reader for %s", id)
 	reader := readerInterface.(*Reader)
 	defer r.readerPool.Put(reader)
 	
 	entity, err := reader.GetEntity(id)
 	if err != nil {
-		logger.Error("EntityRepository.GetByID: Failed to get entity %s from pooled reader: %v", id, err)
+		logger.Error("Failed to get entity %s: %v", id, err)
 		
 		// Try recovery if read failed
-		logger.Info("EntityRepository.GetByID: Attempting recovery for entity %s", id)
+		logger.Info("Attempting recovery for entity %s", id)
 		if recoveredEntity, recErr := r.recovery.RecoverCorruptedEntity(r, id); recErr == nil {
-			logger.Info("EntityRepository.GetByID: Successfully recovered entity %s", id)
+			logger.Info("Successfully recovered entity %s", id)
 			// Store recovered entity
 			r.mu.Lock()
 			r.entities[id] = recoveredEntity
 			r.mu.Unlock()
 			return recoveredEntity, nil
 		} else {
-			logger.Error("EntityRepository.GetByID: Recovery failed for entity %s: %v", id, recErr)
+			logger.Error("Recovery failed for entity %s: %v", id, recErr)
 		}
 		
 		return nil, err
 	}
 	
 	if entity != nil {
-		logger.Debug("EntityRepository.GetByID: Found entity %s with pooled reader, %d bytes content, %d tags",
+		logger.Trace("Found entity %s: %d bytes, %d tags",
 			id, len(entity.Content), len(entity.Tags))
 		
 		// Store in memory for future fast access
@@ -512,7 +495,7 @@ func (r *EntityRepository) GetByID(id string) (*models.Entity, error) {
 		r.entities[id] = entity
 		r.mu.Unlock()
 	} else {
-		logger.Debug("EntityRepository.GetByID: Entity %s not found", id)
+		logger.Trace("Entity %s not found", id)
 	}
 	
 	return entity, nil
@@ -683,7 +666,7 @@ func (r *EntityRepository) FindOrphanedEntries() []string {
 
 // RebuildIndex rebuilds the index from scratch
 func (r *EntityRepository) RebuildIndex() error {
-	logger.Info("Rebuilding index from data file...")
+	logger.Info("Rebuilding index from data file")
 	
 	// Create a new temporary file
 	tempPath := r.getDataFile() + ".rebuild"
@@ -730,7 +713,7 @@ func (r *EntityRepository) RebuildIndex() error {
 		return fmt.Errorf("failed to move rebuilt file: %v", err)
 	}
 	
-	logger.Info("Index rebuilt successfully with %d valid entities", validCount)
+	logger.Info("Index rebuilt: %d valid entities", validCount)
 	
 	// Rebuild in-memory indexes
 	r.buildIndexes()
@@ -742,7 +725,7 @@ func (r *EntityRepository) RebuildIndex() error {
 func (r *EntityRepository) RemoveFromIndex(id string) error {
 	// This would require modifying the Writer to support index removal
 	// For now, we'll need to rebuild the entire index
-	logger.Warn("RemoveFromIndex called for %s, triggering full rebuild", id)
+	logger.Warn("RemoveFromIndex triggering full rebuild for %s", id)
 	return r.RebuildIndex()
 }
 
@@ -850,48 +833,38 @@ func (r *EntityRepository) List() ([]*models.Entity, error) {
 
 // ListByTag lists entities with a specific tag
 func (r *EntityRepository) ListByTag(tag string) ([]*models.Entity, error) {
-	logger.Debug("ListByTag called with tag: %s", tag)
+	logger.Trace("ListByTag: %s", tag)
 	
 	// Check cache first
 	cacheKey := fmt.Sprintf("tag:%s", tag)
 	if cached, found := r.cache.Get(cacheKey); found {
-		logger.Debug("ListByTag cache hit for tag: %s", tag)
+		logger.Trace("Cache hit for tag: %s", tag)
 		return cached.([]*models.Entity), nil
 	}
 	
-	logger.Debug("ListByTag cache miss for tag: %s", tag)
+	logger.Trace("Cache miss for tag: %s", tag)
 	
 	r.mu.RLock()
-	logger.Debug("ListByTag acquired read lock for tag index")
 	
 	// For non-temporal searches, we need to find tags that match the requested tag
 	// regardless of the timestamp prefix
 	matchingEntityIDs := make([]string, 0)
 	uniqueEntityIDs := make(map[string]bool)
 	
-	// Dump all tags in the index (for debugging)
-	logger.Debug("===== Tag Index Contents =====")
-	for indexedTag, ids := range r.tagIndex {
-		logger.Debug("Tag: '%s' => %d entities", indexedTag, len(ids))
-	}
-	logger.Debug("=============================")
+	// Remove verbose debug output
 	
 	// First check for exact tag match
 	if entityIDs, exists := r.tagIndex[tag]; exists {
-		logger.Debug("Found exact tag match for '%s' with %d entities", tag, len(entityIDs))
+		logger.Trace("Found exact match: %d entities", len(entityIDs))
 		for _, entityID := range entityIDs {
 			if !uniqueEntityIDs[entityID] {
 				uniqueEntityIDs[entityID] = true
 				matchingEntityIDs = append(matchingEntityIDs, entityID)
-				logger.Debug("Added entity %s from exact match", entityID)
 			}
 		}
-	} else {
-		logger.Debug("No exact match found for tag '%s' in index", tag)
 	}
 	
 	// Then check for temporal tags with timestamp prefix
-	logger.Debug("Checking for temporal tag matches for '%s'", tag)
 	matchCount := 0
 	for indexedTag, entityIDs := range r.tagIndex {
 		// Skip if this is exactly the tag we already processed
@@ -903,33 +876,27 @@ func (r *EntityRepository) ListByTag(tag string) ([]*models.Entity, error) {
 		tagParts := strings.SplitN(indexedTag, "|", 2)
 		if len(tagParts) == 2 {
 			actualTag := tagParts[1]
-			logger.Debug("Checking temporal tag: '%s' (actual part: '%s')", indexedTag, actualTag)
 			
 			// Check if the actual tag matches our search tag
 			if actualTag == tag {
-				logger.Debug("Found temporal tag match '%s' in '%s' with %d entities", 
-					tag, indexedTag, len(entityIDs))
 				matchCount++
 				for _, entityID := range entityIDs {
 					if !uniqueEntityIDs[entityID] {
 						uniqueEntityIDs[entityID] = true
 						matchingEntityIDs = append(matchingEntityIDs, entityID)
-						logger.Debug("Added entity %s from temporal match", entityID)
 					}
 				}
 			}
 		}
 	}
-	logger.Debug("Found %d temporal tag matches for '%s'", matchCount, tag)
+	logger.Trace("Found %d temporal matches", matchCount)
 	
 	r.mu.RUnlock()
-	logger.Debug("ListByTag released read lock")
 	
-	logger.Debug("ListByTag for '%s' found %d matching entities: %v", 
-		tag, len(matchingEntityIDs), matchingEntityIDs)
+	logger.Debug("ListByTag: %s found %d entities", 
+		tag, len(matchingEntityIDs))
 	
 	if len(matchingEntityIDs) == 0 {
-		logger.Debug("ListByTag returning empty result for tag: %s", tag)
 		return []*models.Entity{}, nil
 	}
 	
@@ -942,7 +909,7 @@ func (r *EntityRepository) ListByTag(tag string) ([]*models.Entity, error) {
 	// Get a reader from the pool
 	readerInterface := r.readerPool.Get()
 	if readerInterface == nil {
-		logger.Debug("Creating new reader for entities")
+		logger.Trace("Creating new reader")
 		reader, err := NewReader(r.getDataFile())
 		if err != nil {
 			logger.Error("Failed to create reader: %v", err)
@@ -952,7 +919,7 @@ func (r *EntityRepository) ListByTag(tag string) ([]*models.Entity, error) {
 		return r.fetchEntitiesWithReader(reader, matchingEntityIDs)
 	}
 	
-	logger.Debug("Using reader from pool")
+	logger.Trace("Using pooled reader")
 	reader := readerInterface.(*Reader)
 	defer r.readerPool.Put(reader)
 	
@@ -962,7 +929,7 @@ func (r *EntityRepository) ListByTag(tag string) ([]*models.Entity, error) {
 		return nil, err
 	}
 	
-	logger.Debug("Successfully fetched %d entities", len(entities))
+	logger.Trace("Fetched %d entities", len(entities))
 	
 	// Cache the result
 	r.cache.Set(cacheKey, entities)
@@ -989,7 +956,7 @@ func (r *EntityRepository) fetchEntitiesWithReader(reader *Reader, entityIDs []s
 
 // ListByTags retrieves entities with all specified tags
 func (r *EntityRepository) ListByTags(tags []string, matchAll bool) ([]*models.Entity, error) {
-	logger.Debug("ListByTags called with tags: %v, matchAll: %v", tags, matchAll)
+	logger.Trace("ListByTags: %d tags, matchAll=%v", len(tags), matchAll)
 	
 	if len(tags) == 0 {
 		return r.List()
@@ -1002,19 +969,7 @@ func (r *EntityRepository) ListByTags(tags []string, matchAll bool) ([]*models.E
 	
 	if matchAll {
 		// Get entity IDs for first tag
-		logger.Debug("ListByTags: Looking for tag '%s' in index", tags[0])
-		
-		// Debug: log a sample of available tags
-		tagCount := 0
-		for tag := range r.tagIndex {
-			if strings.HasPrefix(tag, "dataspace:") {
-				logger.Debug("ListByTags: Available hub tag: '%s' with %d entities", tag, len(r.tagIndex[tag]))
-			}
-			tagCount++
-			if tagCount > 10 {
-				break
-			}
-		}
+		logger.Trace("Looking for first tag: %s", tags[0])
 		
 		// Helper function to find entities by tag (including temporal matches)
 		findEntitiesByTag := func(searchTag string) map[string]bool {
@@ -1022,7 +977,7 @@ func (r *EntityRepository) ListByTags(tags []string, matchAll bool) ([]*models.E
 			
 			// First check for exact tag match
 			if ids, exists := r.tagIndex[searchTag]; exists {
-				logger.Debug("ListByTags: Found exact match for '%s' with %d entities", searchTag, len(ids))
+				logger.Trace("Found exact match: %d entities", len(ids))
 				for _, id := range ids {
 					entitySet[id] = true
 				}
@@ -1037,8 +992,7 @@ func (r *EntityRepository) ListByTags(tags []string, matchAll bool) ([]*models.E
 				// Extract the actual tag part (after the timestamp)
 				tagParts := strings.SplitN(indexedTag, "|", 2)
 				if len(tagParts) == 2 && tagParts[1] == searchTag {
-					logger.Debug("ListByTags: Found temporal match '%s' in '%s' with %d entities", 
-						searchTag, indexedTag, len(ids))
+					logger.Trace("Found temporal match: %d entities", len(ids))
 					for _, id := range ids {
 						entitySet[id] = true
 					}
@@ -1051,7 +1005,6 @@ func (r *EntityRepository) ListByTags(tags []string, matchAll bool) ([]*models.E
 		// Get entities for first tag
 		firstTagEntities := findEntitiesByTag(tags[0])
 		if len(firstTagEntities) == 0 {
-			logger.Debug("ListByTags: Tag '%s' not found in index (total tags: %d)", tags[0], len(r.tagIndex))
 			r.mu.RUnlock()
 			return []*models.Entity{}, nil
 		}
@@ -1061,7 +1014,7 @@ func (r *EntityRepository) ListByTags(tags []string, matchAll bool) ([]*models.E
 		for id := range firstTagEntities {
 			entityIDs = append(entityIDs, id)
 		}
-		logger.Debug("ListByTags: Found %d entities for first tag '%s'", len(entityIDs), tags[0])
+		logger.Trace("Found %d entities for first tag", len(entityIDs))
 		
 		// Intersect with remaining tags
 		for i := 1; i < len(tags) && len(entityIDs) > 0; i++ {
@@ -1079,7 +1032,7 @@ func (r *EntityRepository) ListByTags(tags []string, matchAll bool) ([]*models.E
 				}
 			}
 			entityIDs = filtered
-			logger.Debug("ListByTags: After intersecting with tag '%s', %d entities remain", tags[i], len(entityIDs))
+			logger.Trace("After intersecting tag %d: %d entities remain", i, len(entityIDs))
 		}
 	} else {
 		// For matchAny, create a set to collect unique entity IDs
@@ -1435,24 +1388,18 @@ func (r *EntityRepository) CreateRelationship(rel interface{}) error {
 }
 
 func (r *EntityRepository) GetRelationshipByID(id string) (interface{}, error) {
-	logger.Debug("GetRelationshipByID called for: %s", id)
+	logger.Trace("GetRelationshipByID: %s", id)
 	entity, err := r.GetByID(id)
 	if err != nil {
-		logger.Debug("GetRelationshipByID: failed to get entity: %v", err)
+		logger.Trace("Failed to get entity: %v", err)
 		return nil, err
-	}
-	
-	logger.Debug("GetRelationshipByID: entity %s has %d tags", id, len(entity.Tags))
-	for i, tag := range entity.Tags {
-		logger.Debug("GetRelationshipByID: tag[%d]: %s", i, tag)
 	}
 	
 	hasTypeRelationship := r.hasTag(entity, "type:relationship")
 	hasRelationshipWildcard := r.hasTag(entity, "_relationship:*")
-	logger.Debug("GetRelationshipByID: hasTypeRelationship=%v, hasRelationshipWildcard=%v", hasTypeRelationship, hasRelationshipWildcard)
 	
 	if !hasTypeRelationship && !hasRelationshipWildcard {
-		logger.Debug("GetRelationshipByID: entity is not a relationship (missing type:relationship or _relationship:* tag)")
+		logger.Trace("Entity is not a relationship")
 		return nil, fmt.Errorf("entity is not a relationship")
 	}
 	
@@ -1478,8 +1425,8 @@ func (r *EntityRepository) GetRelationshipByID(id string) (interface{}, error) {
 		}
 	}
 	
-	logger.Debug("GetRelationshipByID: successfully converted to relationship: Type=%s, Source=%s, Target=%s", 
-		rel.RelationshipType, rel.SourceID, rel.TargetID)
+	logger.Trace("Converted to relationship: %s -> %s (%s)", 
+		rel.SourceID, rel.TargetID, rel.RelationshipType)
 	
 	// Set the Type field as well (for compatibility)
 	if rel.Type == "" {
@@ -1491,29 +1438,27 @@ func (r *EntityRepository) GetRelationshipByID(id string) (interface{}, error) {
 
 func (r *EntityRepository) GetRelationshipsBySource(sourceID string) ([]interface{}, error) {
 	searchTag := "_source:" + sourceID
-	logger.Info("EntityRepository.GetRelationshipsBySource: searching for tag '%s'", searchTag)
+	logger.Debug("GetRelationshipsBySource: %s", sourceID)
 	
 	entities, err := r.ListByTag(searchTag)
 	if err != nil {
-		logger.Error("EntityRepository.GetRelationshipsBySource: ListByTag failed: %v", err)
+		logger.Error("ListByTag failed: %v", err)
 		return nil, err
 	}
 	
-	logger.Info("EntityRepository.GetRelationshipsBySource: found %d entities with tag '%s'", len(entities), searchTag)
+	logger.Debug("Found %d entities with source %s", len(entities), sourceID)
 	
 	relationships := make([]interface{}, 0)
 	for _, entity := range entities {
-		logger.Debug("EntityRepository.GetRelationshipsBySource: processing entity %s", entity.ID)
 		rel, err := r.GetRelationshipByID(entity.ID)
 		if err == nil {
 			relationships = append(relationships, rel)
-			logger.Debug("EntityRepository.GetRelationshipsBySource: successfully converted entity %s to relationship", entity.ID)
 		} else {
-			logger.Debug("EntityRepository.GetRelationshipsBySource: failed to convert entity %s: %v", entity.ID, err)
+			logger.Trace("Failed to convert entity %s: %v", entity.ID, err)
 		}
 	}
 	
-	logger.Debug("EntityRepository.GetRelationshipsBySource: returning %d relationships for source %s", len(relationships), sourceID)
+	logger.Debug("Returning %d relationships for source %s", len(relationships), sourceID)
 	return relationships, nil
 }
 
@@ -1721,7 +1666,7 @@ func (r *EntityRepository) ReplayWAL() error {
 		return fmt.Errorf("WAL not initialized")
 	}
 	
-	logger.Info("Replaying WAL entries...")
+	logger.Debug("Replaying WAL entries")
 	
 	count := 0
 	err := r.wal.Replay(func(entry WALEntry) error {
@@ -1762,16 +1707,16 @@ func (r *EntityRepository) ReplayWAL() error {
 		return fmt.Errorf("error replaying WAL: %w", err)
 	}
 	
-	logger.Debug("Replayed %d WAL entries", count)
+	logger.Info("Replayed %d WAL entries", count)
 	
 	// After successful replay, checkpoint and truncate
 	if count > 0 {
 		if err := r.wal.LogCheckpoint(); err != nil {
-			logger.Debug("Error logging checkpoint: %v", err)
+			logger.Error("Failed to log checkpoint: %v", err)
 		}
 		
 		if err := r.wal.Truncate(); err != nil {
-			logger.Debug("Error truncating WAL: %v", err)
+			logger.Error("Failed to truncate WAL: %v", err)
 		}
 	}
 	
@@ -1796,7 +1741,7 @@ func (r *EntityRepository) RepairIndex() error {
 
 // ReindexTags rebuilds all tag indexes from scratch
 func (r *EntityRepository) ReindexTags() error {
-	logger.Info("Starting tag reindexing...")
+	logger.Info("Starting tag reindexing")
 	
 	// Acquire write lock to prevent concurrent access during reindexing
 	r.mu.Lock()
@@ -1809,7 +1754,7 @@ func (r *EntityRepository) ReindexTags() error {
 	r.namespaceIndex = NewNamespaceIndex()
 	r.entities = make(map[string]*models.Entity)
 	
-	logger.Debug("Cleared existing indexes")
+	logger.Trace("Cleared existing indexes")
 	
 	// Create a new reader to read all entities
 	reader, err := NewReader(r.getDataFile())
@@ -1865,14 +1810,14 @@ func (r *EntityRepository) ReindexTags() error {
 		
 		// Log progress for large datasets
 		if (i+1)%1000 == 0 {
-			logger.Debug("Reindexed %d/%d entities", i+1, len(entities))
+			logger.Info("Reindexed %d/%d entities", i+1, len(entities))
 		}
 	}
 	
 	// Clear the query cache since indexes have changed
 	r.cache.Clear()
 	
-	logger.Info("Tag reindexing completed successfully. Indexed %d entities", len(entities))
+	logger.Info("Tag reindexing complete: %d entities indexed", len(entities))
 	return nil
 }
 
@@ -1958,7 +1903,7 @@ func (r *EntityRepository) replayWAL() error {
 		return err
 	}
 	
-	logger.Info("WAL replay completed: %d entities processed", entitiesReplayed)
+	logger.Info("WAL replay complete: %d entities processed", entitiesReplayed)
 	return nil
 }
 
@@ -1976,21 +1921,21 @@ func (r *EntityRepository) VerifyIndexHealth() error {
 			indexedEntities[id]++
 			totalTagEntries++
 		}
-		logger.Trace("Tag '%s' has %d entities", tag, len(entityIDs))
+		logger.Trace("Tag %s: %d entities", tag, len(entityIDs))
 	}
 	
 	// Count entities in repository
 	entityCount := len(r.entities)
 	indexCount := len(indexedEntities)
 	
-	logger.Info("Index health check: %d entities in repository (r.entities), %d entities in tag index, %d total tag entries", 
+	logger.Info("Index health: %d entities, %d in tag index, %d tag entries", 
 		entityCount, indexCount, totalTagEntries)
 		
 	// Debug: Show first few entities in memory
 	debugCount := 0
 	for id := range r.entities {
 		if debugCount < 5 {
-			logger.Debug("Entity in memory: %s", id)
+			logger.Trace("Entity in memory: %s", id)
 			debugCount++
 		} else {
 			break
@@ -1998,17 +1943,13 @@ func (r *EntityRepository) VerifyIndexHealth() error {
 	}
 	
 	if entityCount != indexCount {
-		logger.Error("Index mismatch details:")
-		logger.Error("- Entities in repository: %d", entityCount)
-		logger.Error("- Entities in tag index: %d", indexCount)
-		logger.Error("- Total tag entries: %d", totalTagEntries)
-		logger.Error("- Persistent index loaded: %v", r.persistentIndexLoaded)
+		logger.Error("Index mismatch: %d entities, %d in index", entityCount, indexCount)
 		
 		// Find entities that are missing from index
 		missingFromIndex := 0
 		for entityID := range r.entities {
 			if _, exists := indexedEntities[entityID]; !exists {
-				logger.Error("- Entity %s not found in tag index", entityID)
+				logger.Error("Entity %s not in tag index", entityID)
 				missingFromIndex++
 			}
 		}
@@ -2017,19 +1958,16 @@ func (r *EntityRepository) VerifyIndexHealth() error {
 		missingFromRepo := 0
 		for entityID := range indexedEntities {
 			if _, exists := r.entities[entityID]; !exists {
-				logger.Error("- Entity %s in tag index but not in repository", entityID)
+				logger.Error("Entity %s in index but not in repository", entityID)
 				missingFromRepo++
 			}
 		}
 		
-		logger.Error("- Missing from index: %d", missingFromIndex)
-		logger.Error("- Missing from repository: %d", missingFromRepo)
-		
-		return fmt.Errorf("index mismatch: %d entities in repo, %d in index (missing from index: %d, missing from repo: %d)", 
+		return fmt.Errorf("index mismatch: %d entities, %d in index (missing from index: %d, from repo: %d)", 
 			entityCount, indexCount, missingFromIndex, missingFromRepo)
 	}
 	
-	logger.Info("Index health check passed: all %d entities properly indexed", entityCount)
+	logger.Info("Index health check passed: %d entities indexed", entityCount)
 	return nil
 }
 
@@ -2039,12 +1977,12 @@ func (r *EntityRepository) SaveTagIndex() error {
 	defer r.mu.RUnlock()
 	
 	if !r.tagIndexDirty {
-		logger.Debug("Tag index not dirty, skipping save")
+		logger.Trace("Tag index not dirty, skipping save")
 		return nil
 	}
 	
 	startTime := time.Now()
-	logger.Info("Saving tag index to disk...")
+	logger.Debug("Saving tag index")
 	
 	if err := SaveTagIndexV2(r.getDataFile(), r.tagIndex); err != nil {
 		return fmt.Errorf("failed to save tag index: %w", err)
@@ -2053,7 +1991,7 @@ func (r *EntityRepository) SaveTagIndex() error {
 	r.tagIndexDirty = false
 	r.lastIndexSave = time.Now()
 	
-	logger.Info("Tag index saved successfully in %v", time.Since(startTime))
+	logger.Info("Tag index saved in %v", time.Since(startTime))
 	return nil
 }
 
@@ -2068,7 +2006,7 @@ func (r *EntityRepository) SaveTagIndexIfNeeded() error {
 
 // Close closes the repository and saves any pending data
 func (r *EntityRepository) Close() error {
-	logger.Info("Closing entity repository...")
+	logger.Debug("Closing entity repository")
 	
 	// Save tag index if dirty
 	if err := r.SaveTagIndex(); err != nil {
@@ -2092,7 +2030,7 @@ func (r *EntityRepository) Close() error {
 	// Clear reader pool
 	r.readerPool = sync.Pool{}
 	
-	logger.Info("Entity repository closed successfully")
+	logger.Debug("Entity repository closed")
 	return nil
 }
 

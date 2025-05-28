@@ -28,13 +28,6 @@ var (
 		WARN:  "WARN",
 		ERROR: "ERROR",
 	}
-	levelPrefixes = map[LogLevel]string{
-		TRACE: "[EntityDB] TRACE: ",
-		DEBUG: "[EntityDB] DEBUG: ",
-		INFO:  "[EntityDB] INFO: ",
-		WARN:  "[EntityDB] WARN: ",
-		ERROR: "[EntityDB] ERROR: ",
-	}
 )
 
 // Logger is the main logger instance
@@ -68,41 +61,40 @@ func GetLogLevel() string {
 	return levelNames[currentLevel]
 }
 
-// getFunctionName gets the name of the calling function
-func getFunctionName(skip int) string {
-	pc, _, _, ok := runtime.Caller(skip)
-	if !ok {
-		return "unknown"
-	}
-	
-	fn := runtime.FuncForPC(pc)
-	if fn == nil {
-		return "unknown"
-	}
-	
-	// Get full function name
-	fullName := fn.Name()
-	
-	// Extract just the function name (remove package path)
-	parts := strings.Split(fullName, "/")
-	lastPart := parts[len(parts)-1]
-	
-	// Remove package name if present
-	if idx := strings.LastIndex(lastPart, "."); idx != -1 {
-		return lastPart[idx+1:]
-	}
-	
-	return lastPart
-}
 
 // logf is the internal logging function
 func logf(level LogLevel, format string, args ...interface{}) {
 	if level >= currentLevel {
 		// Get caller info (skip 3: logf -> Debug/Info/etc -> actual caller)
-		funcName := getFunctionName(3)
+		pc, file, line, ok := runtime.Caller(3)
+		if !ok {
+			file = "unknown"
+			line = 0
+		}
+		
+		// Extract just the filename (not the full path)
+		if idx := strings.LastIndex(file, "/"); idx != -1 {
+			file = file[idx+1:]
+		}
+		
+		// Get function name
+		funcName := "unknown"
+		if fn := runtime.FuncForPC(pc); fn != nil {
+			fullName := fn.Name()
+			// Extract just the function name (remove package path)
+			parts := strings.Split(fullName, "/")
+			lastPart := parts[len(parts)-1]
+			// Remove package name if present
+			if idx := strings.LastIndex(lastPart, "."); idx != -1 {
+				funcName = lastPart[idx+1:]
+			} else {
+				funcName = lastPart
+			}
+		}
 		
 		msg := fmt.Sprintf(format, args...)
-		Logger.Printf("%s[%s] %s", levelPrefixes[level], funcName, msg)
+		// Format: timestamp [LEVEL] [file] [function] [line] message
+		Logger.Printf("[%s] [%s] [%s] [%d] %s", levelNames[level], file, funcName, line, msg)
 	}
 }
 
@@ -158,8 +150,35 @@ func Errorf(format string, args ...interface{}) {
 
 // Fatal logs an error message and exits the program
 func Fatal(format string, args ...interface{}) {
+	// Get caller info (skip 2: Fatal -> actual caller)
+	pc, file, line, ok := runtime.Caller(2)
+	if !ok {
+		file = "unknown"
+		line = 0
+	}
+	
+	// Extract just the filename (not the full path)
+	if idx := strings.LastIndex(file, "/"); idx != -1 {
+		file = file[idx+1:]
+	}
+	
+	// Get function name
+	funcName := "unknown"
+	if fn := runtime.FuncForPC(pc); fn != nil {
+		fullName := fn.Name()
+		// Extract just the function name (remove package path)
+		parts := strings.Split(fullName, "/")
+		lastPart := parts[len(parts)-1]
+		// Remove package name if present
+		if idx := strings.LastIndex(lastPart, "."); idx != -1 {
+			funcName = lastPart[idx+1:]
+		} else {
+			funcName = lastPart
+		}
+	}
+	
 	msg := fmt.Sprintf(format, args...)
-	Logger.Printf("%sFATAL: %s", levelPrefixes[ERROR], msg)
+	Logger.Printf("[FATAL] [%s] [%s] [%d] %s", file, funcName, line, msg)
 	os.Exit(1)
 }
 
@@ -170,8 +189,35 @@ func Fatalf(format string, args ...interface{}) {
 
 // Panic logs an error message and panics
 func Panic(format string, args ...interface{}) {
+	// Get caller info (skip 2: Panic -> actual caller)
+	pc, file, line, ok := runtime.Caller(2)
+	if !ok {
+		file = "unknown"
+		line = 0
+	}
+	
+	// Extract just the filename (not the full path)
+	if idx := strings.LastIndex(file, "/"); idx != -1 {
+		file = file[idx+1:]
+	}
+	
+	// Get function name
+	funcName := "unknown"
+	if fn := runtime.FuncForPC(pc); fn != nil {
+		fullName := fn.Name()
+		// Extract just the function name (remove package path)
+		parts := strings.Split(fullName, "/")
+		lastPart := parts[len(parts)-1]
+		// Remove package name if present
+		if idx := strings.LastIndex(lastPart, "."); idx != -1 {
+			funcName = lastPart[idx+1:]
+		} else {
+			funcName = lastPart
+		}
+	}
+	
 	msg := fmt.Sprintf(format, args...)
-	Logger.Printf("%sPANIC: %s", levelPrefixes[ERROR], msg)
+	Logger.Printf("[PANIC] [%s] [%s] [%d] %s", file, funcName, line, msg)
 	panic(msg)
 }
 
