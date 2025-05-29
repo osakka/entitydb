@@ -94,7 +94,7 @@ func logf(level LogLevel, format string, args ...interface{}) {
 		
 		msg := fmt.Sprintf(format, args...)
 		// Format: timestamp [LEVEL] [file] [function] [line] message
-		Logger.Printf("[%s] [%s] [%s] [%d] %s", levelNames[level], file, funcName, line, msg)
+		Logger.Printf("[%s] [%s:%d:%s] %s", levelNames[level], file, line, funcName, msg)
 	}
 }
 
@@ -178,7 +178,7 @@ func Fatal(format string, args ...interface{}) {
 	}
 	
 	msg := fmt.Sprintf(format, args...)
-	Logger.Printf("[FATAL] [%s] [%s] [%d] %s", file, funcName, line, msg)
+	Logger.Printf("[FATAL] [%s:%d:%s] %s", file, line, funcName, msg)
 	os.Exit(1)
 }
 
@@ -217,7 +217,7 @@ func Panic(format string, args ...interface{}) {
 	}
 	
 	msg := fmt.Sprintf(format, args...)
-	Logger.Printf("[PANIC] [%s] [%s] [%d] %s", file, funcName, line, msg)
+	Logger.Printf("[PANIC] [%s:%d:%s] %s", file, line, funcName, msg)
 	panic(msg)
 }
 
