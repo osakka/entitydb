@@ -3,7 +3,7 @@
 > [!IMPORTANT]
 > EntityDB is a high-performance temporal database where every tag is timestamped with nanosecond precision. All data is stored in a custom binary format (EBF) with Write-Ahead Logging for durability and concurrent access support.
 
-## Current State (v2.16.0)
+## Current State (v2.18.0)
 
 EntityDB now features a unified Entity model with autochunking:
 - **Unified Entity Model**: Single content field ([]byte) per entity
@@ -23,6 +23,7 @@ EntityDB now features a unified Entity model with autochunking:
 - **Observability**: Comprehensive metrics with health checks, Prometheus format, and system analytics
 - **RBAC Metrics**: Real-time session monitoring, authentication analytics, and security metrics dashboard
 - **Modular Widget System**: Customizable dashboards with extensible widget registry and full-screen responsive layout
+- **Professional Logging**: Structured logging with contextual error messages, appropriate log levels, and automatic file/function/line information
 
 ## What's Implemented
 
@@ -164,14 +165,27 @@ The server automatically creates a default admin user if none exists:
 - Audit logging
 - Aggregation queries (beyond sorting/filtering)
 
-## Recent Changes (v2.16.0)
+## Recent Changes (v2.18.0)
+
+- **Logging Standards Implementation**: Professional logging system with consistent formatting
+  - Removed redundant manual prefixes since logger provides file/function/line automatically  
+  - Enhanced API error messages with contextual information (entity IDs, query parameters, operation details)
+  - Fixed inappropriate log levels (error conditions moved from DEBUG to WARN/ERROR, detailed operations moved from INFO to TRACE)
+  - Reduced excessive INFO logging in storage layer (reader.go and writer.go operations now at TRACE level)
+  - Created comprehensive logging audit and standards documentation
+- **Public RBAC Metrics Endpoint**: New unauthenticated endpoint for basic metrics
+  - `/api/v1/rbac/metrics/public` provides basic authentication and session counts without requiring admin access
+- **RBAC Tag Manager**: Enhanced RBAC management component for user tag operations
+- **Code Cleanup**: Moved 19 fix files and 15 debug tools to trash, consolidated redundant implementations
+
+## Previous Changes (v2.16.0)
 
 - **UUID Storage Fix**: Fixed critical authentication bug by increasing EntityID from 36 to 64 bytes
   - Resolved login failures due to truncated UUIDs in binary format
   - All entity operations now correctly handle full UUID strings
   - Fixed user authentication and session management
 
-## Recent Changes (v2.13.0)
+## Previous Changes (v2.13.0)
 
 - **Configuration System Overhaul**: Environment-based configuration with no hardcoded values
 - **Configuration Hierarchy**: CLI flags > env vars > instance config > default config
@@ -221,7 +235,7 @@ All development follows the standardized Git workflow described in [docs/develop
 
 - URL: https://git.home.arpa/itdlabs/entitydb.git
 - Branch: main
-- Latest tag: v2.16.0
+- Latest tag: v2.18.0
 
 ## Development Principles
 
