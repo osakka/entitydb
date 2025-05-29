@@ -88,8 +88,8 @@ func StartOperation(opType OperationType, entityID string, metadata map[string]i
 	operationTracker.mu.Unlock()
 	
 	// Log operation start
-	logger.Info("[Operation] Started %s operation %s for entity %s", opType, op.ID, entityID)
-	logger.Debug("[Operation] %s metadata: %+v", op.ID, op.Metadata)
+	logger.Debug("Started %s operation %s for entity %s", opType, op.ID, entityID)
+	logger.Trace("%s metadata: %+v", op.ID, op.Metadata)
 	
 	return op
 }
@@ -103,7 +103,7 @@ func (op *OperationContext) Complete() {
 	op.Status = "completed"
 	duration := op.EndTime.Sub(op.StartTime)
 	
-	logger.Info("[Operation] Completed %s operation %s for entity %s (duration: %v)", 
+	logger.Debug("Completed %s operation %s for entity %s (duration: %v)", 
 		op.Type, op.ID, op.EntityID, duration)
 }
 
@@ -117,7 +117,7 @@ func (op *OperationContext) Fail(err error) {
 	op.Error = err
 	duration := op.EndTime.Sub(op.StartTime)
 	
-	logger.Error("[Operation] Failed %s operation %s for entity %s (duration: %v): %v", 
+	logger.Error("Failed %s operation %s for entity %s (duration: %v): %v", 
 		op.Type, op.ID, op.EntityID, duration, err)
 }
 
@@ -131,7 +131,7 @@ func (op *OperationContext) SetMetadata(key string, value interface{}) {
 	}
 	op.Metadata[key] = value
 	
-	logger.Debug("[Operation] %s updated metadata %s = %v", op.ID, key, value)
+	logger.Trace("%s updated metadata %s = %v", op.ID, key, value)
 }
 
 // GetMetadata retrieves metadata value
@@ -146,9 +146,11 @@ func (op *OperationContext) GetMetadata(key string) (interface{}, bool) {
 // Log adds a log entry for this operation
 func (op *OperationContext) Log(level, format string, args ...interface{}) {
 	message := fmt.Sprintf(format, args...)
-	fullMessage := fmt.Sprintf("[Operation %s] %s", op.ID, message)
+	fullMessage := fmt.Sprintf("Operation %s: %s", op.ID, message)
 	
 	switch level {
+	case "trace":
+		logger.Trace(fullMessage)
 	case "debug":
 		logger.Debug(fullMessage)
 	case "info":
@@ -187,7 +189,7 @@ func CleanupOldOperations(maxAge time.Duration) int {
 	}
 	
 	if removed > 0 {
-		logger.Info("[Operation] Cleaned up %d old operations", removed)
+		logger.Debug("Cleaned up %d old operations", removed)
 	}
 	
 	return removed
