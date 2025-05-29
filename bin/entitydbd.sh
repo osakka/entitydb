@@ -247,7 +247,7 @@ start_server() {
         fi
         
         # Initialize database if needed
-        init_database
+        # init_database  # Disabled - admin user created during security initialization
     else
         print_message "$RED" "Failed to start EntityDB Consolidated Entity Server. Check logs at $LOG_FILE"
         cat "$LOG_FILE"

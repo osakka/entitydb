@@ -13,12 +13,14 @@ import (
 // AuthHandler handles authentication using the new relationship-based security system
 type AuthHandler struct {
 	securityManager *models.SecurityManager
+	sessionManager  *models.SessionManager
 }
 
 // NewAuthHandler creates a new authentication handler
-func NewAuthHandler(securityManager *models.SecurityManager) *AuthHandler {
+func NewAuthHandler(securityManager *models.SecurityManager, sessionManager *models.SessionManager) *AuthHandler {
 	return &AuthHandler{
 		securityManager: securityManager,
+		sessionManager:  sessionManager,
 	}
 }
 
@@ -93,19 +95,35 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 	logger.Debug("[AuthHandler] User authenticated successfully: %s", userEntity.ID)
 
-	// Generate session token (simplified for now)
-	sessionToken := "token_" + userEntity.ID + "_" + time.Now().Format("20060102150405")
+	// Get user roles from the SecurityUser
+	var roles []string
+	for _, tag := range userEntity.Entity.GetTagsWithoutTimestamp() {
+		if strings.HasPrefix(tag, "rbac:role:") {
+			role := strings.TrimPrefix(tag, "rbac:role:")
+			roles = append(roles, role)
+		}
+	}
 
-	// Create response with unified string timestamp
+	// Create session using SessionManager
+	session, err := h.sessionManager.CreateSession(userEntity.ID, userEntity.Username, roles)
+	if err != nil {
+		logger.Error("[AuthHandler] Failed to create session for user %s: %v", userEntity.ID, err)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(AuthErrorResponse{Error: "Failed to create session"})
+		return
+	}
+
+	// Create response with session token
 	response := AuthLoginResponse{
-		Token:     sessionToken,
+		Token:     session.Token,
 		UserID:    userEntity.ID,
-		ExpiresAt: time.Now().Add(24 * time.Hour).Format(time.RFC3339),
+		ExpiresAt: session.ExpiresAt.Format(time.RFC3339),
 		User: AuthUserInfo{
 			ID:       userEntity.ID,
-			Username: loginReq.Username,
+			Username: userEntity.Username,
 			Email:    userEntity.Email,
-			Roles:    []string{},
+			Roles:    roles,
 		},
 	}
 

@@ -369,6 +369,20 @@ definitions:
         example: 236206
         type: integer
     type: object
+  api.PublicRBACMetricsResponse:
+    properties:
+      auth:
+        $ref: '#/definitions/api.SimplifiedAuthMetrics'
+      sessions:
+        $ref: '#/definitions/api.PublicSessionMetrics'
+      timestamp:
+        type: string
+    type: object
+  api.PublicSessionMetrics:
+    properties:
+      active_count:
+        type: integer
+    type: object
   api.QueryEntityResponse:
     properties:
       entities:
@@ -1304,6 +1318,19 @@ paths:
           schema:
             $ref: '#/definitions/api.RBACMetricsResponse'
       summary: Get RBAC metrics
+      tags:
+      - rbac
+  /api/v1/rbac/metrics/public:
+    get:
+      description: Get basic RBAC metrics available without authentication
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.PublicRBACMetricsResponse'
+      summary: Get public RBAC metrics
       tags:
       - rbac
   /api/v1/system/metrics:

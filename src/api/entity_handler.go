@@ -176,7 +176,7 @@ func (h *EntityHandler) CreateEntity(w http.ResponseWriter, r *http.Request) {
 	// Save entity
 	err := h.repo.Create(entity)
 	if err != nil {
-		logger.Error("Failed to create entity: %v", err)
+		logger.Error("Failed to create entity %s: %v", entity.ID, err)
 		RespondError(w, http.StatusInternalServerError, "Failed to create entity")
 		return
 	}
@@ -450,7 +450,23 @@ func (h *EntityHandler) ListEntities(w http.ResponseWriter, r *http.Request) {
 	}
 	
 	if err != nil {
-		logger.Error("Failed to list entities: %v", err)
+		// Build context string based on query type
+		var queryContext string
+		switch {
+		case wildcard != "":
+			queryContext = fmt.Sprintf("with wildcard '%s'", wildcard)
+		case search != "" && contentType != "":
+			queryContext = fmt.Sprintf("with search '%s' and content type '%s'", search, contentType)
+		case search != "":
+			queryContext = fmt.Sprintf("with search '%s'", search)
+		case namespace != "":
+			queryContext = fmt.Sprintf("with namespace '%s'", namespace)
+		case tag != "":
+			queryContext = fmt.Sprintf("with tag '%s'", tag)
+		default:
+			queryContext = "all entities"
+		}
+		logger.Error("Failed to list entities %s: %v", queryContext, err)
 		RespondError(w, http.StatusInternalServerError, "Failed to list entities")
 		return
 	}
@@ -524,7 +540,8 @@ func (h *EntityHandler) QueryEntities(w http.ResponseWriter, r *http.Request) {
 	// Execute query
 	entities, err := query.Execute()
 	if err != nil {
-		logger.Error("Failed to execute query: %v", err)
+		logger.Error("Failed to execute query with filter=%s, operator=%s, value=%s, sort=%s: %v", 
+			filter, operator, value, sort, err)
 		RespondError(w, http.StatusInternalServerError, "Failed to execute query")
 		return
 	}
@@ -1029,7 +1046,7 @@ func (h *EntityHandler) UpdateEntity(w http.ResponseWriter, r *http.Request) {
 	
 	err = h.repo.Update(entity)
 	if err != nil {
-		logger.Error("Failed to update entity: %v", err)
+		logger.Error("Failed to update entity %s: %v", entityID, err)
 		RespondError(w, http.StatusInternalServerError, "Failed to update entity")
 		return
 	}
@@ -1037,7 +1054,7 @@ func (h *EntityHandler) UpdateEntity(w http.ResponseWriter, r *http.Request) {
 	// Re-fetch the entity to ensure we have the latest version
 	updated, err := h.repo.GetByID(entityID)
 	if err != nil {
-		logger.Error("Failed to get updated entity: %v", err)
+		logger.Error("Failed to get updated entity %s: %v", entityID, err)
 		RespondError(w, http.StatusInternalServerError, "Failed to retrieve updated entity")
 		return
 	}
@@ -1196,7 +1213,7 @@ func (h *EntityHandler) GetEntityHistory(w http.ResponseWriter, r *http.Request)
 	// Get entity history
 	history, err := temporalRepo.GetEntityHistory(entityID, limit)
 	if err != nil {
-		logger.Error("Failed to get entity history: %v", err)
+		logger.Error("Failed to get entity history for %s (limit=%d): %v", entityID, limit, err)
 		RespondError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to get entity history: %v", err))
 		return
 	}
@@ -1257,7 +1274,11 @@ func (h *EntityHandler) GetRecentChanges(w http.ResponseWriter, r *http.Request)
 	}
 	
 	if err != nil {
-		logger.Error("Failed to get recent changes: %v", err)
+		if entityID != "" {
+			logger.Error("Failed to get recent changes for entity %s (limit=%d): %v", entityID, limit, err)
+		} else {
+			logger.Error("Failed to get recent changes (limit=%d): %v", limit, err)
+		}
 		RespondError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to get recent changes: %v", err))
 		return
 	}
@@ -1380,7 +1401,7 @@ func (h *EntityHandler) GetEntityDiff(w http.ResponseWriter, r *http.Request) {
 	
 	beforeEntity, afterEntity, err := temporalRepo.GetEntityDiff(entityID, t1, t2)
 	if err != nil {
-		logger.Error("Failed to get entity diff: %v", err)
+		logger.Error("Failed to get entity diff for %s between %v and %v: %v", entityID, t1, t2, err)
 		RespondError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to get entity diff: %v", err))
 		return
 	}

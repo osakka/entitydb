@@ -347,23 +347,10 @@ func (si *SecurityInitializer) createGroupRoleRelationships() error {
 // createDefaultAdminUser creates the default admin user if it doesn't exist
 func (si *SecurityInitializer) createDefaultAdminUser() error {
 	logger.Debug("[SecurityInit] Creating default admin user...")
-	// During initial setup, always try to create admin user
-	// The security manager will handle if it already exists
-	adminUser, err := si.securityManager.CreateUser("admin", "admin", "admin@entitydb.local")
+	// Get or create admin user (with uniqueness check)
+	adminUser, err := si.getOrCreateAdminUser()
 	if err != nil {
-		logger.Debug("[SecurityInit] CreateUser failed: %v", err)
-		// If user already exists, that's okay, try to get it
-		adminEntities, listErr := si.entityRepo.ListByTag("identity:username:admin")
-		if listErr != nil || len(adminEntities) == 0 {
-			logger.Error("[SecurityInit] Failed to create admin user and couldn't find existing one: createErr=%v, listErr=%v", err, listErr)
-			return fmt.Errorf("failed to create admin user and couldn't find existing one: %v", err)
-		}
-		logger.Debug("[SecurityInit] Found existing admin user: %s", adminEntities[0].ID)
-		// Convert Entity to SecurityUser-like structure for relationship creation
-		adminUser = &SecurityUser{
-			ID:       adminEntities[0].ID,
-			Username: "admin",
-		}
+		return fmt.Errorf("failed to get or create admin user: %v", err)
 	}
 
 	// Add admin to administrators group
@@ -399,8 +386,45 @@ func (si *SecurityInitializer) createDefaultAdminUser() error {
 	if err := si.entityRepo.CreateRelationship(adminRoleRelationship); err != nil {
 		return fmt.Errorf("failed to create admin-role relationship: %v", err)
 	}
+	
+	// Also add direct RBAC tags to the admin user entity
+	rbacTagManager := NewRBACTagManager(si.entityRepo)
+	if err := rbacTagManager.AssignRoleToUser(adminUser.ID, "admin"); err != nil {
+		return fmt.Errorf("failed to assign admin role tag: %v", err)
+	}
 
 	return nil
+}
+
+// getOrCreateAdminUser safely gets existing admin user or creates one if it doesn't exist
+func (si *SecurityInitializer) getOrCreateAdminUser() (*SecurityUser, error) {
+	// First, check if admin user already exists
+	adminEntities, err := si.entityRepo.ListByTag("identity:username:admin")
+	if err != nil {
+		return nil, fmt.Errorf("failed to check for existing admin user: %v", err)
+	}
+	
+	if len(adminEntities) > 0 {
+		// User exists, return the first one
+		logger.Debug("[SecurityInit] Found existing admin user: %s", adminEntities[0].ID)
+		return &SecurityUser{
+			ID:       adminEntities[0].ID,
+			Username: "admin",
+			Email:    "admin@entitydb.local",
+			Status:   "active",
+			Entity:   adminEntities[0],
+		}, nil
+	}
+	
+	// User doesn't exist, create it
+	logger.Debug("[SecurityInit] Creating new admin user...")
+	adminUser, err := si.securityManager.CreateUser("admin", "admin", "admin@entitydb.local")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create admin user: %v", err)
+	}
+	
+	logger.Info("[SecurityInit] Created new admin user: %s", adminUser.ID)
+	return adminUser, nil
 }
 
 // ensureAdminUserRelationships ensures existing admin user has proper relationships
@@ -460,6 +484,12 @@ func (si *SecurityInitializer) ensureAdminUserRelationships(adminUserID string) 
 		if err := si.entityRepo.CreateRelationship(adminRoleRelationship); err != nil {
 			return fmt.Errorf("failed to create admin-role relationship: %v", err)
 		}
+	}
+	
+	// Ensure admin user has direct RBAC tags
+	rbacTagManager := NewRBACTagManager(si.entityRepo)
+	if err := rbacTagManager.AssignRoleToUser(adminUserID, "admin"); err != nil {
+		return fmt.Errorf("failed to assign admin role tag: %v", err)
 	}
 
 	return nil

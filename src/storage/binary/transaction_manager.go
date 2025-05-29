@@ -76,7 +76,7 @@ func (tm *TransactionManager) Begin() *Transaction {
 	})
 	op.Complete()
 	
-	logger.Info("[Transaction] Started transaction %s", tx.ID)
+	logger.Info("Started transaction %s", tx.ID)
 	return tx
 }
 
@@ -86,12 +86,12 @@ func (tx *Transaction) AddOperation(op TransactionOp) {
 	defer tx.mu.Unlock()
 	
 	if tx.State != TxStateActive {
-		logger.Error("[Transaction] Cannot add operation to transaction %s in state %v", tx.ID, tx.State)
+		logger.Error("Cannot add operation to transaction %s in state %v", tx.ID, tx.State)
 		return
 	}
 	
 	tx.Operations = append(tx.Operations, op)
-	logger.Debug("[Transaction] Added operation to transaction %s: %s on %s", tx.ID, op.Type, op.File)
+	logger.Debug("Added operation to transaction %s: %s on %s", tx.ID, op.Type, op.File)
 }
 
 // Prepare prepares the transaction for commit (two-phase commit)
@@ -109,7 +109,7 @@ func (tx *Transaction) Prepare() error {
 	})
 	defer op.Complete()
 	
-	logger.Info("[Transaction] Preparing transaction %s with %d operations", tx.ID, len(tx.Operations))
+	logger.Info("Preparing transaction %s with %d operations", tx.ID, len(tx.Operations))
 	
 	// Create backups of all files that will be modified
 	for _, txOp := range tx.Operations {
@@ -125,7 +125,7 @@ func (tx *Transaction) Prepare() error {
 					return fmt.Errorf("failed to backup %s: %v", txOp.File, err)
 				}
 				tx.Backups[txOp.File] = backupPath
-				logger.Debug("[Transaction] Created backup: %s -> %s", txOp.File, backupPath)
+				logger.Debug("Created backup: %s -> %s", txOp.File, backupPath)
 			}
 		}
 	}
@@ -143,15 +143,15 @@ func (tx *Transaction) Prepare() error {
 			}
 			
 			tx.TempFiles[txOp.File] = tempPath
-			logger.Debug("[Transaction] Wrote temp file: %s", tempPath)
+			logger.Debug("Wrote temp file: %s", tempPath)
 		} else if txOp.Callback != nil {
 			// For callbacks, we can't prepare them, just note they exist
-			logger.Debug("[Transaction] Callback operation prepared for %s", txOp.File)
+			logger.Debug("Callback operation prepared for %s", txOp.File)
 		}
 	}
 	
 	tx.State = TxStatePrepared
-	logger.Info("[Transaction] Transaction %s prepared successfully", tx.ID)
+	logger.Info("Transaction %s prepared successfully", tx.ID)
 	return nil
 }
 
@@ -169,18 +169,18 @@ func (tx *Transaction) Commit() error {
 	})
 	defer op.Complete()
 	
-	logger.Info("[Transaction] Committing transaction %s", tx.ID)
+	logger.Info("Committing transaction %s", tx.ID)
 	
 	// Move all temp files to final locations
 	for finalPath, tempPath := range tx.TempFiles {
 		if err := os.Rename(tempPath, finalPath); err != nil {
 			op.Fail(err)
-			logger.Error("[Transaction] Failed to rename %s to %s: %v", tempPath, finalPath, err)
+			logger.Error("Failed to rename %s to %s: %v", tempPath, finalPath, err)
 			// Try to rollback what we can
 			tx.Rollback()
 			return fmt.Errorf("failed to commit file %s: %v", finalPath, err)
 		}
-		logger.Debug("[Transaction] Committed: %s", finalPath)
+		logger.Debug("Committed: %s", finalPath)
 	}
 	
 	// Execute callbacks
@@ -188,7 +188,7 @@ func (tx *Transaction) Commit() error {
 		if txOp.Callback != nil {
 			if err := txOp.Callback(); err != nil {
 				op.Fail(err)
-				logger.Error("[Transaction] Callback failed: %v", err)
+				logger.Error("Callback failed: %v", err)
 				// At this point we can't rollback file changes
 				return fmt.Errorf("callback failed: %v", err)
 			}
@@ -198,11 +198,11 @@ func (tx *Transaction) Commit() error {
 	// Clean up backups
 	for _, backupPath := range tx.Backups {
 		os.Remove(backupPath)
-		logger.Debug("[Transaction] Removed backup: %s", backupPath)
+		logger.Debug("Removed backup: %s", backupPath)
 	}
 	
 	tx.State = TxStateCommitted
-	logger.Info("[Transaction] Transaction %s committed successfully", tx.ID)
+	logger.Info("Transaction %s committed successfully", tx.ID)
 	return nil
 }
 
@@ -220,25 +220,25 @@ func (tx *Transaction) Rollback() error {
 	})
 	defer op.Complete()
 	
-	logger.Info("[Transaction] Rolling back transaction %s", tx.ID)
+	logger.Info("Rolling back transaction %s", tx.ID)
 	
 	// Remove temp files
 	for _, tempPath := range tx.TempFiles {
 		os.Remove(tempPath)
-		logger.Debug("[Transaction] Removed temp file: %s", tempPath)
+		logger.Debug("Removed temp file: %s", tempPath)
 	}
 	
 	// Restore backups
 	for originalPath, backupPath := range tx.Backups {
 		if err := os.Rename(backupPath, originalPath); err != nil {
-			logger.Error("[Transaction] Failed to restore backup %s to %s: %v", backupPath, originalPath, err)
+			logger.Error("Failed to restore backup %s to %s: %v", backupPath, originalPath, err)
 		} else {
-			logger.Debug("[Transaction] Restored backup: %s -> %s", backupPath, originalPath)
+			logger.Debug("Restored backup: %s -> %s", backupPath, originalPath)
 		}
 	}
 	
 	tx.State = TxStateAborted
-	logger.Info("[Transaction] Transaction %s rolled back", tx.ID)
+	logger.Info("Transaction %s rolled back", tx.ID)
 	return nil
 }
 
@@ -293,7 +293,7 @@ func (tm *TransactionManager) CleanupOldTransactions() error {
 	}
 	
 	if cleaned > 0 {
-		logger.Info("[Transaction] Cleaned up %d old transaction files", cleaned)
+		logger.Info("Cleaned up %d old transaction files", cleaned)
 	}
 	
 	return nil

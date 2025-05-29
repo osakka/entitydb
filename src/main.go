@@ -255,7 +255,7 @@ func main() {
 	server.entityHandler = api.NewEntityHandler(entityRepo)
 	server.relationHandler = api.NewEntityRelationshipHandler(relationRepo)
 	server.userHandler = api.NewUserHandler(entityRepo)
-	server.authHandler = api.NewAuthHandler(server.securityManager)
+	server.authHandler = api.NewAuthHandler(server.securityManager, server.sessionManager)
 	server.securityMiddleware = api.NewSecurityMiddleware(server.securityManager)
 	
 	// Initialize with default entities
@@ -427,9 +427,12 @@ func main() {
 	systemMetricsHandler := api.NewSystemMetricsHandler(server.entityRepo)
 	apiRouter.HandleFunc("/system/metrics", systemMetricsHandler.SystemMetrics).Methods("GET")
 	
-	// RBAC metrics endpoint (requires admin permission)
+	// RBAC metrics endpoints
 	rbacMetricsHandler := api.NewRBACMetricsHandler(server.entityRepo, server.sessionManager)
-	apiRouter.HandleFunc("/rbac/metrics", api.RBACMiddleware(server.entityRepo, server.sessionManager, api.RBACPermission{Resource: "admin", Action: "view"})(rbacMetricsHandler.GetRBACMetrics)).Methods("GET")
+	// Public endpoint for basic metrics (no auth required)
+	apiRouter.HandleFunc("/rbac/metrics/public", rbacMetricsHandler.GetPublicRBACMetrics).Methods("GET")
+	// Authenticated endpoint for full metrics (any authenticated user)
+	apiRouter.HandleFunc("/rbac/metrics", api.SessionAuthMiddleware(server.sessionManager, server.entityRepo)(rbacMetricsHandler.GetAuthenticatedRBACMetrics)).Methods("GET")
 	
 	// Integrity metrics endpoint (requires admin permission)
 	integrityHandler := api.IntegrityMetricsHandler(server.entityRepo)

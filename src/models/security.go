@@ -89,21 +89,40 @@ type SecurityPermission struct {
 // CreateUser creates a new user entity with separate credential entity
 func (sm *SecurityManager) CreateUser(username, password, email string) (*SecurityUser, error) {
 	logger.Debug("[SecurityManager] CreateUser called for username: %s", username)
+	
+	// Check if user already exists
+	existingUsers, err := sm.entityRepo.ListByTag("identity:username:" + username)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check for existing user: %v", err)
+	}
+	
+	if len(existingUsers) > 0 {
+		logger.Debug("[SecurityManager] User %s already exists with ID: %s", username, existingUsers[0].ID)
+		return nil, fmt.Errorf("user with username '%s' already exists", username)
+	}
+	
 	// Generate secure UUID for user
 	userID := "user_" + generateSecureUUID()
 	logger.Debug("[SecurityManager] Generated user ID: %s", userID)
 	
 	// Create user entity (no sensitive data)
+	tags := []string{
+		"type:" + EntityTypeUser,
+		"identity:username:" + username,
+		"identity:uuid:" + userID,
+		"status:active",
+		"profile:email:" + email,
+		"created:" + NowString(),
+	}
+	
+	// Add rbac:role:admin tag directly for admin user
+	if username == "admin" {
+		tags = append(tags, "rbac:role:admin")
+	}
+	
 	userEntity := &Entity{
-		ID: userID,
-		Tags: []string{
-			"type:" + EntityTypeUser,
-			"identity:username:" + username,
-			"identity:uuid:" + userID,
-			"status:active",
-			"profile:email:" + email,
-			"created:" + NowString(),
-		},
+		ID:        userID,
+		Tags:      tags,
 		Content:   nil, // No content for user entities
 		CreatedAt: Now(),
 		UpdatedAt: Now(),

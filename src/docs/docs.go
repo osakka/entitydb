@@ -1031,6 +1031,26 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/rbac/metrics/public": {
+            "get": {
+                "description": "Get basic RBAC metrics available without authentication",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "rbac"
+                ],
+                "summary": "Get public RBAC metrics",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.PublicRBACMetricsResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/system/metrics": {
             "get": {
                 "description": "Get comprehensive system metrics specific to EntityDB",
@@ -1858,6 +1878,28 @@ const docTemplate = `{
                 "total_gc_pause_ns": {
                     "type": "integer",
                     "example": 236206
+                }
+            }
+        },
+        "api.PublicRBACMetricsResponse": {
+            "type": "object",
+            "properties": {
+                "auth": {
+                    "$ref": "#/definitions/api.SimplifiedAuthMetrics"
+                },
+                "sessions": {
+                    "$ref": "#/definitions/api.PublicSessionMetrics"
+                },
+                "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.PublicSessionMetrics": {
+            "type": "object",
+            "properties": {
+                "active_count": {
+                    "type": "integer"
                 }
             }
         },

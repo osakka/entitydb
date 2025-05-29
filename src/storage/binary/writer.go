@@ -52,7 +52,7 @@ func NewWriter(filename string) (*Writer, error) {
 	// Try to read existing file
 	if stat, err := file.Stat(); err == nil && stat.Size() > 0 {
 		if err := w.readExisting(); err != nil {
-			logger.Debug("Warning: failed to read existing file, creating new: %v", err)
+			logger.Warn("Failed to read existing file, creating new: %v", err)
 			// Reset the file
 			file.Truncate(0)
 			file.Seek(0, 0)
@@ -97,14 +97,14 @@ func (w *Writer) WriteEntity(entity *models.Entity) error {
 	defer w.mu.Unlock()
 	
 	// Log write intent
-	logger.Info("[Writer] Starting write for entity %s (tags=%d, content=%d bytes)", 
+	logger.Trace("Starting write for entity %s (tags=%d, content=%d bytes)", 
 		entity.ID, len(entity.Tags), len(entity.Content))
 	
 	// Validate entity
 	if entity.ID == "" {
 		err := fmt.Errorf("entity ID cannot be empty")
 		op.Fail(err)
-		logger.Error("[Writer] Validation failed: %v", err)
+		logger.Error("Validation failed: %v", err)
 		return err
 	}
 	
@@ -112,7 +112,7 @@ func (w *Writer) WriteEntity(entity *models.Entity) error {
 	contentChecksum := sha256.Sum256(entity.Content)
 	op.SetMetadata("content_checksum", hex.EncodeToString(contentChecksum[:]))
 	
-	logger.Debug("[Writer] Entity %s content checksum: %x", entity.ID, contentChecksum)
+	logger.Debug("Entity %s content checksum: %x", entity.ID, contentChecksum)
 	
 	// Prepare entity data
 	w.buffer.Reset()
@@ -132,7 +132,7 @@ func (w *Writer) WriteEntity(entity *models.Entity) error {
 	if !hasChecksum {
 		tags = append([]string{}, entity.Tags...)
 		tags = append(tags, checksumTag)
-		logger.Info("[Writer] Added checksum tag for entity %s: %s", entity.ID, checksumTag)
+		logger.Trace("Added checksum tag for entity %s: %s", entity.ID, checksumTag)
 	}
 	
 	// Convert tags to IDs
@@ -217,7 +217,7 @@ func (w *Writer) WriteEntity(entity *models.Entity) error {
 	offset, err := w.file.Seek(0, os.SEEK_END)
 	if err != nil {
 		op.Fail(err)
-		logger.Error("[Writer] Failed to seek to end for entity %s: %v", entity.ID, err)
+		logger.Error("Failed to seek to end for entity %s: %v", entity.ID, err)
 		return err
 	}
 	
@@ -227,25 +227,25 @@ func (w *Writer) WriteEntity(entity *models.Entity) error {
 	op.SetMetadata("write_offset", offset)
 	op.SetMetadata("buffer_size", w.buffer.Len())
 	
-	logger.Info("[Writer] Writing entity %s: %d bytes at offset %d", entity.ID, w.buffer.Len(), offset)
+	logger.Trace("Writing entity %s: %d bytes at offset %d", entity.ID, w.buffer.Len(), offset)
 	
 	// Write to file
 	n, err := w.file.Write(w.buffer.Bytes())
 	if err != nil {
 		op.Fail(err)
-		logger.Error("[Writer] Failed to write entity %s data: %v", entity.ID, err)
+		logger.Error("Failed to write entity %s data: %v", entity.ID, err)
 		return err
 	}
 	
 	if n != w.buffer.Len() {
 		err := fmt.Errorf("incomplete write: expected %d bytes, wrote %d", w.buffer.Len(), n)
 		op.Fail(err)
-		logger.Error("[Writer] %v for entity %s", err, entity.ID)
+		logger.Error("%v for entity %s", err, entity.ID)
 		return err
 	}
 	
 	op.SetMetadata("bytes_written", n)
-	logger.Info("[Writer] Successfully wrote %d bytes for entity %s", n, entity.ID)
+	logger.Trace("Successfully wrote %d bytes for entity %s", n, entity.ID)
 	
 	// Update index
 	entry := &IndexEntry{
@@ -264,21 +264,21 @@ func (w *Writer) WriteEntity(entity *models.Entity) error {
 	copy(entry.EntityID[:], idBytes)
 	w.index[entity.ID] = entry
 	
-	logger.Info("[Writer] Added index entry for %s: offset=%d, size=%d", entity.ID, entry.Offset, entry.Size)
+	logger.Trace("Added index entry for %s: offset=%d, size=%d", entity.ID, entry.Offset, entry.Size)
 	op.SetMetadata("index_offset", entry.Offset)
 	op.SetMetadata("index_size", entry.Size)
 	
 	// Verify we can read back what we wrote
 	verifyBuffer := make([]byte, n)
 	if _, err := w.file.ReadAt(verifyBuffer, int64(offset)); err != nil {
-		logger.Error("[Writer] Failed to verify write for entity %s: %v", entity.ID, err)
+		logger.Error("Failed to verify write for entity %s: %v", entity.ID, err)
 		// Don't fail the operation, but log the issue
 	} else {
 		verifyChecksum := sha256.Sum256(verifyBuffer)
 		if hex.EncodeToString(verifyChecksum[:]) != hex.EncodeToString(bufferChecksum[:]) {
-			logger.Error("[Writer] Checksum mismatch after write for entity %s", entity.ID)
+			logger.Error("Checksum mismatch after write for entity %s", entity.ID)
 		} else {
-			logger.Debug("[Writer] Write verification successful for entity %s", entity.ID)
+			logger.Debug("Write verification successful for entity %s", entity.ID)
 		}
 	}
 	
@@ -287,7 +287,7 @@ func (w *Writer) WriteEntity(entity *models.Entity) error {
 	w.header.FileSize = uint64(offset) + uint64(n)
 	w.header.LastModified = time.Now().Unix()
 	
-	logger.Info("[Writer] Updated header: EntityCount=%d, FileSize=%d", w.header.EntityCount, w.header.FileSize)
+	logger.Trace("Updated header: EntityCount=%d, FileSize=%d", w.header.EntityCount, w.header.FileSize)
 	op.SetMetadata("final_entity_count", w.header.EntityCount)
 	op.SetMetadata("final_file_size", w.header.FileSize)
 	
@@ -393,14 +393,14 @@ func (w *Writer) Close() error {
 		}
 		writtenCount++
 	}
-	logger.Info("Wrote %d index entries (header claims %d)", writtenCount, w.header.EntityCount)
+	logger.Trace("Wrote %d index entries (header claims %d)", writtenCount, w.header.EntityCount)
 	
 	// Verify index count matches header
 	if writtenCount != int(w.header.EntityCount) {
 		logger.Error("Index entry count mismatch: wrote %d entries but header claims %d", writtenCount, w.header.EntityCount)
 		// Update header to match actual count
 		w.header.EntityCount = uint64(writtenCount)
-		logger.Info("Updated header EntityCount to match actual index: %d", w.header.EntityCount)
+		logger.Trace("Updated header EntityCount to match actual index: %d", w.header.EntityCount)
 	}
 	
 	// Update header

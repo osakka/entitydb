@@ -8,6 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Logging Standards Implementation**: Professional logging system with consistent formatting
+  - Removed redundant manual prefixes (`[Transaction]`, `[WAL]`, `[Writer]`, `[Reader]`) since logger provides file/function/line automatically
+  - Enhanced API error messages with contextual information (entity IDs, query parameters, operation details)
+  - Fixed inappropriate log levels (error conditions moved from DEBUG to WARN/ERROR, detailed operations moved from INFO to TRACE)
+  - Reduced excessive INFO logging in storage layer (reader.go and writer.go operations now at TRACE level)
+  - Created comprehensive logging audit and standards documentation  
+  - Established pattern for replacing direct print statements with structured logger calls
+- **Public RBAC Metrics Endpoint**: New unauthenticated endpoint for basic metrics
+  - `/api/v1/rbac/metrics/public` provides basic authentication and session counts without requiring admin access
+  - Complements existing authenticated `/api/v1/rbac/metrics` endpoint
+- **RBAC Tag Manager**: Enhanced RBAC management component for user tag operations
+- **Repository Cleanup Tools**: Maintenance utilities for duplicate user cleanup and system health
 - **Data Integrity System**: Comprehensive operation tracking and logging infrastructure
   - Operation ID generation for all data operations (READ, WRITE, DELETE, INDEX, WAL)
   - Enhanced logging in Writer with SHA256 checksums and write verification

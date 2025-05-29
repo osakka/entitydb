@@ -1407,7 +1407,24 @@ func (r *EntityRepository) GetRelationshipByID(id string) (interface{}, error) {
 		ID: entity.ID,
 	}
 	
-	// Extract relationship data from entity
+	// First, try to extract from JSON content if available
+	if len(entity.Content) > 0 {
+		var relData map[string]interface{}
+		if err := json.Unmarshal(entity.Content, &relData); err == nil {
+			// Extract fields from JSON
+			if v, ok := relData["relationship_type"].(string); ok {
+				rel.RelationshipType = v
+			}
+			if v, ok := relData["source_id"].(string); ok {
+				rel.SourceID = v
+			}
+			if v, ok := relData["target_id"].(string); ok {
+				rel.TargetID = v
+			}
+		}
+	}
+	
+	// Extract relationship data from entity tags (can override JSON if needed)
 	for _, tag := range entity.Tags {
 		// Handle temporal tags by extracting the actual tag part
 		actualTag := tag
@@ -1417,11 +1434,20 @@ func (r *EntityRepository) GetRelationshipByID(id string) (interface{}, error) {
 		}
 		
 		if strings.HasPrefix(actualTag, "_relationship:") {
-			rel.RelationshipType = strings.TrimPrefix(actualTag, "_relationship:")
+			relType := strings.TrimPrefix(actualTag, "_relationship:")
+			if relType != "" {
+				rel.RelationshipType = relType
+			}
 		} else if strings.HasPrefix(actualTag, "_source:") {
-			rel.SourceID = strings.TrimPrefix(actualTag, "_source:")
+			sourceID := strings.TrimPrefix(actualTag, "_source:")
+			if sourceID != "" {
+				rel.SourceID = sourceID
+			}
 		} else if strings.HasPrefix(actualTag, "_target:") {
-			rel.TargetID = strings.TrimPrefix(actualTag, "_target:")
+			targetID := strings.TrimPrefix(actualTag, "_target:")
+			if targetID != "" {
+				rel.TargetID = targetID
+			}
 		}
 	}
 	
@@ -1431,6 +1457,12 @@ func (r *EntityRepository) GetRelationshipByID(id string) (interface{}, error) {
 	// Set the Type field as well (for compatibility)
 	if rel.Type == "" {
 		rel.Type = rel.RelationshipType
+	}
+	
+	// Validate that we have all required fields
+	if rel.SourceID == "" || rel.TargetID == "" {
+		return nil, fmt.Errorf("relationship missing required fields: source=%s, target=%s", 
+			rel.SourceID, rel.TargetID)
 	}
 	
 	return rel, nil

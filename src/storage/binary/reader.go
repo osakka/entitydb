@@ -87,18 +87,18 @@ func NewReader(filename string) (*Reader, error) {
 	
 	// Read index
 	if r.header.EntityIndexOffset > 0 {
-		logger.Info("[Reader] Reading index from offset %d, expecting %d entries", 
+		logger.Trace("Reading index from offset %d, expecting %d entries", 
 			r.header.EntityIndexOffset, r.header.EntityCount)
 		
 		// Validate index location
 		if int64(r.header.EntityIndexOffset) > stat.Size() {
-			logger.Error("[Reader] Index offset %d exceeds file size %d", 
+			logger.Error("Index offset %d exceeds file size %d", 
 				r.header.EntityIndexOffset, stat.Size())
 			return r, nil // Return partial reader
 		}
 		
 		if _, err := file.Seek(int64(r.header.EntityIndexOffset), os.SEEK_SET); err != nil {
-			logger.Error("[Reader] Failed to seek to index: %v", err)
+			logger.Error("Failed to seek to index: %v", err)
 			return nil, err
 		}
 		
@@ -109,7 +109,7 @@ func NewReader(filename string) (*Reader, error) {
 		maxPossibleEntries := uint64(remainingFileSize / entrySize)
 		
 		if maxPossibleEntries < r.header.EntityCount {
-			logger.Warn("[Reader] File can only hold %d index entries but header claims %d",
+			logger.Warn("File can only hold %d index entries but header claims %d",
 				maxPossibleEntries, r.header.EntityCount)
 		}
 		
@@ -118,7 +118,7 @@ func NewReader(filename string) (*Reader, error) {
 			// Check if we have enough bytes remaining
 			currentPos, _ := file.Seek(0, os.SEEK_CUR)
 			if currentPos+entrySize > stat.Size() {
-				logger.Warn("[Reader] Not enough data for index entry %d (pos=%d, need %d bytes, file_size=%d)",
+				logger.Warn("Not enough data for index entry %d (pos=%d, need %d bytes, file_size=%d)",
 					i, currentPos, entrySize, stat.Size())
 				break
 			}
@@ -127,10 +127,10 @@ func NewReader(filename string) (*Reader, error) {
 			if err := binary.Read(file, binary.LittleEndian, &entry.EntityID); err != nil {
 				// Stop reading if we hit EOF
 				if err == io.EOF {
-					logger.Warn("[Reader] Hit EOF at index entry %d (reading EntityID)", i)
+					logger.Warn("Hit EOF at index entry %d (reading EntityID)", i)
 					break
 				}
-				logger.Error("[Reader] Failed to read index entry %d: %v", i, err)
+				logger.Error("Failed to read index entry %d: %v", i, err)
 				break // Don't fail entirely, just stop reading index
 			}
 			if err := binary.Read(file, binary.LittleEndian, &entry.Offset); err != nil {
@@ -164,14 +164,14 @@ func NewReader(filename string) (*Reader, error) {
 			}
 			r.index[id] = entry
 			entriesRead++
-			logger.Debug("[Reader] Loaded index entry %d: ID=%s, Offset=%d, Size=%d", i, id, entry.Offset, entry.Size)
+			logger.Debug("Loaded index entry %d: ID=%s, Offset=%d, Size=%d", i, id, entry.Offset, entry.Size)
 		}
 		
-		logger.Info("[Reader] Index loading complete: read %d entries, loaded %d into index (expected %d)",
+		logger.Trace("Index loading complete: read %d entries, loaded %d into index (expected %d)",
 			entriesRead, len(r.index), r.header.EntityCount)
 		
 		if entriesRead < r.header.EntityCount {
-			logger.Warn("[Reader] Index is incomplete: missing %d entries", r.header.EntityCount - entriesRead)
+			logger.Warn("Index is incomplete: missing %d entries", r.header.EntityCount - entriesRead)
 		}
 	}
 	
@@ -190,13 +190,13 @@ func (r *Reader) GetEntity(id string) (*models.Entity, error) {
 		}
 	}()
 	
-	logger.Debug("[Reader] GetEntity called for ID: %s", id)
+	logger.Debug("GetEntity called for ID: %s", id)
 	
 	entry, exists := r.index[id]
 	if !exists {
 		err := fmt.Errorf("entity %s not found in index", id)
 		op.Fail(err)
-		logger.Debug("[Reader] Entity %s not found in index", id)
+		logger.Debug("Entity %s not found in index", id)
 		return nil, ErrNotFound
 	}
 	
@@ -335,9 +335,9 @@ func (r *Reader) parseEntity(data []byte, id string) (*models.Entity, error) {
 					expectedChecksum := parts[1]
 					if expectedChecksum == actualChecksumHex {
 						checksumValid = true
-						logger.Debug("[Reader] Checksum verification passed for entity %s", id)
+						logger.Debug("Checksum verification passed for entity %s", id)
 					} else {
-						logger.Error("[Reader] Checksum mismatch for entity %s: expected %s, got %s", 
+						logger.Error("Checksum mismatch for entity %s: expected %s, got %s", 
 							id, expectedChecksum, actualChecksumHex)
 					}
 					break
@@ -346,7 +346,7 @@ func (r *Reader) parseEntity(data []byte, id string) (*models.Entity, error) {
 		}
 		
 		if !checksumValid {
-			logger.Warn("[Reader] No checksum found for entity %s, content integrity not verified", id)
+			logger.Warn("No checksum found for entity %s, content integrity not verified", id)
 		}
 	}
 	

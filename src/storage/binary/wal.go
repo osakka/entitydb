@@ -73,7 +73,7 @@ func (w *WAL) LogCreate(entity *models.Entity) error {
 	})
 	defer op.Complete()
 	
-	logger.Info("[WAL] Logging CREATE operation for entity %s", entity.ID)
+	logger.Info("Logging CREATE operation for entity %s", entity.ID)
 	
 	err := w.logEntry(WALEntry{
 		OpType:    WALOpCreate,
@@ -84,12 +84,12 @@ func (w *WAL) LogCreate(entity *models.Entity) error {
 	
 	if err != nil {
 		op.Fail(err)
-		logger.Error("[WAL] Failed to log CREATE for entity %s: %v", entity.ID, err)
+		logger.Error("Failed to log CREATE for entity %s: %v", entity.ID, err)
 		return err
 	}
 	
 	op.SetMetadata("sequence", w.sequence)
-	logger.Debug("[WAL] Successfully logged CREATE for entity %s at sequence %d", entity.ID, w.sequence)
+	logger.Debug("Successfully logged CREATE for entity %s at sequence %d", entity.ID, w.sequence)
 	return nil
 }
 
@@ -102,7 +102,7 @@ func (w *WAL) LogUpdate(entity *models.Entity) error {
 	})
 	defer op.Complete()
 	
-	logger.Info("[WAL] Logging UPDATE operation for entity %s", entity.ID)
+	logger.Info("Logging UPDATE operation for entity %s", entity.ID)
 	
 	err := w.logEntry(WALEntry{
 		OpType:    WALOpUpdate,
@@ -113,12 +113,12 @@ func (w *WAL) LogUpdate(entity *models.Entity) error {
 	
 	if err != nil {
 		op.Fail(err)
-		logger.Error("[WAL] Failed to log UPDATE for entity %s: %v", entity.ID, err)
+		logger.Error("Failed to log UPDATE for entity %s: %v", entity.ID, err)
 		return err
 	}
 	
 	op.SetMetadata("sequence", w.sequence)
-	logger.Debug("[WAL] Successfully logged UPDATE for entity %s at sequence %d", entity.ID, w.sequence)
+	logger.Debug("Successfully logged UPDATE for entity %s at sequence %d", entity.ID, w.sequence)
 	return nil
 }
 
@@ -129,7 +129,7 @@ func (w *WAL) LogDelete(entityID string) error {
 	})
 	defer op.Complete()
 	
-	logger.Info("[WAL] Logging DELETE operation for entity %s", entityID)
+	logger.Info("Logging DELETE operation for entity %s", entityID)
 	
 	err := w.logEntry(WALEntry{
 		OpType:    WALOpDelete,
@@ -139,12 +139,12 @@ func (w *WAL) LogDelete(entityID string) error {
 	
 	if err != nil {
 		op.Fail(err)
-		logger.Error("[WAL] Failed to log DELETE for entity %s: %v", entityID, err)
+		logger.Error("Failed to log DELETE for entity %s: %v", entityID, err)
 		return err
 	}
 	
 	op.SetMetadata("sequence", w.sequence)
-	logger.Debug("[WAL] Successfully logged DELETE for entity %s at sequence %d", entityID, w.sequence)
+	logger.Debug("Successfully logged DELETE for entity %s at sequence %d", entityID, w.sequence)
 	return nil
 }
 
@@ -258,7 +258,7 @@ func (w *WAL) serializeEntry(entry WALEntry) ([]byte, error) {
 		buf = append(buf, entityLenBuf...)
 		buf = append(buf, entityBuf...)
 		
-		logger.Debug("[WAL] Serialized entity %s with checksum %s", entry.EntityID, checksumStr)
+		logger.Debug("Serialized entity %s with checksum %s", entry.EntityID, checksumStr)
 	} else {
 		// No entity data
 		entityLenBuf := make([]byte, 4)
@@ -277,12 +277,12 @@ func (w *WAL) Replay(callback func(entry WALEntry) error) error {
 	})
 	defer op.Complete()
 	
-	logger.Info("[WAL] Starting WAL replay from %s", w.path)
+	logger.Info("Starting WAL replay from %s", w.path)
 	
 	// Seek to the beginning
 	if _, err := w.file.Seek(0, io.SeekStart); err != nil {
 		op.Fail(err)
-		logger.Error("[WAL] Failed to seek to beginning: %v", err)
+		logger.Error("Failed to seek to beginning: %v", err)
 		return err
 	}
 	
@@ -297,7 +297,7 @@ func (w *WAL) Replay(callback func(entry WALEntry) error) error {
 				break
 			}
 			op.Fail(err)
-			logger.Error("[WAL] Failed to read entry length: %v", err)
+			logger.Error("Failed to read entry length: %v", err)
 			return err
 		}
 		
@@ -305,7 +305,7 @@ func (w *WAL) Replay(callback func(entry WALEntry) error) error {
 		data := make([]byte, length)
 		if _, err := io.ReadFull(w.file, data); err != nil {
 			op.Fail(err)
-			logger.Error("[WAL] Failed to read entry data (length=%d): %v", length, err)
+			logger.Error("Failed to read entry data (length=%d): %v", length, err)
 			return err
 		}
 		
@@ -313,16 +313,16 @@ func (w *WAL) Replay(callback func(entry WALEntry) error) error {
 		entry, err := w.deserializeEntry(data)
 		if err != nil {
 			entriesFailed++
-			logger.Error("[WAL] Failed to deserialize entry: %v", err)
+			logger.Error("Failed to deserialize entry: %v", err)
 			continue // Skip bad entries during replay
 		}
 		
-		logger.Debug("[WAL] Replaying %v operation for entity %s", entry.OpType, entry.EntityID)
+		logger.Debug("Replaying %v operation for entity %s", entry.OpType, entry.EntityID)
 		
 		// Process entry
 		if err := callback(*entry); err != nil {
 			entriesFailed++
-			logger.Error("[WAL] Failed to process entry for entity %s: %v", entry.EntityID, err)
+			logger.Error("Failed to process entry for entity %s: %v", entry.EntityID, err)
 			continue // Continue with other entries
 		}
 		
@@ -332,7 +332,7 @@ func (w *WAL) Replay(callback func(entry WALEntry) error) error {
 	op.SetMetadata("entries_processed", entriesProcessed)
 	op.SetMetadata("entries_failed", entriesFailed)
 	
-	logger.Info("[WAL] WAL replay completed: %d entries processed, %d failed", entriesProcessed, entriesFailed)
+	logger.Info("WAL replay completed: %d entries processed, %d failed", entriesProcessed, entriesFailed)
 	
 	return nil
 }
@@ -352,20 +352,87 @@ func (w *WAL) deserializeEntry(data []byte) (*WALEntry, error) {
 	ts := binary.LittleEndian.Uint64(data[1:9])
 	entry.Timestamp = time.Unix(0, int64(ts))
 	
-	// Read entity ID
+	// Read entity ID length
 	idLen := binary.LittleEndian.Uint16(data[9:11])
 	if len(data) < 11+int(idLen) {
 		return nil, fmt.Errorf("invalid WAL entry: ID length mismatch")
 	}
 	
+	// Read entity ID
 	entry.EntityID = string(data[11 : 11+idLen])
 	
-	// Read entity data if present
 	pos := 11 + int(idLen)
-	if pos < len(data) {
-		// Simplified deserialization
-		// In production, you'd use proper deserialization
-		entry.Entity = &models.Entity{ID: entry.EntityID}
+	
+	// Read checksum if present
+	if pos+2 <= len(data) {
+		checksumLen := binary.LittleEndian.Uint16(data[pos:pos+2])
+		pos += 2
+		
+		if checksumLen > 0 && pos+int(checksumLen) <= len(data) {
+			entry.Checksum = string(data[pos : pos+int(checksumLen)])
+			pos += int(checksumLen)
+		}
+	}
+	
+	// Read entity data length
+	if pos+4 <= len(data) {
+		entityDataLen := binary.LittleEndian.Uint32(data[pos:pos+4])
+		pos += 4
+		
+		if entityDataLen > 0 && pos+int(entityDataLen) <= len(data) {
+			// We have entity data to deserialize
+			entityData := data[pos : pos+int(entityDataLen)]
+			
+			entity := &models.Entity{
+				ID:        entry.EntityID,
+				Tags:      []string{},
+				Content:   []byte{},
+				CreatedAt: entry.Timestamp.UnixNano(),
+				UpdatedAt: entry.Timestamp.UnixNano(),
+			}
+			
+			// Parse entity data
+			entityPos := 0
+			
+			// Read tag count
+			if entityPos+2 <= len(entityData) {
+				tagCount := binary.LittleEndian.Uint16(entityData[entityPos:entityPos+2])
+				entityPos += 2
+				
+				// Read tags
+				for i := uint16(0); i < tagCount && entityPos < len(entityData); i++ {
+					if entityPos+2 > len(entityData) {
+						break
+					}
+					
+					tagLen := binary.LittleEndian.Uint16(entityData[entityPos:entityPos+2])
+					entityPos += 2
+					
+					if entityPos+int(tagLen) > len(entityData) {
+						break
+					}
+					
+					tag := string(entityData[entityPos : entityPos+int(tagLen)])
+					entity.Tags = append(entity.Tags, tag)
+					entityPos += int(tagLen)
+				}
+			}
+			
+			// Read content length and content
+			if entityPos+4 <= len(entityData) {
+				contentLen := binary.LittleEndian.Uint32(entityData[entityPos:entityPos+4])
+				entityPos += 4
+				
+				if contentLen > 0 && entityPos+int(contentLen) <= len(entityData) {
+					entity.Content = entityData[entityPos : entityPos+int(contentLen)]
+				}
+			}
+			
+			entry.Entity = entity
+		} else if entry.OpType == WALOpDelete {
+			// For delete operations, we don't need entity data
+			entry.Entity = nil
+		}
 	}
 	
 	return entry, nil

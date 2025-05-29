@@ -91,6 +91,14 @@ This directory contains the source code for the EntityDB platform. This document
    - Command-line tools are organized by category in `/src/tools`
    - All compiled tools use the `entitydb_` prefix
 
+5. **Logging Standards**
+   - All code uses the structured logger from `entitydb/logger` package
+   - Logger automatically provides timestamp, level, file, function, and line information
+   - Log levels: TRACE → DEBUG → INFO → WARN → ERROR → FATAL
+   - Error messages include contextual information (entity IDs, operation parameters)
+   - No manual prefixes or redundant information in log messages
+   - See `LOGGING_AUDIT_REPORT.md` for comprehensive standards documentation
+
 ## Git Workflow and Protocol
 
 All developers must follow the EntityDB Git workflow guidelines. For detailed information on:
