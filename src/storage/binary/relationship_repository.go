@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"strings"
 	"encoding/json"
+	"sort"
+	"bytes"
 )
 
 // RelationshipRepository provides binary storage for entity relationships
@@ -277,8 +279,8 @@ func (r *RelationshipRepository) relationshipToEntity(rel *models.EntityRelation
 	entity := &models.Entity{
 		ID:        rel.ID,
 		Tags:      []string{},
-		CreatedAt: models.Now(),
-		UpdatedAt: models.Now(),
+		CreatedAt: rel.CreatedAt,  // Preserve original timestamp
+		UpdatedAt: rel.CreatedAt,  // Use same timestamp for consistency
 	}
 	
 	// Add relationship tags - use underscore prefix for consistency with entity_repository.go
@@ -293,12 +295,12 @@ func (r *RelationshipRepository) relationshipToEntity(rel *models.EntityRelation
 		entity.AddTagWithValue("metadata", rel.Metadata)
 	}
 	
-	// Store metadata as content
+	// Store metadata as content using deterministic JSON marshaling
 	contentData := map[string]interface{}{
 		"created_at": rel.CreatedAt,
 		"metadata":   rel.Metadata,
 	}
-	jsonData, _ := json.Marshal(contentData)
+	jsonData := marshalDeterministic(contentData)
 	entity.Content = jsonData
 	entity.AddTag("content:type:relationship")
 	
@@ -353,4 +355,36 @@ func (r *RelationshipRepository) entityToRelationship(entity *models.Entity) (*m
 	}
 	
 	return rel, nil
+}
+
+// marshalDeterministic marshals a map to JSON with sorted keys for consistent checksums
+func marshalDeterministic(data map[string]interface{}) []byte {
+	var buf bytes.Buffer
+	buf.WriteString("{")
+	
+	// Get sorted keys
+	keys := make([]string, 0, len(data))
+	for k := range data {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	
+	// Write key-value pairs in sorted order
+	for i, key := range keys {
+		if i > 0 {
+			buf.WriteString(",")
+		}
+		
+		// Marshal key
+		keyBytes, _ := json.Marshal(key)
+		buf.Write(keyBytes)
+		buf.WriteString(":")
+		
+		// Marshal value
+		valueBytes, _ := json.Marshal(data[key])
+		buf.Write(valueBytes)
+	}
+	
+	buf.WriteString("}")
+	return buf.Bytes()
 }

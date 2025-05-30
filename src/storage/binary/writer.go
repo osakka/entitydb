@@ -21,7 +21,6 @@ type Writer struct {
 	header   *Header
 	tagDict  *TagDictionary
 	index    map[string]*IndexEntry
-	buffer   *bytes.Buffer
 	mu       sync.Mutex
 }
 
@@ -46,7 +45,6 @@ func NewWriter(filename string) (*Writer, error) {
 		header:  &Header{Magic: MagicNumber, Version: FormatVersion},
 		tagDict: NewTagDictionary(),
 		index:   make(map[string]*IndexEntry),
-		buffer:  new(bytes.Buffer),
 	}
 	
 	// Try to read existing file
@@ -114,8 +112,9 @@ func (w *Writer) WriteEntity(entity *models.Entity) error {
 	
 	logger.Trace("Entity %s content checksum: %x", entity.ID, contentChecksum)
 	
-	// Prepare entity data
-	w.buffer.Reset()
+	// Get buffer from pool
+	buffer := LargeBufferPool.Get()
+	defer LargeBufferPool.Put(buffer)
 	
 	// Add checksum tag if not already present
 	checksumTag := fmt.Sprintf("%d|checksum:sha256:%s", time.Now().UnixNano(), hex.EncodeToString(contentChecksum[:]))
@@ -152,11 +151,11 @@ func (w *Writer) WriteEntity(entity *models.Entity) error {
 	logger.Trace("Writing entity header: Modified=%d, TagCount=%d, ContentCount=%d", 
 		header.Modified, header.TagCount, header.ContentCount)
 	
-	binary.Write(w.buffer, binary.LittleEndian, header)
+	binary.Write(buffer, binary.LittleEndian, header)
 	
 	// Write tag IDs
 	for _, id := range tagIDs {
-		binary.Write(w.buffer, binary.LittleEndian, id)
+		binary.Write(buffer, binary.LittleEndian, id)
 	}
 	
 	// Write content as a single item
@@ -186,31 +185,49 @@ func (w *Writer) WriteEntity(entity *models.Entity) error {
 		}
 		logger.Trace("Final content type for entity %s: %s", entity.ID, contentType)
 		
+		// Compress content if beneficial
+		compressed, err := CompressWithPool(entity.Content)
+		if err != nil {
+			logger.Warn("Compression failed for entity %s: %v, storing uncompressed", entity.ID, err)
+			compressed = &CompressedContent{
+				Type: CompressionNone,
+				Data: entity.Content,
+				OriginalSize: len(entity.Content),
+			}
+		}
+		
+		// Write compression type
+		binary.Write(buffer, binary.LittleEndian, uint8(compressed.Type))
+		
 		// For JSON content, store it directly without additional wrapping
 		if contentType == "application/json" {
 			// Content is already JSON, store it as-is
-			binary.Write(w.buffer, binary.LittleEndian, uint16(len(contentType)))
-			w.buffer.WriteString(contentType)
-			binary.Write(w.buffer, binary.LittleEndian, uint32(len(entity.Content)))
-			w.buffer.Write(entity.Content)
+			binary.Write(buffer, binary.LittleEndian, uint16(len(contentType)))
+			buffer.WriteString(contentType)
+			binary.Write(buffer, binary.LittleEndian, uint32(compressed.OriginalSize))
+			binary.Write(buffer, binary.LittleEndian, uint32(len(compressed.Data)))
+			buffer.Write(compressed.Data)
 		} else {
 			// For other content types, use application/octet-stream wrapper
-			binary.Write(w.buffer, binary.LittleEndian, uint16(len("application/octet-stream")))
-			w.buffer.WriteString("application/octet-stream")
-			binary.Write(w.buffer, binary.LittleEndian, uint32(len(entity.Content)))
-			w.buffer.Write(entity.Content)
+			binary.Write(buffer, binary.LittleEndian, uint16(len("application/octet-stream")))
+			buffer.WriteString("application/octet-stream")
+			binary.Write(buffer, binary.LittleEndian, uint32(compressed.OriginalSize))
+			binary.Write(buffer, binary.LittleEndian, uint32(len(compressed.Data)))
+			buffer.Write(compressed.Data)
 		}
 		
 		// Timestamp: current time
-		binary.Write(w.buffer, binary.LittleEndian, time.Now().UnixNano())
+		binary.Write(buffer, binary.LittleEndian, time.Now().UnixNano())
 	} else {
 		// Empty content
+		binary.Write(buffer, binary.LittleEndian, uint8(CompressionNone))
 		contentType := "application/octet-stream"
-		binary.Write(w.buffer, binary.LittleEndian, uint16(len(contentType)))
-		w.buffer.WriteString(contentType)
+		binary.Write(buffer, binary.LittleEndian, uint16(len(contentType)))
+		buffer.WriteString(contentType)
 		
-		binary.Write(w.buffer, binary.LittleEndian, uint32(0))
-		binary.Write(w.buffer, binary.LittleEndian, time.Now().UnixNano())
+		binary.Write(buffer, binary.LittleEndian, uint32(0)) // Original size
+		binary.Write(buffer, binary.LittleEndian, uint32(0)) // Compressed size
+		binary.Write(buffer, binary.LittleEndian, time.Now().UnixNano())
 	}
 	
 	// Get current file position
@@ -222,23 +239,23 @@ func (w *Writer) WriteEntity(entity *models.Entity) error {
 	}
 	
 	// Calculate buffer checksum
-	bufferChecksum := sha256.Sum256(w.buffer.Bytes())
+	bufferChecksum := sha256.Sum256(buffer.Bytes())
 	op.SetMetadata("buffer_checksum", hex.EncodeToString(bufferChecksum[:]))
 	op.SetMetadata("write_offset", offset)
-	op.SetMetadata("buffer_size", w.buffer.Len())
+	op.SetMetadata("buffer_size", buffer.Len())
 	
-	logger.Trace("Writing entity %s: %d bytes at offset %d", entity.ID, w.buffer.Len(), offset)
+	logger.Trace("Writing entity %s: %d bytes at offset %d", entity.ID, buffer.Len(), offset)
 	
 	// Write to file
-	n, err := w.file.Write(w.buffer.Bytes())
+	n, err := w.file.Write(buffer.Bytes())
 	if err != nil {
 		op.Fail(err)
 		logger.Error("Failed to write entity %s data: %v", entity.ID, err)
 		return err
 	}
 	
-	if n != w.buffer.Len() {
-		err := fmt.Errorf("incomplete write: expected %d bytes, wrote %d", w.buffer.Len(), n)
+	if n != buffer.Len() {
+		err := fmt.Errorf("incomplete write: expected %d bytes, wrote %d", buffer.Len(), n)
 		op.Fail(err)
 		logger.Error("%v for entity %s", err, entity.ID)
 		return err

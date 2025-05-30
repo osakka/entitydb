@@ -110,7 +110,7 @@ func NewEntity() *Entity {
 	timestamp := Now()
 	return &Entity{
 		ID:        GenerateUUID(),
-		Tags:      []string{},
+		Tags:      make([]string, 0, 8), // Pre-allocate common size
 		CreatedAt: timestamp,
 		UpdatedAt: timestamp,
 	}
@@ -124,10 +124,11 @@ func GenerateUUID() string {
 	return hex.EncodeToString(hash[:16])
 }
 
-// AddTag adds a tag with automatic timestamping
+// AddTag adds a tag with automatic timestamping and interning
 func (e *Entity) AddTag(tag string) {
-	// Use our centralized temporal tag formatting
-	e.Tags = append(e.Tags, FormatTemporalTag(tag))
+	// Use our centralized temporal tag formatting and intern the result
+	temporalTag := FormatTemporalTag(tag)
+	e.Tags = append(e.Tags, Intern(temporalTag))
 }
 
 // AddTagWithValue adds a key:value tag with automatic timestamping  

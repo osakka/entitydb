@@ -1,275 +1,297 @@
-# EntityDB API Reference
+# EntityDB Core API Reference
 
-This document provides a comprehensive reference for the EntityDB REST API.
+**Version**: 2.19.0  
+**Last Updated**: 2025-05-30
+
+> [!NOTE]
+> This document covers the core entity operations. For the complete API reference including all 85+ endpoints, see [API_REFERENCE_COMPLETE.md](./API_REFERENCE_COMPLETE.md).
+
+## Table of Contents
+1. [Authentication](#authentication)
+2. [Entity Operations](#entity-operations)
+3. [Temporal Operations](#temporal-operations)
+4. [Entity Relationships](#entity-relationships)
+5. [Tag System](#tag-system)
+6. [Permission System](#permission-system)
+7. [Examples](#examples)
 
 ## Authentication
 
-All API endpoints (except `/api/v1/auth/login`) require JWT authentication.
+All API endpoints (except `/api/v1/auth/login`) require authentication via Bearer token.
 
 ### Headers
 ```
-Authorization: Bearer <jwt_token>
+Authorization: Bearer <token>
 Content-Type: application/json
 ```
 
-## Base URL
+### Base URL
 ```
 http://localhost:8085
+https://localhost:8443 (when SSL enabled)
 ```
 
-## Endpoints
-
-### Authentication
-
-#### Login
+### Login
 ```http
 POST /api/v1/auth/login
 ```
 
-Request:
+**Request:**
 ```json
 {
   "username": "admin",
-  "password": "password"
+  "password": "admin"
 }
 ```
 
-Response:
+**Response:**
 ```json
 {
-  "token": "tk_admin_1234567890",
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
   "user": {
-    "id": "usr_admin",
+    "id": "550e8400-e29b-41d4-a716-446655440000",
     "username": "admin",
-    "roles": ["admin"]
-  }
+    "roles": ["admin", "user"]
+  },
+  "expires_at": "2025-01-02T10:00:00Z"
 }
 ```
 
-#### Logout
+### Logout
 ```http
 POST /api/v1/auth/logout
 Authorization: Bearer <token>
 ```
 
-Response:
-```json
-{
-  "status": "ok",
-  "message": "Logged out successfully"
-}
-```
-
-#### Status
+### Check Status
 ```http
 GET /api/v1/auth/status
 Authorization: Bearer <token>
 ```
 
-Response:
-```json
-{
-  "status": "ok",
-  "user": {
-    "id": "usr_admin",
-    "username": "admin",
-    "roles": ["admin"]
-  }
-}
-```
-
-### Entities
-
-#### List Entities
+### Who Am I
 ```http
-GET /api/v1/entities/list?type=<type>&tags=<tags>&status=<status>
+GET /api/v1/auth/whoami
 Authorization: Bearer <token>
 ```
 
-Query Parameters:
-- `type` (optional): Filter by entity type
-- `tags` (optional): Comma-separated list of tags
-- `status` (optional): Filter by status
-
-Response:
-```json
-{
-  "status": "ok",
-  "data": [
-    {
-      "id": "entity_123",
-      "type": "issue",
-      "title": "Sample Issue",
-      "description": "Issue description",
-      "status": "active",
-      "tags": ["type:issue", "priority:high"],
-      "created_at": "2024-01-01T00:00:00Z",
-      "updated_at": "2024-01-01T00:00:00Z"
-    }
-  ],
-  "count": 1
-}
-```
-
-#### Create Entity
+### Refresh Token
 ```http
-POST /api/v1/entities
+POST /api/v1/auth/refresh
 Authorization: Bearer <token>
 ```
 
-Request:
+## Entity Operations
+
+EntityDB uses a unified entity model where everything is stored as entities with tags and content.
+
+### Entity Structure
 ```json
 {
-  "type": "issue",
-  "title": "New Issue",
-  "description": "Detailed description",
-  "tags": ["priority:high", "status:pending"],
-  "properties": {
-    "custom_field": "value"
-  }
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "tags": ["type:document", "status:active"],
+  "content": "base64_encoded_or_json_content",
+  "created_at": 1737564000000000000,
+  "updated_at": 1737564000000000000
 }
 ```
 
-Response:
-```json
-{
-  "status": "ok",
-  "message": "Entity created successfully",
-  "data": {
-    "id": "entity_1234567890",
-    "type": "issue",
-    "title": "New Issue",
-    "description": "Detailed description",
-    "tags": ["priority:high", "status:pending"],
-    "created_at": "2024-01-01T00:00:00Z"
-  }
-}
+### List Entities
+```http
+GET /api/v1/entities/list
+Authorization: Bearer <token>
 ```
 
-#### Get Entity
+**Query Parameters:**
+- `tag` - Filter by specific tag (e.g., "type:user")
+- `wildcard` - Filter by wildcard pattern
+- `search` - Search in content
+- `contentType` - Content type for search
+- `namespace` - Filter by tag namespace
+- `include_timestamps` - Include temporal timestamps in tags (default: false)
+
+**Response:**
+```json
+[
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "tags": ["type:document", "status:active", "author:admin"],
+    "content": "...",
+    "created_at": 1737564000000000000,
+    "updated_at": 1737564000000000000
+  }
+]
+```
+
+### Get Entity
 ```http
 GET /api/v1/entities/get?id=<entity_id>
 Authorization: Bearer <token>
 ```
 
-Response:
-```json
-{
-  "status": "ok",
-  "data": {
-    "id": "entity_123",
-    "type": "issue",
-    "title": "Sample Issue",
-    "description": "Issue description",
-    "status": "active",
-    "tags": ["type:issue", "priority:high"],
-    "created_at": "2024-01-01T00:00:00Z",
-    "updated_at": "2024-01-01T00:00:00Z"
-  }
-}
-```
+**Query Parameters:**
+- `id` (required) - Entity ID
+- `include_timestamps` - Include temporal timestamps in tags
 
-#### Update Entity
+### Create Entity
 ```http
-PUT /api/v1/entities/update
+POST /api/v1/entities/create
 Authorization: Bearer <token>
 ```
 
-Request:
+**Request:**
 ```json
 {
-  "id": "entity_123",
-  "title": "Updated Title",
-  "tags": ["priority:low", "status:completed"]
+  "id": "optional_custom_id",
+  "tags": ["type:document", "status:draft", "priority:high"],
+  "content": "string, base64, or JSON object"
 }
 ```
 
-Response:
+**Response:**
 ```json
 {
-  "status": "ok",
-  "message": "Entity updated successfully",
-  "data": {
-    "id": "entity_123",
-    "title": "Updated Title",
-    "tags": ["priority:low", "status:completed"],
-    "updated_at": "2024-01-01T00:00:00Z"
-  }
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "tags": ["type:document", "status:draft", "priority:high"],
+  "content": "...",
+  "created_at": 1737564000000000000,
+  "updated_at": 1737564000000000000
 }
 ```
 
-### Entity Relationships
+### Update Entity
+```http
+PUT /api/v1/entities/update?id=<entity_id>
+Authorization: Bearer <token>
+```
 
-#### Create Relationship
+**Request:**
+```json
+{
+  "tags": ["type:document", "status:published", "priority:low"],
+  "content": "updated content"
+}
+```
+
+### Query Entities (Advanced)
+```http
+GET /api/v1/entities/query
+Authorization: Bearer <token>
+```
+
+**Query Parameters:**
+- `filter` - Field to filter on (created_at, updated_at, tag:*)
+- `operator` - Comparison operator (eq, ne, gt, lt, gte, lte, like, in)
+- `value` - Value to compare
+- `sort` - Sort field (created_at, updated_at, id, tag_count)
+- `order` - Sort order (asc, desc)
+- `limit` - Maximum results
+- `offset` - Skip results
+
+### Stream Entity
+For large files, use streaming:
+```http
+GET /api/v1/entities/stream?id=<entity_id>
+Authorization: Bearer <token>
+```
+
+### Download Entity
+Download entity as file:
+```http
+GET /api/v1/entities/download?id=<entity_id>
+Authorization: Bearer <token>
+```
+
+## Temporal Operations
+
+EntityDB stores all tags with nanosecond precision timestamps, enabling powerful temporal queries.
+
+### Get Entity As-Of
+Retrieve entity state at a specific time:
+```http
+GET /api/v1/entities/as-of?id=<entity_id>&as_of=<timestamp>
+Authorization: Bearer <token>
+```
+
+**Parameters:**
+- `id` - Entity ID
+- `as_of` - RFC3339 timestamp
+
+### Get Entity History
+Retrieve entity changes over time:
+```http
+GET /api/v1/entities/history?id=<entity_id>&from=<timestamp>&to=<timestamp>
+Authorization: Bearer <token>
+```
+
+**Parameters:**
+- `id` - Entity ID
+- `from` - Start timestamp (default: 24 hours ago)
+- `to` - End timestamp (default: now)
+
+### Get Recent Changes
+Find entities modified recently:
+```http
+GET /api/v1/entities/changes?since=<timestamp>
+Authorization: Bearer <token>
+```
+
+**Parameters:**
+- `since` - Timestamp (default: 1 hour ago)
+
+### Get Entity Diff
+Compare entity at two times:
+```http
+GET /api/v1/entities/diff?id=<entity_id>&t1=<timestamp>&t2=<timestamp>
+Authorization: Bearer <token>
+```
+
+## Entity Relationships
+
+Create and manage relationships between entities.
+
+### Create Relationship
 ```http
 POST /api/v1/entity-relationships
 Authorization: Bearer <token>
 ```
 
-Request:
+**Request:**
 ```json
 {
-  "source_id": "entity_123",
-  "target_id": "entity_456",
-  "type": "depends_on",
-  "properties": {
-    "weight": 1
-  }
+  "source_id": "550e8400-e29b-41d4-a716-446655440000",
+  "target_id": "660e8400-e29b-41d4-a716-446655440001",
+  "relationship_type": "contains"
 }
 ```
 
-Response:
-```json
-{
-  "status": "ok",
-  "message": "Relationship created successfully",
-  "data": {
-    "id": "rel_789",
-    "source_id": "entity_123",
-    "target_id": "entity_456",
-    "type": "depends_on",
-    "created_at": "2024-01-01T00:00:00Z"
-  }
-}
-```
-
-#### List Relationships by Source
+### Get Relationship
 ```http
-GET /api/v1/entity-relationships/source?source=<entity_id>
+GET /api/v1/entity-relationships?source_id=<id>&relationship_type=<type>&target_id=<id>
 Authorization: Bearer <token>
 ```
 
-Response:
-```json
-{
-  "status": "ok",
-  "data": [
-    {
-      "id": "rel_789",
-      "source_id": "entity_123",
-      "target_id": "entity_456",
-      "type": "depends_on",
-      "properties": {
-        "weight": 1
-      }
-    }
-  ]
-}
-```
-
-#### List Relationships by Target
+### List by Source
 ```http
-GET /api/v1/entity-relationships/target?target=<entity_id>
+GET /api/v1/entity-relationships/by-source?source_id=<entity_id>
 Authorization: Bearer <token>
 ```
 
-#### Delete Relationship
+### List by Target
 ```http
-DELETE /api/v1/entity-relationships?id=<relationship_id>
+GET /api/v1/entity-relationships/by-target?target_id=<entity_id>
+Authorization: Bearer <token>
+```
+
+### Delete Relationship
+```http
+DELETE /api/v1/entity-relationships?source_id=<id>&relationship_type=<type>&target_id=<id>
 Authorization: Bearer <token>
 ```
 
 ## Tag System
+
+EntityDB uses a hierarchical tag system for metadata and permissions.
 
 ### Tag Format
 ```
@@ -280,33 +302,33 @@ namespace:category:subcategory:value
 
 1. **type:** - Entity classification
    - `type:user`
-   - `type:agent`
-   - `type:issue`
-   - `type:workspace`
+   - `type:document`
+   - `type:metric`
+   - `type:config`
 
 2. **rbac:** - Access control
    - `rbac:role:admin`
    - `rbac:role:user`
    - `rbac:perm:entity:create`
-   - `rbac:perm:issue:*`
    - `rbac:perm:*`
 
 3. **status:** - Entity state
    - `status:active`
-   - `status:pending`
-   - `status:completed`
+   - `status:draft`
+   - `status:published`
    - `status:archived`
 
 4. **id:** - Unique identifiers
    - `id:username:admin`
-   - `id:agent:claude-2`
-   - `id:issue:issue_123`
+   - `id:email:user@example.com`
 
-5. **priority:** - Priority levels
-   - `priority:critical`
-   - `priority:high`
-   - `priority:medium`
-   - `priority:low`
+### Temporal Tags
+All tags are stored with timestamps internally:
+```
+1737564000000000000|type:document
+```
+
+The API handles this transparently unless you specify `include_timestamps=true`.
 
 ## Permission System
 
@@ -314,105 +336,131 @@ namespace:category:subcategory:value
 
 | Endpoint | Required Permission |
 |----------|-------------------|
-| GET /api/v1/entities/list | rbac:perm:entity:read |
-| POST /api/v1/entities | rbac:perm:entity:create |
-| PUT /api/v1/entities/update | rbac:perm:entity:update |
-| DELETE /api/v1/entities | rbac:perm:entity:delete |
-| GET /api/v1/entity-relationships/* | rbac:perm:relationship:read |
-| POST /api/v1/entity-relationships | rbac:perm:relationship:create |
-| DELETE /api/v1/entity-relationships | rbac:perm:relationship:delete |
+| GET /api/v1/entities/list | `entity:view` |
+| POST /api/v1/entities/create | `entity:create` |
+| PUT /api/v1/entities/update | `entity:update` |
+| DELETE /api/v1/entities | `entity:delete` |
+| GET /api/v1/entity-relationships/* | `relation:view` |
+| POST /api/v1/entity-relationships | `relation:create` |
+| DELETE /api/v1/entity-relationships | `relation:delete` |
+
+### Roles
+- `rbac:role:admin` - Full access (includes `rbac:perm:*`)
+- `rbac:role:user` - Basic user access
 
 ### Wildcard Permissions
-
 - `rbac:perm:*` - All permissions
 - `rbac:perm:entity:*` - All entity operations
-- `rbac:perm:issue:*` - All issue operations
-
-## Error Responses
-
-### 400 Bad Request
-```json
-{
-  "status": "error",
-  "message": "Invalid request format"
-}
-```
-
-### 401 Unauthorized
-```json
-{
-  "status": "error",
-  "message": "Authentication required"
-}
-```
-
-### 403 Forbidden
-```json
-{
-  "status": "error",
-  "message": "Permission denied"
-}
-```
-
-### 404 Not Found
-```json
-{
-  "status": "error",
-  "message": "Entity not found"
-}
-```
-
-### 500 Internal Server Error
-```json
-{
-  "status": "error",
-  "message": "Internal server error"
-}
-```
-
-## Rate Limiting
-
-Currently no rate limiting is implemented.
-
-## Pagination
-
-Pagination is not yet implemented. All list endpoints return complete results.
+- `rbac:perm:user:*` - All user operations
 
 ## Examples
 
-### Create Issue with Authentication
+### Complete Workflow
 ```bash
-# Login
+# 1. Login
 TOKEN=$(curl -s -X POST http://localhost:8085/api/v1/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"username":"admin","password":"password"}' \
+  -d '{"username":"admin","password":"admin"}' \
   | jq -r .token)
 
-# Create issue
-curl -X POST http://localhost:8085/api/v1/entities \
+# 2. Create a document
+ENTITY_ID=$(curl -s -X POST http://localhost:8085/api/v1/entities/create \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "type": "issue",
-    "title": "Fix login bug",
-    "description": "Users cannot login with special characters",
-    "tags": ["priority:high", "status:pending", "component:auth"]
+    "tags": ["type:document", "status:draft", "title:API Guide"],
+    "content": {
+      "title": "EntityDB API Guide",
+      "body": "Complete guide to using the EntityDB API"
+    }
+  }' | jq -r .id)
+
+# 3. Update the document
+curl -X PUT "http://localhost:8085/api/v1/entities/update?id=$ENTITY_ID" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "tags": ["type:document", "status:published", "title:API Guide"],
+    "content": {
+      "title": "EntityDB API Guide",
+      "body": "Updated guide with more examples"
+    }
   }'
 
-# List issues
-curl -X GET "http://localhost:8085/api/v1/entities/list?type=issue" \
+# 4. Query documents
+curl -X GET "http://localhost:8085/api/v1/entities/list?tag=type:document" \
   -H "Authorization: Bearer $TOKEN"
-```
 
-### Create Entity Relationship
-```bash
-# Create dependency between issues
+# 5. Get temporal history
+curl -X GET "http://localhost:8085/api/v1/entities/history?id=$ENTITY_ID" \
+  -H "Authorization: Bearer $TOKEN"
+
+# 6. Create a relationship
 curl -X POST http://localhost:8085/api/v1/entity-relationships \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "source_id": "entity_123",
-    "target_id": "entity_456",
-    "type": "depends_on"
+    "source_id": "'$ENTITY_ID'",
+    "target_id": "another_entity_id",
+    "relationship_type": "references"
   }'
 ```
+
+### Working with Large Files
+```bash
+# Upload a large file (>4MB will auto-chunk)
+curl -X POST http://localhost:8085/api/v1/entities/create \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "tags": ["type:file", "filename:data.csv", "size:10485760"],
+    "content": "'$(base64 -w 0 large-file.csv)'"
+  }'
+
+# Stream the file back
+curl -X GET "http://localhost:8085/api/v1/entities/stream?id=$FILE_ID" \
+  -H "Authorization: Bearer $TOKEN" \
+  --output retrieved-file.csv
+```
+
+### Temporal Queries
+```bash
+# Get entity state from 1 hour ago
+TIMESTAMP=$(date -u -d '1 hour ago' '+%Y-%m-%dT%H:%M:%SZ')
+curl -X GET "http://localhost:8085/api/v1/entities/as-of?id=$ENTITY_ID&as_of=$TIMESTAMP" \
+  -H "Authorization: Bearer $TOKEN"
+
+# Compare entity between two times
+T1=$(date -u -d '2 hours ago' '+%Y-%m-%dT%H:%M:%SZ')
+T2=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+curl -X GET "http://localhost:8085/api/v1/entities/diff?id=$ENTITY_ID&t1=$T1&t2=$T2" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+## Error Responses
+
+All errors follow this format:
+```json
+{
+  "error": "Error message"
+}
+```
+
+Common status codes:
+- `400` - Bad Request (invalid parameters)
+- `401` - Unauthorized (missing/invalid token)
+- `403` - Forbidden (insufficient permissions)
+- `404` - Not Found
+- `500` - Internal Server Error
+
+## Additional Resources
+
+- [Complete API Reference](./API_REFERENCE_COMPLETE.md) - All 85+ endpoints
+- [Query API Guide](./query_api.md) - Advanced query operations
+- [Authentication Guide](./auth.md) - Detailed auth documentation
+- [Temporal Features](../features/TEMPORAL_FEATURES.md) - Temporal capabilities
+- [Examples](./examples.md) - More code examples
+
+---
+
+For the latest updates and complete documentation, visit the [EntityDB Documentation](/docs/README.md).

@@ -58,9 +58,11 @@ type TemporalRepository struct {
 	// Configuration
 	bucketSize       int64 // Default to hour buckets
 	
-	// Locks
+	// Sharded locks for reduced contention
+	entityLocks      *ShardedLock
+	bucketLocks      *ShardedLock
 	timelineMu       sync.RWMutex
-	bucketMu         sync.RWMutex
+	bucketIndexMu    sync.RWMutex // For the bucket index map itself
 }
 
 // EntitySet is a thread-safe set of entity IDs
@@ -114,6 +116,8 @@ func NewTemporalRepository(dataPath string) (*TemporalRepository, error) {
 		},
 		temporalStats: &TemporalStats{},
 		bucketSize:    HourBucket.BucketSize,
+		entityLocks:   NewShardedLock(64), // 64 shards for entity operations
+		bucketLocks:   NewShardedLock(16), // 16 shards for bucket operations
 	}
 	
 	// Build temporal indexes in parallel
@@ -185,18 +189,32 @@ func (r *TemporalRepository) indexEntityTemporal(entity *models.Entity) {
 		r.timelineIndex.Put(timestamp, entity.ID)
 		r.timelineMu.Unlock()
 		
-		// Update bucket index
+		// Update bucket index with sharded locking
 		bucket := TimeBucket{r.bucketSize}.GetBucket(timestamp)
-		r.bucketMu.Lock()
-		if r.bucketIndex[bucket] == nil {
-			r.bucketIndex[bucket] = &EntitySet{
-				items: make(map[string]bool),
+		bucketKey := fmt.Sprintf("bucket:%d", bucket)
+		
+		// First check if bucket exists (read lock)
+		r.bucketIndexMu.RLock()
+		_, exists := r.bucketIndex[bucket]
+		r.bucketIndexMu.RUnlock()
+		
+		// Create bucket if needed (write lock)
+		if !exists {
+			r.bucketIndexMu.Lock()
+			if r.bucketIndex[bucket] == nil {
+				r.bucketIndex[bucket] = &EntitySet{
+					items: make(map[string]bool),
+				}
 			}
+			r.bucketIndexMu.Unlock()
 		}
-		r.bucketIndex[bucket].mu.Lock()
-		r.bucketIndex[bucket].items[entity.ID] = true
-		r.bucketIndex[bucket].mu.Unlock()
-		r.bucketMu.Unlock()
+		
+		// Update bucket with sharded lock
+		r.bucketLocks.WithLock(bucketKey, func() {
+			r.bucketIndex[bucket].mu.Lock()
+			r.bucketIndex[bucket].items[entity.ID] = true
+			r.bucketIndex[bucket].mu.Unlock()
+		})
 	}
 	
 	// Sort timestamps
@@ -351,8 +369,8 @@ func (r *TemporalRepository) FindEntitiesInRange(start, end time.Time) ([]*model
 	
 	entityIDs := make(map[string]bool)
 	
-	r.bucketMu.RLock()
-	defer r.bucketMu.RUnlock()
+	r.bucketIndexMu.RLock()
+	defer r.bucketIndexMu.RUnlock()
 	
 	// Check each bucket in range
 	for bucket := startBucket; bucket <= endBucket; bucket += r.bucketSize {
@@ -431,14 +449,10 @@ func (r *TemporalRepository) GetEntityHistory(entityID string, limit int) ([]*mo
 		}
 	}
 	
-	// Sort by timestamp (newest first)
-	for i := 0; i < len(tagHistory); i++ {
-		for j := i + 1; j < len(tagHistory); j++ {
-			if tagHistory[i].Timestamp < tagHistory[j].Timestamp {
-				tagHistory[i], tagHistory[j] = tagHistory[j], tagHistory[i]
-			}
-		}
-	}
+	// Sort by timestamp (newest first) - use efficient sort
+	sort.Slice(tagHistory, func(i, j int) bool {
+		return tagHistory[i].Timestamp > tagHistory[j].Timestamp
+	})
 	
 	// Create change records
 	changes := make([]*models.EntityChange, 0)

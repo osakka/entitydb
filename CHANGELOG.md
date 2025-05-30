@@ -5,6 +5,37 @@ All notable changes to the EntityDB Platform will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.20.0] - 2025-05-30
+
+### Added
+- **Advanced Memory Optimization**: Comprehensive memory management improvements
+  - String interning for tag storage reducing memory by up to 70% for duplicate tags
+  - Sharded lock system for high-concurrency scenarios
+  - Safe buffer pool implementation with size-based pools (small, medium, large)
+  - Compression support for entity content with 1KB threshold
+  - Memory pool integration throughout storage layer
+
+### Fixed
+- **Authentication System**: Resolved credential storage and retrieval issues
+  - Fixed compression handling for credential entities
+  - Corrected reader implementation to properly handle both compressed and uncompressed content
+  - Ensured bcrypt hashes are stored and retrieved without corruption
+  - Fixed binary format reader to correctly parse both original and compressed sizes
+
+### Changed
+- **Storage Layer Optimizations**: 
+  - Enhanced writer with compression support using gzip for content > 1KB
+  - Improved reader with proper decompression handling
+  - Added trace logging for compression operations
+  - Integrated buffer pools for reduced GC pressure
+
+### Removed
+- **Development Tools Cleanup**: Moved 30+ debug/fix tools to trash
+  - Removed temporary authentication debugging tools
+  - Cleaned up credential fix utilities
+  - Removed duplicate reader implementations
+  - Maintained single source of truth principle
+
 ## [2.19.0] - 2025-05-30
 
 ### Fixed

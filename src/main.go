@@ -418,8 +418,8 @@ func main() {
 	apiRouter.HandleFunc("/metrics/history", metricsHistoryHandler.GetMetricHistory).Methods("GET")
 	apiRouter.HandleFunc("/metrics/available", metricsHistoryHandler.GetAvailableMetrics).Methods("GET")
 	
-	// Start background metrics collector (collect every 1 second with change detection)
-	backgroundCollector := api.NewBackgroundMetricsCollector(server.entityRepo, 1*time.Second)
+	// Start background metrics collector (collect every 30 seconds with change detection)
+	backgroundCollector := api.NewBackgroundMetricsCollector(server.entityRepo, 30*time.Second)
 	backgroundCollector.Start()
 	defer backgroundCollector.Stop()
 	

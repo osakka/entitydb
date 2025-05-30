@@ -2,8 +2,10 @@ package binary
 
 import (
 	"encoding/binary"
+	"entitydb/models"
 	"errors"
 	"io"
+	"sync"
 	"entitydb/logger"
 )
 
@@ -17,8 +19,8 @@ const (
 	// Header size in bytes
 	HeaderSize = 64
 	
-	// Index entry size (64-byte ID + 8-byte offset + 4-byte size + 4-byte flags)
-	IndexEntrySize = 80
+	// Index entry size (96-byte ID + 8-byte offset + 4-byte size + 4-byte flags)
+	IndexEntrySize = 112
 )
 
 var (
@@ -106,7 +108,7 @@ func (h *Header) Read(r io.Reader) error {
 
 // IndexEntry represents an entry in the entity index
 type IndexEntry struct {
-	EntityID [64]byte  // UUID with prefix (up to 64 bytes)
+	EntityID [96]byte  // UUID with prefix (up to 96 bytes)
 	Offset   uint64
 	Size     uint32
 	Flags    uint32
@@ -120,11 +122,12 @@ type EntityHeader struct {
 	Reserved     uint32
 }
 
-// TagDictionary manages tag string compression
+// TagDictionary manages tag string compression with interning
 type TagDictionary struct {
 	idToTag map[uint32]string
 	tagToID map[string]uint32
 	nextID  uint32
+	mu      sync.RWMutex // Add mutex for thread safety
 }
 
 // NewTagDictionary creates a new tag dictionary
@@ -138,24 +141,48 @@ func NewTagDictionary() *TagDictionary {
 
 // GetOrCreateID returns the ID for a tag, creating if necessary
 func (d *TagDictionary) GetOrCreateID(tag string) uint32 {
+	// Intern the string first
+	tag = models.Intern(tag)
+	
+	// Fast path - read lock
+	d.mu.RLock()
+	if id, exists := d.tagToID[tag]; exists {
+		d.mu.RUnlock()
+		return id
+	}
+	d.mu.RUnlock()
+	
+	// Slow path - write lock
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	
+	// Double check
 	if id, exists := d.tagToID[tag]; exists {
 		return id
 	}
 	
+	// Intern the tag string to save memory
+	internedTag := models.Intern(tag)
+	
 	id := d.nextID
 	d.nextID++
-	d.idToTag[id] = tag
-	d.tagToID[tag] = id
+	d.idToTag[id] = internedTag
+	d.tagToID[internedTag] = id
 	return id
 }
 
 // GetTag returns the tag string for an ID
 func (d *TagDictionary) GetTag(id uint32) string {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
 	return d.idToTag[id]
 }
 
 // Write writes the dictionary to writer
 func (d *TagDictionary) Write(w io.Writer) error {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+	
 	// Write count
 	if err := binary.Write(w, binary.LittleEndian, uint32(len(d.idToTag))); err != nil {
 		return err
@@ -179,6 +206,9 @@ func (d *TagDictionary) Write(w io.Writer) error {
 
 // Read reads the dictionary from reader
 func (d *TagDictionary) Read(r io.Reader) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	
 	var count uint32
 	if err := binary.Read(r, binary.LittleEndian, &count); err != nil {
 		return err
@@ -200,8 +230,10 @@ func (d *TagDictionary) Read(r io.Reader) error {
 			return err
 		}
 		
-		d.idToTag[id] = string(tag)
-		d.tagToID[string(tag)] = id
+		// Intern the tag string
+		tagStr := models.Intern(string(tag))
+		d.idToTag[id] = tagStr
+		d.tagToID[tagStr] = id
 		if id >= d.nextID {
 			d.nextID = id + 1
 		}

@@ -78,7 +78,7 @@ func (h *EntityHandler) CreateEntity(w http.ResponseWriter, r *http.Request) {
 	
 	// Parse request body
 	var req CreateEntityRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := DecodeJSON(r, &req); err != nil {
 		RespondError(w, http.StatusBadRequest, "Invalid request body")
 		return
 	}
@@ -565,7 +565,7 @@ func (h *EntityHandler) QueryEntities(w http.ResponseWriter, r *http.Request) {
 func (h *EntityHandler) TestCreateEntity(w http.ResponseWriter, r *http.Request) {
 	// Parse request body
 	var reqData map[string]interface{}
-	if err := json.NewDecoder(r.Body).Decode(&reqData); err != nil {
+	if err := DecodeJSON(r, &reqData); err != nil {
 		RespondError(w, http.StatusBadRequest, "Invalid request body")
 		return
 	}
@@ -686,7 +686,7 @@ type SimpleEntityRequest struct {
 func (h *EntityHandler) SimpleCreateEntity(w http.ResponseWriter, r *http.Request) {
 	// Parse request body
 	var req SimpleEntityRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := DecodeJSON(r, &req); err != nil {
 		RespondError(w, http.StatusBadRequest, "Invalid request body")
 		return
 	}

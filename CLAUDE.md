@@ -165,7 +165,31 @@ The server automatically creates a default admin user if none exists:
 - Audit logging
 - Aggregation queries (beyond sorting/filtering)
 
-## Recent Changes (v2.19.0)
+## Recent Changes (v2.20.0)
+
+- **Advanced Memory Optimization**: Comprehensive memory management improvements
+  - String interning for tag storage reducing memory by up to 70% for duplicate tags
+  - Sharded lock system for high-concurrency scenarios  
+  - Safe buffer pool implementation with size-based pools (small, medium, large)
+  - Compression support for entity content with 1KB threshold
+  - Memory pool integration throughout storage layer
+- **Authentication System Fix**: Resolved credential storage and retrieval issues
+  - Fixed compression handling for credential entities
+  - Corrected reader implementation to properly handle both compressed and uncompressed content
+  - Ensured bcrypt hashes are stored and retrieved without corruption
+  - Fixed binary format reader to correctly parse both original and compressed sizes
+- **Storage Layer Optimizations**: 
+  - Enhanced writer with compression support using gzip for content > 1KB
+  - Improved reader with proper decompression handling
+  - Added trace logging for compression operations
+  - Integrated buffer pools for reduced GC pressure
+- **Development Tools Cleanup**: Moved 30+ debug/fix tools to trash
+  - Removed temporary authentication debugging tools
+  - Cleaned up credential fix utilities
+  - Removed duplicate reader implementations
+  - Maintained single source of truth principle
+
+## Previous Changes (v2.19.0)
 
 - **Critical WAL Management Fix**: Prevented unbounded WAL growth that caused disk space exhaustion
   - Implemented automatic WAL checkpointing: every 1000 operations, 5 minutes, or 100MB size

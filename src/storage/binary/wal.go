@@ -73,7 +73,7 @@ func (w *WAL) LogCreate(entity *models.Entity) error {
 	})
 	defer op.Complete()
 	
-	logger.Info("Logging CREATE operation for entity %s", entity.ID)
+	logger.Trace("Logging CREATE operation for entity %s", entity.ID)
 	
 	err := w.logEntry(WALEntry{
 		OpType:    WALOpCreate,
@@ -102,7 +102,7 @@ func (w *WAL) LogUpdate(entity *models.Entity) error {
 	})
 	defer op.Complete()
 	
-	logger.Info("Logging UPDATE operation for entity %s", entity.ID)
+	logger.Trace("Logging UPDATE operation for entity %s", entity.ID)
 	
 	err := w.logEntry(WALEntry{
 		OpType:    WALOpUpdate,
@@ -129,7 +129,7 @@ func (w *WAL) LogDelete(entityID string) error {
 	})
 	defer op.Complete()
 	
-	logger.Info("Logging DELETE operation for entity %s", entityID)
+	logger.Trace("Logging DELETE operation for entity %s", entityID)
 	
 	err := w.logEntry(WALEntry{
 		OpType:    WALOpDelete,
