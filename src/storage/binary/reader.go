@@ -28,7 +28,7 @@ type Reader struct {
 
 // NewReader creates a new reader for the given file
 func NewReader(filename string) (*Reader, error) {
-	logger.Debug("Opening reader for file: %s", filename)
+	logger.Trace("Opening reader for file: %s", filename)
 	
 	file, err := os.Open(filename)
 	if err != nil {
@@ -43,7 +43,7 @@ func NewReader(filename string) (*Reader, error) {
 		file.Close()
 		return nil, err
 	}
-	logger.Debug("File size: %d bytes", stat.Size())
+	logger.Trace("File size: %d bytes", stat.Size())
 	
 	r := &Reader{
 		file:    file,
@@ -53,26 +53,26 @@ func NewReader(filename string) (*Reader, error) {
 	}
 	
 	// Read header
-	logger.Debug("Reading header")
+	logger.Trace("Reading header")
 	if err := r.header.Read(file); err != nil {
 		logger.Error("Failed to read header: %v", err)
 		return nil, err
 	}
 	
-	logger.Debug("Header read successfully: Magic=%x, Version=%d, EntityCount=%d, FileSize=%d",
+	logger.Trace("Header read successfully: Magic=%x, Version=%d, EntityCount=%d, FileSize=%d",
 		r.header.Magic, r.header.Version, r.header.EntityCount, r.header.FileSize)
-	logger.Debug("TagDictOffset=%d, TagDictSize=%d", r.header.TagDictOffset, r.header.TagDictSize)
-	logger.Debug("EntityIndexOffset=%d, EntityIndexSize=%d", r.header.EntityIndexOffset, r.header.EntityIndexSize)
+	logger.Trace("TagDictOffset=%d, TagDictSize=%d", r.header.TagDictOffset, r.header.TagDictSize)
+	logger.Trace("EntityIndexOffset=%d, EntityIndexSize=%d", r.header.EntityIndexOffset, r.header.EntityIndexSize)
 	
 	// Skip dictionary and index if no entities
 	if r.header.EntityCount == 0 {
-		logger.Debug("No entities in file, skipping dictionary and index")
+		logger.Trace("No entities in file, skipping dictionary and index")
 		return r, nil
 	}
 	
 	// Read tag dictionary
 	if r.header.TagDictOffset > 0 && r.header.TagDictSize > 0 {
-		logger.Debug("Reading tag dictionary from offset %d", r.header.TagDictOffset)
+		logger.Trace("Reading tag dictionary from offset %d", r.header.TagDictOffset)
 		if _, err := file.Seek(int64(r.header.TagDictOffset), os.SEEK_SET); err != nil {
 			logger.Error("Failed to seek to tag dictionary: %v", err)
 			return nil, err
@@ -81,7 +81,7 @@ func NewReader(filename string) (*Reader, error) {
 			// Log but don't fail - allow partial reads
 			logger.Warn("Failed to read tag dictionary: %v", err)
 		} else {
-			logger.Debug("Tag dictionary loaded with %d entries", 0)
+			logger.Trace("Tag dictionary loaded with %d entries", 0)
 		}
 	}
 	
@@ -159,12 +159,12 @@ func NewReader(filename string) (*Reader, error) {
 			id := string(bytes.TrimRight(entry.EntityID[:], "\x00"))
 			// Skip empty IDs
 			if id == "" {
-				logger.Debug("Skipping empty index entry %d", i)
+				logger.Trace("Skipping empty index entry %d", i)
 				continue
 			}
 			r.index[id] = entry
 			entriesRead++
-			logger.Debug("Loaded index entry %d: ID=%s, Offset=%d, Size=%d", i, id, entry.Offset, entry.Size)
+			logger.Trace("Loaded index entry %d: ID=%s, Offset=%d, Size=%d", i, id, entry.Offset, entry.Size)
 		}
 		
 		logger.Trace("Index loading complete: read %d entries, loaded %d into index (expected %d)",
@@ -190,17 +190,17 @@ func (r *Reader) GetEntity(id string) (*models.Entity, error) {
 		}
 	}()
 	
-	logger.Debug("GetEntity called for ID: %s", id)
+	logger.Trace("GetEntity called for ID: %s", id)
 	
 	entry, exists := r.index[id]
 	if !exists {
 		err := fmt.Errorf("entity %s not found in index", id)
 		op.Fail(err)
-		logger.Debug("Entity %s not found in index", id)
+		logger.Trace("Entity %s not found in index", id)
 		return nil, ErrNotFound
 	}
 	
-	logger.Debug("Found entity %s at offset %d, size %d", id, entry.Offset, entry.Size)
+	logger.Trace("Found entity %s at offset %d, size %d", id, entry.Offset, entry.Size)
 	
 	// Seek to entity position
 	_, err := r.file.Seek(int64(entry.Offset), os.SEEK_SET)
@@ -221,7 +221,7 @@ func (r *Reader) GetEntity(id string) (*models.Entity, error) {
 		return nil, errors.New("incomplete read")
 	}
 	
-	logger.Debug("Read %d bytes for entity %s", n, id)
+	logger.Trace("Read %d bytes for entity %s", n, id)
 	
 	entity, err := r.parseEntity(data, id)
 	if err != nil {
@@ -229,27 +229,27 @@ func (r *Reader) GetEntity(id string) (*models.Entity, error) {
 		return nil, err
 	}
 	
-	logger.Debug("Successfully parsed entity %s", id)
+	logger.Trace("Successfully parsed entity %s", id)
 	return entity, nil
 }
 
 // GetAllEntities reads all entities
 func (r *Reader) GetAllEntities() ([]*models.Entity, error) {
-	logger.Debug("GetAllEntities called, index has %d entries, header says %d entities", len(r.index), r.header.EntityCount)
+	logger.Trace("GetAllEntities called, index has %d entries, header says %d entities", len(r.index), r.header.EntityCount)
 	entities := make([]*models.Entity, 0, r.header.EntityCount)
 	
 	for id := range r.index {
-		logger.Debug("Getting entity with ID: %s", id)
+		logger.Trace("Getting entity with ID: %s", id)
 		entity, err := r.GetEntity(id)
 		if err != nil {
-			logger.Debug("Error getting entity %s: %v", id, err)
+			logger.Warn("Error getting entity %s: %v", id, err)
 			// Skip entities we can't read
 			continue
 		}
 		entities = append(entities, entity)
 	}
 	
-	logger.Debug("GetAllEntities returning %d entities", len(entities))
+	logger.Trace("GetAllEntities returning %d entities", len(entities))
 	return entities, nil
 }
 
@@ -335,7 +335,7 @@ func (r *Reader) parseEntity(data []byte, id string) (*models.Entity, error) {
 					expectedChecksum := parts[1]
 					if expectedChecksum == actualChecksumHex {
 						checksumValid = true
-						logger.Debug("Checksum verification passed for entity %s", id)
+						logger.Trace("Checksum verification passed for entity %s", id)
 					} else {
 						logger.Error("Checksum mismatch for entity %s: expected %s, got %s", 
 							id, expectedChecksum, actualChecksumHex)

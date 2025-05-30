@@ -88,7 +88,7 @@ type SecurityPermission struct {
 
 // CreateUser creates a new user entity with separate credential entity
 func (sm *SecurityManager) CreateUser(username, password, email string) (*SecurityUser, error) {
-	logger.Debug("[SecurityManager] CreateUser called for username: %s", username)
+	logger.Debug("CreateUser called for username: %s", username)
 	
 	// Check if user already exists
 	existingUsers, err := sm.entityRepo.ListByTag("identity:username:" + username)
@@ -97,13 +97,13 @@ func (sm *SecurityManager) CreateUser(username, password, email string) (*Securi
 	}
 	
 	if len(existingUsers) > 0 {
-		logger.Debug("[SecurityManager] User %s already exists with ID: %s", username, existingUsers[0].ID)
+		logger.Debug("User %s already exists with ID: %s", username, existingUsers[0].ID)
 		return nil, fmt.Errorf("user with username '%s' already exists", username)
 	}
 	
 	// Generate secure UUID for user
 	userID := "user_" + generateSecureUUID()
-	logger.Debug("[SecurityManager] Generated user ID: %s", userID)
+	logger.Debug("Generated user ID: %s", userID)
 	
 	// Create user entity (no sensitive data)
 	tags := []string{
@@ -130,10 +130,10 @@ func (sm *SecurityManager) CreateUser(username, password, email string) (*Securi
 	
 	// Create user entity
 	if err := sm.entityRepo.Create(userEntity); err != nil {
-		logger.Error("[SecurityManager] Failed to create user entity: %v", err)
+		logger.Error("Failed to create user entity: %v", err)
 		return nil, fmt.Errorf("failed to create user entity: %v", err)
 	}
-	logger.Debug("[SecurityManager] Successfully created user entity")
+	logger.Debug("Successfully created user entity")
 	
 	// Create separate credential entity
 	credentialID := "cred_" + generateSecureUUID()
@@ -189,17 +189,17 @@ func (sm *SecurityManager) CreateUser(username, password, email string) (*Securi
 // AuthenticateUser performs relationship-based authentication
 func (sm *SecurityManager) AuthenticateUser(username, password string) (*SecurityUser, error) {
 	// Find user by username tag
-	logger.Debug("[SecurityManager] Looking for user with tag: identity:username:%s", username)
+	logger.Debug("Looking for user with tag: identity:username:%s", username)
 	userEntities, err := sm.entityRepo.ListByTag("identity:username:" + username)
 	if err != nil {
-		logger.Error("[SecurityManager] Error finding user: %v", err)
+		logger.Error("Error finding user: %v", err)
 		return nil, fmt.Errorf("user not found: %v", err)
 	}
 	if len(userEntities) == 0 {
-		logger.Debug("[SecurityManager] No user entities found with username: %s", username)
+		logger.Debug("No user entities found with username: %s", username)
 		return nil, fmt.Errorf("user not found")
 	}
-	logger.Debug("[SecurityManager] Found %d user entities for username: %s", len(userEntities), username)
+	logger.Debug("Found %d user entities for username: %s", len(userEntities), username)
 	
 	userEntity := userEntities[0]
 	
@@ -218,27 +218,27 @@ func (sm *SecurityManager) AuthenticateUser(username, password string) (*Securit
 	}
 	
 	// Get credential entity via relationship
-	logger.Debug("[SecurityManager] Getting relationships for user ID: %s", userEntity.ID)
+	logger.Debug("Getting relationships for user ID: %s", userEntity.ID)
 	credentialEntities, err := sm.entityRepo.GetRelationshipsBySource(userEntity.ID)
 	if err != nil {
-		logger.Error("[SecurityManager] Failed to get relationships for user %s: %v", userEntity.ID, err)
+		logger.Error("Failed to get relationships for user %s: %v", userEntity.ID, err)
 		return nil, fmt.Errorf("failed to get user credentials: %v", err)
 	}
-	logger.Debug("[SecurityManager] Found %d relationships for user %s", len(credentialEntities), userEntity.ID)
+	logger.Debug("Found %d relationships for user %s", len(credentialEntities), userEntity.ID)
 	
 	var credentialEntity *Entity
 	for _, rel := range credentialEntities {
 		if relationship, ok := rel.(*EntityRelationship); ok {
-			logger.Debug("[SecurityManager] Checking relationship %s of type %s/%s", relationship.ID, relationship.Type, relationship.RelationshipType)
+			logger.Debug("Checking relationship %s of type %s/%s", relationship.ID, relationship.Type, relationship.RelationshipType)
 			if relationship.Type == RelationshipHasCredential || relationship.RelationshipType == RelationshipHasCredential {
-				logger.Debug("[SecurityManager] Found has_credential relationship, fetching credential entity %s", relationship.TargetID)
+				logger.Debug("Found has_credential relationship, fetching credential entity %s", relationship.TargetID)
 				credEntity, err := sm.entityRepo.GetByID(relationship.TargetID)
 				if err == nil {
 					credentialEntity = credEntity
-					logger.Debug("[SecurityManager] Successfully fetched credential entity %s", relationship.TargetID)
+					logger.Debug("Successfully fetched credential entity %s", relationship.TargetID)
 					break
 				} else {
-					logger.Error("[SecurityManager] Failed to fetch credential entity %s: %v", relationship.TargetID, err)
+					logger.Error("Failed to fetch credential entity %s: %v", relationship.TargetID, err)
 				}
 			}
 		}

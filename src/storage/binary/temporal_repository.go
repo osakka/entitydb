@@ -681,6 +681,32 @@ func (r *TemporalRepository) Update(entity *models.Entity) error {
 	return nil
 }
 
+// AddTag adds a tag to an entity and maintains temporal indexes
+func (r *TemporalRepository) AddTag(entityID, tag string) error {
+	logger.Debug("TemporalRepository.AddTag: Adding tag '%s' to entity %s", tag, entityID)
+	
+	// First, add the tag using the base repository
+	err := r.HighPerformanceRepository.AddTag(entityID, tag)
+	if err != nil {
+		logger.Error("TemporalRepository.AddTag: Failed to add tag to base repository: %v", err)
+		return err
+	}
+	
+	// Get the updated entity to re-index it temporally
+	entity, err := r.GetByID(entityID)
+	if err != nil {
+		logger.Error("TemporalRepository.AddTag: Failed to retrieve updated entity %s: %v", entityID, err)
+		return err
+	}
+	
+	// Re-index the entity temporally to include the new tag
+	logger.Debug("TemporalRepository.AddTag: Re-indexing entity %s temporally", entityID)
+	r.indexEntityTemporal(entity)
+	
+	logger.Debug("TemporalRepository.AddTag: Successfully added tag and updated temporal index for entity %s", entityID)
+	return nil
+}
+
 // ListByTag implements listing with temporal support
 func (r *TemporalRepository) ListByTag(tag string) ([]*models.Entity, error) {
 	// Use the base repository for now

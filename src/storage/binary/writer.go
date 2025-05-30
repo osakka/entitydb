@@ -112,7 +112,7 @@ func (w *Writer) WriteEntity(entity *models.Entity) error {
 	contentChecksum := sha256.Sum256(entity.Content)
 	op.SetMetadata("content_checksum", hex.EncodeToString(contentChecksum[:]))
 	
-	logger.Debug("Entity %s content checksum: %x", entity.ID, contentChecksum)
+	logger.Trace("Entity %s content checksum: %x", entity.ID, contentChecksum)
 	
 	// Prepare entity data
 	w.buffer.Reset()
@@ -139,7 +139,7 @@ func (w *Writer) WriteEntity(entity *models.Entity) error {
 	tagIDs := make([]uint32, len(tags))
 	for i, tag := range tags {
 		tagIDs[i] = w.tagDict.GetOrCreateID(tag)
-		logger.Debug("Tag '%s' assigned ID %d", tag, tagIDs[i])
+		logger.Trace("Tag '%s' assigned ID %d", tag, tagIDs[i])
 	}
 	
 	// Write entity header
@@ -149,7 +149,7 @@ func (w *Writer) WriteEntity(entity *models.Entity) error {
 		ContentCount: 1, // Now we store content as a single item
 	}
 	
-	logger.Debug("Writing entity header: Modified=%d, TagCount=%d, ContentCount=%d", 
+	logger.Trace("Writing entity header: Modified=%d, TagCount=%d, ContentCount=%d", 
 		header.Modified, header.TagCount, header.ContentCount)
 	
 	binary.Write(w.buffer, binary.LittleEndian, header)
@@ -163,13 +163,13 @@ func (w *Writer) WriteEntity(entity *models.Entity) error {
 	if len(entity.Content) > 0 {
 		// Determine content type from entity tags or default to application/octet-stream
 		contentType := "application/octet-stream" // Default
-		logger.Debug("Entity %s has %d tags, checking for content type", entity.ID, len(entity.Tags))
+		logger.Trace("Entity %s has %d tags, checking for content type", entity.ID, len(entity.Tags))
 		for _, tag := range entity.Tags {
-			logger.Debug("Checking tag: %s", tag)
+			logger.Trace("Checking tag: %s", tag)
 			if strings.HasPrefix(tag, "content:type:") {
 				// Direct match (non-timestamped)
 				contentType = strings.TrimPrefix(tag, "content:type:")
-				logger.Debug("Found direct content type: %s", contentType)
+				logger.Trace("Found direct content type: %s", contentType)
 				break
 			} else if strings.Contains(tag, "|content:type:") {
 				// Timestamped tag
@@ -178,13 +178,13 @@ func (w *Writer) WriteEntity(entity *models.Entity) error {
 					tagPart := parts[1] // Use the part after timestamp
 					if strings.HasPrefix(tagPart, "content:type:") {
 						contentType = strings.TrimPrefix(tagPart, "content:type:")
-						logger.Debug("Found timestamped content type: %s", contentType)
+						logger.Trace("Found timestamped content type: %s", contentType)
 						break
 					}
 				}
 			}
 		}
-		logger.Debug("Final content type for entity %s: %s", entity.ID, contentType)
+		logger.Trace("Final content type for entity %s: %s", entity.ID, contentType)
 		
 		// For JSON content, store it directly without additional wrapping
 		if contentType == "application/json" {

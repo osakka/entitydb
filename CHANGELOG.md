@@ -5,7 +5,46 @@ All notable changes to the EntityDB Platform will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.19.0] - 2025-05-30
+
+### Fixed
+- **Critical WAL Management Issue**: Prevented unbounded WAL growth that caused 8GB disk space exhaustion
+  - Implemented automatic WAL checkpointing: every 1000 operations, 5 minutes, or 100MB size
+  - Added checkpoint triggers to Create(), Update(), and AddTag() operations
+  - Fixed root cause: WAL was only truncated at startup, never during runtime
+  - Added WAL monitoring metrics: wal_size, wal_size_mb, wal_warning (>50MB), wal_critical (>100MB)
+- **Temporal Timeline Indexing**: Fixed "entity timeline not found" errors for metrics
+  - Added AddTag() method to TemporalRepository that maintains timeline indexes
+  - Fixed metrics history API that was failing due to missing timeline entries
+  - Ensured all temporal tag additions update the entity timeline index
+
+### Added
+- **Real-Time Temporal Metrics System**: Complete metrics collection and visualization
+  - Background collector runs every 1 second with change-only detection
+  - Temporal storage using AddTag() for time-series data
+  - Retention management tags: retention:count:100, retention:period:3600
+  - Fixed time periods for charts: 1h, 24h, 7d, 30d with appropriate grid sizing
+  - Zero-fill for missing data points, no fallback to mock data
+- **Enhanced Metrics Collection**: Comprehensive system monitoring
+  - Memory metrics: alloc, total_alloc, sys, heap_alloc, heap_inuse
+  - GC metrics: runs, pause duration
+  - Database metrics: size, WAL size, index size
+  - Entity metrics: counts by type, creation statistics
+  - All metrics stored as temporal tags for historical analysis
+- **Code Consolidation**: Major cleanup maintaining single source of truth
+  - Moved 28+ debug/fix tools from src/tools to trash/tools_debug
+  - Removed redundant API handlers to trash/api_redundant
+  - Cleaned up temporal fix scripts to trash/temporal_fixes
+  - Maintained production code integrity while removing development artifacts
+
+### Changed
+- **Metrics Background Collector**: Enhanced with thread-safety and efficiency
+  - Added lastValues map for change detection
+  - Thread-safe implementation with sync.RWMutex
+  - Only writes metrics when values actually change
+  - Proper mutex protection for concurrent access
+
+## [2.18.0] - 2025-05-29
 
 ### Added
 - **Logging Standards Implementation**: Professional logging system with consistent formatting

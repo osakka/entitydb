@@ -209,12 +209,6 @@ func (h *EntityHandler) CreateEntity(w http.ResponseWriter, r *http.Request) {
 // @Success 200 {object} models.Entity
 // @Router /api/v1/entities/get [get]
 func (h *EntityHandler) GetEntity(w http.ResponseWriter, r *http.Request) {
-	// Use our improved implementation
-	h.GetEntityImproved(w, r)
-}
-
-// Original GetEntity implementation kept for reference
-func (h *EntityHandler) GetEntityOriginal(w http.ResponseWriter, r *http.Request) {
 	// Check if timestamps should be included in response
 	includeTimestamps := r.URL.Query().Get("include_timestamps") == "true"
 	
@@ -1083,7 +1077,7 @@ func (h *EntityHandler) GetEntityAsOf(w http.ResponseWriter, r *http.Request) {
 	// Get entity ID from query
 	entityID := r.URL.Query().Get("id")
 	if entityID == "" {
-		logger.Error("Entity ID is missing in request")
+		logger.Warn("GetEntityAsOf: entity ID is missing in request")
 		RespondError(w, http.StatusBadRequest, "Entity ID is required")
 		return
 	}
@@ -1094,7 +1088,7 @@ func (h *EntityHandler) GetEntityAsOf(w http.ResponseWriter, r *http.Request) {
 		asOfStr = r.URL.Query().Get("timestamp")
 	}
 	if asOfStr == "" {
-		logger.Error("Timestamp is missing in request")
+		logger.Warn("GetEntityAsOf: timestamp is missing in request")
 		RespondError(w, http.StatusBadRequest, "Timestamp is required")
 		return
 	}
@@ -1179,7 +1173,7 @@ func (h *EntityHandler) GetEntityHistory(w http.ResponseWriter, r *http.Request)
 	// Get entity ID from query
 	entityID := r.URL.Query().Get("id")
 	if entityID == "" {
-		logger.Error("Entity ID is missing in request")
+		logger.Warn("GetEntityHistory: entity ID is missing in request")
 		RespondError(w, http.StatusBadRequest, "Entity ID is required")
 		return
 	}
@@ -1308,7 +1302,7 @@ func (h *EntityHandler) GetEntityDiff(w http.ResponseWriter, r *http.Request) {
 	// Get entity ID from query
 	entityID := r.URL.Query().Get("id")
 	if entityID == "" {
-		logger.Error("Entity ID is missing in request")
+		logger.Warn("GetEntityDiff: entity ID is missing in request")
 		RespondError(w, http.StatusBadRequest, "Entity ID is required")
 		return
 	}

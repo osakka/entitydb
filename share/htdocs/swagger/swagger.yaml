@@ -334,6 +334,30 @@ definitions:
         example: 20971520
         type: integer
     type: object
+  api.MetricDataPoint:
+    properties:
+      timestamp:
+        type: string
+      value:
+        type: number
+    type: object
+  api.MetricHistoryResponse:
+    properties:
+      count:
+        type: integer
+      data_points:
+        items:
+          $ref: '#/definitions/api.MetricDataPoint'
+        type: array
+      end_time:
+        type: string
+      metric_name:
+        type: string
+      start_time:
+        type: string
+      unit:
+        type: string
+    type: object
   api.OperationStat:
     properties:
       duration_ms:
@@ -1307,6 +1331,52 @@ paths:
       summary: Set feature flag
       tags:
       - configuration
+  /api/v1/metrics/available:
+    get:
+      consumes:
+      - application/json
+      description: Get a list of all metrics being collected
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              type: string
+            type: array
+      summary: List available metrics
+      tags:
+      - metrics
+  /api/v1/metrics/history:
+    get:
+      consumes:
+      - application/json
+      description: Retrieve historical values for a specific metric
+      parameters:
+      - description: Metric name (e.g., memory_alloc, entity_count_total)
+        in: query
+        name: metric_name
+        required: true
+        type: string
+      - description: 'Number of hours to look back (default: 24)'
+        in: query
+        name: hours
+        type: integer
+      - description: 'Maximum number of data points (default: 100)'
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.MetricHistoryResponse'
+      summary: Get metric history
+      tags:
+      - metrics
   /api/v1/rbac/metrics:
     get:
       description: Get comprehensive RBAC, session, and authentication metrics

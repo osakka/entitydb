@@ -3,7 +3,7 @@
 > [!IMPORTANT]
 > EntityDB is a high-performance temporal database where every tag is timestamped with nanosecond precision. All data is stored in a custom binary format (EBF) with Write-Ahead Logging for durability and concurrent access support.
 
-## Current State (v2.18.0)
+## Current State (v2.19.0)
 
 EntityDB now features a unified Entity model with autochunking:
 - **Unified Entity Model**: Single content field ([]byte) per entity
@@ -165,7 +165,29 @@ The server automatically creates a default admin user if none exists:
 - Audit logging
 - Aggregation queries (beyond sorting/filtering)
 
-## Recent Changes (v2.18.0)
+## Recent Changes (v2.19.0)
+
+- **Critical WAL Management Fix**: Prevented unbounded WAL growth that caused disk space exhaustion
+  - Implemented automatic WAL checkpointing: every 1000 operations, 5 minutes, or 100MB size
+  - Added checkpoint triggers to Create(), Update(), and AddTag() operations
+  - Fixed temporal timeline indexing in AddTag() method for metrics collection
+  - Added WAL monitoring metrics: wal_size, wal_size_mb, wal_warning, wal_critical
+- **Temporal Metrics System**: Complete real-time metrics implementation
+  - 1-second collection interval with change-only detection
+  - Temporal storage of metric values using AddTag() with proper timeline indexing
+  - Retention tags for automatic data lifecycle (retention:count:100, retention:period:3600)
+  - Fixed "entity timeline not found" errors by maintaining indexes during AddTag operations
+- **Background Metrics Collector**: Enhanced system metrics collection
+  - Memory, GC, database, entity, and WAL metrics
+  - Change detection to prevent redundant writes
+  - Thread-safe implementation with proper mutex protection
+- **Code Audit and Cleanup**: Major codebase consolidation
+  - Moved 28+ debug/fix tools to trash directory
+  - Removed redundant handler implementations
+  - Cleaned up temporal fix scripts
+  - Maintained single source of truth principle
+
+## Previous Changes (v2.18.0)
 
 - **Logging Standards Implementation**: Professional logging system with consistent formatting
   - Removed redundant manual prefixes since logger provides file/function/line automatically  
@@ -235,7 +257,7 @@ All development follows the standardized Git workflow described in [docs/develop
 
 - URL: https://git.home.arpa/itdlabs/entitydb.git
 - Branch: main
-- Latest tag: v2.18.0
+- Latest tag: v2.19.0
 
 ## Development Principles
 

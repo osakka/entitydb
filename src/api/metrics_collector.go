@@ -6,6 +6,7 @@ import (
 	"entitydb/logger"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -149,7 +150,6 @@ func (c *MetricsCollector) GetMetricHistory(w http.ResponseWriter, r *http.Reque
 	values := c.extractMetricValues(entity, sinceTime, untilTime)
 	
 	response := map[string]interface{}{
-		"metric_id": metricID,
 		"metric":    metricName,
 		"instance":  instance,
 		"since":     sinceTime.Format(time.RFC3339),
@@ -161,69 +161,47 @@ func (c *MetricsCollector) GetMetricHistory(w http.ResponseWriter, r *http.Reque
 	RespondJSON(w, http.StatusOK, response)
 }
 
-// GetCurrentMetrics returns current values for all metrics
+// GetCurrentMetrics retrieves the current value for all metrics
 func (c *MetricsCollector) GetCurrentMetrics(w http.ResponseWriter, r *http.Request) {
-	// Find all metric entities
-	entities, err := c.repo.ListByTag("type:metric")
+	// Get all metric entities
+	metricEntities, err := c.repo.ListByTag("type:metric")
 	if err != nil {
-		RespondError(w, http.StatusInternalServerError, "Failed to list metrics")
+		RespondError(w, http.StatusInternalServerError, "Failed to fetch metrics")
 		return
 	}
 	
-	metrics := []map[string]interface{}{}
+	metrics := make(map[string]interface{})
 	
-	for _, entity := range entities {
-		// Extract current value from snapshot tag
-		var metricName, currentValue, unit string
-		var value float64
+	for _, entity := range metricEntities {
+		// Extract metric name and current value
+		var metricName string
+		var currentValue float64
+		var unit string
 		
-		for _, tag := range entity.Tags {
-			// Handle temporal tags
-			actualTag := tag
-			if idx := strings.LastIndex(tag, "|"); idx != -1 {
-				actualTag = tag[idx+1:]
-			}
-			
-			if strings.HasPrefix(actualTag, "metric:name:") {
-				metricName = strings.TrimPrefix(actualTag, "metric:name:")
-			}
-			if strings.HasPrefix(actualTag, "metric:current:") {
-				// Parse: metric:current:NAME:VALUE:UNIT
-				parts := strings.Split(actualTag, ":")
-				if len(parts) >= 5 {
-					currentValue = parts[3]
-					unit = parts[4]
-					fmt.Sscanf(currentValue, "%f", &value)
+		for _, tag := range entity.GetTagsWithoutTimestamp() {
+			if strings.HasPrefix(tag, "metric:name:") {
+				metricName = strings.TrimPrefix(tag, "metric:name:")
+			} else if strings.HasPrefix(tag, "metric:current:") {
+				// Parse current value from snapshot tag
+				parts := strings.Split(strings.TrimPrefix(tag, "metric:current:"), ":")
+				if len(parts) >= 2 {
+					currentValue, _ = strconv.ParseFloat(parts[1], 64)
+					if len(parts) >= 3 {
+						unit = parts[2]
+					}
 				}
 			}
 		}
 		
-		if metricName != "" && currentValue != "" {
-			metric := map[string]interface{}{
-				"id":        entity.ID,
-				"name":      metricName,
-				"value":     value,
-				"unit":      unit,
-				"updated":   entity.UpdatedAt,
+		if metricName != "" {
+			metrics[metricName] = map[string]interface{}{
+				"value": currentValue,
+				"unit":  unit,
 			}
-			
-			// Add instance if present
-			for _, tag := range entity.Tags {
-				if strings.HasPrefix(tag, "metric:instance:") {
-					metric["instance"] = strings.TrimPrefix(tag, "metric:instance:")
-					break
-				}
-			}
-			
-			metrics = append(metrics, metric)
 		}
 	}
 	
-	RespondJSON(w, http.StatusOK, map[string]interface{}{
-		"metrics": metrics,
-		"count":   len(metrics),
-		"timestamp": time.Now().Format(time.RFC3339),
-	})
+	RespondJSON(w, http.StatusOK, metrics)
 }
 
 // Helper functions
@@ -248,38 +226,39 @@ func (c *MetricsCollector) createMetricContent(update MetricUpdate) []byte {
 	return data
 }
 
+// Helper method to extract metric values from temporal tags
 func (c *MetricsCollector) extractMetricValues(entity *models.Entity, since, until time.Time) []map[string]interface{} {
 	values := []map[string]interface{}{}
 	
-	// Parse temporal tags to extract metric values
+	// This would need the temporal repository to get historical tags
+	// For now, return current value
 	for _, tag := range entity.Tags {
-		// Check if it's a value tag
-		if strings.HasPrefix(tag, "metric:value:") {
-			// Extract timestamp from temporal tag
-			parts := strings.SplitN(tag, "|", 2)
+		// Look for temporal value tags
+		if strings.Contains(tag, "|metric:value:") {
+			parts := strings.Split(tag, "|")
 			if len(parts) == 2 {
-				// Parse timestamp
-				timestamp, err := time.Parse(time.RFC3339, parts[0])
+				// Extract timestamp
+				timestampNano, err := strconv.ParseInt(parts[0], 10, 64)
 				if err != nil {
 					continue
 				}
+				timestamp := time.Unix(0, timestampNano)
 				
-				// Check time range
+				// Check if within time range
 				if timestamp.Before(since) || timestamp.After(until) {
 					continue
 				}
 				
-				// Parse value and unit from tag
+				// Extract value
 				valueParts := strings.Split(parts[1], ":")
-				if len(valueParts) >= 4 { // metric:value:NUMBER:UNIT
-					var value float64
-					fmt.Sscanf(valueParts[2], "%f", &value)
-					
-					values = append(values, map[string]interface{}{
-						"timestamp": timestamp.Format(time.RFC3339),
-						"value":     value,
-						"unit":      valueParts[3],
-					})
+				if len(valueParts) >= 3 {
+					value, err := strconv.ParseFloat(valueParts[2], 64)
+					if err == nil {
+						values = append(values, map[string]interface{}{
+							"timestamp": timestamp.Format(time.RFC3339),
+							"value":     value,
+						})
+					}
 				}
 			}
 		}

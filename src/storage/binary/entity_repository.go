@@ -47,6 +47,11 @@ type EntityRepository struct {
 	// Tag index persistence
 	tagIndexDirty         bool        // Whether tag index needs to be saved
 	lastIndexSave         time.Time   // Last time index was saved
+	
+	// WAL checkpoint management
+	walOperationCount     int64       // Count of operations since last checkpoint
+	lastCheckpoint        time.Time   // Time of last checkpoint
+	checkpointMu          sync.Mutex  // Protect checkpoint operations
 	persistentIndexLoaded bool        // Whether persistent index was loaded successfully
 	
 	// Recovery manager
@@ -61,15 +66,16 @@ func NewEntityRepository(dataPath string) (*EntityRepository, error) {
 	}
 	
 	repo := &EntityRepository{
-		dataPath:      dataPath,
-		tagIndex:      make(map[string][]string),
-		contentIndex:  make(map[string][]string),
-		entities:      make(map[string]*models.Entity),
-		lockManager:   NewLockManager(),
-		writerManager: NewWriterManager(filepath.Join(dataPath, "entities.ebf")),
+		dataPath:       dataPath,
+		tagIndex:       make(map[string][]string),
+		contentIndex:   make(map[string][]string),
+		entities:       make(map[string]*models.Entity),
+		lockManager:    NewLockManager(),
+		writerManager:  NewWriterManager(filepath.Join(dataPath, "entities.ebf")),
 		cache:          cache.NewQueryCache(1000, 5*time.Minute), // Cache up to 1000 queries for 5 minutes
 		temporalIndex:  NewTemporalIndex(),
 		namespaceIndex: NewNamespaceIndex(),
+		lastCheckpoint: time.Now(),  // Initialize checkpoint time
 	}
 	
 	// Ensure the data file exists with a proper header before trying to read it
@@ -128,7 +134,7 @@ func NewEntityRepository(dataPath string) (*EntityRepository, error) {
 	// Replay WAL to catch any entries not yet in the data file
 	// Skip WAL replay if we successfully loaded a persistent index
 	if repo.persistentIndexLoaded {
-		logger.Info("Persistent index loaded, skipping WAL replay")
+		logger.Debug("Persistent index loaded, skipping WAL replay")
 	} else {
 		logger.Debug("Replaying WAL to rebuild tag index")
 		if err := repo.replayWAL(); err != nil {
@@ -189,7 +195,7 @@ func (r *EntityRepository) buildIndexes() error {
 	}
 	
 	// Build indexes and load entities
-	logger.Info("Index rebuild: %d entities found", len(entities))
+	logger.Debug("Index rebuild: %d entities found", len(entities))
 	for _, entity := range entities {
 		// Add to entity cache
 		r.entities[entity.ID] = entity
@@ -364,6 +370,9 @@ func (r *EntityRepository) Create(entity *models.Entity) error {
 	if err := r.SaveTagIndexIfNeeded(); err != nil {
 		logger.Warn("Failed to save tag index: %v", err)
 	}
+	
+	// Check if we need to perform checkpoint
+	r.checkAndPerformCheckpoint()
 	
 	return nil
 }
@@ -599,6 +608,9 @@ func (r *EntityRepository) Update(entity *models.Entity) error {
 	if err := r.SaveTagIndexIfNeeded(); err != nil {
 		logger.Warn("Failed to save tag index: %v", err)
 	}
+	
+	// Check if we need to perform checkpoint
+	r.checkAndPerformCheckpoint()
 	
 	return nil
 }
@@ -1272,23 +1284,161 @@ func (r *EntityRepository) AddContent(entityID, contentType, content string) err
 	return err
 }
 
-// AddTag adds a tag to an entity
+// AddTag adds a tag to an entity efficiently without full entity rewrite
 func (r *EntityRepository) AddTag(entityID, tag string) error {
+	logger.Debug("AddTag: adding tag '%s' to entity %s", tag, entityID)
+	
+	// Get current entity to verify it exists and check for duplicate tags
 	entity, err := r.GetByID(entityID)
 	if err != nil {
+		logger.Error("Entity %s not found for AddTag: %v", entityID, err)
 		return err
 	}
 	
-	// Check if tag already exists
+	// Ensure tag has timestamp (temporal-only system)
+	timestampedTag := tag
+	if !strings.Contains(tag, "|") {
+		timestampedTag = fmt.Sprintf("%s|%s", models.NowString(), tag)
+	}
+	
+	// Check if tag already exists (check both timestamped and non-timestamped versions)
 	for _, existingTag := range entity.Tags {
-		if existingTag == tag {
+		if existingTag == timestampedTag || existingTag == tag {
+			logger.Debug("Tag '%s' already exists on entity %s", tag, entityID)
 			return nil // Tag already exists
+		}
+		// Also check if the tag content matches (ignoring timestamp)
+		if strings.Contains(existingTag, "|") {
+			parts := strings.SplitN(existingTag, "|", 2)
+			if len(parts) == 2 && parts[1] == tag {
+				logger.Debug("Tag content '%s' already exists on entity %s with different timestamp", tag, entityID)
+				return nil // Tag content already exists
+			}
 		}
 	}
 	
-	entity.Tags = append(entity.Tags, tag)
-	err = r.Update(entity)
-	return err
+	// Log to WAL first for durability
+	entity.Tags = append(entity.Tags, timestampedTag)
+	entity.UpdatedAt = models.Now()
+	
+	if err := r.wal.LogUpdate(entity); err != nil {
+		logger.Error("Failed to log AddTag to WAL for entity %s: %v", entityID, err)
+		return fmt.Errorf("error logging to WAL: %w", err)
+	}
+	
+	// Acquire write lock
+	r.lockManager.AcquireEntityLock(entityID, WriteLock)
+	defer r.lockManager.ReleaseEntityLock(entityID, WriteLock)
+	
+	// Update in-memory entity
+	r.mu.Lock()
+	if cachedEntity, exists := r.entities[entityID]; exists {
+		cachedEntity.Tags = append(cachedEntity.Tags, timestampedTag)
+		cachedEntity.UpdatedAt = entity.UpdatedAt
+	}
+	r.mu.Unlock()
+	
+	// Update indexes efficiently without database rewrite
+	r.mu.Lock()
+	r.addToTagIndex(timestampedTag, entityID)
+	// Also index the non-timestamped version for easier searching
+	if strings.Contains(timestampedTag, "|") {
+		parts := strings.SplitN(timestampedTag, "|", 2)
+		if len(parts) == 2 {
+			r.addToTagIndex(parts[1], entityID)
+		}
+	}
+	r.tagIndexDirty = true
+	r.mu.Unlock()
+	
+	// Add to temporal index if applicable
+	if strings.Contains(timestampedTag, "|") {
+		parts := strings.SplitN(timestampedTag, "|", 2)
+		if len(parts) == 2 {
+			if timestampNanos, err := strconv.ParseInt(parts[0], 10, 64); err == nil {
+				timestamp := time.Unix(0, timestampNanos)
+				r.temporalIndex.AddEntry(entityID, timestampedTag, timestamp)
+			}
+		}
+	}
+	
+	// Add to namespace index
+	r.namespaceIndex.AddTag(entityID, timestampedTag)
+	
+	// Invalidate cache
+	r.cache.Clear()
+	
+	logger.Debug("AddTag completed successfully for entity %s, tag '%s'", entityID, tag)
+	
+	// Check if we need to perform checkpoint
+	r.checkAndPerformCheckpoint()
+	
+	return nil
+}
+
+// checkAndPerformCheckpoint checks if checkpoint is needed and performs it
+func (r *EntityRepository) checkAndPerformCheckpoint() {
+	r.checkpointMu.Lock()
+	defer r.checkpointMu.Unlock()
+	
+	// Increment operation count
+	r.walOperationCount++
+	
+	// Check conditions for checkpoint:
+	// 1. Every 1000 operations
+	// 2. Every 5 minutes
+	// 3. WAL file size > 100MB
+	shouldCheckpoint := false
+	checkpointReason := ""
+	
+	if r.walOperationCount >= 1000 {
+		shouldCheckpoint = true
+		checkpointReason = fmt.Sprintf("operation count reached %d", r.walOperationCount)
+	} else if time.Since(r.lastCheckpoint) > 5*time.Minute {
+		shouldCheckpoint = true
+		checkpointReason = fmt.Sprintf("time elapsed: %v", time.Since(r.lastCheckpoint))
+	} else {
+		// Check WAL file size
+		walPath := filepath.Join(r.dataPath, "entitydb.wal")
+		if info, err := os.Stat(walPath); err == nil && info.Size() > 100*1024*1024 { // 100MB
+			shouldCheckpoint = true
+			checkpointReason = fmt.Sprintf("WAL size: %d bytes", info.Size())
+		}
+	}
+	
+	if shouldCheckpoint {
+		logger.Info("Performing WAL checkpoint (reason: %s)", checkpointReason)
+		
+		// Log checkpoint operation
+		if err := r.wal.LogCheckpoint(); err != nil {
+			logger.Error("Failed to log checkpoint: %v", err)
+			return
+		}
+		
+		// Flush all pending writes
+		if err := r.writerManager.Flush(); err != nil {
+			logger.Error("Failed to flush writes during checkpoint: %v", err)
+			return
+		}
+		
+		// Force checkpoint to persist everything
+		if err := r.writerManager.Checkpoint(); err != nil {
+			logger.Error("Failed to checkpoint during WAL truncation: %v", err)
+			return
+		}
+		
+		// Truncate the WAL
+		if err := r.wal.Truncate(); err != nil {
+			logger.Error("Failed to truncate WAL: %v", err)
+			return
+		}
+		
+		// Reset counters
+		r.walOperationCount = 0
+		r.lastCheckpoint = time.Now()
+		
+		logger.Info("WAL checkpoint completed successfully")
+	}
 }
 
 // RemoveTag removes a tag from an entity

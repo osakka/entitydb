@@ -12,6 +12,11 @@ This directory contains the source code for the EntityDB platform. This document
 │   │   ├── entity_changes.test # Temporal changes test
 │   │   ├── entity_diff.test  # Temporal diff test
 │   │   └── entity_history.test # Entity history test
+│   ├── chunking/             # Chunking test scripts
+│   ├── integrity/            # Data integrity tests
+│   ├── performance/          # Performance benchmarks
+│   ├── temporal/             # Temporal feature tests
+│   ├── verification/         # System verification tests
 │   ├── test_framework.sh     # Test framework implementation
 │   ├── test_temporal_api.sh  # Temporal API test script
 │   ├── run_tests.sh          # Test runner
@@ -25,6 +30,11 @@ This directory contains the source code for the EntityDB platform. This document
 │   ├── user_handler_rbac.go  # RBAC wrapper for user API
 │   ├── auth_middleware.go    # Authentication middleware
 │   ├── rbac_middleware.go    # RBAC enforcement middleware
+│   ├── metrics_handler.go    # Prometheus metrics endpoint
+│   ├── system_metrics_handler.go # System metrics API
+│   ├── rbac_metrics_handler.go # RBAC & session metrics
+│   ├── metrics_background_collector.go # Background metrics collection
+│   ├── metrics_history_handler.go # Temporal metrics history
 │   ├── router.go             # HTTP router setup
 │   └── response_helpers.go   # Response formatting utilities
 ├── models/                   # Data models

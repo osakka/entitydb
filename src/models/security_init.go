@@ -346,7 +346,7 @@ func (si *SecurityInitializer) createGroupRoleRelationships() error {
 
 // createDefaultAdminUser creates the default admin user if it doesn't exist
 func (si *SecurityInitializer) createDefaultAdminUser() error {
-	logger.Debug("[SecurityInit] Creating default admin user...")
+	logger.Debug("Creating default admin user...")
 	// Get or create admin user (with uniqueness check)
 	adminUser, err := si.getOrCreateAdminUser()
 	if err != nil {
@@ -406,7 +406,7 @@ func (si *SecurityInitializer) getOrCreateAdminUser() (*SecurityUser, error) {
 	
 	if len(adminEntities) > 0 {
 		// User exists, return the first one
-		logger.Debug("[SecurityInit] Found existing admin user: %s", adminEntities[0].ID)
+		logger.Debug("Found existing admin user: %s", adminEntities[0].ID)
 		return &SecurityUser{
 			ID:       adminEntities[0].ID,
 			Username: "admin",
@@ -417,13 +417,13 @@ func (si *SecurityInitializer) getOrCreateAdminUser() (*SecurityUser, error) {
 	}
 	
 	// User doesn't exist, create it
-	logger.Debug("[SecurityInit] Creating new admin user...")
+	logger.Debug("Creating new admin user...")
 	adminUser, err := si.securityManager.CreateUser("admin", "admin", "admin@entitydb.local")
 	if err != nil {
 		return nil, fmt.Errorf("failed to create admin user: %v", err)
 	}
 	
-	logger.Info("[SecurityInit] Created new admin user: %s", adminUser.ID)
+	logger.Info("Created new admin user: %s", adminUser.ID)
 	return adminUser, nil
 }
 

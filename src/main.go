@@ -356,14 +356,8 @@ func main() {
 			return
 		}
 		
-		// Apply the tag fix
-		err := api.FixTemporalTagIndex(server.entityHandler)
-		if err != nil {
-			logger.Error("Failed to fix temporal tag index: %v", err)
-			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte(`{"error":"Failed to fix temporal tag index"}`))
-			return
-		}
+		// Tag fix has been integrated into the main codebase
+		// No longer need to call the separate fix function
 		
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(`{"status":"success","message":"Temporal tag index has been fixed"}`))
@@ -416,8 +410,18 @@ func main() {
 	// Temporal metrics collection endpoints
 	metricsCollector := api.NewMetricsCollector(server.entityRepo)
 	apiRouter.HandleFunc("/metrics/collect", api.RBACMiddleware(server.entityRepo, server.sessionManager, api.RBACPermission{Resource: "metrics", Action: "write"})(metricsCollector.CollectMetric)).Methods("POST")
-	apiRouter.HandleFunc("/metrics/history", api.RBACMiddleware(server.entityRepo, server.sessionManager, api.RBACPermission{Resource: "metrics", Action: "read"})(metricsCollector.GetMetricHistory)).Methods("GET")
+	// apiRouter.HandleFunc("/metrics/history", api.RBACMiddleware(server.entityRepo, server.sessionManager, api.RBACPermission{Resource: "metrics", Action: "read"})(metricsCollector.GetMetricHistory)).Methods("GET") // Disabled - using public endpoint below
 	apiRouter.HandleFunc("/metrics/current", api.RBACMiddleware(server.entityRepo, server.sessionManager, api.RBACPermission{Resource: "metrics", Action: "read"})(metricsCollector.GetCurrentMetrics)).Methods("GET")
+	
+	// New metrics history handler for real-time chart data (no authentication required)
+	metricsHistoryHandler := api.NewMetricsHistoryHandler(server.entityRepo)
+	apiRouter.HandleFunc("/metrics/history", metricsHistoryHandler.GetMetricHistory).Methods("GET")
+	apiRouter.HandleFunc("/metrics/available", metricsHistoryHandler.GetAvailableMetrics).Methods("GET")
+	
+	// Start background metrics collector (collect every 1 second with change detection)
+	backgroundCollector := api.NewBackgroundMetricsCollector(server.entityRepo, 1*time.Second)
+	backgroundCollector.Start()
+	defer backgroundCollector.Stop()
 	
 	// Worca dashboard metrics endpoint
 	worcaMetricsHandler := api.NewWorcaMetricsHandler(server.entityRepo)

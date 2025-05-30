@@ -1,152 +1,142 @@
 # EntityDB Logging Standards
 
-## Log Format
-```
-timestamp [LEVEL] [file] [function] [line] message
-```
-Example:
-```
-2025/05/28 12:30:45.123456 [INFO] [entity_repository.go] [Create] [245] Entity created: user_123
-```
+## Overview
+This document defines the logging standards for the EntityDB codebase. All code must follow these standards to ensure consistent, actionable, and efficient logging.
 
-## Log Levels and Usage
+## Core Principles
 
-### TRACE (Development Only)
-- **Purpose**: Detailed data flow and variable values
-- **Audience**: Developers debugging specific issues
-- **Examples**:
-  - Entering/exiting functions with parameters
-  - Loop iterations with values
-  - Intermediate calculation results
-- **Guidelines**: 
-  - Include actual data values
-  - Use for complex algorithms
-  - Never in production
+1. **No Redundant Information**: Since the logger automatically includes file, function, and line number, never include this information in log messages.
+2. **Appropriate Log Levels**: Use the correct log level for the situation.
+3. **Actionable Messages**: Log messages should be specific and indicate what action should be taken if needed.
+4. **Performance First**: Disabled log levels should incur zero CPU overhead.
+
+## Log Levels
+
+### TRACE
+- **Purpose**: Extremely detailed information about program flow and data
+- **Examples**: Variable values, data sizes, checksums, index entries
+- **When to use**: 
+  - Detailed data flow tracking
+  - Variable values and sizes
+  - Routine operations that succeed
+  - Index/offset/position information
+- **Example**: `logger.Trace("Entity %s content checksum: %x", entity.ID, checksum)`
 
 ### DEBUG
-- **Purpose**: Diagnostic information for troubleshooting
-- **Audience**: Developers and advanced SREs
-- **Examples**:
-  - Configuration loaded
-  - Cache hits/misses
-  - Non-critical retry attempts
-- **Guidelines**:
-  - Include relevant IDs and counts
-  - Avoid sensitive data
-  - Keep concise
+- **Purpose**: Information useful for debugging but not needed in production
+- **Examples**: Function entry/exit, configuration values, state changes
+- **When to use**:
+  - Non-routine operations
+  - State changes that might affect behavior
+  - Configuration or initialization details
+- **Example**: `logger.Debug("Session cleanup: removed %d expired sessions", count)`
 
 ### INFO
-- **Purpose**: Normal operational events
-- **Audience**: SREs and operations teams
-- **Examples**:
-  - Service started/stopped
-  - Database connections established
-  - Periodic statistics (entities created, indexed)
-- **Guidelines**:
-  - Focus on state changes
-  - Include success metrics
-  - Be meaningful to ops
+- **Purpose**: Important business events and state changes
+- **Examples**: Service start/stop, major operations completed, user actions
+- **When to use**:
+  - Service lifecycle events
+  - Major operations (batch jobs, migrations)
+  - User-initiated actions that succeed
+- **Example**: `logger.Info("Server started on port %d with SSL=%v", port, sslEnabled)`
 
 ### WARN
-- **Purpose**: Potentially harmful situations
-- **Audience**: SREs and operations teams
-- **Examples**:
-  - Degraded performance
-  - Retry succeeded after failures
-  - Configuration fallbacks used
-- **Guidelines**:
-  - Include impact assessment
-  - Suggest remediation if possible
-  - Be actionable
+- **Purpose**: Unusual but recoverable conditions
+- **Examples**: Missing optional config, fallback behavior, retries
+- **When to use**:
+  - Using default values due to missing config
+  - Automatic recovery from errors
+  - Deprecated feature usage
+  - Invalid user input (not errors)
+- **Example**: `logger.Warn("GetEntityAsOf: entity ID is missing in request")`
 
 ### ERROR
-- **Purpose**: Error events but application continues
-- **Audience**: SREs and operations teams
-- **Examples**:
-  - Failed operations (with recovery)
-  - Invalid input rejected
+- **Purpose**: Errors that need attention but don't stop the service
+- **Examples**: Failed operations, invalid data, integration failures
+- **When to use**:
+  - Operation failures that affect users
+  - Data integrity issues
   - External service failures
-- **Guidelines**:
-  - Include error details
-  - Log once per incident
-  - Include correlation IDs
+- **Example**: `logger.Error("Failed to save entity %s: %v", entity.ID, err)`
 
-### FATAL/PANIC
-- **Purpose**: Application cannot continue
-- **Audience**: SREs and operations teams
-- **Examples**:
-  - Critical resource unavailable
-  - Data corruption detected
-  - Unrecoverable state
-- **Guidelines**:
-  - Include full context
-  - Log before termination
-  - Be explicit about impact
+### FATAL
+- **Purpose**: Unrecoverable errors that will terminate the program
+- **Examples**: Critical initialization failures, data corruption
+- **When to use**: Only when the program cannot continue
+- **Example**: `logger.Fatal("Failed to initialize database: %v", err)`
 
-## Message Guidelines
+## Message Format Guidelines
 
 ### DO:
-- Be concise and specific
-- Include relevant IDs (entity ID, user ID)
+- Include relevant IDs, counts, and error details
 - Use consistent terminology
-- Include counts and metrics
-- Focus on "what happened"
+- Make messages grep-friendly
+- Include operation context
 
 ### DON'T:
-- Log sensitive data (passwords, tokens)
-- Include redundant information (already in file/func/line)
-- Use vague messages ("something went wrong")
-- Over-log in loops (use counters)
-- Mix user output with logs in tools
+- Include prefixes like [Module] or [Component]
+- Log sensitive information (passwords, tokens)
+- Use generic messages like "Error occurred"
+- Include redundant information
 
-## Component-Specific Patterns
+## Examples of Good vs Bad
 
-### Storage Layer
+### Bad:
 ```go
-// Good
-logger.Debug("Building index for %d entities", count)
-logger.Info("Index rebuild completed: %d entities, %d tags", entityCount, tagCount)
-logger.Warn("Index corruption detected, rebuilding from WAL")
-
-// Bad
-logger.Debug("Starting to build indexes...") // Too vague
-logger.Info("Built index") // Missing metrics
+logger.Error("[SecurityManager] Failed to authenticate user")
+logger.Info("[EntityRepository] Entity created")
+logger.Debug("Processing...")
+logger.Error("Error")
 ```
 
-### API Handlers
+### Good:
 ```go
-// Good
-logger.Debug("Create entity request: type=%s, tags=%d", entityType, len(tags))
-logger.Info("Entity created: %s", entity.ID)
-logger.Error("Entity creation failed: %v", err)
-
-// Bad
-logger.Info("Processing request") // Which request?
-logger.Error("Error: %v", err) // What operation failed?
+logger.Error("Failed to authenticate user %s: invalid password", username)
+logger.Debug("Entity created: id=%s, tags=%d, content_size=%d", entity.ID, len(entity.Tags), len(entity.Content))
+logger.Trace("Processing batch %d/%d: %d items", current, total, itemCount)
+logger.Error("Database connection failed after %d retries: %v", retries, err)
 ```
 
-### Tools and Utilities
+## Performance Guidelines
+
+1. **Early Exit**: The logger checks if a level is enabled before processing
+2. **Lazy Evaluation**: Don't pre-compute values for trace/debug logs
+3. **Sampling**: For high-frequency operations, consider sampling
+
+### Example of Lazy Evaluation:
 ```go
-// For tools, separate user output from logs:
-fmt.Printf("Processing %d entities...\n", count) // User feedback
-logger.Debug("Batch processing started: size=%d", count) // Diagnostic log
+// Bad - always computes the expensive string
+expensiveStr := computeExpensiveDebugInfo()
+logger.Debug("Debug info: %s", expensiveStr)
+
+// Good - only computes if DEBUG is enabled
+if logger.IsDebugEnabled() {
+    logger.Debug("Debug info: %s", computeExpensiveDebugInfo())
+}
 ```
 
-## Performance Considerations
+## Special Cases
 
-- Log level checks happen before message formatting
-- When disabled, TRACE/DEBUG have near-zero overhead
-- Use lazy evaluation for expensive operations:
-  ```go
-  if logger.GetLogLevel() == "TRACE" {
-      logger.Trace("Complex data: %s", expensiveToString())
-  }
-  ```
+### User Input Validation
+- Use WARN for invalid input (not ERROR)
+- Include what was expected
+- Don't log the full invalid input if it could be large
 
-## Migration Strategy
+### Loops and High-Frequency Operations
+- Use TRACE for per-item logging
+- Use DEBUG/INFO for summary at the end
+- Consider sampling for very high frequencies
 
-1. Update all direct `log.Print` to use `logger` package
-2. Convert `fmt.Print` in application code to appropriate log levels
-3. Tools keep `fmt.Print` for user output, add `logger` for diagnostics
-4. Remove redundant prefixes from messages
-5. Ensure consistent ID formatting (entity_123, user_456)
+### Error Handling
+- Always include the error value with %v
+- Add context about what was being attempted
+- Include relevant IDs or parameters
+
+## Migration Checklist
+
+When updating existing code:
+1. Remove redundant prefixes ([Module], [Component])
+2. Change INFO to DEBUG for routine operations
+3. Change DEBUG to TRACE for detailed data
+4. Ensure ERROR messages include context
+5. Check that WARN is used for recoverable issues

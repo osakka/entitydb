@@ -1011,6 +1011,76 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/metrics/available": {
+            "get": {
+                "description": "Get a list of all metrics being collected",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "metrics"
+                ],
+                "summary": "List available metrics",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/metrics/history": {
+            "get": {
+                "description": "Retrieve historical values for a specific metric",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "metrics"
+                ],
+                "summary": "Get metric history",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Metric name (e.g., memory_alloc, entity_count_total)",
+                        "name": "metric_name",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Number of hours to look back (default: 24)",
+                        "name": "hours",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Maximum number of data points (default: 100)",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.MetricHistoryResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/rbac/metrics": {
             "get": {
                 "description": "Get comprehensive RBAC, session, and authentication metrics",
@@ -1828,6 +1898,43 @@ const docTemplate = `{
                 "total_alloc_bytes": {
                     "type": "integer",
                     "example": 20971520
+                }
+            }
+        },
+        "api.MetricDataPoint": {
+            "type": "object",
+            "properties": {
+                "timestamp": {
+                    "type": "string"
+                },
+                "value": {
+                    "type": "number"
+                }
+            }
+        },
+        "api.MetricHistoryResponse": {
+            "type": "object",
+            "properties": {
+                "count": {
+                    "type": "integer"
+                },
+                "data_points": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.MetricDataPoint"
+                    }
+                },
+                "end_time": {
+                    "type": "string"
+                },
+                "metric_name": {
+                    "type": "string"
+                },
+                "start_time": {
+                    "type": "string"
+                },
+                "unit": {
+                    "type": "string"
                 }
             }
         },

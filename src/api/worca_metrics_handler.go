@@ -24,11 +24,11 @@ func NewWorcaMetricsHandler(repo models.EntityRepository) *WorcaMetricsHandler {
 type MetricSeries struct {
 	Name   string                 `json:"name"`
 	Labels map[string]string      `json:"labels"`
-	Data   []MetricDataPoint      `json:"data"`
+	Data   []WorcaMetricDataPoint  `json:"data"`
 }
 
-// MetricDataPoint represents a single data point
-type MetricDataPoint struct {
+// WorcaMetricDataPoint represents a single data point
+type WorcaMetricDataPoint struct {
 	Timestamp string  `json:"timestamp"`
 	Value     float64 `json:"value"`
 }
@@ -85,7 +85,7 @@ func (h *WorcaMetricsHandler) GetDashboardMetrics(w http.ResponseWriter, r *http
 			metricsMap[seriesKey] = &MetricSeries{
 				Name:   metricName,
 				Labels: labels,
-				Data:   []MetricDataPoint{},
+				Data:   []WorcaMetricDataPoint{},
 			}
 			metricsMap[seriesKey].Labels["instance"] = instance
 		}
@@ -109,7 +109,7 @@ func (h *WorcaMetricsHandler) GetDashboardMetrics(w http.ResponseWriter, r *http
 						if err := json.Unmarshal([]byte(valueStr), &value); err == nil {
 							// Convert timestamp to ISO format
 							if ts, err := time.Parse(time.RFC3339Nano, timestamp); err == nil {
-								metricsMap[seriesKey].Data = append(metricsMap[seriesKey].Data, MetricDataPoint{
+								metricsMap[seriesKey].Data = append(metricsMap[seriesKey].Data, WorcaMetricDataPoint{
 									Timestamp: ts.Format(time.RFC3339),
 									Value:     value,
 								})
