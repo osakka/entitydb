@@ -1,182 +1,137 @@
 # EntityDB Documentation
 
-> **⚠️ IMPORTANT DISCLAIMER**
-> 
-> **This documentation section is currently undergoing heavy reorganization and content cleanup.**
-> 
-> Some documentation files may contain outdated, incomplete, or partially relevant information. We are actively working to improve and update all documentation to reflect the current state of the EntityDB platform.
->
-> For the most accurate and up-to-date information, please refer to:
-> - The main [README.md](../README.md) file in the project root
-> - Files in the [core/](./core/) directory
-> - The [architecture diagram](../share/resources/architecture.svg)
->
-> We appreciate your patience as we continue to improve the documentation.
+Welcome to the comprehensive documentation for EntityDB - a high-performance temporal database platform.
 
-Welcome to the EntityDB documentation. This directory contains documentation for the EntityDB platform.
+## 📚 Documentation Index
 
-## Documentation Structure
+### Getting Started
+- [Quick Start Guide](./guides/quick-start.md) - Get up and running in 5 minutes
+- [Core Concepts](./architecture/overview.md) - Understand entities, tags, and temporal storage
+- [API Examples](./api/examples.md) - Common API usage patterns
 
-| Directory | Description |
-|-----------|-------------|
-| [core/](./core/) | Core documentation, requirements, and specifications |
-| [features/](./features/) | Feature-specific documentation |
-| [implementation/](./implementation/) | Implementation details and migration guides |
-| [performance/](./performance/) | Performance benchmarks and optimization guides |
-| [troubleshooting/](./troubleshooting/) | Troubleshooting guides |
-| [api/](./api/) | API documentation |
-| [architecture/](./architecture/) | Architecture documentation |
-| [development/](./development/) | Development guides |
-| [guides/](./guides/) | User guides |
-| [examples/](./examples/) | Example use cases |
-| [spikes/](./spikes/) | Technical spikes and investigations |
-| [releases/](./releases/) | Release notes |
-| [archive/](./archive/) | Legacy documentation |
-| [../share/resources/](../share/resources/) | Logo and design resources (moved from docs) |
-| [../trash/](../trash/) | Trash bin for unused/outdated code and files |
+### Core Documentation
+- [Requirements](./core/REQUIREMENTS.md) - System requirements and dependencies
+- [Specifications](./core/SPECIFICATIONS.md) - Technical specifications
+- [Current State](./core/current_state_summary.md) - Platform capabilities and status
 
-> **Important Note:** Always move unused, outdated, or deprecated code to the `/trash` directory instead of deleting it. This makes it easy to reference old implementations if needed while keeping the main codebase clean.
+### API Reference
+- [Authentication](./api/auth.md) - Login, sessions, and tokens
+- [Entity Operations](./api/entities.md) - CRUD operations for entities
+- [Query API](./api/query_api.md) - Advanced querying capabilities
+- [Temporal API](./api/auth_temporal_demo.md) - Time-travel queries
+- [Examples](./api/examples.md) - Practical API usage examples
 
-## Core Documentation
+### Architecture
+- [Overview](./architecture/overview.md) - System architecture and design
+- [Entity Model](./architecture/entities.md) - Core data model
+- [Temporal Architecture](./architecture/temporal_architecture.md) - Time-series design
+- [Tag-Based RBAC](./architecture/tag_based_rbac.md) - Security model
+- [Tag System](./architecture/tags.md) - Tag architecture and namespaces
+- [RBAC Implementation](./architecture/tag_based_rbac_implementation.md) - Security implementation
 
-| Document | Description |
-|----------|-------------|
-| [core/PROJECT_REQUIREMENTS.md](./core/PROJECT_REQUIREMENTS.md) | **[NEW]** Comprehensive list of project requirements that guided EntityDB development |
-| [core/REQUIREMENTS.md](./core/REQUIREMENTS.md) | System requirements, dependencies, and compatibility information |
-| [core/SPECIFICATIONS.md](./core/SPECIFICATIONS.md) | Technical specifications of the EntityDB platform |
-| [../CHANGELOG.md](../CHANGELOG.md) | Complete version history and detailed change logs |
-| [core/current_state_summary.md](./core/current_state_summary.md) | Summary of current system state |
-| [core/query_implementation_summary.md](./core/query_implementation_summary.md) | Query implementation summary |
-| [core/RENAMING_SUMMARY.md](./core/RENAMING_SUMMARY.md) | System renaming summary |
+### Features
+- [Temporal Storage](./features/TEMPORAL_FEATURES.md) - Time-travel capabilities
+- [Autochunking](./features/AUTOCHUNKING.md) - Large file handling
+- [Binary Format](./features/CUSTOM_BINARY_FORMAT.md) - EBF specification
+- [Query System](./features/QUERY_IMPLEMENTATION.md) - Query engine details
+- [Configuration](./features/CONFIG_SYSTEM.md) - System configuration
+- [Widget System](./features/WIDGET_SYSTEM.md) - UI components
+- [API Testing](./features/API_TESTING_FRAMEWORK.md) - Testing framework
 
-## Contributing Guidelines
+### Implementation
+- [Status Overview](./implementation/IMPLEMENTATION_STATUS.md) - Feature completion status
+- [Temporal Implementation](./implementation/TEMPORAL_IMPLEMENTATION.md) - Temporal storage details
+- [Binary Format](./implementation/BINARY_FORMAT_IMPLEMENTATION.md) - Storage engine
+- [Data Integrity](./implementation/DATA_INTEGRITY_COMPLETE.md) - Consistency guarantees
+- [Performance Optimizations](./implementation/PERFORMANCE_OPTIMIZATION_SUMMARY.md) - Speed improvements
+- [Multi-Dataspace](./implementation/MULTI_DATASPACE_ARCHITECTURE.md) - Multi-tenancy
 
-| Document | Description |
-|----------|-------------|
-| [core/contributing/CONTRIBUTING.md](./core/contributing/CONTRIBUTING.md) | Contributing guidelines |
-| [core/contributing/COLLABORATION.md](./core/contributing/COLLABORATION.md) | Collaboration guidelines |
-| [core/contributing/WORKFLOW.md](./core/contributing/WORKFLOW.md) | Development workflow |
+### Performance
+- [Overview](./performance/PERFORMANCE.md) - Performance characteristics
+- [Benchmarks](./performance/PERFORMANCE_COMPARISON.md) - Speed comparisons
+- [Temporal Performance](./performance/TEMPORAL_PERFORMANCE.md) - Time-travel query speed
+- [High Performance Mode](./performance/HIGH_PERFORMANCE_MODE_REPORT.md) - Optimization settings
+- [100x Plan](./performance/100X_PERFORMANCE_PLAN.md) - Performance roadmap
 
-## Security Documentation
+### Development
+- [Contributing](./development/contributing.md) - How to contribute
+- [Git Workflow](./development/git-workflow.md) - Development process
+- [Security Implementation](./development/security-implementation.md) - Security guidelines
+- [Production Notes](./development/production-notes.md) - Deployment guidance
 
-| Document | Description |
-|----------|-------------|
-| [core/security/SECURITY.md](./core/security/SECURITY.md) | Security policy and guidelines |
+### Guides
+- [Deployment](./guides/deployment.md) - Production deployment
+- [Migration](./guides/migration.md) - Upgrading EntityDB
+- [Admin Interface](./guides/admin-interface.md) - Web UI guide
+- [Security Policy](./guides/security-policy.md) - Security best practices
+- [Project Structure](./guides/project-structure.md) - Codebase organization
 
-## Feature Documentation
+### Applications
+- [Worca Overview](./applications/worca/README.md) - Workforce orchestrator
+- [Worca Architecture](./applications/worca/WORCA_DATASPACE_ARCHITECTURE.md) - App design
+- [Widget System](./applications/worca/WIDGET_SYSTEM_ARCHITECTURE.md) - UI components
 
-| Document | Description |
-|----------|-------------|
-| [features/TEMPORAL_FEATURES.md](./features/TEMPORAL_FEATURES.md) | Temporal storage and time-travel queries |
-| [features/AUTOCHUNKING.md](./features/AUTOCHUNKING.md) | Autochunking system for large files |
-| [features/CUSTOM_BINARY_FORMAT.md](./features/CUSTOM_BINARY_FORMAT.md) | EntityDB Binary Format (EBF) details |
-| [features/QUERY_IMPLEMENTATION.md](./features/QUERY_IMPLEMENTATION.md) | Query system implementation |
-| [features/TEMPORAL_API_GUIDE.md](./features/TEMPORAL_API_GUIDE.md) | Guide to using temporal API features |
-| [features/API_TESTING_FRAMEWORK.md](./features/API_TESTING_FRAMEWORK.md) | Framework for testing API endpoints |
-| [features/CONFIG_SYSTEM.md](./features/CONFIG_SYSTEM.md) | Configuration system documentation |
+### Examples
+- [Temporal Queries](./examples/temporal_examples.md) - Time-travel examples
+- [Ticketing System](./examples/ticketing_system.md) - Real-world use case
 
-## Architecture Documentation
+### Troubleshooting
+- [Content Format](./troubleshooting/CONTENT_FORMAT_TROUBLESHOOTING.md) - Data issues
+- [SSL Configuration](./troubleshooting/SSL_CONFIGURATION.md) - HTTPS setup
+- [Tag Index Persistence](./troubleshooting/TAG_INDEX_PERSISTENCE_BUG.md) - Index issues
 
-| Document | Description |
-|----------|-------------|
-| [architecture/overview.md](./architecture/overview.md) | High-level architecture overview |
-| [architecture/entities.md](./architecture/entities.md) | Entity model architecture |
-| [architecture/tag_based_rbac.md](./architecture/tag_based_rbac.md) | Tag-based RBAC implementation |
-| [architecture/temporal_architecture.md](./architecture/temporal_architecture.md) | Temporal system architecture |
-| [architecture/TAG_VALIDATION.md](./architecture/TAG_VALIDATION.md) | Tag system validation report |
+### Release Notes
+- [v2.19.0](../CHANGELOG.md#2190---2025-05-30) - Latest release
+- [v2.14.0](./releases/RELEASE_NOTES_v2.14.0.md) - Major performance update
+- [v2.13.1](./releases/RELEASE_NOTES_v2.13.1.md) - Bug fixes
+- [v2.13.0](./releases/RELEASE_NOTES_v2.13.0.md) - Configuration overhaul
+- [v2.12.0](./releases/RELEASE_NOTES_v2.12.0.md) - Unified entity model
 
-## API Documentation
+### Archive
+The [archive](./archive/) directory contains historical documentation from earlier versions. While these documents may contain outdated information, they can be valuable for understanding the evolution of EntityDB.
 
-| Document | Description |
-|----------|-------------|
-| [api/entities.md](./api/entities.md) | Entity API documentation |
-| [api/auth.md](./api/auth.md) | Authentication API documentation |
-| [api/query_api.md](./api/query_api.md) | Query API documentation |
-| [api/examples.md](./api/examples.md) | API usage examples |
+## 📖 Documentation Standards
 
-## Performance Documentation
+### File Naming Convention
+- Use UPPERCASE for emphasis: `IMPORTANT_FEATURE.md`
+- Use lowercase with underscores for regular docs: `feature_guide.md`
+- Release notes: `RELEASE_NOTES_vX.Y.Z.md`
+- Implementation docs: `FEATURE_IMPLEMENTATION.md`
 
-| Document | Description |
-|----------|-------------|
-| [performance/PERFORMANCE.md](./performance/PERFORMANCE.md) | Performance overview and benchmarks |
-| [performance/PERFORMANCE_COMPARISON.md](./performance/PERFORMANCE_COMPARISON.md) | Performance comparison with previous versions |
-| [performance/TEMPORAL_PERFORMANCE.md](./performance/TEMPORAL_PERFORMANCE.md) | Temporal feature performance |
-| [performance/HIGH_PERFORMANCE_MODE_REPORT.md](./performance/HIGH_PERFORMANCE_MODE_REPORT.md) | High-performance mode report |
-| [performance/100X_PERFORMANCE_PLAN.md](./performance/100X_PERFORMANCE_PLAN.md) | 100x performance improvement plan |
-| [performance/100X_PERFORMANCE_SUMMARY.md](./performance/100X_PERFORMANCE_SUMMARY.md) | 100x performance improvement summary |
-| [performance/PERFORMANCE_INDEX.md](./performance/PERFORMANCE_INDEX.md) | Performance index |
-| [performance/PERFORMANCE_RESULTS_OLD.md](./performance/PERFORMANCE_RESULTS_OLD.md) | Historical performance results |
+### Document Structure
+Each document should include:
+1. Title and brief description
+2. Table of contents for longer documents
+3. Clear sections with headers
+4. Code examples where applicable
+5. Links to related documentation
 
-## Implementation Details
+### Maintenance
+- Keep documentation synchronized with code changes
+- Archive outdated docs rather than deleting
+- Update this index when adding new documentation
+- Use relative links for internal references
 
-| Document | Description |
-|----------|-------------|
-| [implementation/IMPLEMENTATION_STATUS.md](./implementation/IMPLEMENTATION_STATUS.md) | Current implementation status |
-| [implementation/TEMPORAL_IMPLEMENTATION.md](./implementation/TEMPORAL_IMPLEMENTATION.md) | Temporal system implementation details |
-| [implementation/AUTOCHUNKING_IMPLEMENTATION.md](./implementation/AUTOCHUNKING_IMPLEMENTATION.md) | Autochunking implementation details |
-| [implementation/BINARY_FORMAT_IMPLEMENTATION.md](./implementation/BINARY_FORMAT_IMPLEMENTATION.md) | Binary format implementation details |
-| [implementation/SSL_IMPLEMENTATION_SUMMARY.md](./implementation/SSL_IMPLEMENTATION_SUMMARY.md) | SSL implementation summary |
-| [implementation/SSL_ONLY_MODE.md](./implementation/SSL_ONLY_MODE.md) | SSL-only mode implementation |
-| [implementation/SSL_ONLY_SUMMARY.md](./implementation/SSL_ONLY_SUMMARY.md) | SSL-only mode summary |
-| [implementation/ENTITY_MODEL_MIGRATION.md](./implementation/ENTITY_MODEL_MIGRATION.md) | Entity model migration guide |
-| [implementation/CONTENT_V3_MIGRATION.md](./implementation/CONTENT_V3_MIGRATION.md) | Content v3 migration guide |
-| [implementation/CONTENT_V3_EXAMPLE.md](./implementation/CONTENT_V3_EXAMPLE.md) | Content v3 examples |
-| [implementation/TEMPORAL_IMPLEMENTATION_SUMMARY.md](./implementation/TEMPORAL_IMPLEMENTATION_SUMMARY.md) | Temporal implementation summary |
+## 🔍 Finding Information
 
-## Troubleshooting
+### By Topic
+- **Getting Started**: See [Quick Start Guide](./guides/quick-start.md)
+- **API Usage**: Check [API Examples](./api/examples.md)
+- **Architecture**: Read [Overview](./architecture/overview.md)
+- **Performance**: Review [Performance Docs](./performance/)
+- **Troubleshooting**: See [Troubleshooting Guides](./troubleshooting/)
 
-| Document | Description |
-|----------|-------------|
-| [troubleshooting/CONTENT_FORMAT_TROUBLESHOOTING.md](./troubleshooting/CONTENT_FORMAT_TROUBLESHOOTING.md) | Content format troubleshooting guide |
-| [troubleshooting/SSL_CONFIGURATION.md](./troubleshooting/SSL_CONFIGURATION.md) | SSL configuration troubleshooting |
+### By Role
+- **Developers**: Start with [Contributing](./development/contributing.md)
+- **Operators**: Read [Deployment Guide](./guides/deployment.md)
+- **Users**: See [Quick Start](./guides/quick-start.md)
 
-## Development Guides
+## 📝 Contributing to Documentation
 
-| Document | Description |
-|----------|-------------|
-| [development/contributing.md](./development/contributing.md) | Contributing guidelines |
-| [development/git-workflow.md](./development/git-workflow.md) | **[IMPORTANT]** Centralized Git workflow guide (all developers must follow) |
-| [development/production-notes.md](./development/production-notes.md) | Production deployment notes |
-| [development/security-implementation.md](./development/security-implementation.md) | Security implementation details |
+1. Follow the naming conventions above
+2. Update this index when adding new docs
+3. Keep examples up-to-date with current code
+4. Archive rather than delete outdated content
+5. Cross-reference related documentation
 
-## User Guides
-
-| Document | Description |
-|----------|-------------|
-| [guides/quick-start.md](./guides/quick-start.md) | Quick start guide |
-| [guides/deployment.md](./guides/deployment.md) | Deployment guide |
-| [guides/migration.md](./guides/migration.md) | Migration guide |
-| [guides/admin-interface.md](./guides/admin-interface.md) | Admin interface guide |
-| [guides/SETUP_ADMIN.md](./guides/SETUP_ADMIN.md) | Admin setup guide |
-
-## Examples and Use Cases
-
-| Document | Description |
-|----------|-------------|
-| [examples/temporal_examples.md](./examples/temporal_examples.md) | Temporal query examples |
-| [examples/ticketing_system.md](./examples/ticketing_system.md) | Ticketing system example |
-
-## Technical Spikes
-
-| Document | Description |
-|----------|-------------|
-| [spikes/TEMPORAL_STORAGE_SPIKE.md](./spikes/TEMPORAL_STORAGE_SPIKE.md) | Temporal storage implementation investigation |
-| [spikes/BINARY_STORAGE_FORMAT_SPIKE.md](./spikes/BINARY_STORAGE_FORMAT_SPIKE.md) | Binary storage format investigation |
-| [spikes/AUTOCHUNKING_SPIKE.md](./spikes/AUTOCHUNKING_SPIKE.md) | Autochunking system investigation |
-
-## Release Notes
-
-| Document | Description |
-|----------|-------------|
-| [releases/RELEASE_NOTES_v2.13.1.md](./releases/RELEASE_NOTES_v2.13.1.md) | v2.13.1 release notes |
-| [releases/RELEASE_NOTES_v2.13.0.md](./releases/RELEASE_NOTES_v2.13.0.md) | v2.13.0 release notes |
-| [releases/RELEASE_NOTES_v2.12.0.md](./releases/RELEASE_NOTES_v2.12.0.md) | v2.12.0 release notes |
-
-## Resources
-
-Logo resources have been moved to `/share/resources/` directory.
-
-| Resource | Description |
-|----------|-------------|
-| [/share/resources/logo_white.svg](/share/resources/logo_white.svg) | EntityDB logo - white text version |
-| [/share/resources/logo_black.svg](/share/resources/logo_black.svg) | EntityDB logo - black text version |
+For questions or improvements, please open an issue in the repository.

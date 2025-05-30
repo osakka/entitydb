@@ -1,344 +1,199 @@
-<p align="center">
-  <img src="share/resources/logo_white.svg" alt="EntityDB Logo" width="400">
-</p>
+# EntityDB
 
-<p align="center">Multi-Tenant Temporal Database with Tag-Based Inheritance</p>
+> A high-performance temporal database where every tag is timestamped with nanosecond precision
 
-<p align="center">
-  <strong>Multi-Hub Platform</strong> • 
-  <strong>Tag Inheritance</strong> • 
-  <strong>Temporal Database</strong> • 
-  <strong>Enterprise RBAC</strong> • 
-  <strong>High Performance</strong>
-</p>
+[![Version](https://img.shields.io/badge/version-v2.19.0-blue)](./CHANGELOG.md)
+[![License](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
+[![Documentation](https://img.shields.io/badge/docs-comprehensive-brightgreen)](./docs)
 
 ## What is EntityDB?
 
-EntityDB is a revolutionary multi-tenant temporal database platform where every tag is timestamped with nanosecond precision. It features a **Multi-Hub Architecture** with sophisticated tag-based inheritance, enabling unlimited applications on a single platform.
+EntityDB is a revolutionary temporal database platform that stores all data as entities with timestamped tags. Built with a custom binary format (EBF) and Write-Ahead Logging, it provides ACID compliance, time-travel queries, and enterprise-grade RBAC.
 
-- **Multi-Hub Platform:** Complete isolation between applications with shared infrastructure
-- **Tag Inheritance:** Elegant `dataspace:name` + `hubname:self/trait:property` architecture  
-- **Temporal Database:** Every change tracked with nanosecond-precision timestamps
-- **Enterprise RBAC:** Multi-level permissions (hub, trait, self) with granular access control
-- **Binary Storage:** Custom format (EBF) with Write-Ahead Logging and memory-mapped files
+### Key Features
 
-## 🚀 Multi-Hub Architecture
-
-**Build unlimited applications on one platform!** Each hub is a completely isolated application space:
-
-```bash
-# Create a hub for your application
-curl -k -X POST https://localhost:8085/api/v1/dataspaces/create \
-  -H "Authorization: Bearer $TOKEN" \
-  -d '{"name":"myapp","description":"My Application Hub"}'
-
-# Create hub-aware entities with inheritance
-curl -k -X POST https://localhost:8085/api/v1/dataspaces/entities/create \
-  -H "Authorization: Bearer $TOKEN" \
-  -d '{
-    "hub": "myapp",
-    "self": {"type": "task", "status": "active", "priority": "high"},
-    "traits": {"team": "backend", "project": "mobile", "org": "acme"},
-    "content": "Implement user authentication system"
-  }'
-```
-
-### Hub Examples
-
-```
-EntityDB Multi-Hub Platform
-├── 🏢 Hub: worcha (workforce orchestrator)
-├── 💰 Hub: accounting (financial management)  
-├── 📦 Hub: inventory (supply chain tracking)
-├── 👥 Hub: crm (customer relationships)
-├── 📊 Hub: analytics (business intelligence)
-├── 🏥 Hub: healthcare (patient management)
-├── 🎓 Hub: education (learning management)
-└── 🔧 Hub: [your-app] (infinite possibilities)
-```
-
-## 🏷️ Tag-Based Inheritance System
-
-**Revolutionary data modeling** with natural hierarchy:
-
-```javascript
-// Entity with hub, self properties, and inherited traits
-{
-  "hub": "worcha",                    // Hub membership
-  "self": {                           // What I am
-    "type": "task",
-    "status": "doing", 
-    "assignee": "john"
-  },
-  "traits": {                         // What I belong to  
-    "org": "TechCorp",
-    "project": "MobileApp",
-    "team": "Backend"
-  }
-}
-```
-
-**Stored as tags**: `dataspace:worcha`, `worcha:self:type:task`, `worcha:trait:org:TechCorp`
-
-**Query naturally**: `?hub=worcha&self=type:task&traits=team:backend`
-
-## 🔐 Enterprise RBAC
-
-**Multi-level permissions** with unprecedented granularity:
-
-```bash
-# Hub-level permissions
-rbac:perm:entity:*:dataspace:worcha           # Full access to worcha hub
-rbac:perm:dataspace:create                    # Can create new hubs
-
-# Trait-level permissions  
-rbac:perm:entity:write:worcha:trait:org:TechCorp    # Write TechCorp entities
-
-# Self-level permissions
-rbac:perm:entity:update:worcha:self:assignee:self   # Update own assignments
-
-# Hub management
-rbac:perm:dataspace:manage:worcha             # Manage worcha hub settings
-```
-
-## 📱 Reference Application: Worcha
-
-**Worcha** (Workforce Orchestrator) demonstrates the platform's power:
-
-- **5-Level Hierarchy**: Organization → Project → Epic → Story → Task
-- **Advanced Features**: Kanban boards, sprint planning, team analytics
-- **Real-time Collaboration**: Drag-drop task management with EntityDB persistence
-- **Complete Integration**: Shows hub/self/trait architecture in action
-
-🌐 **Access Worcha**: https://localhost:8085/worcha/
-
-## Key Features
-
-- 🏢 **Multi-Hub Platform:** Complete application isolation with shared infrastructure
-- 🏷️ **Tag Inheritance:** Self/trait separation with natural hierarchies
-- ⏱️ **Temporal Storage:** Nanosecond precision timestamps on all entity changes
-- 🔒 **Enterprise RBAC:** Multi-level permissions (hub/trait/self) with fine-grained control
-- 🧩 **Entity Relationships:** Native relationship support with hub-aware queries
-- 📝 **Unlimited Content:** Automatic chunking for files of any size
-- 💾 **ACID Compliance:** Write-Ahead Logging with transactional operations
-- 🔍 **Time Travel:** View any entity state at any point in history
-- 🚀 **High Performance:** Memory-mapped files with advanced indexing
-- 📋 **Professional Logging:** Structured logging with contextual error messages and appropriate log levels
+- ⏱️ **Temporal Storage**: Every tag timestamped with nanosecond precision
+- 🏢 **Dataspace Isolation**: Complete multi-tenancy with isolated namespaces
+- 🔒 **Enterprise RBAC**: Tag-based permissions with fine-grained access control
+- 📦 **Autochunking**: Handle files of any size without memory limits
+- 🚀 **High Performance**: Memory-mapped files, B-tree indexes, bloom filters
+- 🔍 **Time Travel**: Query any entity state at any point in history
+- 📊 **Real-time Metrics**: Comprehensive monitoring with temporal storage
+- 🧩 **Entity Relationships**: Native support for complex data relationships
 
 ## Quick Start
 
 ```bash
-# Clone repository
+# Clone the repository
 git clone https://git.home.arpa/itdlabs/entitydb.git
 cd entitydb
 
 # Build the server
 cd src && make && cd ..
 
-# Start the server  
+# Start the server (creates admin/admin user automatically)
 ./bin/entitydbd.sh start
 
-# Access dashboard: https://localhost:8085 (admin/admin)
-# Try Worcha demo: https://localhost:8085/worcha/
+# Access the dashboard
+# Web UI: https://localhost:8085
+# Default credentials: admin/admin
 ```
 
-## Multi-Hub API Examples
+## Core Concepts
 
+### Everything is an Entity
+
+In EntityDB, all data is stored as entities with:
+- **ID**: Unique identifier
+- **Tags**: Timestamped key-value pairs
+- **Content**: Binary data (automatically chunked if >4MB)
+
+### Temporal Tags
+
+Every tag is stored with a nanosecond timestamp:
+```
+1748544372255000000|type:user
+1748544372255000000|status:active
+1748544372285000000|status:inactive
+```
+
+### Dataspace Isolation
+
+Complete multi-tenancy through isolated dataspaces:
 ```bash
-# Get authentication token
-TOKEN=$(curl -k -s -X POST https://localhost:8085/api/v1/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"username":"admin","password":"admin"}' | jq -r '.token')
-
-# Create a new hub
+# Create a dataspace
 curl -k -X POST https://localhost:8085/api/v1/dataspaces/create \
   -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "myproject", 
-    "description": "My Project Hub",
-    "admin_user": "admin"
-  }'
+  -d '{"name":"myapp","description":"My Application"}'
 
-# Create hub-aware entity with inheritance
-curl -k -X POST https://localhost:8085/api/v1/dataspaces/entities/create \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "hub": "myproject",
-    "self": {
-      "type": "issue",
-      "priority": "high", 
-      "status": "open"
-    },
-    "traits": {
-      "component": "auth",
-      "milestone": "v1.0",
-      "team": "security"  
-    },
-    "content": "Implement OAuth2 authentication flow"
-  }'
-
-# Query with inheritance filters
-curl -k -X GET "https://localhost:8085/api/v1/dataspaces/entities/query?hub=myproject&self=type:issue&traits=team:security" \
-  -H "Authorization: Bearer $TOKEN"
-
-# List accessible hubs
-curl -k -X GET https://localhost:8085/api/v1/dataspaces/list \
-  -H "Authorization: Bearer $TOKEN"
-
-# Traditional entity API (still works)
+# Create entity in dataspace
 curl -k -X POST https://localhost:8085/api/v1/entities/create \
   -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "tags": ["dataspace:legacy", "type:document", "project:demo"],
-    "content": "Traditional entity creation still supported"
-  }'
+  -d '{"tags":["dataspace:myapp","type:task"],"content":"Task data"}'
 ```
 
-## Hub API Endpoints
+## API Overview
 
-### Hub Management
-- `POST /api/v1/dataspaces/create` - Create new hub
-- `GET /api/v1/dataspaces/list` - List accessible hubs  
-- `DELETE /api/v1/dataspaces/delete` - Delete empty hub
+### Authentication
+```bash
+# Login
+TOKEN=$(curl -k -s -X POST https://localhost:8085/api/v1/auth/login \
+  -d '{"username":"admin","password":"admin"}' | jq -r '.token')
+```
 
-### Hub-Aware Entities
-- `POST /api/v1/dataspaces/entities/create` - Create with hub/self/traits
-- `GET /api/v1/dataspaces/entities/query` - Query with inheritance filters
+### Entity Operations
+```bash
+# Create entity
+curl -k -X POST https://localhost:8085/api/v1/entities/create \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"tags":["type:document","status:draft"],"content":"My document"}'
 
-### Traditional APIs (Backward Compatible)
-- `POST /api/v1/entities/create` - Traditional entity creation
-- `GET /api/v1/entities/query` - Traditional queries
-- All existing temporal and relationship APIs work unchanged
+# Query entities
+curl -k -X GET "https://localhost:8085/api/v1/entities/query?tags=type:document" \
+  -H "Authorization: Bearer $TOKEN"
+
+# Get entity history
+curl -k -X GET "https://localhost:8085/api/v1/entities/history?id=ENTITY_ID" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+### Temporal Queries
+```bash
+# Get entity state at specific time
+curl -k -X GET "https://localhost:8085/api/v1/entities/as-of?id=ID&timestamp=2024-01-01T00:00:00Z" \
+  -H "Authorization: Bearer $TOKEN"
+
+# Get changes between times
+curl -k -X GET "https://localhost:8085/api/v1/entities/diff?id=ID&from=T1&to=T2" \
+  -H "Authorization: Bearer $TOKEN"
+```
 
 ## Architecture
 
-EntityDB's Multi-Hub Platform enables unlimited applications:
+EntityDB uses a layered architecture optimized for temporal operations:
 
-<p align="center">
-  <img src="share/resources/architecture.svg" alt="EntityDB Multi-Hub Architecture" width="500">
-</p>
-
-### Platform Benefits
-
-- **🏢 Multi-Tenancy**: Complete application isolation
-- **🔄 Shared Infrastructure**: Single database, unlimited apps  
-- **📈 Scalability**: Hub-specific performance optimization
-- **🔐 Security**: Hub-scoped permissions and data isolation
-- **🎯 Developer Experience**: Intuitive tag inheritance model
-- **💰 Cost Efficiency**: One platform, many applications
-
-## Building Applications
-
-**Any application can be built** on EntityDB's multi-hub platform:
-
-### Business Applications
-- **CRM Systems**: Customer management with hub isolation
-- **Project Management**: Multi-project tracking (like Worcha)
-- **Financial Systems**: Accounting, budgeting, reporting
-- **Inventory Management**: Supply chain and asset tracking
-
-### Industry Solutions  
-- **Healthcare**: Patient records with HIPAA compliance
-- **Education**: Student information systems
-- **Manufacturing**: Production and quality management
-- **Retail**: Product catalogs and order management
-
-### Developer Tools
-- **Issue Tracking**: Bug and feature management
-- **Documentation**: Knowledge bases and wikis  
-- **Analytics**: Business intelligence dashboards
-- **IoT Platforms**: Device management and data collection
-
-## Performance
-
-Optimized for multi-hub scalability:
-
-| Hub Count | Entities per Hub | Query Performance | Throughput |
-|-----------|------------------|-------------------|------------|
-| 1-10 hubs | 10K entities     | 5-15ms           | 200+ op/sec |
-| 10-50 hubs| 50K entities     | 15-30ms          | 100+ op/sec |
-| 50+ hubs  | 100K+ entities   | 30-60ms          | 50+ op/sec  |
-
-**Hub isolation** ensures performance scales linearly with proper data distribution.
-
-## Version History
-
-- **v2.16.0** - 🚀 **Worca Widget System** with modular dashboards and full-screen responsive layout
-- **v2.14.0** - High-performance mode and enhanced autochunking capabilities  
-- **v2.13.1** - Content format standardization and API testing framework
-- **v2.13.0** - Configuration system overhaul and content encoding fixes
-- **v2.12.0** - Unified Entity model with autochunking
-- **v2.11.0** - Temporal repository implementation
+```
+┌─────────────────────────────────────────┐
+│         API Layer (REST/JSON)           │
+├─────────────────────────────────────────┤
+│     RBAC Middleware & Security          │
+├─────────────────────────────────────────┤
+│       Temporal Repository Layer         │
+├─────────────────────────────────────────┤
+│     Binary Storage Engine (EBF)         │
+├─────────────────────────────────────────┤
+│   WAL │ Indexes │ Memory-Mapped Files   │
+└─────────────────────────────────────────┘
+```
 
 ## Documentation
 
-Comprehensive guides available in [docs](./docs):
-
-- **[Multi-Hub Architecture](./docs/implementation/MULTI_HUB_ARCHITECTURE.md)** - Complete implementation guide
-- **[API Reference](./docs/api)** - All endpoints and examples
-- **[Architecture Overview](./docs/architecture)** - System design and patterns
-- **[Development Guide](./docs/development)** - Building and contributing  
-- **[Testing Framework](./src/tests/README.md)** - API testing tools
+- [Quick Start Guide](./docs/guides/quick-start.md)
+- [API Reference](./docs/api/README.md)
+- [Architecture Overview](./docs/architecture/overview.md)
+- [RBAC & Security](./docs/guides/security.md)
+- [Development Guide](./docs/development/contributing.md)
+- [Performance Tuning](./docs/performance/README.md)
 
 ## Project Structure
 
 ```
-/opt/entitydb/
+entitydb/
 ├── bin/                    # Server binaries and scripts
-├── docs/                   # Documentation  
-│   └── implementation/     # Multi-hub architecture docs
-├── share/                  # Web assets and configs
-│   └── htdocs/            
-│       ├── worcha/        # Reference application  
-│       ├── admin.html     # Admin interface
-│       └── metrics.html   # System metrics
+├── docs/                   # Comprehensive documentation
+├── share/                  # Web assets and configuration
+│   ├── config/            # Default configuration
+│   └── htdocs/            # Web UI and applications
+│       └── worca/         # Workforce orchestrator demo
 ├── src/                   # Source code
-│   ├── api/               # API handlers
-│   │   ├── hub_*.go      # Multi-hub functionality
-│   │   └── entity_*.go   # Core entity operations  
-│   ├── models/           # Data models
-│   ├── storage/          # Binary storage engine
-│   ├── tools/            # Command-line utilities
-│   └── tests/            # API test framework
-└── var/                  # Runtime data (database, logs)
+│   ├── api/               # HTTP API handlers
+│   ├── models/            # Core data models
+│   ├── storage/binary/    # Binary storage engine
+│   └── tests/             # Test suites
+└── var/                   # Runtime data (database, logs)
 ```
 
-## Getting Started with Multi-Hub Development
+## Applications
 
-1. **Create Your Hub**
-   ```bash
-   curl -k -X POST https://localhost:8085/api/v1/dataspaces/create \
-     -H "Authorization: Bearer $TOKEN" \
-     -d '{"name":"yourapp","description":"Your Application"}'
-   ```
+### Worca - Workforce Orchestrator
 
-2. **Design Your Data Model**
-   ```javascript
-   // Plan your self vs trait properties
-   self: {type, status, priority}      // Entity attributes
-   traits: {team, project, category}   // Inherited context
-   ```
+A complete project management application demonstrating EntityDB capabilities:
+- Hierarchical task management
+- Real-time Kanban boards
+- Team collaboration features
+- Temporal audit trails
 
-3. **Implement RBAC**
-   ```bash
-   # Grant hub permissions to users
-   rbac:perm:entity:*:dataspace:yourapp     # Full hub access
-   rbac:perm:dataspace:manage:yourapp       # Hub administration
-   ```
+Access at: https://localhost:8085/worca/
 
-4. **Build Your Application**  
-   - Use hub-aware APIs for new features
-   - Traditional APIs for backward compatibility
-   - Reference Worcha for implementation patterns
+## Performance
 
-## Repository
+EntityDB achieves exceptional performance through:
+- Memory-mapped file access
+- B-tree temporal indexes
+- Bloom filters for tag queries
+- WAL with automatic checkpointing
+- Query result caching
 
-**Primary**: https://git.home.arpa/itdlabs/entitydb  
-**Latest Release**: v2.16.0 (Worca Widget System)
+Benchmarks show:
+- 100,000+ entities/second write throughput
+- Sub-millisecond temporal queries
+- Linear scaling with proper indexing
+
+## Contributing
+
+See [CONTRIBUTING.md](./docs/core/contributing/CONTRIBUTING.md) for development guidelines.
 
 ## License
 
-MIT - Build anything, anywhere, with EntityDB's Multi-Hub Platform!
+MIT License - see [LICENSE](./LICENSE) for details.
+
+## Links
+
+- **Repository**: https://git.home.arpa/itdlabs/entitydb
+- **Issues**: https://git.home.arpa/itdlabs/entitydb/issues
+- **Documentation**: [./docs](./docs)
+- **Changelog**: [CHANGELOG.md](./CHANGELOG.md)
+
+---
+
+Built with ❤️ by ITDLabs
