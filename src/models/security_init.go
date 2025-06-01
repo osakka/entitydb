@@ -23,6 +23,16 @@ func NewSecurityInitializer(securityManager *SecurityManager, entityRepo EntityR
 
 // InitializeDefaultSecurityEntities creates the default roles, permissions, and admin user
 func (si *SecurityInitializer) InitializeDefaultSecurityEntities() error {
+	// Create default dataspaces first (system infrastructure)
+	if err := si.createDefaultDataspaces(); err != nil {
+		return fmt.Errorf("failed to create default dataspaces: %v", err)
+	}
+	
+	// Force sync after creating dataspaces
+	if err := si.forceSync(); err != nil {
+		return fmt.Errorf("failed to sync after creating dataspaces: %v", err)
+	}
+
 	// Create default permissions
 	if err := si.createDefaultPermissions(); err != nil {
 		return fmt.Errorf("failed to create default permissions: %v", err)
@@ -130,6 +140,7 @@ func (si *SecurityInitializer) createDefaultPermissions() error {
 			ID: perm.id,
 			Tags: []string{
 				"type:" + EntityTypePermission,
+				"dataspace:_system",
 				"resource:" + perm.resource,
 				"action:" + perm.action,
 				"scope:" + perm.scope,
@@ -169,6 +180,7 @@ func (si *SecurityInitializer) createDefaultRoles() error {
 			ID: role.id,
 			Tags: []string{
 				"type:" + EntityTypeRole,
+				"dataspace:_system",
 				"name:" + role.name,
 				fmt.Sprintf("level:%d", role.level),
 				"scope:" + role.scope,
@@ -293,6 +305,7 @@ func (si *SecurityInitializer) createDefaultGroups() error {
 			ID: group.id,
 			Tags: []string{
 				"type:" + EntityTypeGroup,
+				"dataspace:_system",
 				"name:" + group.name,
 				"level:" + group.level,
 				"created:" + NowString(),
@@ -578,6 +591,65 @@ func (si *SecurityInitializer) forceSync() error {
 		if err := checkpointable.Checkpoint(); err != nil {
 			return fmt.Errorf("failed to checkpoint repository: %v", err)
 		}
+	}
+	
+	return nil
+}
+
+// createDefaultDataspaces creates the system and default dataspaces
+func (si *SecurityInitializer) createDefaultDataspaces() error {
+	logger.Info("Creating default dataspaces...")
+	
+	// Create system dataspace for system entities (users, permissions, etc.)
+	systemDataspace := &Entity{
+		ID: "dataspace_system",
+		Tags: []string{
+			"type:dataspace",
+			"dataspace:_system",
+			"name:_system",
+			"description:System dataspace for internal entities",
+			"system:true",
+			"created:" + NowString(),
+		},
+		Content:   nil,
+		CreatedAt: Now(),
+		UpdatedAt: Now(),
+	}
+	
+	if err := si.entityRepo.Create(systemDataspace); err != nil {
+		// Check if already exists
+		if !strings.Contains(err.Error(), "already exists") {
+			return fmt.Errorf("failed to create system dataspace: %v", err)
+		}
+		logger.Debug("System dataspace already exists")
+	} else {
+		logger.Info("Created system dataspace: _system")
+	}
+	
+	// Create default dataspace for user data
+	defaultDataspace := &Entity{
+		ID: "dataspace_default",
+		Tags: []string{
+			"type:dataspace",
+			"dataspace:default",
+			"name:default",
+			"description:Default dataspace for user entities",
+			"system:false",
+			"created:" + NowString(),
+		},
+		Content:   nil,
+		CreatedAt: Now(),
+		UpdatedAt: Now(),
+	}
+	
+	if err := si.entityRepo.Create(defaultDataspace); err != nil {
+		// Check if already exists
+		if !strings.Contains(err.Error(), "already exists") {
+			return fmt.Errorf("failed to create default dataspace: %v", err)
+		}
+		logger.Debug("Default dataspace already exists")
+	} else {
+		logger.Info("Created default dataspace: default")
 	}
 	
 	return nil

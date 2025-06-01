@@ -113,8 +113,8 @@ func (w *Writer) WriteEntity(entity *models.Entity) error {
 	logger.Trace("Entity %s content checksum: %x", entity.ID, contentChecksum)
 	
 	// Get buffer from pool
-	buffer := LargeBufferPool.Get()
-	defer LargeBufferPool.Put(buffer)
+	buffer := GetLargeSafeBuffer()
+	defer PutLargeSafeBuffer(buffer)
 	
 	// Add checksum tag if not already present
 	checksumTag := fmt.Sprintf("%d|checksum:sha256:%s", time.Now().UnixNano(), hex.EncodeToString(contentChecksum[:]))
@@ -279,11 +279,15 @@ func (w *Writer) WriteEntity(entity *models.Entity) error {
 		idBytes = idBytes[:len(entry.EntityID)]
 	}
 	copy(entry.EntityID[:], idBytes)
+	
+	// Check if this is a new entity (not an update)
+	_, isUpdate := w.index[entity.ID]
 	w.index[entity.ID] = entry
 	
-	logger.Trace("Added index entry for %s: offset=%d, size=%d", entity.ID, entry.Offset, entry.Size)
+	logger.Trace("Added index entry for %s: offset=%d, size=%d, isUpdate=%v", entity.ID, entry.Offset, entry.Size, isUpdate)
 	op.SetMetadata("index_offset", entry.Offset)
 	op.SetMetadata("index_size", entry.Size)
+	op.SetMetadata("is_update", isUpdate)
 	
 	// Verify we can read back what we wrote
 	verifyBuffer := make([]byte, n)
@@ -299,8 +303,13 @@ func (w *Writer) WriteEntity(entity *models.Entity) error {
 		}
 	}
 	
-	// Update header
-	w.header.EntityCount++
+	// Update header - only increment count for new entities
+	if !isUpdate {
+		w.header.EntityCount++
+		logger.Trace("Incremented EntityCount to %d for new entity %s", w.header.EntityCount, entity.ID)
+	} else {
+		logger.Trace("Updated existing entity %s, EntityCount remains %d", entity.ID, w.header.EntityCount)
+	}
 	w.header.FileSize = uint64(offset) + uint64(n)
 	w.header.LastModified = time.Now().Unix()
 	
@@ -414,10 +423,12 @@ func (w *Writer) Close() error {
 	
 	// Verify index count matches header
 	if writtenCount != int(w.header.EntityCount) {
-		logger.Error("Index entry count mismatch: wrote %d entries but header claims %d", writtenCount, w.header.EntityCount)
+		logger.Warn("Index entry count mismatch detected: wrote %d entries but header claims %d, correcting header", writtenCount, w.header.EntityCount)
 		// Update header to match actual count
 		w.header.EntityCount = uint64(writtenCount)
-		logger.Trace("Updated header EntityCount to match actual index: %d", w.header.EntityCount)
+		logger.Debug("Corrected header EntityCount to match actual index: %d", w.header.EntityCount)
+	} else {
+		logger.Debug("Index count verification passed: %d entries match header count", writtenCount)
 	}
 	
 	// Update header

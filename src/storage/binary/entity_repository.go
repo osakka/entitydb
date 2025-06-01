@@ -1411,35 +1411,174 @@ func (r *EntityRepository) checkAndPerformCheckpoint() {
 	if shouldCheckpoint {
 		logger.Info("Performing WAL checkpoint (reason: %s)", checkpointReason)
 		
+		// Track checkpoint metrics
+		startTime := time.Now()
+		var walSizeBefore int64
+		walPath := filepath.Join(r.dataPath, "entitydb.wal")
+		if info, err := os.Stat(walPath); err == nil {
+			walSizeBefore = info.Size()
+		}
+		
 		// Log checkpoint operation
 		if err := r.wal.LogCheckpoint(); err != nil {
 			logger.Error("Failed to log checkpoint: %v", err)
+			r.storeCheckpointMetric("failed", 0, walSizeBefore, walSizeBefore, checkpointReason)
 			return
 		}
 		
 		// Flush all pending writes
 		if err := r.writerManager.Flush(); err != nil {
 			logger.Error("Failed to flush writes during checkpoint: %v", err)
+			r.storeCheckpointMetric("failed", time.Since(startTime), walSizeBefore, walSizeBefore, checkpointReason)
 			return
 		}
 		
 		// Force checkpoint to persist everything
 		if err := r.writerManager.Checkpoint(); err != nil {
 			logger.Error("Failed to checkpoint during WAL truncation: %v", err)
+			r.storeCheckpointMetric("failed", time.Since(startTime), walSizeBefore, walSizeBefore, checkpointReason)
 			return
 		}
 		
 		// Truncate the WAL
 		if err := r.wal.Truncate(); err != nil {
 			logger.Error("Failed to truncate WAL: %v", err)
+			r.storeCheckpointMetric("failed", time.Since(startTime), walSizeBefore, walSizeBefore, checkpointReason)
 			return
+		}
+		
+		// Get WAL size after checkpoint
+		var walSizeAfter int64
+		if info, err := os.Stat(walPath); err == nil {
+			walSizeAfter = info.Size()
 		}
 		
 		// Reset counters
 		r.walOperationCount = 0
 		r.lastCheckpoint = time.Now()
 		
-		logger.Info("WAL checkpoint completed successfully")
+		// Store successful checkpoint metrics
+		duration := time.Since(startTime)
+		r.storeCheckpointMetric("success", duration, walSizeBefore, walSizeAfter, checkpointReason)
+		
+		logger.Info("WAL checkpoint completed successfully (duration: %v, size reduced: %d -> %d bytes)", 
+			duration, walSizeBefore, walSizeAfter)
+	}
+}
+
+// storeCheckpointMetric stores WAL checkpoint metrics
+func (r *EntityRepository) storeCheckpointMetric(status string, duration time.Duration, sizeBefore, sizeAfter int64, reason string) {
+	// Store multiple checkpoint-related metrics
+	
+	// 1. Checkpoint count
+	metricID := fmt.Sprintf("metric_wal_checkpoint_%s_total", status)
+	if entity, err := r.GetByID(metricID); err != nil {
+		// Create new metric entity
+		tags := []string{
+			"type:metric",
+			"dataspace:system",
+			fmt.Sprintf("name:wal_checkpoint_%s_total", status),
+			"unit:count",
+			fmt.Sprintf("description:Total WAL checkpoints with status %s", status),
+			"value:1",
+			"retention:count:1000",
+			"retention:period:86400", // 24 hours
+		}
+		
+		newEntity := &models.Entity{
+			ID:      metricID,
+			Tags:    tags,
+			Content: []byte{},
+		}
+		
+		if err := r.Create(newEntity); err != nil {
+			logger.Error("Failed to create checkpoint metric: %v", err)
+		}
+	} else {
+		// Increment counter
+		currentValue := 0.0
+		for _, tag := range entity.GetTagsWithoutTimestamp() {
+			if strings.HasPrefix(tag, "value:") {
+				if val, err := strconv.ParseFloat(strings.TrimPrefix(tag, "value:"), 64); err == nil {
+					currentValue = val
+					break
+				}
+			}
+		}
+		valueTag := fmt.Sprintf("value:%.0f", currentValue+1)
+		if err := r.AddTag(metricID, valueTag); err != nil {
+			logger.Error("Failed to update checkpoint count: %v", err)
+		}
+	}
+	
+	// 2. Checkpoint duration (only for successful checkpoints)
+	if status == "success" && duration > 0 {
+		durationMetricID := "metric_wal_checkpoint_duration_ms"
+		durationMillis := float64(duration.Milliseconds())
+		
+		if _, err := r.GetByID(durationMetricID); err != nil {
+			// Create duration metric
+			tags := []string{
+				"type:metric",
+				"dataspace:system",
+				"name:wal_checkpoint_duration_ms",
+				"unit:milliseconds",
+				"description:WAL checkpoint duration",
+				fmt.Sprintf("value:%.0f", durationMillis),
+				"retention:count:100",
+				"retention:period:3600",
+			}
+			
+			newEntity := &models.Entity{
+				ID:      durationMetricID,
+				Tags:    tags,
+				Content: []byte{},
+			}
+			
+			if err := r.Create(newEntity); err != nil {
+				logger.Error("Failed to create checkpoint duration metric: %v", err)
+			}
+		} else {
+			// Add temporal value
+			valueTag := fmt.Sprintf("value:%.0f", durationMillis)
+			if err := r.AddTag(durationMetricID, valueTag); err != nil {
+				logger.Error("Failed to update checkpoint duration: %v", err)
+			}
+		}
+		
+		// 3. Size reduction metric
+		if sizeBefore > 0 && sizeAfter >= 0 {
+			sizeReductionID := "metric_wal_checkpoint_size_reduction_bytes"
+			reduction := float64(sizeBefore - sizeAfter)
+			
+			if _, err := r.GetByID(sizeReductionID); err != nil {
+				tags := []string{
+					"type:metric",
+					"dataspace:system",
+					"name:wal_checkpoint_size_reduction_bytes",
+					"unit:bytes",
+					"description:Bytes freed by WAL checkpoint",
+					fmt.Sprintf("value:%.0f", reduction),
+					"retention:count:100",
+					"retention:period:3600",
+				}
+				
+				newEntity := &models.Entity{
+					ID:      sizeReductionID,
+					Tags:    tags,
+					Content: []byte{},
+				}
+				
+				if err := r.Create(newEntity); err != nil {
+					logger.Error("Failed to create size reduction metric: %v", err)
+				}
+			} else {
+				valueTag := fmt.Sprintf("value:%.0f", reduction)
+				if err := r.AddTag(sizeReductionID, valueTag); err != nil {
+					logger.Error("Failed to update size reduction: %v", err)
+				}
+			}
+		}
 	}
 }
 
@@ -2151,7 +2290,7 @@ func (r *EntityRepository) VerifyIndexHealth() error {
 			entityCount, indexCount, missingFromIndex, missingFromRepo)
 	}
 	
-	logger.Info("Index health check passed: %d entities indexed", entityCount)
+	logger.Info("Index health check passed: %d entities indexed, all repository layers synchronized", entityCount)
 	return nil
 }
 

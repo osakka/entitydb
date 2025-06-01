@@ -166,11 +166,26 @@ func main() {
 		os.Exit(0)
 	}
 
-	// Set up logging
-	if err := logger.SetLogLevel(logLevel); err != nil {
-		logger.Fatalf("Invalid log level: %v", err)
+	// Configure logging from environment and flags
+	logger.Configure()
+	
+	// Override with command line flag if provided
+	if logLevel != "INFO" {
+		if err := logger.SetLogLevel(logLevel); err != nil {
+			logger.Fatalf("Invalid log level: %v", err)
+		}
 	}
-	// Logger already configured in logger package with proper prefix and formatting
+	
+	// Check for trace subsystems from environment or flag
+	if traceSubsystems := os.Getenv("ENTITYDB_TRACE_SUBSYSTEMS"); traceSubsystems != "" {
+		subsystems := strings.Split(traceSubsystems, ",")
+		for i, s := range subsystems {
+			subsystems[i] = strings.TrimSpace(s)
+		}
+		logger.EnableTrace(subsystems...)
+		logger.Info("Trace subsystems enabled: %s", strings.Join(subsystems, ", "))
+	}
+	
 	logger.Info("Starting EntityDB with log level: %s", logger.GetLogLevel())
 
 	// Initialize binary repositories
@@ -214,6 +229,8 @@ func main() {
 		case *binary.TemporalRepository:
 			binaryRepo = underlying.HighPerformanceRepository.EntityRepository
 		case *binary.HighPerformanceRepository:
+			binaryRepo = underlying.EntityRepository
+		case *binary.DataspaceRepository:
 			binaryRepo = underlying.EntityRepository
 		case *binary.EntityRepository:
 			binaryRepo = underlying
@@ -289,7 +306,7 @@ func main() {
 	
 	// Test endpoints (no auth required) - Add these FIRST
 	logger.Info("Registering test endpoints...")
-	testHandlers := api.NewTestHandlers(server.entityRepo, server.relationRepo)
+	testHandlers := api.NewUnauthenticatedHandlers(server.entityRepo, server.relationRepo)
 	apiRouter.HandleFunc("/test/status", testHandlers.TestStatus).Methods("GET")
 	apiRouter.HandleFunc("/test/entities/create", testHandlers.TestCreateEntity).Methods("POST")
 	apiRouter.HandleFunc("/test/relationships/create", testHandlers.TestCreateRelationship).Methods("POST")
@@ -305,28 +322,26 @@ func main() {
 	// Temporal test endpoint
 	apiRouter.HandleFunc("/test/temporal/status", server.entityHandler.TestTemporalFixHandler).Methods("GET")
 	
-	// Create optimized handler for performance-critical endpoints
-	optimizedHandler := api.NewOptimizedEntityHandler(server.entityRepo)
-	
 	// Entity API routes with RBAC
 	apiRouter.HandleFunc("/entities", server.handleEntities).Methods("GET", "POST")
-	// Use optimized handlers for list and query
-	apiRouter.HandleFunc("/entities/list", api.RBACMiddleware(server.entityRepo, server.sessionManager, api.PermEntityView)(optimizedHandler.ListEntitiesOptimized)).Methods("GET")
-	apiRouter.HandleFunc("/entities/query", api.RBACMiddleware(server.entityRepo, server.sessionManager, api.PermEntityView)(optimizedHandler.QueryEntitiesOptimized)).Methods("GET")
+	// Use standard handlers for list and query  
+	apiRouter.HandleFunc("/entities/list", api.RBACMiddleware(server.entityRepo, server.sessionManager, api.PermEntityView)(server.entityHandler.ListEntities)).Methods("GET")
+	apiRouter.HandleFunc("/entities/query", api.RBACMiddleware(server.entityRepo, server.sessionManager, api.PermEntityView)(server.entityHandler.QueryEntities)).Methods("GET")
 	// Keep regular handlers for other operations
-	apiRouter.HandleFunc("/entities/get", entityHandlerRBAC.GetEntityWithRBAC()).Methods("GET")
-	apiRouter.HandleFunc("/entities/create", entityHandlerRBAC.CreateEntityWithRBAC()).Methods("POST")
-	apiRouter.HandleFunc("/entities/update", entityHandlerRBAC.UpdateEntityWithRBAC()).Methods("PUT")
+	apiRouter.HandleFunc("/entities/get", entityHandlerRBAC.GetEntity()).Methods("GET")
+	apiRouter.HandleFunc("/entities/create", entityHandlerRBAC.CreateEntity()).Methods("POST")
+	apiRouter.HandleFunc("/entities/update", entityHandlerRBAC.UpdateEntity()).Methods("PUT")
 
 	// Dataspace-aware Entity API routes with RBAC and Dataspace validation
 	dataspaceEntityHandler := api.NewDataspaceEntityHandlerRBAC(server.entityHandler, server.entityRepo, server.sessionManager)
-	apiRouter.HandleFunc("/dataspaces/entities/create", dataspaceEntityHandler.CreateDataspaceEntityWithRBAC()).Methods("POST")
-	apiRouter.HandleFunc("/dataspaces/entities/query", dataspaceEntityHandler.QueryDataspaceEntitiesWithRBAC()).Methods("GET")
+	apiRouter.HandleFunc("/dataspaces/entities/create", dataspaceEntityHandler.CreateDataspaceEntity()).Methods("POST")
+	apiRouter.HandleFunc("/dataspaces/entities/query", dataspaceEntityHandler.QueryDataspaceEntities()).Methods("GET")
 	
 	// Dataspace management routes with RBAC
 	dataspaceHandler := api.NewDataspaceHandler(server.entityRepo)
 	dataspaceHandlerRBAC := api.NewDataspaceHandlerRBAC(dataspaceHandler, server.entityRepo, server.sessionManager)
 	apiRouter.HandleFunc("/dataspaces", dataspaceHandlerRBAC.ListDataspaces).Methods("GET")
+	apiRouter.HandleFunc("/dataspaces/list", dataspaceHandlerRBAC.ListDataspaces).Methods("GET") // Alias for compatibility
 	apiRouter.HandleFunc("/dataspaces", dataspaceHandlerRBAC.CreateDataspace).Methods("POST")
 	apiRouter.HandleFunc("/dataspaces/{id}", dataspaceHandlerRBAC.GetDataspace).Methods("GET")
 	apiRouter.HandleFunc("/dataspaces/{id}", dataspaceHandlerRBAC.UpdateDataspace).Methods("PUT")
@@ -337,16 +352,16 @@ func main() {
 	apiRouter.HandleFunc("/entities/download", server.entityHandler.StreamEntity).Methods("GET")
 	
 	// Temporal API routes with RBAC
-	apiRouter.HandleFunc("/entities/as-of", entityHandlerRBAC.GetEntityAsOfWithRBAC()).Methods("GET")
-	apiRouter.HandleFunc("/entities/history", entityHandlerRBAC.GetEntityHistoryWithRBAC()).Methods("GET")
-	apiRouter.HandleFunc("/entities/changes", entityHandlerRBAC.GetRecentChangesWithRBAC()).Methods("GET")
-	apiRouter.HandleFunc("/entities/diff", entityHandlerRBAC.GetEntityDiffWithRBAC()).Methods("GET")
+	apiRouter.HandleFunc("/entities/as-of", entityHandlerRBAC.GetEntityAsOf()).Methods("GET")
+	apiRouter.HandleFunc("/entities/history", entityHandlerRBAC.GetEntityHistory()).Methods("GET")
+	apiRouter.HandleFunc("/entities/changes", entityHandlerRBAC.GetRecentChanges()).Methods("GET")
+	apiRouter.HandleFunc("/entities/diff", entityHandlerRBAC.GetEntityDiff()).Methods("GET")
 	
 	// For backward compatibility with test scripts
-	apiRouter.HandleFunc("/entities/as-of-fixed", entityHandlerRBAC.GetEntityAsOfWithRBAC()).Methods("GET")
-	apiRouter.HandleFunc("/entities/history-fixed", entityHandlerRBAC.GetEntityHistoryWithRBAC()).Methods("GET")
-	apiRouter.HandleFunc("/entities/changes-fixed", entityHandlerRBAC.GetRecentChangesWithRBAC()).Methods("GET")
-	apiRouter.HandleFunc("/entities/diff-fixed", entityHandlerRBAC.GetEntityDiffWithRBAC()).Methods("GET")
+	apiRouter.HandleFunc("/entities/as-of-fixed", entityHandlerRBAC.GetEntityAsOf()).Methods("GET")
+	apiRouter.HandleFunc("/entities/history-fixed", entityHandlerRBAC.GetEntityHistory()).Methods("GET")
+	apiRouter.HandleFunc("/entities/changes-fixed", entityHandlerRBAC.GetRecentChanges()).Methods("GET")
+	apiRouter.HandleFunc("/entities/diff-fixed", entityHandlerRBAC.GetEntityDiff()).Methods("GET")
 	
 	// Tag index fix endpoint
 	apiRouter.HandleFunc("/patches/reindex-tags", func(w http.ResponseWriter, r *http.Request) {
@@ -377,30 +392,30 @@ func main() {
 	
 	// User management routes with RBAC
 	userHandlerRBAC := api.NewUserHandlerRBAC(server.userHandler, server.entityRepo, server.sessionManager)
-	apiRouter.HandleFunc("/users/create", userHandlerRBAC.CreateUserWithRBAC()).Methods("POST")
-		apiRouter.HandleFunc("/users/change-password", userHandlerRBAC.ChangePasswordWithRBAC()).Methods("POST")
-		apiRouter.HandleFunc("/users/reset-password", userHandlerRBAC.ResetPasswordWithRBAC()).Methods("POST")
+	apiRouter.HandleFunc("/users/create", userHandlerRBAC.CreateUser()).Methods("POST")
+		apiRouter.HandleFunc("/users/change-password", userHandlerRBAC.ChangePassword()).Methods("POST")
+		apiRouter.HandleFunc("/users/reset-password", userHandlerRBAC.ResetPassword()).Methods("POST")
 	
 	// Dashboard routes with RBAC
 	dashboardHandler := api.NewDashboardHandler(server.entityRepo)
 	dashboardHandlerRBAC := api.NewDashboardHandlerRBAC(dashboardHandler, server.entityRepo, server.sessionManager)
-	apiRouter.HandleFunc("/dashboard/stats", dashboardHandlerRBAC.GetDashboardStatsWithRBAC()).Methods("GET")
+	apiRouter.HandleFunc("/dashboard/stats", dashboardHandlerRBAC.GetDashboardStats()).Methods("GET")
 	
 	// Configuration routes with RBAC
 	configHandler := api.NewEntityConfigHandler(server.entityRepo)
 	configHandlerRBAC := api.NewEntityConfigHandlerRBAC(configHandler, server.entityRepo, server.sessionManager)
-	apiRouter.HandleFunc("/config", configHandlerRBAC.GetConfigWithRBAC()).Methods("GET")
-	apiRouter.HandleFunc("/config/set", configHandlerRBAC.SetConfigWithRBAC()).Methods("POST")
-	apiRouter.HandleFunc("/feature-flags", configHandlerRBAC.GetFeatureFlagsWithRBAC()).Methods("GET")
-	apiRouter.HandleFunc("/feature-flags/set", configHandlerRBAC.SetFeatureFlagWithRBAC()).Methods("POST")
+	apiRouter.HandleFunc("/config", configHandlerRBAC.GetConfig()).Methods("GET")
+	apiRouter.HandleFunc("/config/set", configHandlerRBAC.SetConfig()).Methods("POST")
+	apiRouter.HandleFunc("/feature-flags", configHandlerRBAC.GetFeatureFlags()).Methods("GET")
+	apiRouter.HandleFunc("/feature-flags/set", configHandlerRBAC.SetFeatureFlag()).Methods("POST")
 	
 	// Admin routes with RBAC (require admin permission)
 	adminHandler := api.NewAdminHandler(server.entityRepo)
 	apiRouter.HandleFunc("/admin/reindex", api.RBACMiddleware(server.entityRepo, server.sessionManager, api.RBACPermission{Resource: "admin", Action: "reindex"})(adminHandler.ReindexHandler)).Methods("POST")
 	apiRouter.HandleFunc("/admin/health", api.RBACMiddleware(server.entityRepo, server.sessionManager, api.RBACPermission{Resource: "admin", Action: "health"})(adminHandler.HealthCheckHandler)).Methods("GET")
 	
-	// Health endpoint (no authentication required) - using optimized version
-	healthHandler := api.NewOptimizedHealthHandler(server.entityRepo)
+	// Health endpoint (no authentication required)
+	healthHandler := api.NewHealthHandler(server.entityRepo)
 	router.HandleFunc("/health", healthHandler.Health).Methods("GET")
 	
 	// Metrics endpoint (Prometheus format, no authentication required)
@@ -430,6 +445,10 @@ func main() {
 	// System metrics endpoint (EntityDB-specific, no authentication required)
 	systemMetricsHandler := api.NewSystemMetricsHandler(server.entityRepo)
 	apiRouter.HandleFunc("/system/metrics", systemMetricsHandler.SystemMetrics).Methods("GET")
+	
+	// Log control endpoints (require admin permission)
+	apiRouter.HandleFunc("/system/log-level", api.RBACMiddleware(server.entityRepo, server.sessionManager, api.RBACPermission{Resource: "admin", Action: "configure"})(server.entityHandler.GetLogLevel)).Methods("GET")
+	apiRouter.HandleFunc("/system/log-level", api.RBACMiddleware(server.entityRepo, server.sessionManager, api.RBACPermission{Resource: "admin", Action: "configure"})(server.entityHandler.SetLogLevel)).Methods("POST")
 	
 	// RBAC metrics endpoints
 	rbacMetricsHandler := api.NewRBACMetricsHandler(server.entityRepo, server.sessionManager)
@@ -469,6 +488,9 @@ func main() {
 	// Static file serving (must be last - handled by PathPrefix)
 	router.PathPrefix("/").Handler(http.HandlerFunc(server.serveStaticFile))
 
+	// Add request metrics middleware
+	requestMetrics := api.NewRequestMetricsMiddleware(server.entityRepo)
+	
 	// Add CORS middleware
 	corsHandler := func(h http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -492,7 +514,7 @@ func main() {
 		// SSL enabled - create HTTPS server
 		server.server = &http.Server{
 			Addr:         fmt.Sprintf(":%d", server.config.SSLPort),
-			Handler:      corsHandler(router),
+			Handler:      corsHandler(requestMetrics.Middleware(router)),
 			ReadTimeout:  15 * time.Second,
 			WriteTimeout: 15 * time.Second,
 			IdleTimeout:  60 * time.Second,
@@ -513,7 +535,7 @@ func main() {
 		// No SSL - create standard HTTP server
 		server.server = &http.Server{
 			Addr:         fmt.Sprintf(":%d", server.config.Port),
-			Handler:      corsHandler(router),
+			Handler:      corsHandler(requestMetrics.Middleware(router)),
 			ReadTimeout:  15 * time.Second,
 			WriteTimeout: 15 * time.Second,
 			IdleTimeout:  60 * time.Second,

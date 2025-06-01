@@ -11,25 +11,45 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 )
 
 // RecoveryManager handles data recovery and repair operations
 type RecoveryManager struct {
-	dataPath string
-	backupPath string
+	dataPath      string
+	backupPath    string
+	attemptCache  map[string]time.Time // Track recent recovery attempts
+	cacheMu       sync.RWMutex         // Protect the cache
 }
 
 // NewRecoveryManager creates a new recovery manager
 func NewRecoveryManager(dataPath string) *RecoveryManager {
 	return &RecoveryManager{
-		dataPath: dataPath,
-		backupPath: filepath.Join(dataPath, "backups"),
+		dataPath:     dataPath,
+		backupPath:   filepath.Join(dataPath, "backups"),
+		attemptCache: make(map[string]time.Time),
 	}
 }
 
 // RecoverCorruptedEntity attempts to recover a corrupted entity
 func (rm *RecoveryManager) RecoverCorruptedEntity(repo *EntityRepository, entityID string) (*models.Entity, error) {
+	// Check if we've recently attempted to recover this entity
+	rm.cacheMu.RLock()
+	lastAttempt, exists := rm.attemptCache[entityID]
+	rm.cacheMu.RUnlock()
+	
+	if exists && time.Since(lastAttempt) < 30*time.Second {
+		logger.Debug("[Recovery] Skipping recent recovery attempt for entity %s (last attempt: %v ago)", 
+			entityID, time.Since(lastAttempt))
+		return nil, fmt.Errorf("recent recovery attempt failed for entity %s", entityID)
+	}
+	
+	// Record this attempt
+	rm.cacheMu.Lock()
+	rm.attemptCache[entityID] = time.Now()
+	rm.cacheMu.Unlock()
+	
 	op := models.StartOperation(models.OpTypeRecovery, entityID, map[string]interface{}{
 		"recovery_type": "corrupted_entity",
 	})

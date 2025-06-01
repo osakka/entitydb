@@ -40,18 +40,26 @@ func NewBackgroundMetricsCollector(repo models.EntityRepository, interval time.D
 func (b *BackgroundMetricsCollector) Start() {
 	logger.Info("Starting background metrics collector with interval: %v", b.interval)
 	
-	// Collect metrics immediately
-	b.collectMetrics()
-	
-	// Then collect periodically
-	ticker := time.NewTicker(b.interval)
 	go func() {
+		// Wait a moment for the system to fully initialize before first collection
+		logger.Debug("Background metrics collector waiting 5s for system initialization")
+		select {
+		case <-time.After(5 * time.Second):
+			// Collect metrics after initial delay
+			b.collectMetrics()
+		case <-b.ctx.Done():
+			return
+		}
+		
+		// Then collect periodically
+		ticker := time.NewTicker(b.interval)
+		defer ticker.Stop()
+		
 		for {
 			select {
 			case <-ticker.C:
 				b.collectMetrics()
 			case <-b.ctx.Done():
-				ticker.Stop()
 				logger.Info("Background metrics collector stopped")
 				return
 			}
@@ -212,10 +220,21 @@ func (b *BackgroundMetricsCollector) storeMetric(name string, value float64, uni
 	// Generate metric entity ID
 	metricID := fmt.Sprintf("metric_%s", name)
 	
-	// Try to get existing metric entity
-	_, getErr := b.repo.GetByID(metricID)
-	if getErr != nil {
-		logger.Debug("Metric entity %s not found, creating new one", metricID)
+	// Check if metric entity exists by checking if the ID exists in the all entities list
+	// This avoids both GetByID (recovery triggering) and complex tag queries
+	allEntities, listErr := b.repo.List()
+	entityExists := false
+	if listErr == nil {
+		for _, entity := range allEntities {
+			if entity.ID == metricID {
+				entityExists = true
+				break
+			}
+		}
+	}
+	
+	if !entityExists {
+		logger.Trace("Metric entity %s not found, creating new one", metricID)
 		// Create new metric entity if it doesn't exist
 		newEntity := &models.Entity{
 			ID: metricID,

@@ -21,57 +21,57 @@ func NewEntityHandlerRBAC(handler *EntityHandler, repo models.EntityRepository, 
 	}
 }
 
-// CreateEntityWithRBAC wraps CreateEntity with permission check
-func (h *EntityHandlerRBAC) CreateEntityWithRBAC() http.HandlerFunc {
+// CreateEntity wraps CreateEntity with permission check
+func (h *EntityHandlerRBAC) CreateEntity() http.HandlerFunc {
 	return RequirePermission(h.sessionManager, h.repo, PermEntityCreate)(h.handler.CreateEntity)
 }
 
-// GetEntityWithRBAC wraps GetEntity with permission check
-func (h *EntityHandlerRBAC) GetEntityWithRBAC() http.HandlerFunc {
+// GetEntity wraps GetEntity with permission check
+func (h *EntityHandlerRBAC) GetEntity() http.HandlerFunc {
 	return RequirePermission(h.sessionManager, h.repo, PermEntityView)(h.handler.GetEntity)
 }
 
-// ListEntitiesWithRBAC wraps ListEntities with permission check
-func (h *EntityHandlerRBAC) ListEntitiesWithRBAC() http.HandlerFunc {
+// ListEntities wraps ListEntities with permission check
+func (h *EntityHandlerRBAC) ListEntities() http.HandlerFunc {
 	return RequirePermission(h.sessionManager, h.repo, PermEntityView)(h.handler.ListEntitiesDataspaceAware)
 }
 
-// UpdateEntityWithRBAC wraps UpdateEntity with permission check
-func (h *EntityHandlerRBAC) UpdateEntityWithRBAC() http.HandlerFunc {
+// UpdateEntity wraps UpdateEntity with permission check
+func (h *EntityHandlerRBAC) UpdateEntity() http.HandlerFunc {
 	return RequirePermission(h.sessionManager, h.repo, PermEntityUpdate)(h.handler.UpdateEntity)
 }
 
-// QueryEntitiesWithRBAC wraps QueryEntities with permission check
-func (h *EntityHandlerRBAC) QueryEntitiesWithRBAC() http.HandlerFunc {
+// QueryEntities wraps QueryEntities with permission check
+func (h *EntityHandlerRBAC) QueryEntities() http.HandlerFunc {
 	return RequirePermission(h.sessionManager, h.repo, PermEntityView)(h.handler.QueryEntities)
 }
 
-// GetEntityAsOfWithRBAC wraps GetEntityAsOf with permission check
-func (h *EntityHandlerRBAC) GetEntityAsOfWithRBAC() http.HandlerFunc {
+// GetEntityAsOf wraps GetEntityAsOf with permission check
+func (h *EntityHandlerRBAC) GetEntityAsOf() http.HandlerFunc {
 	return RequirePermission(h.sessionManager, h.repo, PermEntityView)(h.handler.GetEntityAsOf)
 }
 
-// GetEntityHistoryWithRBAC wraps GetEntityHistory with permission check
-func (h *EntityHandlerRBAC) GetEntityHistoryWithRBAC() http.HandlerFunc {
+// GetEntityHistory wraps GetEntityHistory with permission check
+func (h *EntityHandlerRBAC) GetEntityHistory() http.HandlerFunc {
 	return RequirePermission(h.sessionManager, h.repo, PermEntityView)(h.handler.GetEntityHistory)
 }
 
-// GetRecentChangesWithRBAC wraps GetRecentChanges with permission check
-func (h *EntityHandlerRBAC) GetRecentChangesWithRBAC() http.HandlerFunc {
+// GetRecentChanges wraps GetRecentChanges with permission check
+func (h *EntityHandlerRBAC) GetRecentChanges() http.HandlerFunc {
 	return RequirePermission(h.sessionManager, h.repo, PermEntityView)(h.handler.GetRecentChanges)
 }
 
-// GetEntityDiffWithRBAC wraps GetEntityDiff with permission check
-func (h *EntityHandlerRBAC) GetEntityDiffWithRBAC() http.HandlerFunc {
+// GetEntityDiff wraps GetEntityDiff with permission check
+func (h *EntityHandlerRBAC) GetEntityDiff() http.HandlerFunc {
 	return RequirePermission(h.sessionManager, h.repo, PermEntityView)(h.handler.GetEntityDiff)
 }
 
-// GetEntityTimeseriesWithRBAC wraps GetEntityTimeseries with permission check
-func (h *EntityHandlerRBAC) GetEntityTimeseriesWithRBAC() http.HandlerFunc {
+// GetEntityTimeseries wraps GetEntityTimeseries with permission check
+func (h *EntityHandlerRBAC) GetEntityTimeseries() http.HandlerFunc {
 	return RequirePermission(h.sessionManager, h.repo, PermEntityView)(h.handler.GetEntityTimeseries)
 }
 
-// SimpleCreateEntityWithRBAC wraps SimpleCreateEntity with permission check
-func (h *EntityHandlerRBAC) SimpleCreateEntityWithRBAC() http.HandlerFunc {
+// SimpleCreateEntity wraps SimpleCreateEntity with permission check
+func (h *EntityHandlerRBAC) SimpleCreateEntity() http.HandlerFunc {
 	return RequirePermission(h.sessionManager, h.repo, PermEntityCreate)(h.handler.SimpleCreateEntity)
 }

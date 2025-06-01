@@ -1,5 +1,26 @@
 // Real-time chart initialization with actual metrics data
 
+// Helper function to format bytes to human-readable units
+function formatBytes(bytes, decimals = 2) {
+    if (bytes === 0) return '0 B';
+    
+    const k = 1024;
+    const dm = decimals < 0 ? 0 : decimals;
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
+    
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+}
+
+// Helper function to format numbers with K/M/B suffixes
+function formatNumber(num) {
+    if (num >= 1e9) return (num / 1e9).toFixed(1) + 'B';
+    if (num >= 1e6) return (num / 1e6).toFixed(1) + 'M';
+    if (num >= 1e3) return (num / 1e3).toFixed(1) + 'K';
+    return num.toString();
+}
+
 async function fetchMetricHistory(metricName, hours = 1) {
     try {
         // Use the real metrics history endpoint
@@ -219,16 +240,34 @@ async function initRealTimeCharts() {
                             title: {
                                 display: true,
                                 text: 'Size (MB)'
+                            },
+                            ticks: {
+                                callback: function(value) {
+                                    return value.toFixed(2) + ' MB';
+                                }
                             }
                         }
                     },
                     plugins: {
                         legend: {
+                            display: true,
                             position: 'top'
                         },
                         title: {
                             display: true,
                             text: 'Storage Growth Over Time'
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) {
+                                        label += ': ';
+                                    }
+                                    label += context.parsed.y.toFixed(2) + ' MB';
+                                    return label;
+                                }
+                            }
                         }
                     }
                 }
@@ -286,16 +325,29 @@ async function initRealTimeCharts() {
                                 title: {
                                     display: true,
                                     text: 'Memory (MB)'
+                                },
+                                ticks: {
+                                    callback: function(value) {
+                                        return value.toFixed(1) + ' MB';
+                                    }
                                 }
                             }
                         },
                         plugins: {
                             legend: {
+                                display: true,
                                 position: 'top'
                             },
                             title: {
                                 display: true,
                                 text: 'Memory Usage Over Time'
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return 'Memory: ' + context.parsed.y.toFixed(1) + ' MB';
+                                    }
+                                }
                             }
                         }
                     }
@@ -360,11 +412,19 @@ async function initRealTimeCharts() {
                         },
                         plugins: {
                             legend: {
+                                display: true,
                                 position: 'top'
                             },
                             title: {
                                 display: true,
                                 text: 'Entity Growth Over Time'
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return 'Entities: ' + context.parsed.y.toLocaleString();
+                                    }
+                                }
                             }
                         }
                     }

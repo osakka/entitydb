@@ -83,14 +83,14 @@ func (r *HighPerformanceRepository) buildOptimizedIndexes() error {
 	logger.Info("Building turbo indexes...")
 	start := time.Now()
 	
-	// Get all entities using the base repository's ListByTag method (empty tag to get all)
-	allEntities, err := r.EntityRepository.ListByTag("")
+	// Get all entities using the base repository's List method
+	allEntities, err := r.EntityRepository.List()
 	if err != nil {
-		// If that doesn't work, try querying all entities another way
-		allEntities = make([]*models.Entity, 0)
-		// We'll just continue with an empty index for now
-		logger.Warn("Failed to get all entities for indexing: %v", err)
+		logger.Error("Failed to get all entities for indexing: %v", err)
+		return err
 	}
+	
+	logger.Debug("Building indexes for %d entities", len(allEntities))
 	
 	// Build indexes
 	for _, entity := range allEntities {

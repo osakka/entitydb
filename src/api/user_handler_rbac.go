@@ -21,13 +21,13 @@ func NewUserHandlerRBAC(handler *UserHandler, repo models.EntityRepository, sess
 	}
 }
 
-// CreateUserWithRBAC wraps CreateUser with permission check
-func (h *UserHandlerRBAC) CreateUserWithRBAC() http.HandlerFunc {
+// CreateUser wraps CreateUser with permission check
+func (h *UserHandlerRBAC) CreateUser() http.HandlerFunc {
 	return RBACMiddleware(h.repo, h.sessionManager, PermUserCreate)(h.handler.CreateUser)
 }
 
-// GetUserWithRBAC wraps GetUser with permission check - viewing user info requires permission
-func (h *UserHandlerRBAC) GetUserWithRBAC() http.HandlerFunc {
+// GetUser wraps GetUser with permission check - viewing user info requires permission
+func (h *UserHandlerRBAC) GetUser() http.HandlerFunc {
 	return RBACMiddleware(h.repo, h.sessionManager, PermUserView)(func(w http.ResponseWriter, r *http.Request) {
 		// For getting user info, we might want to allow users to see their own info
 		// but for now we'll require the general user:view permission
@@ -43,15 +43,15 @@ func (h *UserHandlerRBAC) LoginWithoutRBAC() http.HandlerFunc {
 	}
 }
 
-// ChangePasswordWithRBAC wraps ChangePassword with authentication check
+// ChangePassword wraps ChangePassword with authentication check
 // No specific permission needed - users can change their own password if authenticated
-func (h *UserHandlerRBAC) ChangePasswordWithRBAC() http.HandlerFunc {
+func (h *UserHandlerRBAC) ChangePassword() http.HandlerFunc {
 	// We use a custom middleware that checks authentication but doesn't require specific permissions
 	return RBACMiddleware(h.repo, h.sessionManager, PermUserUpdate)(h.handler.ChangePassword)
 }
 
-// ResetPasswordWithRBAC wraps ResetPassword with admin permission check
-func (h *UserHandlerRBAC) ResetPasswordWithRBAC() http.HandlerFunc {
+// ResetPassword wraps ResetPassword with admin permission check
+func (h *UserHandlerRBAC) ResetPassword() http.HandlerFunc {
 	// This requires admin permission
 	return RBACMiddleware(h.repo, h.sessionManager, PermUserUpdate)(h.handler.ResetPassword)
 }

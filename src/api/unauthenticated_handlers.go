@@ -10,22 +10,22 @@ import (
 	"entitydb/logger"
 )
 
-// TestHandlers provides test endpoints that bypass authentication
-type TestHandlers struct {
+// UnauthenticatedHandlers provides endpoints that bypass authentication for testing
+type UnauthenticatedHandlers struct {
 	entityRepo     models.EntityRepository
 	relationshipRepo models.EntityRelationshipRepository
 }
 
-// NewTestHandlers creates test handlers
-func NewTestHandlers(entityRepo models.EntityRepository, relationshipRepo models.EntityRelationshipRepository) *TestHandlers {
-	return &TestHandlers{
+// NewUnauthenticatedHandlers creates handlers for unauthenticated endpoints
+func NewUnauthenticatedHandlers(entityRepo models.EntityRepository, relationshipRepo models.EntityRelationshipRepository) *UnauthenticatedHandlers {
+	return &UnauthenticatedHandlers{
 		entityRepo:     entityRepo,
 		relationshipRepo: relationshipRepo,
 	}
 }
 
 // TestStatus returns a simple status response
-func (h *TestHandlers) TestStatus(w http.ResponseWriter, r *http.Request) {
+func (h *UnauthenticatedHandlers) TestStatus(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"status": "ok",
@@ -35,7 +35,7 @@ func (h *TestHandlers) TestStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 // TestGetEntityAsOf gets entity at a specific time without auth
-func (h *TestHandlers) TestGetEntityAsOf(w http.ResponseWriter, r *http.Request) {
+func (h *UnauthenticatedHandlers) TestGetEntityAsOf(w http.ResponseWriter, r *http.Request) {
 	entityID := r.URL.Query().Get("id")
 	asOfStr := r.URL.Query().Get("as_of")
 	
@@ -61,7 +61,7 @@ func (h *TestHandlers) TestGetEntityAsOf(w http.ResponseWriter, r *http.Request)
 }
 
 // TestGetEntityHistory gets entity history without auth
-func (h *TestHandlers) TestGetEntityHistory(w http.ResponseWriter, r *http.Request) {
+func (h *UnauthenticatedHandlers) TestGetEntityHistory(w http.ResponseWriter, r *http.Request) {
 	entityID := r.URL.Query().Get("id")
 	if entityID == "" {
 		http.Error(w, "Entity ID required", http.StatusBadRequest)
@@ -99,7 +99,7 @@ func (h *TestHandlers) TestGetEntityHistory(w http.ResponseWriter, r *http.Reque
 }
 
 // TestGetRecentChanges gets recent changes without auth
-func (h *TestHandlers) TestGetRecentChanges(w http.ResponseWriter, r *http.Request) {
+func (h *UnauthenticatedHandlers) TestGetRecentChanges(w http.ResponseWriter, r *http.Request) {
 	sinceStr := r.URL.Query().Get("since")
 	
 	// Parse timestamp for validation only (not used in current interface)
@@ -122,7 +122,7 @@ func (h *TestHandlers) TestGetRecentChanges(w http.ResponseWriter, r *http.Reque
 }
 
 // TestGetEntityDiff gets entity diff without auth
-func (h *TestHandlers) TestGetEntityDiff(w http.ResponseWriter, r *http.Request) {
+func (h *UnauthenticatedHandlers) TestGetEntityDiff(w http.ResponseWriter, r *http.Request) {
 	entityID := r.URL.Query().Get("id")
 	t1Str := r.URL.Query().Get("t1")
 	t2Str := r.URL.Query().Get("t2")
@@ -160,7 +160,7 @@ func (h *TestHandlers) TestGetEntityDiff(w http.ResponseWriter, r *http.Request)
 }
 
 // TestCreateEntity creates an entity without authentication
-func (h *TestHandlers) TestCreateEntity(w http.ResponseWriter, r *http.Request) {
+func (h *UnauthenticatedHandlers) TestCreateEntity(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		ID      string   `json:"id,omitempty"`
 		Tags    []string `json:"tags"`
@@ -217,7 +217,7 @@ func (h *TestHandlers) TestCreateEntity(w http.ResponseWriter, r *http.Request) 
 }
 
 // TestCreateRelationship creates a relationship without authentication
-func (h *TestHandlers) TestCreateRelationship(w http.ResponseWriter, r *http.Request) {
+func (h *UnauthenticatedHandlers) TestCreateRelationship(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		SourceID         string `json:"source_id"`
 		RelationshipType string `json:"relationship_type"`
@@ -241,7 +241,7 @@ func (h *TestHandlers) TestCreateRelationship(w http.ResponseWriter, r *http.Req
 }
 
 // TestListRelationships lists relationships without authentication
-func (h *TestHandlers) TestListRelationships(w http.ResponseWriter, r *http.Request) {
+func (h *UnauthenticatedHandlers) TestListRelationships(w http.ResponseWriter, r *http.Request) {
 	sourceID := r.URL.Query().Get("source")
 	targetID := r.URL.Query().Get("target")
 	
@@ -267,7 +267,7 @@ func (h *TestHandlers) TestListRelationships(w http.ResponseWriter, r *http.Requ
 }
 
 // TestGetEntity gets an entity by ID without authentication
-func (h *TestHandlers) TestGetEntity(w http.ResponseWriter, r *http.Request) {
+func (h *UnauthenticatedHandlers) TestGetEntity(w http.ResponseWriter, r *http.Request) {
 	id := r.URL.Query().Get("id")
 	if id == "" {
 		http.Error(w, "Entity ID required", http.StatusBadRequest)
@@ -294,7 +294,7 @@ func (h *TestHandlers) TestGetEntity(w http.ResponseWriter, r *http.Request) {
 }
 
 // TestListEntities lists all entities without authentication
-func (h *TestHandlers) TestListEntities(w http.ResponseWriter, r *http.Request) {
+func (h *UnauthenticatedHandlers) TestListEntities(w http.ResponseWriter, r *http.Request) {
 	includeTimestamps := r.URL.Query().Get("include_timestamps") == "true"
 	
 	entities, err := h.entityRepo.List()

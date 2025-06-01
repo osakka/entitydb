@@ -41,12 +41,42 @@ func (p *SafeBufferPool) Put(buf *bytes.Buffer) {
 
 // Global pools for different use cases
 var (
-	// SmallBufferPool for small operations (4KB)
-	SmallBufferPool = NewSafeBufferPool(4 * 1024)
+	// smallSafeBufferPool for small operations (4KB)
+	smallSafeBufferPool = NewSafeBufferPool(4 * 1024)
 	
-	// MediumBufferPool for medium operations (64KB) 
-	MediumBufferPool = NewSafeBufferPool(64 * 1024)
+	// mediumSafeBufferPool for medium operations (64KB) 
+	mediumSafeBufferPool = NewSafeBufferPool(64 * 1024)
 	
-	// LargeBufferPool for large operations (1MB)
-	LargeBufferPool = NewSafeBufferPool(1024 * 1024)
+	// largeSafeBufferPool for large operations (1MB)
+	largeSafeBufferPool = NewSafeBufferPool(1024 * 1024)
 )
+
+// GetSmallBuffer gets a small buffer from the safe pool
+func GetSmallBuffer() *bytes.Buffer {
+	return smallSafeBufferPool.Get()
+}
+
+// PutSmallBuffer returns a small buffer to the safe pool
+func PutSmallBuffer(buf *bytes.Buffer) {
+	smallSafeBufferPool.Put(buf)
+}
+
+// GetMediumBuffer gets a medium buffer from the safe pool
+func GetMediumBuffer() *bytes.Buffer {
+	return mediumSafeBufferPool.Get()
+}
+
+// PutMediumBuffer returns a medium buffer to the safe pool
+func PutMediumBuffer(buf *bytes.Buffer) {
+	mediumSafeBufferPool.Put(buf)
+}
+
+// GetLargeSafeBuffer gets a large buffer from the safe pool
+func GetLargeSafeBuffer() *bytes.Buffer {
+	return largeSafeBufferPool.Get()
+}
+
+// PutLargeSafeBuffer returns a large buffer to the safe pool
+func PutLargeSafeBuffer(buf *bytes.Buffer) {
+	largeSafeBufferPool.Put(buf)
+}

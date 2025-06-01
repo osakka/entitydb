@@ -28,17 +28,17 @@ var (
 	PermHubDelete = RBACPermission{Resource: "hub", Action: "delete"}
 )
 
-// CreateDataspaceWithRBAC wraps CreateDataspace with permission check
-func (h *DataspaceManagementHandlerRBAC) CreateDataspaceWithRBAC() http.HandlerFunc {
+// CreateDataspace wraps CreateDataspace with permission check
+func (h *DataspaceManagementHandlerRBAC) CreateDataspace() http.HandlerFunc {
 	return RBACMiddleware(h.repo, h.sessionManager, PermHubCreate)(h.handler.CreateDataspace)
 }
 
-// ListDataspacesWithRBAC wraps ListDataspaces with permission check
-func (h *DataspaceManagementHandlerRBAC) ListDataspacesWithRBAC() http.HandlerFunc {
+// ListDataspaces wraps ListDataspaces with permission check
+func (h *DataspaceManagementHandlerRBAC) ListDataspaces() http.HandlerFunc {
 	return RBACMiddleware(h.repo, h.sessionManager, PermHubView)(h.handler.ListDataspaces)
 }
 
-// DeleteDataspaceWithRBAC wraps DeleteDataspace with permission check
-func (h *DataspaceManagementHandlerRBAC) DeleteDataspaceWithRBAC() http.HandlerFunc {
+// DeleteDataspace wraps DeleteDataspace with permission check
+func (h *DataspaceManagementHandlerRBAC) DeleteDataspace() http.HandlerFunc {
 	return RBACMiddleware(h.repo, h.sessionManager, PermHubDelete)(h.handler.DeleteDataspace)
 }

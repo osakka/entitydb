@@ -11,8 +11,8 @@ type StringIntern struct {
 	strings map[string]string
 }
 
-// globalIntern is the singleton instance
-var globalIntern = &StringIntern{
+// defaultStringInterner is the singleton instance for string interning
+var defaultStringInterner = &StringIntern{
 	strings: make(map[string]string),
 }
 
@@ -21,24 +21,24 @@ var globalIntern = &StringIntern{
 // Otherwise, it adds the string to the pool
 func Intern(s string) string {
 	// Fast path - check if already interned
-	globalIntern.mu.RLock()
-	if interned, ok := globalIntern.strings[s]; ok {
-		globalIntern.mu.RUnlock()
+	defaultStringInterner.mu.RLock()
+	if interned, ok := defaultStringInterner.strings[s]; ok {
+		defaultStringInterner.mu.RUnlock()
 		return interned
 	}
-	globalIntern.mu.RUnlock()
+	defaultStringInterner.mu.RUnlock()
 	
 	// Slow path - add to pool
-	globalIntern.mu.Lock()
-	defer globalIntern.mu.Unlock()
+	defaultStringInterner.mu.Lock()
+	defer defaultStringInterner.mu.Unlock()
 	
 	// Double check in case another goroutine added it
-	if interned, ok := globalIntern.strings[s]; ok {
+	if interned, ok := defaultStringInterner.strings[s]; ok {
 		return interned
 	}
 	
 	// Add to pool
-	globalIntern.strings[s] = s
+	defaultStringInterner.strings[s] = s
 	return s
 }
 
@@ -52,14 +52,14 @@ func InternSlice(strings []string) []string {
 
 // Size returns the number of interned strings
 func Size() int {
-	globalIntern.mu.RLock()
-	defer globalIntern.mu.RUnlock()
-	return len(globalIntern.strings)
+	defaultStringInterner.mu.RLock()
+	defer defaultStringInterner.mu.RUnlock()
+	return len(defaultStringInterner.strings)
 }
 
 // Clear removes all interned strings (use with caution)
 func Clear() {
-	globalIntern.mu.Lock()
-	defer globalIntern.mu.Unlock()
-	globalIntern.strings = make(map[string]string)
+	defaultStringInterner.mu.Lock()
+	defer defaultStringInterner.mu.Unlock()
+	defaultStringInterner.strings = make(map[string]string)
 }

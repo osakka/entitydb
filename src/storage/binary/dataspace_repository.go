@@ -63,6 +63,11 @@ func NewDataspaceRepository(dataPath string) (*DataspaceRepository, error) {
 		logger.Error("Failed to load dataspace indexes: %v", err)
 	}
 	
+	// Rebuild dataspace indexes from existing entities
+	if err := repo.rebuildDataspaceIndexes(); err != nil {
+		logger.Error("Failed to rebuild dataspace indexes: %v", err)
+	}
+	
 	// Create default dataspace if none exists
 	if _, exists := repo.dataspaceIndexes["default"]; !exists {
 		defaultDs := &models.Dataspace{
@@ -200,20 +205,77 @@ func (r *DataspaceRepository) ListByTags(tags []string, matchAll bool) ([]*model
 		
 		logger.Debug("Found %d entities in dataspace '%s'", len(entityIDs), dataspaceName)
 		
-		// Fetch entities using embedded repository
+		// Fetch entities using embedded repository's GetByID method
 		entities := make([]*models.Entity, 0, len(entityIDs))
 		for _, id := range entityIDs {
-			// Access the Get method through the embedded EntityRepository
-			if entity, exists := r.EntityRepository.entities[id]; exists {
+			// Use the proper GetByID method instead of direct map access
+			entity, err := r.EntityRepository.GetByID(id)
+			if err != nil {
+				logger.Trace("Entity %s not found in dataspace '%s': %v", id, dataspaceName, err)
+				continue
+			}
+			if entity != nil {
 				entities = append(entities, entity)
 			}
 		}
 		
+		logger.Debug("Retrieved %d entities from dataspace '%s'", len(entities), dataspaceName)
 		return entities, nil
 	}
 	
-	// Fall back to global search
-	return r.EntityRepository.ListByTags(tags, matchAll)
+	// Special handling for system queries
+	if len(tags) == 1 {
+		tag := tags[0]
+		// Handle temporal tags
+		actualTag := tag
+		if parts := strings.SplitN(tag, "|", 2); len(parts) == 2 {
+			actualTag = parts[1]
+		}
+		
+		// System entities queries (users, permissions, etc.) should query _system dataspace
+		if strings.HasPrefix(actualTag, "identity:username:") || 
+		   strings.HasPrefix(actualTag, "type:user") ||
+		   strings.HasPrefix(actualTag, "type:permission") ||
+		   strings.HasPrefix(actualTag, "type:role") ||
+		   strings.HasPrefix(actualTag, "type:group") ||
+		   strings.HasPrefix(actualTag, "type:session") ||
+		   strings.HasPrefix(actualTag, "token:") {
+			logger.Debug("System query detected, using _system dataspace for: %s", actualTag)
+			dataspaceName = "_system"
+			
+			r.dsLock.RLock()
+			dsIndex, exists := r.dataspaceIndexes[dataspaceName]
+			r.dsLock.RUnlock()
+			
+			if !exists {
+				logger.Debug("System dataspace not found")
+				return []*models.Entity{}, nil
+			}
+			
+			entityIDs, err := dsIndex.QueryByTags([]string{actualTag}, matchAll)
+			if err != nil {
+				return nil, err
+			}
+			
+			// Fetch entities
+			entities := make([]*models.Entity, 0, len(entityIDs))
+			for _, id := range entityIDs {
+				entity, err := r.EntityRepository.GetByID(id)
+				if err != nil {
+					continue
+				}
+				if entity != nil {
+					entities = append(entities, entity)
+				}
+			}
+			
+			return entities, nil
+		}
+	}
+	
+	// No fallback to global search - enforce dataspace isolation
+	logger.Trace("No dataspace tag found in query, returning empty result for isolation")
+	return []*models.Entity{}, nil
 }
 
 // extractDataspace determines which dataspace an entity belongs to
@@ -225,10 +287,6 @@ func (r *DataspaceRepository) extractDataspace(entity *models.Entity) string {
 			actualTag = parts[1]
 		}
 		
-		if strings.HasPrefix(actualTag, "dataspace:") {
-			return strings.TrimPrefix(actualTag, "dataspace:")
-		}
-		// Backward compatibility with hub
 		if strings.HasPrefix(actualTag, "dataspace:") {
 			return strings.TrimPrefix(actualTag, "dataspace:")
 		}
@@ -290,7 +348,7 @@ func (d *DataspaceIndexImpl) AddEntity(entity *models.Entity) error {
 		}
 		
 		// Skip dataspace tags
-		if strings.HasPrefix(actualTag, "dataspace:") || strings.HasPrefix(actualTag, "dataspace:") {
+		if strings.HasPrefix(actualTag, "dataspace:") {
 			continue
 		}
 		
@@ -382,5 +440,69 @@ func (d *DataspaceIndexImpl) LoadFromFile(filepath string) error {
 	}
 	
 	d.stats.EntityCount = int64(len(d.entities))
+	return nil
+}
+
+// rebuildDataspaceIndexes rebuilds dataspace indexes from existing entities
+func (r *DataspaceRepository) rebuildDataspaceIndexes() error {
+	logger.Info("Rebuilding dataspace indexes from existing entities...")
+	
+	// Get all entities from the base repository
+	allEntities, err := r.EntityRepository.List()
+	if err != nil {
+		return fmt.Errorf("failed to list entities: %w", err)
+	}
+	
+	logger.Info("Found %d entities to index", len(allEntities))
+	
+	// Index each entity into its dataspace
+	for _, entity := range allEntities {
+		dataspaceName := r.extractDataspace(entity)
+		
+		// Ensure dataspace index exists
+		r.dsLock.RLock()
+		dsIndex, exists := r.dataspaceIndexes[dataspaceName]
+		r.dsLock.RUnlock()
+		
+		if !exists {
+			// Create dataspace on demand
+			logger.Info("Creating dataspace '%s' during rebuild", dataspaceName)
+			newDataspace := &models.Dataspace{
+				Name: dataspaceName,
+				Config: models.DataspaceConfig{
+					IndexStrategy: models.IndexStrategyBTree,
+					OptimizeFor:   models.OptimizeForReads,
+				},
+			}
+			if err := r.CreateDataspace(newDataspace); err != nil {
+				logger.Error("Failed to create dataspace during rebuild: %v", err)
+				continue
+			}
+			
+			// Get the newly created index
+			r.dsLock.RLock()
+			dsIndex, exists = r.dataspaceIndexes[dataspaceName]
+			r.dsLock.RUnlock()
+		}
+		
+		if exists {
+			if err := dsIndex.AddEntity(entity); err != nil {
+				logger.Error("Failed to add entity %s to dataspace %s: %v", entity.ID, dataspaceName, err)
+			}
+		}
+	}
+	
+	// Save all dataspace indexes
+	r.dsLock.RLock()
+	defer r.dsLock.RUnlock()
+	
+	for name, dsIndex := range r.dataspaceIndexes {
+		if err := dsIndex.SaveToFile(dsIndex.indexPath); err != nil {
+			logger.Error("Failed to save dataspace index %s: %v", name, err)
+		} else {
+			logger.Info("Saved dataspace index %s with %d entities", name, len(dsIndex.entities))
+		}
+	}
+	
 	return nil
 }

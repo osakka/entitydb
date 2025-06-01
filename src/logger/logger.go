@@ -6,13 +6,16 @@ import (
 	"os"
 	"runtime"
 	"strings"
+	"sync"
+	"sync/atomic"
+	"time"
 )
 
 // LogLevel represents the severity of a log message
-type LogLevel int
+type LogLevel int32
 
 const (
-	TRACE LogLevel = iota // Most detailed level for tracing data flow
+	TRACE LogLevel = iota
 	DEBUG
 	INFO
 	WARN
@@ -20,7 +23,7 @@ const (
 )
 
 var (
-	currentLevel LogLevel = INFO
+	currentLevel atomic.Int32
 	levelNames = map[LogLevel]string{
 		TRACE: "TRACE",
 		DEBUG: "DEBUG",
@@ -28,28 +31,37 @@ var (
 		WARN:  "WARN",
 		ERROR: "ERROR",
 	}
+	
+	// Trace subsystems that are enabled
+	traceSubsystems = make(map[string]bool)
+	traceMutex      sync.RWMutex
+	
+	// Process and thread IDs
+	processID = os.Getpid()
+	
+	// Logger instance
+	logger *log.Logger
 )
 
-// Logger is the main logger instance
-var Logger *log.Logger
-
 func init() {
-	Logger = log.New(os.Stdout, "", log.Ldate|log.Ltime|log.Lmicroseconds)
+	// Custom logger with no prefix (we'll format everything ourselves)
+	logger = log.New(os.Stdout, "", 0)
+	currentLevel.Store(int32(INFO))
 }
 
 // SetLogLevel sets the minimum log level
 func SetLogLevel(level string) error {
-	switch strings.ToLower(level) {
-	case "trace":
-		currentLevel = TRACE
-	case "debug":
-		currentLevel = DEBUG
-	case "info":
-		currentLevel = INFO
-	case "warn":
-		currentLevel = WARN
-	case "error":
-		currentLevel = ERROR
+	switch strings.ToUpper(level) {
+	case "TRACE":
+		currentLevel.Store(int32(TRACE))
+	case "DEBUG":
+		currentLevel.Store(int32(DEBUG))
+	case "INFO":
+		currentLevel.Store(int32(INFO))
+	case "WARN":
+		currentLevel.Store(int32(WARN))
+	case "ERROR":
+		currentLevel.Store(int32(ERROR))
 	default:
 		return fmt.Errorf("invalid log level: %s", level)
 	}
@@ -58,170 +70,187 @@ func SetLogLevel(level string) error {
 
 // GetLogLevel returns the current log level
 func GetLogLevel() string {
-	return levelNames[currentLevel]
+	level := LogLevel(currentLevel.Load())
+	return strings.TrimSpace(levelNames[level])
 }
 
-
-// logf is the internal logging function
-func logf(level LogLevel, format string, args ...interface{}) {
-	if level >= currentLevel {
-		// Get caller info (skip 3: logf -> Debug/Info/etc -> actual caller)
-		pc, file, line, ok := runtime.Caller(3)
-		if !ok {
-			file = "unknown"
-			line = 0
-		}
-		
-		// Extract just the filename (not the full path)
-		if idx := strings.LastIndex(file, "/"); idx != -1 {
-			file = file[idx+1:]
-		}
-		
-		// Get function name
-		funcName := "unknown"
-		if fn := runtime.FuncForPC(pc); fn != nil {
-			fullName := fn.Name()
-			// Extract just the function name (remove package path)
-			parts := strings.Split(fullName, "/")
-			lastPart := parts[len(parts)-1]
-			// Remove package name if present
-			if idx := strings.LastIndex(lastPart, "."); idx != -1 {
-				funcName = lastPart[idx+1:]
-			} else {
-				funcName = lastPart
-			}
-		}
-		
-		msg := fmt.Sprintf(format, args...)
-		// Format: timestamp [LEVEL] [file] [function] [line] message
-		Logger.Printf("[%s] [%s:%d:%s] %s", levelNames[level], file, line, funcName, msg)
+// EnableTrace enables trace logging for specific subsystems
+func EnableTrace(subsystems ...string) {
+	traceMutex.Lock()
+	defer traceMutex.Unlock()
+	for _, subsystem := range subsystems {
+		traceSubsystems[subsystem] = true
 	}
 }
 
-// Trace logs a trace-level message for detailed data flow tracing
+// DisableTrace disables trace logging for specific subsystems
+func DisableTrace(subsystems ...string) {
+	traceMutex.Lock()
+	defer traceMutex.Unlock()
+	for _, subsystem := range subsystems {
+		delete(traceSubsystems, subsystem)
+	}
+}
+
+// ClearTrace disables all trace subsystems
+func ClearTrace() {
+	traceMutex.Lock()
+	defer traceMutex.Unlock()
+	traceSubsystems = make(map[string]bool)
+}
+
+// GetTraceSubsystems returns currently enabled trace subsystems
+func GetTraceSubsystems() []string {
+	traceMutex.RLock()
+	defer traceMutex.RUnlock()
+	
+	subsystems := make([]string, 0, len(traceSubsystems))
+	for subsystem := range traceSubsystems {
+		subsystems = append(subsystems, subsystem)
+	}
+	return subsystems
+}
+
+// isTraceEnabled checks if trace is enabled for a subsystem
+func isTraceEnabled(subsystem string) bool {
+	traceMutex.RLock()
+	defer traceMutex.RUnlock()
+	return traceSubsystems[subsystem]
+}
+
+// formatMessage formats a log message according to our standard
+func formatMessage(level LogLevel, skip int, format string, args ...interface{}) string {
+	// Get caller info
+	pc, file, line, ok := runtime.Caller(skip)
+	if !ok {
+		file = "unknown"
+		line = 0
+	}
+	
+	// Extract just the filename without extension
+	if idx := strings.LastIndex(file, "/"); idx != -1 {
+		file = file[idx+1:]
+	}
+	if idx := strings.LastIndex(file, ".go"); idx != -1 {
+		file = file[:idx]
+	}
+	
+	// Get function name
+	funcName := "unknown"
+	if fn := runtime.FuncForPC(pc); fn != nil {
+		fullName := fn.Name()
+		// Extract just the function name
+		if idx := strings.LastIndex(fullName, "."); idx != -1 {
+			funcName = fullName[idx+1:]
+		}
+	}
+	
+	// Format message
+	msg := fmt.Sprintf(format, args...)
+	
+	// Get current goroutine ID (thread ID equivalent)
+	threadID := getGoroutineID()
+	
+	// Format: timestamp [pid:tid] [LEVEL] function.filename:line: message
+	timestamp := time.Now().Format("2006/01/02 15:04:05.000000")
+	return fmt.Sprintf("%s [%d:%d] [%s] %s.%s:%d: %s",
+		timestamp, processID, threadID, levelNames[level], funcName, file, line, msg)
+}
+
+// getGoroutineID extracts the current goroutine ID
+func getGoroutineID() int {
+	var buf [64]byte
+	n := runtime.Stack(buf[:], false)
+	idField := strings.Fields(string(buf[:n]))[1]
+	id := 0
+	fmt.Sscanf(idField, "%d", &id)
+	return id
+}
+
+// logMessage is the internal logging function
+func logMessage(level LogLevel, skip int, format string, args ...interface{}) {
+	// Quick check if we should log (atomic operation, very fast)
+	if level < LogLevel(currentLevel.Load()) {
+		return
+	}
+	
+	// Format and output message
+	msg := formatMessage(level, skip, format, args...)
+	logger.Println(msg)
+}
+
+// TraceIf logs a trace message only if the subsystem is enabled
+func TraceIf(subsystem string, format string, args ...interface{}) {
+	// Double check: both trace level and subsystem must be enabled
+	if LogLevel(currentLevel.Load()) > TRACE || !isTraceEnabled(subsystem) {
+		return
+	}
+	logMessage(TRACE, 3, "[%s] %s", subsystem, fmt.Sprintf(format, args...))
+}
+
+// Trace logs a trace-level message
 func Trace(format string, args ...interface{}) {
-	logf(TRACE, format, args...)
+	logMessage(TRACE, 3, format, args...)
 }
 
 // Debug logs a debug message
 func Debug(format string, args ...interface{}) {
-	logf(DEBUG, format, args...)
+	logMessage(DEBUG, 3, format, args...)
 }
 
 // Info logs an info message
 func Info(format string, args ...interface{}) {
-	logf(INFO, format, args...)
+	logMessage(INFO, 3, format, args...)
 }
 
 // Warn logs a warning message
 func Warn(format string, args ...interface{}) {
-	logf(WARN, format, args...)
+	logMessage(WARN, 3, format, args...)
 }
 
 // Error logs an error message
 func Error(format string, args ...interface{}) {
-	logf(ERROR, format, args...)
+	logMessage(ERROR, 3, format, args...)
 }
 
-// Tracef is an alias for Trace
-func Tracef(format string, args ...interface{}) {
-	Trace(format, args...)
-}
-
-// Debugf is an alias for Debug
-func Debugf(format string, args ...interface{}) {
-	Debug(format, args...)
-}
-
-// Infof is an alias for Info
-func Infof(format string, args ...interface{}) {
-	Info(format, args...)
-}
-
-// Warnf is an alias for Warn
-func Warnf(format string, args ...interface{}) {
-	Warn(format, args...)
-}
-
-// Errorf is an alias for Error
-func Errorf(format string, args ...interface{}) {
-	Error(format, args...)
-}
-
-// Fatal logs an error message and exits the program
+// Fatal logs an error message and exits
 func Fatal(format string, args ...interface{}) {
-	// Get caller info (skip 2: Fatal -> actual caller)
-	pc, file, line, ok := runtime.Caller(2)
-	if !ok {
-		file = "unknown"
-		line = 0
-	}
-	
-	// Extract just the filename (not the full path)
-	if idx := strings.LastIndex(file, "/"); idx != -1 {
-		file = file[idx+1:]
-	}
-	
-	// Get function name
-	funcName := "unknown"
-	if fn := runtime.FuncForPC(pc); fn != nil {
-		fullName := fn.Name()
-		// Extract just the function name (remove package path)
-		parts := strings.Split(fullName, "/")
-		lastPart := parts[len(parts)-1]
-		// Remove package name if present
-		if idx := strings.LastIndex(lastPart, "."); idx != -1 {
-			funcName = lastPart[idx+1:]
-		} else {
-			funcName = lastPart
-		}
-	}
-	
-	msg := fmt.Sprintf(format, args...)
-	Logger.Printf("[FATAL] [%s:%d:%s] %s", file, line, funcName, msg)
+	msg := formatMessage(ERROR, 2, format, args...)
+	logger.Println(msg)
 	os.Exit(1)
-}
-
-// Fatalf is an alias for Fatal
-func Fatalf(format string, args ...interface{}) {
-	Fatal(format, args...)
 }
 
 // Panic logs an error message and panics
 func Panic(format string, args ...interface{}) {
-	// Get caller info (skip 2: Panic -> actual caller)
-	pc, file, line, ok := runtime.Caller(2)
-	if !ok {
-		file = "unknown"
-		line = 0
-	}
-	
-	// Extract just the filename (not the full path)
-	if idx := strings.LastIndex(file, "/"); idx != -1 {
-		file = file[idx+1:]
-	}
-	
-	// Get function name
-	funcName := "unknown"
-	if fn := runtime.FuncForPC(pc); fn != nil {
-		fullName := fn.Name()
-		// Extract just the function name (remove package path)
-		parts := strings.Split(fullName, "/")
-		lastPart := parts[len(parts)-1]
-		// Remove package name if present
-		if idx := strings.LastIndex(lastPart, "."); idx != -1 {
-			funcName = lastPart[idx+1:]
-		} else {
-			funcName = lastPart
-		}
-	}
-	
-	msg := fmt.Sprintf(format, args...)
-	Logger.Printf("[PANIC] [%s:%d:%s] %s", file, line, funcName, msg)
-	panic(msg)
+	msg := formatMessage(ERROR, 2, format, args...)
+	logger.Println(msg)
+	panic(fmt.Sprintf(format, args...))
 }
 
-// Panicf is an alias for Panic
-func Panicf(format string, args ...interface{}) {
-	Panic(format, args...)
+// Configure sets up logging from environment variables
+func Configure() {
+	// Set log level from environment
+	if level := os.Getenv("ENTITYDB_LOG_LEVEL"); level != "" {
+		SetLogLevel(level)
+	}
+	
+	// Set trace subsystems from environment
+	if trace := os.Getenv("ENTITYDB_TRACE_SUBSYSTEMS"); trace != "" {
+		subsystems := strings.Split(trace, ",")
+		for i, s := range subsystems {
+			subsystems[i] = strings.TrimSpace(s)
+		}
+		EnableTrace(subsystems...)
+	}
 }
+
+// Aliases for backward compatibility
+var (
+	Tracef = Trace
+	Debugf = Debug
+	Infof  = Info
+	Warnf  = Warn
+	Errorf = Error
+	Fatalf = Fatal
+	Panicf = Panic
+)

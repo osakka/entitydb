@@ -21,12 +21,12 @@ func NewDataspaceEntityHandlerRBAC(handler *EntityHandler, repo models.EntityRep
 	}
 }
 
-// CreateDataspaceEntityWithRBAC wraps CreateEntity with dataspace context
-func (h *DataspaceEntityHandlerRBAC) CreateDataspaceEntityWithRBAC() http.HandlerFunc {
+// CreateDataspaceEntity wraps CreateEntity with dataspace context
+func (h *DataspaceEntityHandlerRBAC) CreateDataspaceEntity() http.HandlerFunc {
 	return RBACMiddleware(h.repo, h.sessionManager, PermEntityCreate)(h.handler.CreateEntity)
 }
 
-// QueryDataspaceEntitiesWithRBAC wraps QueryEntities with dataspace context
-func (h *DataspaceEntityHandlerRBAC) QueryDataspaceEntitiesWithRBAC() http.HandlerFunc {
+// QueryDataspaceEntities wraps QueryEntities with dataspace context
+func (h *DataspaceEntityHandlerRBAC) QueryDataspaceEntities() http.HandlerFunc {
 	return RBACMiddleware(h.repo, h.sessionManager, PermEntityView)(h.handler.QueryEntities)
 }

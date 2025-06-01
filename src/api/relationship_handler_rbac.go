@@ -21,28 +21,28 @@ func NewEntityRelationshipHandlerRBAC(handler *EntityRelationshipHandler, repo m
 	}
 }
 
-// CreateRelationshipWithRBAC wraps CreateRelationship with permission check
-func (h *EntityRelationshipHandlerRBAC) CreateRelationshipWithRBAC() http.HandlerFunc {
+// CreateRelationship wraps CreateRelationship with permission check
+func (h *EntityRelationshipHandlerRBAC) CreateRelationship() http.HandlerFunc {
 	return RBACMiddleware(h.repo, h.sessionManager, PermRelationCreate)(h.handler.CreateRelationship)
 }
 
-// GetRelationshipWithRBAC wraps GetRelationship with permission check
-func (h *EntityRelationshipHandlerRBAC) GetRelationshipWithRBAC() http.HandlerFunc {
+// GetRelationship wraps GetRelationship with permission check
+func (h *EntityRelationshipHandlerRBAC) GetRelationship() http.HandlerFunc {
 	return RBACMiddleware(h.repo, h.sessionManager, PermRelationView)(h.handler.GetRelationship)
 }
 
-// ListRelationshipsBySourceWithRBAC wraps ListRelationshipsBySource with permission check
-func (h *EntityRelationshipHandlerRBAC) ListRelationshipsBySourceWithRBAC() http.HandlerFunc {
+// ListRelationshipsBySource wraps ListRelationshipsBySource with permission check
+func (h *EntityRelationshipHandlerRBAC) ListRelationshipsBySource() http.HandlerFunc {
 	return RBACMiddleware(h.repo, h.sessionManager, PermRelationView)(h.handler.ListRelationshipsBySource)
 }
 
 // UpdateRelationships doesn't exist, so we'll use the general handler
-// HandleEntityRelationshipsWithRBAC wraps HandleEntityRelationships with permission check
-func (h *EntityRelationshipHandlerRBAC) HandleEntityRelationshipsWithRBAC() http.HandlerFunc {
+// HandleEntityRelationships wraps HandleEntityRelationships with permission check
+func (h *EntityRelationshipHandlerRBAC) HandleEntityRelationships() http.HandlerFunc {
 	return RBACMiddleware(h.repo, h.sessionManager, PermRelationView)(h.handler.HandleEntityRelationships)
 }
 
-// DeleteRelationshipWithRBAC wraps DeleteRelationship with permission check
-func (h *EntityRelationshipHandlerRBAC) DeleteRelationshipWithRBAC() http.HandlerFunc {
+// DeleteRelationship wraps DeleteRelationship with permission check
+func (h *EntityRelationshipHandlerRBAC) DeleteRelationship() http.HandlerFunc {
 	return RBACMiddleware(h.repo, h.sessionManager, PermRelationDelete)(h.handler.DeleteRelationship)
 }

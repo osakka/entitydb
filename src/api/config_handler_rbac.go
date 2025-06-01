@@ -21,23 +21,23 @@ func NewEntityConfigHandlerRBAC(handler *EntityConfigHandler, repo models.Entity
 	}
 }
 
-// GetConfigWithRBAC wraps GetConfig with permission check
-func (h *EntityConfigHandlerRBAC) GetConfigWithRBAC() http.HandlerFunc {
+// GetConfig wraps GetConfig with permission check
+func (h *EntityConfigHandlerRBAC) GetConfig() http.HandlerFunc {
 	return RBACMiddleware(h.repo, h.sessionManager, PermConfigView)(h.handler.GetConfig)
 }
 
-// SetConfigWithRBAC wraps SetConfig with permission check
-func (h *EntityConfigHandlerRBAC) SetConfigWithRBAC() http.HandlerFunc {
+// SetConfig wraps SetConfig with permission check
+func (h *EntityConfigHandlerRBAC) SetConfig() http.HandlerFunc {
 	return RBACMiddleware(h.repo, h.sessionManager, PermConfigUpdate)(h.handler.SetConfig)
 }
 
-// GetFeatureFlagsWithRBAC wraps GetFeatureFlags with permission check
-func (h *EntityConfigHandlerRBAC) GetFeatureFlagsWithRBAC() http.HandlerFunc {
+// GetFeatureFlags wraps GetFeatureFlags with permission check
+func (h *EntityConfigHandlerRBAC) GetFeatureFlags() http.HandlerFunc {
 	return RBACMiddleware(h.repo, h.sessionManager, PermConfigView)(h.handler.GetFeatureFlags)
 }
 
-// SetFeatureFlagWithRBAC wraps SetFeatureFlag with permission check
-func (h *EntityConfigHandlerRBAC) SetFeatureFlagWithRBAC() http.HandlerFunc {
+// SetFeatureFlag wraps SetFeatureFlag with permission check
+func (h *EntityConfigHandlerRBAC) SetFeatureFlag() http.HandlerFunc {
 	return RBACMiddleware(h.repo, h.sessionManager, PermConfigUpdate)(h.handler.SetFeatureFlag)
 }
 
@@ -57,7 +57,7 @@ func NewDashboardHandlerRBAC(handler *DashboardHandler, repo models.EntityReposi
 	}
 }
 
-// GetDashboardStatsWithRBAC wraps DashboardStats with permission check
-func (h *DashboardHandlerRBAC) GetDashboardStatsWithRBAC() http.HandlerFunc {
+// GetDashboardStats wraps DashboardStats with permission check
+func (h *DashboardHandlerRBAC) GetDashboardStats() http.HandlerFunc {
 	return RBACMiddleware(h.repo, h.sessionManager, PermSystemView)(h.handler.DashboardStats)
 }

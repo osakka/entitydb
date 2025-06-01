@@ -98,12 +98,13 @@ func (h *DataspaceHandler) CreateDataspace(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// Create dataspace entity
+	// Create dataspace entity (dataspaces themselves belong to _system dataspace)
 	entity := &models.Entity{
 		ID:   uuid.New().String(),
 		Tags: []string{
 			"type:dataspace",
-			"dataspace:" + req.Name,
+			"dataspace:_system", // Dataspace entities belong to the system dataspace
+			"name:" + req.Name,
 			"id:" + req.Name,
 		},
 		Content: h.marshalDataspaceContent(req),
@@ -229,7 +230,7 @@ func (h *DataspaceHandler) entityToDataspaceResponse(entity *models.Entity) Data
 		UpdatedAt: updatedAt,
 	}
 
-	// Extract dataspace name from tags
+	// Extract dataspace name and description from tags
 	for _, tag := range entity.Tags {
 		// Handle temporal tags (TIMESTAMP|tag format)
 		actualTag := tag
@@ -237,9 +238,10 @@ func (h *DataspaceHandler) entityToDataspaceResponse(entity *models.Entity) Data
 			actualTag = tag[idx+1:]
 		}
 		
-		if strings.HasPrefix(actualTag, "dataspace:") {
-			resp.Name = strings.TrimPrefix(actualTag, "dataspace:")
-			break
+		if strings.HasPrefix(actualTag, "name:") {
+			resp.Name = strings.TrimPrefix(actualTag, "name:")
+		} else if strings.HasPrefix(actualTag, "description:") {
+			resp.Description = strings.TrimPrefix(actualTag, "description:")
 		}
 	}
 

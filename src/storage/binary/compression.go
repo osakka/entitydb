@@ -120,8 +120,8 @@ func CompressWithPool(content []byte) (*CompressedContent, error) {
 	}
 	
 	// Get buffer from pool
-	compressed := SmallBufferPool.Get()
-	defer SmallBufferPool.Put(compressed)
+	compressed := GetSmallBuffer()
+	defer PutSmallBuffer(compressed)
 	compressed.Reset()
 	
 	gw := gzip.NewWriter(compressed)
@@ -166,8 +166,8 @@ func DecompressWithPool(compressedData []byte) ([]byte, error) {
 	defer gr.Close()
 	
 	// Get buffer from pool
-	decompressed := SmallBufferPool.Get()
-	defer SmallBufferPool.Put(decompressed)
+	decompressed := GetSmallBuffer()
+	defer PutSmallBuffer(decompressed)
 	decompressed.Reset()
 	
 	_, err = io.Copy(decompressed, gr)

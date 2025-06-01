@@ -108,6 +108,7 @@ func (sm *SecurityManager) CreateUser(username, password, email string) (*Securi
 	// Create user entity (no sensitive data)
 	tags := []string{
 		"type:" + EntityTypeUser,
+		"dataspace:_system",
 		"identity:username:" + username,
 		"identity:uuid:" + userID,
 		"status:active",
@@ -147,6 +148,7 @@ func (sm *SecurityManager) CreateUser(username, password, email string) (*Securi
 		ID: credentialID,
 		Tags: []string{
 			"type:" + EntityTypeCredential,
+			"dataspace:_system",
 			"algorithm:bcrypt",
 			"user:" + userID,
 			"salt:" + salt,
@@ -292,6 +294,7 @@ func (sm *SecurityManager) CreateSession(user *SecurityUser, ipAddress, userAgen
 		ID: sessionID,
 		Tags: []string{
 			"type:" + EntityTypeSession,
+			"dataspace:_system",
 			"token:" + token,
 			"expires:" + expiresAt.Format(time.RFC3339),
 			"ip:" + ipAddress,
