@@ -3,7 +3,7 @@
 > [!IMPORTANT]
 > EntityDB is a high-performance temporal database where every tag is timestamped with nanosecond precision. All data is stored in a custom binary format (EBF) with Write-Ahead Logging for durability and concurrent access support.
 
-## Current State (v2.19.0)
+## Current State (v2.21.0)
 
 EntityDB now features a unified Entity model with autochunking:
 - **Unified Entity Model**: Single content field ([]byte) per entity
@@ -164,6 +164,23 @@ The server automatically creates a default admin user if none exists:
 - Rate limiting
 - Audit logging
 - Aggregation queries (beyond sorting/filtering)
+
+## Recent Changes (v2.21.0)
+
+- **Tab Structure Validation System**: Comprehensive protection against UI rendering issues
+  - Runtime validation automatically checks tab structure on page load
+  - Build-time validation integrated into Makefile prevents broken builds
+  - Git pre-commit hook blocks commits with invalid tab structures
+  - Converted all 10 dashboard tabs from x-show to x-if templates for proper flex layout compatibility
+- **Request/Response Metrics**: New HTTP request tracking middleware
+  - Tracks duration, size, status codes, and errors with temporal storage
+  - Provides historical analysis capabilities for performance monitoring
+- **Enhanced Monitoring UI**: Improved chart visualizations
+  - Added legends, tooltips, and proper units to all monitoring charts
+  - Better data formatting and user experience
+- **WAL Checkpoint Metrics**: Added comprehensive checkpoint tracking
+  - Monitors checkpoint operations, success rates, and storage efficiency
+  - Provides insights into storage health and performance
 
 ## Recent Changes (v2.20.0)
 

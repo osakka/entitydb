@@ -5,6 +5,46 @@ All notable changes to the EntityDB Platform will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.21.0] - 2025-06-01
+
+### Added
+- **Tab Structure Validation System**: Comprehensive validation to prevent UI tab rendering issues
+  - Runtime validation with `/js/tab-validator.js` that checks tab structure on page load
+  - Build-time validation script `/scripts/validate_tab_structure.sh`
+  - Git pre-commit hook to prevent committing broken tab structures
+  - Detailed documentation in `/docs/development/TAB_STRUCTURE_GUIDELINES.md`
+- **Request/Response Metrics**: New middleware for HTTP request tracking
+  - Tracks request duration, size, status codes, and errors
+  - Stores metrics using temporal tags for historical analysis
+  - Integrated into main server initialization
+- **Enhanced UI Charts**: Improved monitoring dashboards
+  - Added legends to all charts with proper positioning
+  - Implemented tooltips with formatted values and units
+  - Added proper axis labels and scaling
+
+### Fixed
+- **Critical Tab Rendering Issue**: Fixed dashboard tabs not displaying
+  - Root cause: Using `x-show` with flex layouts caused tabs after Storage to be invisible
+  - Solution: Converted all 10 tabs from `x-show` to `x-if` with template tags
+  - This ensures only active tab is in DOM, preventing flex layout conflicts
+- **WAL Checkpoint Metrics**: Added proper metrics collection for checkpoint operations
+  - Tracks checkpoint success/failure, duration, and size reduction
+  - Provides visibility into storage health and performance
+
+### Changed
+- **Tab Implementation Pattern**: Migrated from x-show to x-if templates
+  - All tabs now use `<template x-if="activeTab === 'name'">` pattern
+  - Improves performance by removing inactive tabs from DOM
+  - Prevents layout calculation issues with hidden flex children
+- **Build Process**: Added tab validation to Makefile
+  - Server build now validates tab structure before compilation
+  - Ensures UI consistency is maintained across builds
+
+### Documentation
+- Created comprehensive tab structure guidelines
+- Updated build documentation with validation steps
+- Added troubleshooting guide for tab-related issues
+
 ## [2.20.0] - 2025-05-30
 
 ### Added

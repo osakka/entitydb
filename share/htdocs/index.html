@@ -10,6 +10,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
     <script src="/js/realtime-charts.js"></script>
     <script src="/js/metrics-utils.js"></script>
+    <script src="/js/tab-validator.js"></script>
     <style>
         * {
             margin: 0;
@@ -509,9 +510,19 @@
         /* Main Content */
         .main-content {
             flex: 1;
-            overflow: hidden;
+            min-height: 0;
             display: flex;
             flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Tab container to hold the active tab */
+        .tab-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            position: relative;
         }
 
         .tab-content {
@@ -3202,7 +3213,8 @@
         <!-- Main Content -->
         <main class="main-content">
             <!-- System Overview Tab -->
-            <div x-show="activeTab === 'overview'" class="tab-content">
+            <template x-if="activeTab === 'overview'">
+                <div class="tab-content">
                 <div class="toolbar">
                     <div class="toolbar-left">
                         <h2>System Overview</h2>
@@ -3417,10 +3429,12 @@
                         </div>
                     </div>
                 </div>
-            </div>
+                </div>
+            </template>
 
             <!-- Entity Explorer Tab -->
-            <div x-show="activeTab === 'entities'" class="tab-content">
+            <template x-if="activeTab === 'entities'">
+                <div class="tab-content">
                 <div class="toolbar">
                     <div class="search-box">
                         <i class="fas fa-search search-icon"></i>
@@ -3511,10 +3525,12 @@
                         </div>
                     </div>
                 </div>
-            </div>
+                </div>
+            </template>
 
             <!-- Other tabs with placeholders for now -->
-            <div x-show="activeTab === 'relationships'" class="tab-content">
+            <template x-if="activeTab === 'relationships'">
+                <div class="tab-content">
                 <div class="card">
                     <div class="card-header">
                         <h3 class="card-title">
@@ -3526,9 +3542,11 @@
                         Relationship visualization coming soon...
                     </p>
                 </div>
-            </div>
+                </div>
+            </template>
 
-            <div x-show="activeTab === 'dataspaces'" class="tab-content">
+            <template x-if="activeTab === 'dataspaces'">
+                <div class="tab-content">
                 <div class="card">
                     <div class="card-header">
                         <h3 class="card-title">
@@ -3540,9 +3558,11 @@
                         Dataspace administration coming soon...
                     </p>
                 </div>
-            </div>
+                </div>
+            </template>
 
-            <div x-show="activeTab === 'users'" class="tab-content">
+            <template x-if="activeTab === 'users'">
+                <div class="tab-content">
                 <div class="toolbar">
                     <div class="toolbar-left">
                         <h2>User Management</h2>
@@ -3821,9 +3841,11 @@
                         </div>
                     </div>
                 </div>
-            </div>
+                </div>
+            </template>
 
-            <div x-show="activeTab === 'storage'" class="tab-content">
+            <template x-if="activeTab === 'storage'">
+                <div class="tab-content">
                 <!-- Toolbar with time range and actions -->
                 <div class="toolbar" style="margin-bottom: 24px;">
                     <div class="toolbar-left">
@@ -3961,9 +3983,9 @@
                         <div class="third-circle"></div>
                     </div>
                 </div>
-
-                    <!-- Storage Components Table -->
-                    <div class="card" style="margin-bottom: 24px;">
+                
+                <!-- Storage Components Table -->
+                <div class="card" style="margin-bottom: 24px;">
                         <div class="card-header">
                             <h3 class="card-title">
                                 <i class="fas fa-database"></i>
@@ -4025,8 +4047,8 @@
                         </div>
                     </div>
 
-                    <!-- Storage Charts -->
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+                <!-- Storage Charts -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
                         <div class="card">
                             <div class="card-header">
                                 <h3 class="card-title">
@@ -4089,10 +4111,17 @@
                     </div>
 
                 </div>
-            </div>
+                </div>
+            </template>
 
-            <div x-show="activeTab === 'performance'" class="tab-content">
-                <div style="background: blue; color: white; padding: 10px;">DEBUG: Performance tab is showing</div>
+            <!-- Performance Tab -->
+            <template x-if="activeTab === 'performance'">
+                <div class="tab-content">
+                <div class="toolbar" style="margin-bottom: 24px;">
+                    <div class="toolbar-left">
+                        <h2>Performance Analytics</h2>
+                    </div>
+                </div>
                 <div class="card">
                     <div class="card-header">
                         <h3 class="card-title">
@@ -4104,10 +4133,11 @@
                         Performance monitoring coming soon...
                     </p>
                 </div>
-            </div>
+                </div>
+            </template>
 
-            <div x-show="activeTab === 'system'" class="tab-content">
-                <div style="background: green; color: white; padding: 10px;">DEBUG: System Health tab is showing</div>
+            <template x-if="activeTab === 'system'">
+                <div class="tab-content">
                 <div class="card">
                     <div class="card-header">
                         <h3 class="card-title">
@@ -4119,10 +4149,12 @@
                         System diagnostics coming soon...
                     </p>
                 </div>
-            </div>
+                </div>
+            </template>
 
             <!-- Settings Tab -->
-            <div x-show="activeTab === 'settings'" class="tab-content">
+            <template x-if="activeTab === 'settings'">
+                <div class="tab-content">
                 <div class="card settings-full-height">
                     <div class="card-header">
                         <h3 class="card-title">
@@ -4453,11 +4485,12 @@
                         </div>
                     </div>
                 </div>
-            </div>
+                </div>
+            </template>
             
             <!-- RBAC Metrics Tab -->
-            <div x-show="activeTab === 'rbac-metrics'" class="tab-content">
-                <div style="background: purple; color: white; padding: 10px;">DEBUG: RBAC Metrics tab is showing</div>
+            <template x-if="activeTab === 'rbac-metrics'">
+                <div class="tab-content">
                 <div class="toolbar">
                 <div class="toolbar-left">
                     <h2>RBAC & Security Metrics</h2>
@@ -4671,11 +4704,12 @@
                         </div>
                     </div>
                 </div>
-            </div>
+                </div>
+            </template>
             <!-- End of RBAC Metrics Tab -->
 
         </main>
-    </div>
+    </div> <!-- End of app-container -->
 
     <!-- Entity Viewer Modal -->
     <div x-show="showEntityModal" class="modal-backdrop" @click.self="showEntityModal = false">
@@ -4710,6 +4744,11 @@
     </div>
 
     <script>
+        // Add global error handler
+        window.addEventListener('error', function(event) {
+            console.error('Global error:', event.error);
+        });
+        
         function entityDBAdmin() {
             return {
                 // Auth state

@@ -38,16 +38,20 @@ endif
 # Echo command - use printf for better compatibility
 ECHO := printf
 
-.PHONY: all server clean install dev test tools entity-tools unit-tests api-tests entity-tests simple-tests test-utils help security-tests master-tests docs
+.PHONY: all server clean install dev test tools entity-tools unit-tests api-tests entity-tests simple-tests test-utils help security-tests master-tests docs validate-tabs
 
 all: server install
+
+validate-tabs:
+	@$(ECHO) "$(YELLOW)Validating tab structure...$(NC)\n"
+	@../scripts/validate_tab_structure.sh || ($(ECHO) "$(RED)Tab structure validation failed!$(NC)\n"; exit 1)
 
 docs:
 	@$(ECHO) "$(YELLOW)Generating API documentation...$(NC)\n"
 	@./generate_docs.sh
 	@$(ECHO) "$(GREEN)API documentation generated successfully$(NC)\n"
 
-server: docs
+server: docs validate-tabs
 	@$(ECHO) "$(YELLOW)Building server binary: $(NAME)...$(NC)\n"
 	@mkdir -p $(BUILD_DIR)
 	@$(ECHO) "$(YELLOW)Excluding deprecated code from build...$(NC)\n"

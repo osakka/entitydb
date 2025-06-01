@@ -1,0 +1,19 @@
+#!/bin/bash
+#
+# Pre-commit hook to validate tab structure
+#
+
+# Run tab structure validation if index.html is being committed
+if git diff --cached --name-only | grep -q "index.html"; then
+    echo "Running tab structure validation..."
+    /opt/entitydb/scripts/validate_tab_structure.sh
+    
+    if [ $? -ne 0 ]; then
+        echo ""
+        echo "❌ Commit blocked: Tab structure validation failed!"
+        echo "Please fix the issues above before committing."
+        exit 1
+    fi
+fi
+
+exit 0
