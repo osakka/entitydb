@@ -470,11 +470,11 @@ func main() {
 	apiRouter.HandleFunc("/system/log-level", api.RBACMiddleware(server.entityRepo, server.sessionManager, api.RBACPermission{Resource: "admin", Action: "configure"})(server.entityHandler.SetLogLevel)).Methods("POST")
 	
 	// RBAC metrics endpoints
-	rbacMetricsHandler := api.NewRBACMetricsHandler(server.entityRepo, server.sessionManager)
+	rbacMetricsHandler := api.NewTemporalRBACMetricsHandler(server.entityRepo, server.sessionManager)
 	// Public endpoint for basic metrics (no auth required)
-	apiRouter.HandleFunc("/rbac/metrics/public", rbacMetricsHandler.GetPublicRBACMetrics).Methods("GET")
-	// Authenticated endpoint for full metrics (any authenticated user)
-	apiRouter.HandleFunc("/rbac/metrics", api.SessionAuthMiddleware(server.sessionManager, server.entityRepo)(rbacMetricsHandler.GetAuthenticatedRBACMetrics)).Methods("GET")
+	apiRouter.HandleFunc("/rbac/metrics/public", rbacMetricsHandler.GetRBACMetricsFromTemporal).Methods("GET")
+	// Authenticated endpoint for full metrics (any authenticated user can see RBAC metrics)
+	apiRouter.HandleFunc("/rbac/metrics", api.SessionAuthMiddleware(server.sessionManager, server.entityRepo)(rbacMetricsHandler.GetRBACMetricsFromTemporal)).Methods("GET")
 	
 	// Integrity metrics endpoint (requires admin permission)
 	integrityHandler := api.IntegrityMetricsHandler(server.entityRepo)

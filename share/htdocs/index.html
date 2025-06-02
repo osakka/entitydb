@@ -6020,21 +6020,23 @@
                                     pendingOps: '0'
                                 },
                                 mmap: {
-                                    status: 'Active',
+                                    status: data.storage?.total_storage_bytes > 0 ? 'Active' : 'Not Available',
                                     mappedSize: this.formatBytes(data.storage?.total_storage_bytes || 0),
-                                    pageFaults: '0',
-                                    cacheHitRate: '95%'
+                                    pageFaults: 'N/A',
+                                    cacheHitRate: data.performance?.query_cache_hits > 0 ? 
+                                        Math.round((data.performance.query_cache_hits / (data.performance.query_cache_hits + data.performance.query_cache_miss)) * 100) + '%' : 
+                                        'N/A'
                                 },
                                 performance: {
                                     readIOPS: data.performance?.index_lookups?.toString() || '0',
-                                    writeIOPS: '0',
-                                    readLatency: '0.3ms',
-                                    writeLatency: '1.2ms'
+                                    writeIOPS: data.performance?.writes_per_second?.toString() || '0',
+                                    readLatency: 'N/A',
+                                    writeLatency: 'N/A'
                                 },
                                 compression: {
-                                    ratio: data.storage?.compression_ratio ? `${data.storage.compression_ratio.toFixed(1)}:1` : 'N/A',
-                                    spaceSaved: data.storage?.compression_ratio ? `${((1 - 1/data.storage.compression_ratio) * 100).toFixed(1)}%` : 'N/A',
-                                    indexEfficiency: '95%'
+                                    ratio: data.storage?.compression_ratio > 1 ? `${data.storage.compression_ratio.toFixed(1)}:1` : 'None',
+                                    spaceSaved: data.storage?.compression_ratio > 1 ? `${((1 - 1/data.storage.compression_ratio) * 100).toFixed(1)}%` : '0%',
+                                    indexEfficiency: data.temporal?.temporal_tags_ratio ? `${Math.round(data.temporal.temporal_tags_ratio * 100)}%` : 'N/A'
                                 }
                             };
 
