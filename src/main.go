@@ -457,9 +457,9 @@ func main() {
 	// Initialize error metrics collector
 	api.InitErrorMetrics(server.entityRepo)
 	
-	// Worca dashboard metrics endpoint
-	worcaMetricsHandler := api.NewWorcaMetricsHandler(server.entityRepo)
-	apiRouter.HandleFunc("/worca/metrics", api.RBACMiddleware(server.entityRepo, server.sessionManager, api.RBACPermission{Resource: "metrics", Action: "read"})(worcaMetricsHandler.GetDashboardMetrics)).Methods("GET")
+	// Generic application metrics endpoint - applications can filter by namespace
+	applicationMetricsHandler := api.NewApplicationMetricsHandler(server.entityRepo)
+	apiRouter.HandleFunc("/application/metrics", api.RBACMiddleware(server.entityRepo, server.sessionManager, api.RBACPermission{Resource: "metrics", Action: "read"})(applicationMetricsHandler.GetApplicationMetrics)).Methods("GET")
 	
 	// System metrics endpoint (EntityDB-specific, no authentication required)
 	systemMetricsHandler := api.NewSystemMetricsHandler(server.entityRepo)

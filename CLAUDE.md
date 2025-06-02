@@ -22,7 +22,7 @@ EntityDB now features a unified Entity model with autochunking:
 - **Query Adaptations**: All query functions handle temporal tags transparently
 - **Observability**: Comprehensive metrics with health checks, Prometheus format, and system analytics
 - **RBAC Metrics**: Real-time session monitoring, authentication analytics, and security metrics dashboard
-- **Modular Widget System**: Customizable dashboards with extensible widget registry and full-screen responsive layout
+- **Application-Agnostic Design**: Pure database platform with generic metrics API for applications
 - **Professional Logging**: Structured logging with contextual error messages, appropriate log levels, and automatic file/function/line information
 
 ## What's Implemented
@@ -39,8 +39,10 @@ EntityDB now features a unified Entity model with autochunking:
 - Health monitoring and metrics endpoints
 - RBAC & session metrics with real-time monitoring dashboard
 
-### Applications Built on EntityDB
-- **Worca (Workforce Orchestrator)**: Complete workforce management platform inspired by Orca intelligence. Features modular widget system, full-screen responsive layout, Kanban boards, team management, project hierarchies, and real-time analytics with oceanic theming. Includes customizable dashboards, comprehensive widget registry, dark/light themes, and mobile-responsive design. Located at `/share/htdocs/worca/`
+### Application Development on EntityDB
+- EntityDB is designed as a pure database platform. Applications can be built on top of it using the comprehensive API endpoints.
+- The generic `/api/v1/application/metrics` endpoint allows applications to store and retrieve their own metrics by namespace.
+- Example applications like workforce management, monitoring systems, or analytics platforms can be built as separate projects that connect to EntityDB via its API.
 
 ### Architecture
 ```
@@ -69,15 +71,11 @@ EntityDB now features a unified Entity model with autochunking:
 ├── bin/
 │   ├── entitydb                     # Server binary
 │   └── entitydbd.sh                 # Daemon script
-├── share/htdocs/worca/              # Workforce Orchestrator Application  
-│   ├── index.html                   # Main dashboard with full-screen layout
-│   ├── worca.js                     # Core application logic with widget system
-│   ├── worca-api.js                 # EntityDB API wrapper
-│   ├── worca-widgets.js             # Modular widget system registry
-│   ├── worca-logo-dark.svg          # Orca-inspired logo (dark theme)
-│   ├── worca-logo-light.svg         # Orca-inspired logo (light theme)
-│   ├── metrics.html                 # System metrics dashboard
-│   └── demo.md                      # Usage examples and demos
+├── share/htdocs/                    # Static web files  
+│   ├── index.html                   # EntityDB dashboard
+│   ├── integrity.html               # Data integrity tools
+│   ├── js/                          # JavaScript utilities
+│   └── swagger/                     # API documentation
 ```
 
 ### API Endpoints
@@ -111,6 +109,7 @@ GET    /health                       # Health check with system metrics (no auth
 GET    /metrics                      # Prometheus metrics format (no auth)
 GET    /api/v1/system/metrics        # EntityDB comprehensive metrics (no auth)
 GET    /api/v1/rbac/metrics          # RBAC & session metrics (requires admin)
+GET    /api/v1/application/metrics   # Generic application metrics (requires metrics:read)
 
 # API Documentation
 GET    /swagger/                     # Swagger UI
@@ -164,6 +163,14 @@ The server automatically creates a default admin user if none exists:
 - Rate limiting
 - Audit logging
 - Aggregation queries (beyond sorting/filtering)
+
+## Recent Changes (v2.23.0)
+
+- **Application-Agnostic Platform**: Removed all application-specific code from core server
+  - Replaced worca-specific metrics endpoint with generic `/api/v1/application/metrics`
+  - Applications can now filter metrics by namespace/app parameter
+  - Moved example applications (worca, methub) out of core distribution
+  - EntityDB is now a pure database platform without embedded applications
 
 ## Recent Changes (v2.22.0)
 
@@ -314,7 +321,7 @@ All development follows the standardized Git workflow described in [docs/develop
 
 - URL: https://git.home.arpa/itdlabs/entitydb.git
 - Branch: main
-- Latest tag: v2.22.0
+- Latest tag: v2.23.0
 
 ## Development Principles
 

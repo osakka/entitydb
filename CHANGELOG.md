@@ -5,6 +5,27 @@ All notable changes to the EntityDB Platform will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.23.0] - 2025-06-02
+
+### Changed
+- **Application-Agnostic Platform**: Removed all application-specific code from core server
+  - Replaced worca-specific `/api/v1/worca/metrics` endpoint with generic `/api/v1/application/metrics`
+  - Applications can now filter metrics by `namespace` or `app` query parameter
+  - Moved example applications (worca, methub) out of core distribution to trash directory
+  - EntityDB is now a pure database platform without embedded applications
+  - Updated all documentation to reflect the application-agnostic design
+
+### Added
+- **Generic Application Metrics API**: New endpoint for application-specific metrics
+  - `/api/v1/application/metrics` accepts namespace/app parameter for filtering
+  - Returns metrics in a format suitable for any application
+  - Maintains RBAC enforcement (requires `metrics:read` permission)
+
+### Removed
+- Worca application files from `/share/htdocs/worca/`
+- Methub application files from `/share/htdocs/methub/`
+- Application-specific handlers (`worca_metrics_handler.go`)
+
 ## [2.22.0] - 2025-06-02
 
 ### Added
