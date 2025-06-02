@@ -433,10 +433,29 @@ func main() {
 	apiRouter.HandleFunc("/metrics/history", metricsHistoryHandler.GetMetricHistory).Methods("GET")
 	apiRouter.HandleFunc("/metrics/available", metricsHistoryHandler.GetAvailableMetrics).Methods("GET")
 	
-	// Start background metrics collector (collect every 30 seconds with change detection)
-	backgroundCollector := api.NewBackgroundMetricsCollector(server.entityRepo, 30*time.Second)
+	// Start background metrics collector with configurable interval
+	metricsInterval := 30 * time.Second // default
+	if intervalStr := os.Getenv("ENTITYDB_METRICS_INTERVAL"); intervalStr != "" {
+		if interval, err := time.ParseDuration(intervalStr); err == nil {
+			metricsInterval = interval
+			logger.Info("Metrics collection interval set to %v", metricsInterval)
+		} else {
+			logger.Warn("Invalid ENTITYDB_METRICS_INTERVAL format: %s, using default 30s", intervalStr)
+		}
+	}
+	
+	backgroundCollector := api.NewBackgroundMetricsCollector(server.entityRepo, metricsInterval)
 	backgroundCollector.Start()
 	defer backgroundCollector.Stop()
+	
+	// Initialize query metrics collector
+	api.InitQueryMetrics(server.entityRepo)
+	
+	// Initialize storage metrics collector
+	binary.InitStorageMetrics(server.entityRepo)
+	
+	// Initialize error metrics collector
+	api.InitErrorMetrics(server.entityRepo)
 	
 	// Worca dashboard metrics endpoint
 	worcaMetricsHandler := api.NewWorcaMetricsHandler(server.entityRepo)

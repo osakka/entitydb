@@ -3,7 +3,7 @@
 > [!IMPORTANT]
 > EntityDB is a high-performance temporal database where every tag is timestamped with nanosecond precision. All data is stored in a custom binary format (EBF) with Write-Ahead Logging for durability and concurrent access support.
 
-## Current State (v2.21.0)
+## Current State (v2.22.0)
 
 EntityDB now features a unified Entity model with autochunking:
 - **Unified Entity Model**: Single content field ([]byte) per entity
@@ -165,6 +165,22 @@ The server automatically creates a default admin user if none exists:
 - Audit logging
 - Aggregation queries (beyond sorting/filtering)
 
+## Recent Changes (v2.22.0)
+
+- **Comprehensive Metrics System**: Phase 1 implementation of advanced observability
+  - Query performance metrics with complexity scoring and slow query detection
+  - Storage operation metrics tracking read/write latencies, WAL operations, and compression
+  - Error tracking system with categorization, pattern detection, and recovery metrics
+  - Request/response metrics middleware for HTTP performance monitoring
+  - Configurable metrics collection interval via ENTITYDB_METRICS_INTERVAL
+  - Enhanced Performance tab in UI with new metric cards and charts
+  - All metrics stored using temporal tags with configurable retention policies
+- **Code Quality Improvements**: Build fixes and deduplication
+  - Fixed compilation error in entity creation (unused startTime variable)
+  - Added missing storage metrics tracking for Create operation
+  - Removed duplicate tool files maintaining single source of truth
+  - Clean build with no warnings or errors
+
 ## Recent Changes (v2.21.0)
 
 - **Tab Structure Validation System**: Comprehensive protection against UI rendering issues
@@ -298,7 +314,7 @@ All development follows the standardized Git workflow described in [docs/develop
 
 - URL: https://git.home.arpa/itdlabs/entitydb.git
 - Branch: main
-- Latest tag: v2.19.0
+- Latest tag: v2.22.0
 
 ## Development Principles
 

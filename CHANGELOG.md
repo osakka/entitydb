@@ -5,6 +5,41 @@ All notable changes to the EntityDB Platform will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.22.0] - 2025-06-02
+
+### Added
+- **Comprehensive Metrics System**: Phase 1 implementation of advanced observability
+  - Query performance metrics with complexity scoring and slow query detection
+  - Storage operation metrics tracking read/write latencies, WAL operations, and compression
+  - Error tracking system with categorization, pattern detection, and recovery metrics
+  - Request/response metrics middleware for HTTP performance monitoring
+  - Configurable metrics collection interval via `ENTITYDB_METRICS_INTERVAL` environment variable
+  - Enhanced Performance tab in UI with new metric cards and charts
+  - All metrics stored using temporal tags with configurable retention policies
+
+### Fixed
+- **Compilation Error**: Fixed unused `startTime` variable in entity creation
+  - Added missing storage metrics tracking for Create operation
+  - Ensures consistent metrics collection across all storage operations
+- **Code Duplication**: Removed duplicate tool files
+  - Consolidated `clean_corrupted_entries.go`, `scan_entity_data.go`, and `test_chunking.go`
+  - Moved redundant admin tools to trash directory
+  - Maintained single source of truth principle
+
+### Changed
+- **Metrics Collection**: Made background metrics collection interval configurable
+  - Default 30 seconds, supports any Go duration format
+  - Reduces overhead in production environments
+- **Documentation**: Updated metrics documentation
+  - Created METRICS_AUDIT_FINDINGS.md with comprehensive gap analysis
+  - Created METRICS_ACTION_PLAN.md with phased implementation roadmap
+  - Created METRICS_IMPLEMENTATION_SUMMARY.md documenting Phase 1 completion
+
+### Documentation
+- Comprehensive metrics implementation documentation
+- Updated action plan showing Phase 1 complete
+- Detailed configuration and usage examples
+
 ## [2.21.0] - 2025-06-01
 
 ### Added

@@ -35,6 +35,9 @@ This directory contains the source code for the EntityDB platform. This document
 │   ├── rbac_metrics_handler.go # RBAC & session metrics
 │   ├── metrics_background_collector.go # Background metrics collection
 │   ├── metrics_history_handler.go # Temporal metrics history
+│   ├── query_metrics_middleware.go # Query performance tracking
+│   ├── error_metrics_collector.go # Error tracking system
+│   ├── request_metrics_middleware.go # HTTP request/response metrics
 │   ├── router.go             # HTTP router setup
 │   └── response_helpers.go   # Response formatting utilities
 ├── models/                   # Data models
@@ -54,7 +57,8 @@ This directory contains the source code for the EntityDB platform. This document
 │       ├── reader.go                 # Binary format reading
 │       ├── format.go                 # Binary format specification
 │       ├── wal.go                    # Write-ahead logging
-│       └── mmap_reader.go            # Memory-mapped access
+│       ├── mmap_reader.go            # Memory-mapped access
+│       └── metrics_instrumentation.go # Storage operation metrics
 ├── cache/                    # Caching implementations
 │   └── query_cache.go        # Query result caching
 ├── logger/                   # Logging system

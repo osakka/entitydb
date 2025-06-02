@@ -305,6 +305,8 @@ func (r *EntityRepository) updateIndexes(entity *models.Entity) {
 
 // Create creates a new entity with strong durability guarantees
 func (r *EntityRepository) Create(entity *models.Entity) error {
+	startTime := time.Now()
+	
 	// Generate UUID only if no ID is provided
 	if entity.ID == "" {
 		entity.ID = models.GenerateUUID()
@@ -376,11 +378,19 @@ func (r *EntityRepository) Create(entity *models.Entity) error {
 	// Check if we need to perform checkpoint
 	r.checkAndPerformCheckpoint()
 	
+	// Track write metrics
+	if storageMetrics != nil {
+		duration := time.Since(startTime)
+		size := int64(len(entity.Content))
+		storageMetrics.TrackWrite("create_entity", size, duration, nil)
+	}
+	
 	return nil
 }
 
 // GetByID gets an entity by ID with improved reliability from in-memory cache
 func (r *EntityRepository) GetByID(id string) (*models.Entity, error) {
+	startTime := time.Now()
 	logger.Trace("GetByID: %s", id)
 	
 	// First check in-memory cache for the entity
@@ -390,7 +400,15 @@ func (r *EntityRepository) GetByID(id string) (*models.Entity, error) {
 	
 	if exists {
 		logger.Trace("Found in memory cache: %s", id)
+		if storageMetrics != nil {
+			storageMetrics.TrackCacheOperation("entity", true)
+		}
 		return entity, nil
+	}
+	
+	// Cache miss
+	if storageMetrics != nil {
+		storageMetrics.TrackCacheOperation("entity", false)
 	}
 	
 	// First check if entity exists in indexes
@@ -441,7 +459,19 @@ func (r *EntityRepository) GetByID(id string) (*models.Entity, error) {
 		}
 		defer reader.Close()
 		
+		readStart := time.Now()
 		entity, err := reader.GetEntity(id)
+		readDuration := time.Since(readStart)
+		
+		// Track read metrics
+		if storageMetrics != nil {
+			size := int64(0)
+			if entity != nil {
+				size = int64(len(entity.Content))
+			}
+			storageMetrics.TrackRead("get_entity", size, readDuration, err)
+		}
+		
 		if err != nil {
 			logger.Error("Failed to get entity %s: %v", id, err)
 			
@@ -453,6 +483,13 @@ func (r *EntityRepository) GetByID(id string) (*models.Entity, error) {
 				r.mu.Lock()
 				r.entities[id] = recoveredEntity
 				r.mu.Unlock()
+				
+				// Track overall operation time including recovery
+				if storageMetrics != nil {
+					totalDuration := time.Since(startTime)
+					storageMetrics.TrackRead("get_entity_with_recovery", int64(len(recoveredEntity.Content)), totalDuration, nil)
+				}
+				
 				return recoveredEntity, nil
 			} else {
 				logger.Error("Recovery failed for entity %s: %v", id, recErr)
@@ -514,6 +551,8 @@ func (r *EntityRepository) GetByID(id string) (*models.Entity, error) {
 
 // Update updates an existing entity
 func (r *EntityRepository) Update(entity *models.Entity) error {
+	startTime := time.Now()
+	
 	if entity.ID == "" {
 		return fmt.Errorf("entity ID is required for update")
 	}
@@ -613,6 +652,13 @@ func (r *EntityRepository) Update(entity *models.Entity) error {
 	
 	// Check if we need to perform checkpoint
 	r.checkAndPerformCheckpoint()
+	
+	// Track write metrics
+	if storageMetrics != nil {
+		duration := time.Since(startTime)
+		size := int64(len(entity.Content))
+		storageMetrics.TrackWrite("update_entity", size, duration, nil)
+	}
 	
 	return nil
 }

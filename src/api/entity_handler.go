@@ -491,6 +491,8 @@ func (h *EntityHandler) ListEntities(w http.ResponseWriter, r *http.Request) {
 // @Success 200 {object} QueryEntityResponse
 // @Router /api/v1/entities/query [get]
 func (h *EntityHandler) QueryEntities(w http.ResponseWriter, r *http.Request) {
+	startTime := time.Now()
+	
 	// Parse query parameters
 	filter := r.URL.Query().Get("filter")
 	operator := r.URL.Query().Get("operator")
@@ -503,9 +505,13 @@ func (h *EntityHandler) QueryEntities(w http.ResponseWriter, r *http.Request) {
 	// Build query using EntityQuery
 	query := h.repo.Query()
 	
+	// Collect tags for complexity calculation
+	var queryTags []string
+	
 	// Add filter if provided
 	if filter != "" && operator != "" && value != "" {
 		query.AddFilter(filter, operator, value)
+		queryTags = append(queryTags, filter+operator+value)
 	}
 	
 	// Add sorting
@@ -533,6 +539,12 @@ func (h *EntityHandler) QueryEntities(w http.ResponseWriter, r *http.Request) {
 	
 	// Execute query
 	entities, err := query.Execute()
+	
+	// Track query metrics
+	if queryMetrics != nil {
+		queryMetrics.TrackQuery("entity_query", queryTags, startTime, len(entities), err)
+	}
+	
 	if err != nil {
 		logger.Error("Failed to execute query with filter=%s, operator=%s, value=%s, sort=%s: %v", 
 			filter, operator, value, sort, err)

@@ -46,8 +46,11 @@ Welcome to the comprehensive documentation for EntityDB - a high-performance tem
 - [Performance Optimizations](./implementation/PERFORMANCE_OPTIMIZATION_SUMMARY.md) - Speed improvements
 - [Multi-Dataspace](./implementation/MULTI_DATASPACE_ARCHITECTURE.md) - Multi-tenancy
 
-### Performance
+### Performance & Metrics
 - [Overview](./performance/PERFORMANCE.md) - Performance characteristics
+- [Metrics Audit](./METRICS_AUDIT_FINDINGS.md) - Comprehensive metrics gap analysis
+- [Metrics Action Plan](./METRICS_ACTION_PLAN.md) - Phased implementation roadmap
+- [Metrics Implementation](./METRICS_IMPLEMENTATION_SUMMARY.md) - Phase 1 completion summary
 - [Benchmarks](./performance/PERFORMANCE_COMPARISON.md) - Speed comparisons
 - [Temporal Performance](./performance/TEMPORAL_PERFORMANCE.md) - Time-travel query speed
 - [High Performance Mode](./performance/HIGH_PERFORMANCE_MODE_REPORT.md) - Optimization settings
@@ -81,7 +84,7 @@ Welcome to the comprehensive documentation for EntityDB - a high-performance tem
 - [Tag Index Persistence](./troubleshooting/TAG_INDEX_PERSISTENCE_BUG.md) - Index issues
 
 ### Release Notes
-- [v2.19.0](../CHANGELOG.md#2190---2025-05-30) - Latest release
+- [v2.22.0](../CHANGELOG.md#2220---2025-06-02) - Latest release - Comprehensive metrics system
 - [v2.14.0](./releases/RELEASE_NOTES_v2.14.0.md) - Major performance update
 - [v2.13.1](./releases/RELEASE_NOTES_v2.13.1.md) - Bug fixes
 - [v2.13.0](./releases/RELEASE_NOTES_v2.13.0.md) - Configuration overhaul
