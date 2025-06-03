@@ -1,3 +1,12 @@
+// Package main provides the EntityDB server implementation.
+//
+// EntityDB is a high-performance temporal database where every tag is timestamped
+// with nanosecond precision. It features a custom binary format (EBF) with 
+// Write-Ahead Logging, ACID compliance, and enterprise-grade RBAC.
+//
+// The server supports multiple storage backends including high-performance
+// memory-mapped files and standard file-based storage with various indexing
+// strategies for optimal query performance.
 package main
 
 import (
@@ -46,7 +55,12 @@ import (
 // @name Authorization
 // @description Bearer token authentication. Example: "Bearer <token>"
 
-// getEnv gets environment variable with default fallback
+// =============================================================================
+// Configuration Helpers
+// =============================================================================
+
+// getEnv retrieves an environment variable value with a default fallback.
+// If the environment variable is not set or empty, the default value is returned.
 func getEnv(key, defaultValue string) string {
 	if value := os.Getenv(key); value != "" {
 		return value
@@ -54,7 +68,9 @@ func getEnv(key, defaultValue string) string {
 	return defaultValue
 }
 
-// getEnvInt gets environment variable as int with default fallback
+// getEnvInt retrieves an environment variable as an integer with a default fallback.
+// If the environment variable is not set, empty, or cannot be parsed as an integer,
+// the default value is returned.
 func getEnvInt(key string, defaultValue int) int {
 	if value := os.Getenv(key); value != "" {
 		if intValue, err := strconv.Atoi(value); err == nil {
@@ -64,7 +80,9 @@ func getEnvInt(key string, defaultValue int) int {
 	return defaultValue
 }
 
-// getEnvBool gets environment variable as bool with default fallback
+// getEnvBool retrieves an environment variable as a boolean with a default fallback.
+// The function considers "true" or "1" as true, everything else as false.
+// If the environment variable is not set or empty, the default value is returned.
 func getEnvBool(key string, defaultValue bool) bool {
 	if value := os.Getenv(key); value != "" {
 		return strings.ToLower(value) == "true"
@@ -72,7 +90,10 @@ func getEnvBool(key string, defaultValue bool) bool {
 	return defaultValue
 }
 
-// getEnvDuration gets environment variable as duration (in seconds) with default fallback
+// getEnvDuration retrieves an environment variable as a time.Duration.
+// The environment variable should contain the number of seconds as an integer.
+// If the variable is not set, empty, or cannot be parsed, the default duration
+// (specified in seconds) is returned.
 func getEnvDuration(key string, defaultSeconds int) time.Duration {
 	if value := os.Getenv(key); value != "" {
 		if intValue, err := strconv.Atoi(value); err == nil {
@@ -82,15 +103,19 @@ func getEnvDuration(key string, defaultSeconds int) time.Duration {
 	return time.Duration(defaultSeconds) * time.Second
 }
 
+// =============================================================================
+// Global Variables and Configuration
+// =============================================================================
+
 // Version information (can be overridden at build time via ldflags)
 var (
-	Version    = "2.24.0" // Build-time version via ldflags
-	BuildDate  = "unknown" // Build-time date via ldflags
+	Version    = "2.24.0"  // Build-time version, set via -ldflags "-X main.Version=x.y.z"
+	BuildDate  = "unknown" // Build-time date, set via -ldflags "-X main.BuildDate=YYYY-MM-DD"
 	AppName    = getEnv("ENTITYDB_APP_NAME", "EntityDB Server")
 	AppVersion = getEnv("ENTITYDB_APP_VERSION", "2.24.0")
 )
 
-// Command line flags
+// Command line flags for server configuration
 var (
 	port             int
 	sslPort          int
@@ -115,28 +140,36 @@ var (
 	swaggerHost        string
 )
 
-// Config for server settings
+// =============================================================================
+// Type Definitions
+// =============================================================================
+
+// Config holds the server configuration settings.
+// These values are populated from command-line flags and environment variables.
 type Config struct {
-	Port              int
-	SSLPort           int
-	UseSSL            bool
-	SSLCert           string
-	SSLKey            string
-	SessionTTL        time.Duration
-	EnableRateLimit   bool
-	RateLimitRequests int
-	RateLimitWindow   time.Duration
+	Port              int                // HTTP server port
+	SSLPort           int                // HTTPS server port
+	UseSSL            bool               // Enable SSL/TLS
+	SSLCert           string             // Path to SSL certificate file
+	SSLKey            string             // Path to SSL private key file
+	SessionTTL        time.Duration      // Session timeout duration
+	EnableRateLimit   bool               // Enable rate limiting
+	RateLimitRequests int                // Number of requests allowed per window
+	RateLimitWindow   time.Duration      // Rate limit time window
 }
 
-// User represents a user in the system
+// User represents a user in the system.
+// This is a legacy structure that will be replaced by entity-based user management.
 type User struct {
-	ID       string
-	Username string
-	Password string
-	Roles    []string
+	ID       string   // Unique user identifier
+	Username string   // Login username
+	Password string   // Hashed password (bcrypt)
+	Roles    []string // User roles for RBAC
 }
 
-// EntityDBServer represents the main server
+// EntityDBServer is the main server instance that manages all components.
+// It coordinates repositories, handlers, and security components to provide
+// the EntityDB REST API.
 type EntityDBServer struct {
 	entityRepo        models.EntityRepository
 	relationRepo      models.EntityRelationshipRepository

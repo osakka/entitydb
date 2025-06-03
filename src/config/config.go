@@ -1,3 +1,13 @@
+// Package config provides centralized configuration management for EntityDB.
+//
+// This package implements a three-tier configuration hierarchy:
+//   1. Database configuration entities (highest priority)
+//   2. CLI flags
+//   3. Environment variables (lowest priority)
+//
+// All configuration values are loaded from environment variables with
+// sensible defaults. Tools and utilities should use this package for
+// consistent configuration across the entire system.
 package config
 
 import (
@@ -6,7 +16,8 @@ import (
 	"time"
 )
 
-// Config holds all configuration values for EntityDB
+// Config holds all configuration values for EntityDB.
+// Values are populated from environment variables with defaults.
 type Config struct {
 	// Server Configuration
 	Port             int

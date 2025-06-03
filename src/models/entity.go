@@ -1,3 +1,14 @@
+// Package models defines the core data structures and interfaces for EntityDB.
+//
+// The models package provides:
+//   - Entity definition with temporal tag support
+//   - Repository interfaces for storage backends
+//   - Session management structures
+//   - Security and RBAC models
+//   - Utility functions for entity manipulation
+//
+// All entities in EntityDB are represented as collections of timestamped tags,
+// enabling powerful temporal queries and maintaining complete history.
 package models
 
 import (
@@ -10,7 +21,9 @@ import (
 	"time"
 )
 
-// EntityRepository interface defines the contract for entity storage
+// EntityRepository defines the contract for entity storage implementations.
+// All storage backends must implement this interface to provide entity
+// persistence with temporal support.
 type EntityRepository interface {
 	// Core CRUD operations
 	Create(entity *Entity) error

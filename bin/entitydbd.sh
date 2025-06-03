@@ -5,7 +5,7 @@
 EntityDB_DIR="$(dirname "$0")/.."
 
 # Load default environment configuration from share/config
-DEFAULT_ENV_FILE="$EntityDB_DIR/share/config/entitydb_server.env"
+DEFAULT_ENV_FILE="$EntityDB_DIR/share/config/entitydb.env"
 if [ -f "$DEFAULT_ENV_FILE" ]; then
     echo "Loading defaults from $DEFAULT_ENV_FILE"
     source "$DEFAULT_ENV_FILE"

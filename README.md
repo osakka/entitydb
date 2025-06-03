@@ -165,6 +165,40 @@ A complete project management application demonstrating EntityDB capabilities:
 
 Access at: https://localhost:8085/worca/
 
+## Configuration
+
+EntityDB uses a comprehensive three-tier configuration system:
+
+1. **Database Configuration Entities** (highest priority)
+2. **CLI Flags**
+3. **Environment Variables** (lowest priority)
+
+### Environment Variables
+
+```bash
+# Server Configuration
+ENTITYDB_PORT=8085                    # HTTP server port
+ENTITYDB_SSL_PORT=8085               # HTTPS server port
+ENTITYDB_USE_SSL=true                # Enable SSL/TLS
+
+# Paths
+ENTITYDB_DATA_PATH=/opt/entitydb/var # Database storage path
+ENTITYDB_STATIC_DIR=/opt/entitydb/share/htdocs # Web files path
+
+# Timeouts
+ENTITYDB_HTTP_READ_TIMEOUT=15        # HTTP read timeout (seconds)
+ENTITYDB_METRICS_INTERVAL=30         # Metrics collection interval
+
+# See docs/configuration-management.md for complete reference
+```
+
+### Configuration Files
+
+- **Default**: `/opt/entitydb/share/config/entitydb.env`
+- **Instance**: `/opt/entitydb/var/entitydb.env` (overrides defaults)
+
+For complete configuration documentation, see [Configuration Management Guide](./docs/configuration-management.md).
+
 ## Performance
 
 EntityDB achieves exceptional performance through:

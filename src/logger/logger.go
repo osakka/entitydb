@@ -1,3 +1,15 @@
+// Package logger provides structured logging capabilities for EntityDB.
+//
+// The logger supports multiple log levels (TRACE, DEBUG, INFO, WARN, ERROR)
+// and automatically includes contextual information such as file, function,
+// and line numbers. It's designed for high-performance concurrent access
+// with atomic operations for level checking.
+//
+// Log output format:
+//   YYYY/MM/DD HH:MM:SS.ssssss [PID:GID] [LEVEL] Message (function.file:line)
+//
+// The logger is safe for concurrent use and provides minimal overhead when
+// logging is disabled for a particular level.
 package logger
 
 import (
@@ -11,7 +23,8 @@ import (
 	"time"
 )
 
-// LogLevel represents the severity of a log message
+// LogLevel represents the severity of a log message.
+// Higher values indicate more severe messages.
 type LogLevel int32
 
 const (

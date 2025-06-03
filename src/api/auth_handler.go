@@ -111,7 +111,8 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 	logger.Debug("[AuthHandler] User authenticated successfully: %s", userEntity.ID)
 
-	// Get user roles from the SecurityUser
+	// Extract user roles from entity tags
+	// Roles are stored as tags with the format "rbac:role:rolename"
 	var roles []string
 	for _, tag := range userEntity.Entity.GetTagsWithoutTimestamp() {
 		if strings.HasPrefix(tag, "rbac:role:") {
@@ -120,7 +121,8 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Create session using SessionManager
+	// Create a new session for the authenticated user
+	// Sessions are managed with TTL and automatic cleanup
 	session, err := h.sessionManager.CreateSession(userEntity.ID, userEntity.Username, roles)
 	if err != nil {
 		logger.Error("[AuthHandler] Failed to create session for user %s: %v", userEntity.ID, err)

@@ -1,3 +1,14 @@
+// Package cache provides caching mechanisms for EntityDB query results.
+//
+// The cache implementation is designed to improve query performance by
+// storing frequently accessed results in memory. It features:
+//   - TTL-based expiration
+//   - LRU eviction when size limits are reached
+//   - Thread-safe concurrent access
+//   - Access count tracking for analytics
+//
+// The cache is particularly effective for temporal queries that are
+// computationally expensive but have stable results within a time window.
 package cache
 
 import (
@@ -5,7 +16,8 @@ import (
 	"time"
 )
 
-// CacheEntry represents a cached query result
+// CacheEntry represents a cached query result with metadata.
+// Each entry tracks when it was cached and how often it's been accessed.
 type CacheEntry struct {
 	Result      interface{}
 	Timestamp   time.Time

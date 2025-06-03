@@ -1,3 +1,14 @@
+// Package api provides HTTP handlers for the EntityDB REST API.
+//
+// This package implements all API endpoints including:
+//   - Entity CRUD operations with temporal support
+//   - Authentication and session management
+//   - RBAC (Role-Based Access Control) enforcement
+//   - Metrics and monitoring endpoints
+//   - Health checks and system status
+//
+// All handlers follow RESTful conventions and return JSON responses.
+// Authentication is required for most endpoints using JWT tokens.
 package api
 
 // Fixed double encoding issue in v2.12.0:

@@ -1,3 +1,14 @@
+// Package binary provides a high-performance binary storage implementation for EntityDB.
+//
+// This package implements a custom binary format (EBF - Entity Binary Format) with:
+//   - Write-Ahead Logging (WAL) for durability
+//   - Memory-mapped file access for performance
+//   - B-tree temporal indexes for time-based queries
+//   - Bloom filters for efficient tag lookups
+//   - Automatic checkpointing and recovery
+//
+// The binary format is designed for optimal performance with temporal data,
+// supporting nanosecond-precision timestamps and efficient range queries.
 package binary
 
 import (
@@ -14,7 +25,9 @@ import (
 	"time"
 )
 
-// EntityRepository implements models.EntityRepository for binary format
+// EntityRepository implements models.EntityRepository using a custom binary format.
+// It provides high-performance storage with temporal capabilities, supporting
+// both standard file-based and memory-mapped access patterns.
 type EntityRepository struct {
 	dataPath string
 	mu       sync.RWMutex  // Still keep this for backward compatibility
@@ -2294,7 +2307,19 @@ func (r *EntityRepository) replayWAL() error {
 	return nil
 }
 
-// persistWALEntries persists all WAL entries to the binary file
+// persistWALEntries persists all Write-Ahead Log entries to the binary storage file.
+// This is a critical function that ensures durability by writing all WAL entries
+// to permanent storage before the WAL can be truncated.
+//
+// The function performs the following steps:
+//   1. Obtains a writer instance directly (bypassing automatic checkpoints)
+//   2. Replays all WAL entries sequentially
+//   3. Writes each Create/Update operation to the binary file
+//   4. Skips Delete operations (handled separately via tombstones)
+//   5. Syncs the writer to ensure all data is on disk
+//
+// This function is called during checkpoint operations to prevent data loss.
+// It's essential that this completes successfully before WAL truncation.
 func (r *EntityRepository) persistWALEntries() error {
 	if r.wal == nil {
 		return fmt.Errorf("WAL not initialized")
@@ -2304,6 +2329,7 @@ func (r *EntityRepository) persistWALEntries() error {
 	entitiesPersisted := 0
 	
 	// Get the writer directly to avoid checkpoint recursion
+	// We must not trigger another checkpoint while persisting WAL entries
 	writer, err := r.writerManager.GetWriter()
 	if err != nil {
 		return fmt.Errorf("failed to get writer: %w", err)
@@ -2311,11 +2337,13 @@ func (r *EntityRepository) persistWALEntries() error {
 	defer r.writerManager.ReleaseWriter()
 	
 	// Replay WAL and write each entity to the binary file
+	// This ensures all operations in the WAL are durably stored
 	err = r.wal.Replay(func(entry WALEntry) error {
 		switch entry.OpType {
 		case WALOpCreate, WALOpUpdate:
 			if entry.Entity != nil {
 				// Write entity directly to binary file without triggering checkpoint
+				// This avoids infinite recursion since checkpoints call this function
 				if err := writer.WriteEntity(entry.Entity); err != nil {
 					logger.Error("Failed to persist entity %s: %v", entry.EntityID, err)
 					return fmt.Errorf("failed to persist entity %s: %w", entry.EntityID, err)
@@ -2325,7 +2353,8 @@ func (r *EntityRepository) persistWALEntries() error {
 			}
 		case WALOpDelete:
 			// Delete operations are handled by marking entities as deleted
-			// For now, we skip them during persistence
+			// For now, we skip them during persistence as they're handled
+			// through tombstone records in the main storage
 			logger.Trace("Skipping delete operation for entity %s", entry.EntityID)
 		}
 		return nil
