@@ -28,7 +28,7 @@ import (
 )
 
 // @title EntityDB API
-// @version 2.12.0
+// @version 2.23.1
 // @description A temporal database with pure entity-based architecture
 // @termsOfService https://github.com/osakka/entitydb
 
@@ -457,6 +457,19 @@ func main() {
 	// Initialize error metrics collector
 	api.InitErrorMetrics(server.entityRepo)
 	
+	// Initialize metrics aggregator for UI display
+	aggregatorInterval := 30 * time.Second // Aggregate every 30 seconds
+	if intervalStr := os.Getenv("ENTITYDB_METRICS_AGGREGATION_INTERVAL"); intervalStr != "" {
+		if interval, err := time.ParseDuration(intervalStr); err == nil {
+			aggregatorInterval = interval
+			logger.Info("Metrics aggregation interval set to %v", aggregatorInterval)
+		}
+	}
+	
+	metricsAggregator := api.NewMetricsAggregator(server.entityRepo, aggregatorInterval)
+	metricsAggregator.Start()
+	defer metricsAggregator.Stop()
+	
 	// Generic application metrics endpoint - applications can filter by namespace
 	applicationMetricsHandler := api.NewApplicationMetricsHandler(server.entityRepo)
 	apiRouter.HandleFunc("/application/metrics", api.RBACMiddleware(server.entityRepo, server.sessionManager, api.RBACPermission{Resource: "metrics", Action: "read"})(applicationMetricsHandler.GetApplicationMetrics)).Methods("GET")
@@ -472,7 +485,7 @@ func main() {
 	// RBAC metrics endpoints
 	rbacMetricsHandler := api.NewTemporalRBACMetricsHandler(server.entityRepo, server.sessionManager)
 	// Public endpoint for basic metrics (no auth required)
-	apiRouter.HandleFunc("/rbac/metrics/public", rbacMetricsHandler.GetRBACMetricsFromTemporal).Methods("GET")
+	apiRouter.HandleFunc("/rbac/metrics/public", rbacMetricsHandler.GetPublicRBACMetrics).Methods("GET")
 	// Authenticated endpoint for full metrics (any authenticated user can see RBAC metrics)
 	apiRouter.HandleFunc("/rbac/metrics", api.SessionAuthMiddleware(server.sessionManager, server.entityRepo)(rbacMetricsHandler.GetRBACMetricsFromTemporal)).Methods("GET")
 	

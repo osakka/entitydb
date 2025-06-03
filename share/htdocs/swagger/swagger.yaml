@@ -688,7 +688,7 @@ info:
     url: https://github.com/osakka/entitydb/blob/main/LICENSE
   termsOfService: https://github.com/osakka/entitydb
   title: EntityDB API
-  version: 2.12.0
+  version: 2.23.1
 paths:
   /api/v1/auth/login:
     post:
@@ -1379,7 +1379,8 @@ paths:
       - metrics
   /api/v1/rbac/metrics:
     get:
-      description: Get comprehensive RBAC, session, and authentication metrics
+      description: Get detailed RBAC metrics including users, authentication, sessions,
+        permissions, and security events
       produces:
       - application/json
       responses:
@@ -1387,7 +1388,9 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/api.RBACMetricsResponse'
-      summary: Get RBAC metrics
+      security:
+      - BearerAuth: []
+      summary: Get comprehensive RBAC metrics
       tags:
       - rbac
   /api/v1/rbac/metrics/public:

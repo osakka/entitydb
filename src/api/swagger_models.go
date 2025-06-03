@@ -184,3 +184,62 @@ type QueryEntityResponse struct {
 	Offset   int              `json:"offset"`  
 	Limit    int              `json:"limit"`
 }
+
+// SimplifiedAuthMetrics represents authentication metrics
+type SimplifiedAuthMetrics struct {
+	SuccessfulLogins int     `json:"successful_logins"`
+	FailedLogins    int     `json:"failed_logins"`
+	SuccessRate     float64 `json:"success_rate"`
+}
+
+// SimplifiedPermissionMetrics represents permission check metrics
+type SimplifiedPermissionMetrics struct {
+	TotalChecks      int     `json:"total_checks"`
+	ChecksPerSecond  float64 `json:"checks_per_second"`
+	CacheHitRate     float64 `json:"cache_hit_rate"`
+}
+
+// SimplifiedSessionMetrics represents session metrics
+type SimplifiedSessionMetrics struct {
+	ActiveCount      int     `json:"active_count"`
+	TotalToday       int     `json:"total_today"`
+	AvgDurationMs    float64 `json:"avg_duration_ms"`
+}
+
+// SimplifiedUserMetrics represents user metrics
+type SimplifiedUserMetrics struct {
+	TotalUsers  int `json:"total_users"`
+	AdminCount  int `json:"admin_count"`
+}
+
+// SecurityEvent represents a security event
+type SecurityEvent struct {
+	ID        string    `json:"id"`
+	Type      string    `json:"type"`
+	Username  string    `json:"username"`
+	Details   string    `json:"details"`
+	Status    string    `json:"status"`
+	Timestamp time.Time `json:"timestamp"`
+}
+
+// RBACMetricsResponse represents comprehensive RBAC metrics
+type RBACMetricsResponse struct {
+	Timestamp      time.Time                    `json:"timestamp"`
+	Users          *SimplifiedUserMetrics       `json:"users"`
+	Auth           *SimplifiedAuthMetrics       `json:"auth"`
+	Sessions       *SimplifiedSessionMetrics    `json:"sessions"`
+	Permissions    *SimplifiedPermissionMetrics `json:"permissions"`
+	SecurityEvents []*SecurityEvent             `json:"security_events"`
+}
+
+// PublicSessionMetrics represents public session metrics
+type PublicSessionMetrics struct {
+	ActiveCount int `json:"active_count"`
+}
+
+// PublicRBACMetricsResponse represents public RBAC metrics
+type PublicRBACMetricsResponse struct {
+	Timestamp time.Time              `json:"timestamp"`
+	Auth      *SimplifiedAuthMetrics `json:"auth"`
+	Sessions  *PublicSessionMetrics  `json:"sessions"`
+}

@@ -25,6 +25,13 @@ func NewTemporalRBACMetricsHandler(entityRepo models.EntityRepository, sessionMa
 }
 
 // GetRBACMetricsFromTemporal retrieves RBAC metrics from temporal storage
+// @Summary Get comprehensive RBAC metrics
+// @Description Get detailed RBAC metrics including users, authentication, sessions, permissions, and security events
+// @Tags rbac
+// @Produce json
+// @Success 200 {object} RBACMetricsResponse
+// @Security BearerAuth
+// @Router /api/v1/rbac/metrics [get]
 func (h *TemporalRBACMetricsHandler) GetRBACMetricsFromTemporal(w http.ResponseWriter, r *http.Request) {
 	logger.Info("Fetching RBAC metrics from temporal storage")
 	
@@ -203,11 +210,20 @@ func (h *TemporalRBACMetricsHandler) GetRBACMetricsFromTemporal(w http.ResponseW
 			TotalChecks:     permissionChecks,
 			CacheHitRate:    0.0, // Will be calculated from temporal data
 		},
-		SecurityEvents: securityEvents,
-		Timestamp:      time.Now().Format(time.RFC3339),
+		SecurityEvents: convertToPointerSlice(securityEvents),
+		Timestamp:      time.Now(),
 	}
 	
 	RespondJSON(w, http.StatusOK, response)
+}
+
+// convertToPointerSlice converts a slice of SecurityEvent to a slice of pointers
+func convertToPointerSlice(events []SecurityEvent) []*SecurityEvent {
+	result := make([]*SecurityEvent, len(events))
+	for i := range events {
+		result[i] = &events[i]
+	}
+	return result
 }
 
 // TrackAuthEvent stores authentication events in temporal storage

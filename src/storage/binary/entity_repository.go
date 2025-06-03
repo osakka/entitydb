@@ -400,14 +400,15 @@ func (r *EntityRepository) GetByID(id string) (*models.Entity, error) {
 	
 	if exists {
 		logger.Trace("Found in memory cache: %s", id)
-		if storageMetrics != nil {
+		// Skip metrics for metric entities to avoid recursion
+		if storageMetrics != nil && !strings.HasPrefix(id, "metric_") {
 			storageMetrics.TrackCacheOperation("entity", true)
 		}
 		return entity, nil
 	}
 	
-	// Cache miss
-	if storageMetrics != nil {
+	// Cache miss - skip metrics for metric entities to avoid recursion
+	if storageMetrics != nil && !strings.HasPrefix(id, "metric_") {
 		storageMetrics.TrackCacheOperation("entity", false)
 	}
 	
@@ -431,17 +432,21 @@ func (r *EntityRepository) GetByID(id string) (*models.Entity, error) {
 		logger.Trace("Not found in index, checking disk: %s", id)
 	}
 	
-	// Force a flush and checkpoint of any pending writes before attempting to read
-	// This ensures that we can read immediately after writing
-	if err := r.writerManager.Flush(); err != nil {
-		logger.Error("Failed to flush writes: %v", err)
-		// Continue anyway as we might still find the entity
-	}
-	
-	// Also force a checkpoint to ensure index is updated
-	if err := r.writerManager.Checkpoint(); err != nil {
-		logger.Error("Failed to checkpoint: %v", err)
-		// Continue anyway as we might still find the entity
+	// Skip flush and checkpoint for metric entities to avoid infinite recursion
+	// For non-metric entities, force a flush and checkpoint
+	if !strings.HasPrefix(id, "metric_") {
+		// Force a flush and checkpoint of any pending writes before attempting to read
+		// This ensures that we can read immediately after writing
+		if err := r.writerManager.Flush(); err != nil {
+			logger.Error("Failed to flush writes: %v", err)
+			// Continue anyway as we might still find the entity
+		}
+		
+		// Also force a checkpoint to ensure index is updated
+		if err := r.writerManager.Checkpoint(); err != nil {
+			logger.Error("Failed to checkpoint: %v", err)
+			// Continue anyway as we might still find the entity
+		}
 	}
 	
 	// Acquire read lock for the entity
@@ -1355,7 +1360,12 @@ func (r *EntityRepository) AddTag(entityID, tag string) error {
 			logger.Debug("Tag '%s' already exists on entity %s", tag, entityID)
 			return nil // Tag already exists
 		}
-		// Also check if the tag content matches (ignoring timestamp)
+		// For value tags, allow multiple instances with different timestamps
+		// This is essential for temporal metrics tracking
+		if strings.HasPrefix(tag, "value:") {
+			continue // Allow duplicate value tags with different timestamps
+		}
+		// For non-value tags, check if the tag content matches (ignoring timestamp)
 		if strings.Contains(existingTag, "|") {
 			parts := strings.SplitN(existingTag, "|", 2)
 			if len(parts) == 2 && parts[1] == tag {
@@ -1469,6 +1479,14 @@ func (r *EntityRepository) checkAndPerformCheckpoint() {
 		if err := r.wal.LogCheckpoint(); err != nil {
 			logger.Error("Failed to log checkpoint: %v", err)
 			r.storeCheckpointMetric("failed", 0, walSizeBefore, walSizeBefore, checkpointReason)
+			return
+		}
+		
+		// Persist all WAL entries to binary file before truncating
+		logger.Debug("Persisting WAL entries to binary file")
+		if err := r.persistWALEntries(); err != nil {
+			logger.Error("Failed to persist WAL entries: %v", err)
+			r.storeCheckpointMetric("failed", time.Since(startTime), walSizeBefore, walSizeBefore, checkpointReason)
 			return
 		}
 		
@@ -2273,6 +2291,56 @@ func (r *EntityRepository) replayWAL() error {
 	}
 	
 	logger.Info("WAL replay complete: %d entities processed", entitiesReplayed)
+	return nil
+}
+
+// persistWALEntries persists all WAL entries to the binary file
+func (r *EntityRepository) persistWALEntries() error {
+	if r.wal == nil {
+		return fmt.Errorf("WAL not initialized")
+	}
+	
+	logger.Debug("Starting WAL persistence")
+	entitiesPersisted := 0
+	
+	// Get the writer directly to avoid checkpoint recursion
+	writer, err := r.writerManager.GetWriter()
+	if err != nil {
+		return fmt.Errorf("failed to get writer: %w", err)
+	}
+	defer r.writerManager.ReleaseWriter()
+	
+	// Replay WAL and write each entity to the binary file
+	err = r.wal.Replay(func(entry WALEntry) error {
+		switch entry.OpType {
+		case WALOpCreate, WALOpUpdate:
+			if entry.Entity != nil {
+				// Write entity directly to binary file without triggering checkpoint
+				if err := writer.WriteEntity(entry.Entity); err != nil {
+					logger.Error("Failed to persist entity %s: %v", entry.EntityID, err)
+					return fmt.Errorf("failed to persist entity %s: %w", entry.EntityID, err)
+				}
+				entitiesPersisted++
+				logger.Trace("Persisted entity %s with %d tags", entry.EntityID, len(entry.Entity.Tags))
+			}
+		case WALOpDelete:
+			// Delete operations are handled by marking entities as deleted
+			// For now, we skip them during persistence
+			logger.Trace("Skipping delete operation for entity %s", entry.EntityID)
+		}
+		return nil
+	})
+	
+	if err != nil {
+		return fmt.Errorf("WAL persistence failed: %w", err)
+	}
+	
+	// Sync the writer to ensure all data is on disk
+	if err := writer.file.Sync(); err != nil {
+		return fmt.Errorf("failed to sync writer: %w", err)
+	}
+	
+	logger.Info("WAL persistence complete: %d entities persisted", entitiesPersisted)
 	return nil
 }
 

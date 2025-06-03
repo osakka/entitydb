@@ -1,20 +1,25 @@
 package api
 
 import (
+	"encoding/json"
 	"net/http"
 	"time"
 )
 
-// PublicRBACMetricsResponse represents basic metrics available without authentication
-type PublicRBACMetricsResponse struct {
-	Auth      *SimplifiedAuthMetrics `json:"auth"`
-	Sessions  *PublicSessionMetrics  `json:"sessions"`
-	Timestamp string                 `json:"timestamp"`
-}
-
-// PublicSessionMetrics contains public session information
-type PublicSessionMetrics struct {
-	ActiveCount int `json:"active_count"`
+// getStringFromContent safely converts byte content to string
+func getStringFromContent(content []byte) string {
+	if content == nil {
+		return ""
+	}
+	
+	// Try to unmarshal as JSON string first
+	var str string
+	if err := json.Unmarshal(content, &str); err == nil {
+		return str
+	}
+	
+	// Otherwise return as raw string
+	return string(content)
 }
 
 // GetPublicRBACMetrics returns basic RBAC metrics without authentication
@@ -24,24 +29,42 @@ type PublicSessionMetrics struct {
 // @Produce json
 // @Success 200 {object} PublicRBACMetricsResponse
 // @Router /api/v1/rbac/metrics/public [get]
-func (h *RBACMetricsHandler) GetPublicRBACMetrics(w http.ResponseWriter, r *http.Request) {
+func (h *TemporalRBACMetricsHandler) GetPublicRBACMetrics(w http.ResponseWriter, r *http.Request) {
 	// Get basic session count
 	activeSessions := h.sessionManager.GetActiveSessions()
 	
-	// Generate basic authentication metrics
-	authMetrics := h.generateAuthenticationMetrics()
+	// Get authentication events from temporal storage
+	authEventEntities, _ := h.entityRepo.ListByTag("type:auth_event")
+	
+	successCount := 0
+	failureCount := 0
+	
+	for _, entity := range authEventEntities {
+		content := getStringFromContent(entity.Content)
+		if content == "success" {
+			successCount++
+		} else if content == "failure" {
+			failureCount++
+		}
+	}
+	
+	totalLogins := successCount + failureCount
+	successRate := 0.0
+	if totalLogins > 0 {
+		successRate = float64(successCount) / float64(totalLogins) * 100
+	}
 	
 	// Create public response with limited data
 	response := PublicRBACMetricsResponse{
 		Auth: &SimplifiedAuthMetrics{
-			SuccessfulLogins: authMetrics.SuccessfulLogins,
-			FailedLogins:     authMetrics.FailedLogins,
-			SuccessRate:      authMetrics.SuccessRate,
+			SuccessfulLogins: successCount,
+			FailedLogins:     failureCount,
+			SuccessRate:      successRate,
 		},
 		Sessions: &PublicSessionMetrics{
 			ActiveCount: activeSessions,
 		},
-		Timestamp: time.Now().Format(time.RFC3339),
+		Timestamp: time.Now(),
 	}
 	
 	RespondJSON(w, http.StatusOK, response)
@@ -49,7 +72,7 @@ func (h *RBACMetricsHandler) GetPublicRBACMetrics(w http.ResponseWriter, r *http
 
 // GetAuthenticatedRBACMetrics returns comprehensive metrics for authenticated users
 // This is a wrapper around GetRBACMetrics that can be used with less restrictive permissions
-func (h *RBACMetricsHandler) GetAuthenticatedRBACMetrics(w http.ResponseWriter, r *http.Request) {
+func (h *TemporalRBACMetricsHandler) GetAuthenticatedRBACMetrics(w http.ResponseWriter, r *http.Request) {
 	// For authenticated users (not just admins), provide full metrics
-	h.GetRBACMetrics(w, r)
+	h.GetRBACMetricsFromTemporal(w, r)
 }

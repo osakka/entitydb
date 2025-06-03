@@ -5,6 +5,31 @@ All notable changes to the EntityDB Platform will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.24.0] - 2025-06-03
+
+### Fixed
+- **Critical WAL Persistence Bug**: Fixed issue where temporal metric values were lost during checkpoints
+  - Added `persistWALEntries()` method to write WAL entries to binary files before truncation
+  - Ensures all `AddTag()` operations for temporal metrics are durably persisted
+  - Prevents data loss when WAL is truncated during checkpoint operations
+- **Metrics Aggregation**: Fixed aggregator to properly collect and sum labeled metrics
+  - Re-fetches entities with full temporal tags for accurate timestamp parsing
+  - Correctly identifies recent values within the 30-minute aggregation window
+  - UI graphs now display actual metric data instead of zeros
+
+### Added
+- **Metrics Aggregator Service**: New background service for UI metric aggregation
+  - Aggregates labeled metrics (with dimensions) into simple metrics for UI consumption
+  - Runs every 30 seconds by default (configurable via `ENTITYDB_METRICS_AGGREGATION_INTERVAL`)
+  - Supports sum, avg, max, min, and last aggregation methods
+
+### Changed
+- **Code Organization**: Major cleanup for maintainability
+  - Consolidated duplicate cleanup tools (kept most comprehensive versions)
+  - Removed duplicate admin creation tools
+  - Moved redundant implementations to trash directory
+  - Cleaned up compiled binaries from source directories
+
 ## [2.23.0] - 2025-06-02
 
 ### Changed

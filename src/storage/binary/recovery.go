@@ -34,6 +34,12 @@ func NewRecoveryManager(dataPath string) *RecoveryManager {
 
 // RecoverCorruptedEntity attempts to recover a corrupted entity
 func (rm *RecoveryManager) RecoverCorruptedEntity(repo *EntityRepository, entityID string) (*models.Entity, error) {
+	// Skip recovery for metric entities - they are created on demand
+	if strings.HasPrefix(entityID, "metric_") {
+		logger.Debug("[Recovery] Skipping recovery for metric entity %s", entityID)
+		return nil, fmt.Errorf("recovery skipped for metric entity %s", entityID)
+	}
+	
 	// Check if we've recently attempted to recover this entity
 	rm.cacheMu.RLock()
 	lastAttempt, exists := rm.attemptCache[entityID]

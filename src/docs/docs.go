@@ -1083,14 +1083,19 @@ const docTemplate = `{
         },
         "/api/v1/rbac/metrics": {
             "get": {
-                "description": "Get comprehensive RBAC, session, and authentication metrics",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get detailed RBAC metrics including users, authentication, sessions, permissions, and security events",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "rbac"
                 ],
-                "summary": "Get RBAC metrics",
+                "summary": "Get comprehensive RBAC metrics",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -2421,7 +2426,7 @@ const docTemplate = `{
 
 // SwaggerInfo holds exported Swagger Info so clients can modify it
 var SwaggerInfo = &swag.Spec{
-	Version:          "2.12.0",
+	Version:          "2.23.1",
 	Host:             "localhost:8085",
 	BasePath:         "/api/v1",
 	Schemes:          []string{},

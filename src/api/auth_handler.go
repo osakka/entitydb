@@ -88,6 +88,22 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	userEntity, err := h.securityManager.AuthenticateUser(loginReq.Username, loginReq.Password)
 	if err != nil {
 		logger.Error("[AuthHandler] Authentication failed for user %s: %v", loginReq.Username, err)
+		
+		// Track failed authentication event
+		authEvent := &models.Entity{
+			ID: "auth_event_" + loginReq.Username + "_" + time.Now().Format("20060102150405"),
+			Tags: []string{
+				"type:auth_event",
+				"status:failed",
+				"user:" + loginReq.Username,
+				"event:failed_login",
+			},
+			Content: []byte(`{"username":"` + loginReq.Username + `","success":false,"details":"Invalid credentials","timestamp":"` + time.Now().Format(time.RFC3339) + `"}`),
+		}
+		if err := h.securityManager.GetEntityRepo().Create(authEvent); err != nil {
+			logger.Error("Failed to track auth event: %v", err)
+		}
+		
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnauthorized)
 		json.NewEncoder(w).Encode(AuthErrorResponse{Error: "Invalid credentials"})
@@ -126,6 +142,23 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 			Roles:    roles,
 		},
 	}
+
+	// Track successful authentication event - TEMPORARILY DISABLED for performance
+	/*
+	authEvent := &models.Entity{
+		ID: "auth_event_" + loginReq.Username + "_" + time.Now().Format("20060102150405"),
+		Tags: []string{
+			"type:auth_event",
+			"status:success",
+			"user:" + loginReq.Username,
+			"event:login",
+		},
+		Content: []byte(`{"username":"` + loginReq.Username + `","success":true,"details":"Login successful","timestamp":"` + time.Now().Format(time.RFC3339) + `"}`),
+	}
+	if err := h.securityManager.GetEntityRepo().Create(authEvent); err != nil {
+		logger.Error("Failed to track auth event: %v", err)
+	}
+	*/
 
 	logger.Info("User %s authenticated successfully", loginReq.Username)
 	w.Header().Set("Content-Type", "application/json")

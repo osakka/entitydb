@@ -23,6 +23,11 @@ func NewSecurityManager(entityRepo EntityRepository) *SecurityManager {
 	}
 }
 
+// GetEntityRepo returns the entity repository
+func (sm *SecurityManager) GetEntityRepo() EntityRepository {
+	return sm.entityRepo
+}
+
 // SecurityEntity types for type safety
 const (
 	EntityTypeUser       = "user"

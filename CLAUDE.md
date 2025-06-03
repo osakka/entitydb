@@ -164,6 +164,20 @@ The server automatically creates a default admin user if none exists:
 - Audit logging
 - Aggregation queries (beyond sorting/filtering)
 
+## Recent Changes (v2.24.0)
+
+- **Critical WAL Persistence Fix**: Fixed data loss issue where temporal metrics weren't persisted during checkpoints
+  - Added `persistWALEntries()` to write WAL entries before truncation
+  - Ensures all temporal value tags from `AddTag()` operations are durably stored
+  - Metrics aggregation now works correctly with persisted temporal data
+- **Metrics Aggregator**: New background service aggregates labeled metrics for UI consumption
+  - Runs every 30 seconds to sum/average metrics by name
+  - Properly handles temporal tags with nanosecond timestamps
+- **Code Cleanup**: Major consolidation of duplicate tools and implementations
+  - Removed duplicate cleanup and admin creation tools
+  - Cleaned up compiled binaries from source directories
+  - Improved single source of truth principle
+
 ## Recent Changes (v2.23.0)
 
 - **Application-Agnostic Platform**: Removed all application-specific code from core server
@@ -321,7 +335,7 @@ All development follows the standardized Git workflow described in [docs/develop
 
 - URL: https://git.home.arpa/itdlabs/entitydb.git
 - Branch: main
-- Latest tag: v2.23.0
+- Latest tag: v2.24.0
 
 ## Development Principles
 

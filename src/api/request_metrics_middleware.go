@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -46,6 +47,8 @@ func (m *RequestMetricsMiddleware) Middleware(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
+		
+		logger.Debug("RequestMetricsMiddleware: Processing request %s %s", r.Method, r.URL.Path)
 		
 		start := time.Now()
 		
@@ -118,6 +121,8 @@ func isStaticFile(path string) bool {
 
 // storeRequestMetrics stores the collected metrics
 func (m *RequestMetricsMiddleware) storeRequestMetrics(method, path string, statusCode int, duration time.Duration, requestSize, responseSize int64) {
+	logger.Debug("Storing request metrics: method=%s, path=%s, status=%d, duration=%v", method, path, statusCode, duration)
+	
 	// Store multiple metrics for comprehensive monitoring
 	
 	// 1. Request count by endpoint
@@ -185,11 +190,21 @@ func (m *RequestMetricsMiddleware) storeRequestMetrics(method, path string, stat
 
 // storeMetric stores a metric value with labels
 func (m *RequestMetricsMiddleware) storeMetric(name string, value float64, unit string, description string, labels map[string]string) {
-	// Build metric ID with labels
+	// Build metric ID with labels in sorted order for consistency
 	metricID := "metric_" + name
-	for k, v := range labels {
-		metricID += "_" + k + "_" + v
+	
+	// Sort label keys for consistent ID generation
+	var keys []string
+	for k := range labels {
+		keys = append(keys, k)
 	}
+	sort.Strings(keys)
+	
+	for _, k := range keys {
+		metricID += "_" + k + "_" + labels[k]
+	}
+	
+	logger.Debug("Storing metric: id=%s, value=%.2f", metricID, value)
 	
 	// Check if metric exists
 	entity, err := m.repo.GetByID(metricID)
@@ -208,8 +223,8 @@ func (m *RequestMetricsMiddleware) storeMetric(name string, value float64, unit 
 			tags = append(tags, "label:"+k+":"+v)
 		}
 		
-		// Initial value
-		tags = append(tags, "value:"+strconv.FormatFloat(value, 'f', 2, 64))
+		// Don't add static value tag - we'll use AddTag for temporal values
+		// tags = append(tags, "value:"+strconv.FormatFloat(value, 'f', 2, 64))
 		
 		// Retention: keep request metrics for 1 hour with 1000 data points max
 		tags = append(tags, "retention:count:1000", "retention:period:3600")
@@ -224,22 +239,22 @@ func (m *RequestMetricsMiddleware) storeMetric(name string, value float64, unit 
 			logger.Error("Failed to create request metric %s: %v", metricID, err)
 			return
 		}
-		return
-	}
-	
-	// For counters, we need to increment the current value
-	if unit == "count" {
-		// Get current value
-		currentValue := 0.0
-		for _, tag := range entity.GetTagsWithoutTimestamp() {
-			if strings.HasPrefix(tag, "value:") {
-				if val, err := strconv.ParseFloat(strings.TrimPrefix(tag, "value:"), 64); err == nil {
-					currentValue = val
-					break
+		// Don't return here - we need to add the temporal value tag
+	} else {
+		// Entity exists - for counters, we need to increment the current value
+		if unit == "count" {
+			// Get current value
+			currentValue := 0.0
+			for _, tag := range entity.GetTagsWithoutTimestamp() {
+				if strings.HasPrefix(tag, "value:") {
+					if val, err := strconv.ParseFloat(strings.TrimPrefix(tag, "value:"), 64); err == nil {
+						currentValue = val
+						break
+					}
 				}
 			}
+			value = currentValue + value
 		}
-		value = currentValue + value
 	}
 	
 	// Add temporal value tag
