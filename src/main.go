@@ -72,10 +72,22 @@ func getEnvBool(key string, defaultValue bool) bool {
 	return defaultValue
 }
 
-// Version information
+// getEnvDuration gets environment variable as duration (in seconds) with default fallback
+func getEnvDuration(key string, defaultSeconds int) time.Duration {
+	if value := os.Getenv(key); value != "" {
+		if intValue, err := strconv.Atoi(value); err == nil {
+			return time.Duration(intValue) * time.Second
+		}
+	}
+	return time.Duration(defaultSeconds) * time.Second
+}
+
+// Version information (can be overridden at build time via ldflags)
 var (
+	Version    = "2.24.0" // Build-time version via ldflags
+	BuildDate  = "unknown" // Build-time date via ldflags
 	AppName    = getEnv("ENTITYDB_APP_NAME", "EntityDB Server")
-	AppVersion = getEnv("ENTITYDB_APP_VERSION", "2.13.0")
+	AppVersion = getEnv("ENTITYDB_APP_VERSION", "2.24.0")
 )
 
 // Command line flags
@@ -91,6 +103,16 @@ var (
 	staticDir        string
 	showVersion      bool
 	highPerformance  bool
+	
+	// HTTP timeout configurations
+	httpReadTimeout    time.Duration
+	httpWriteTimeout   time.Duration
+	httpIdleTimeout    time.Duration
+	shutdownTimeout    time.Duration
+	
+	// Metrics configurations
+	metricsInterval    time.Duration
+	swaggerHost        string
 )
 
 // Config for server settings
@@ -145,8 +167,9 @@ func NewEntityDBServer(config *Config) *EntityDBServer {
 }
 
 func init() {
+	// Basic server configuration
 	flag.IntVar(&port, "port", getEnvInt("ENTITYDB_PORT", 8085), "Server port")
-	flag.IntVar(&sslPort, "ssl-port", getEnvInt("ENTITYDB_SSL_PORT", 8443), "SSL server port")
+	flag.IntVar(&sslPort, "ssl-port", getEnvInt("ENTITYDB_SSL_PORT", 8085), "SSL server port")
 	flag.BoolVar(&useSSL, "use-ssl", getEnvBool("ENTITYDB_USE_SSL", false), "Enable SSL/TLS")
 	flag.StringVar(&sslCert, "ssl-cert", getEnv("ENTITYDB_SSL_CERT", "/etc/ssl/certs/server.pem"), "SSL certificate file path")
 	flag.StringVar(&sslKey, "ssl-key", getEnv("ENTITYDB_SSL_KEY", "/etc/ssl/private/server.key"), "SSL private key file path")
@@ -156,6 +179,16 @@ func init() {
 	flag.StringVar(&staticDir, "static-dir", getEnv("ENTITYDB_STATIC_DIR", "/opt/entitydb/share/htdocs"), "Static files directory")
 	flag.BoolVar(&showVersion, "version", false, "Show version information")
 	flag.BoolVar(&highPerformance, "high-performance", getEnvBool("ENTITYDB_HIGH_PERFORMANCE", false), "Enable high-performance memory-mapped indexing")
+	
+	// HTTP timeout configurations (duration flags parse automatically)
+	flag.DurationVar(&httpReadTimeout, "http-read-timeout", getEnvDuration("ENTITYDB_HTTP_READ_TIMEOUT", 15), "HTTP read timeout")
+	flag.DurationVar(&httpWriteTimeout, "http-write-timeout", getEnvDuration("ENTITYDB_HTTP_WRITE_TIMEOUT", 15), "HTTP write timeout")
+	flag.DurationVar(&httpIdleTimeout, "http-idle-timeout", getEnvDuration("ENTITYDB_HTTP_IDLE_TIMEOUT", 60), "HTTP idle timeout")
+	flag.DurationVar(&shutdownTimeout, "shutdown-timeout", getEnvDuration("ENTITYDB_SHUTDOWN_TIMEOUT", 30), "Server shutdown timeout")
+	
+	// Metrics and API configuration
+	flag.DurationVar(&metricsInterval, "metrics-interval", getEnvDuration("ENTITYDB_METRICS_INTERVAL", 30), "Metrics collection interval")
+	flag.StringVar(&swaggerHost, "swagger-host", getEnv("ENTITYDB_SWAGGER_HOST", "localhost:8085"), "Swagger API documentation host")
 }
 
 func main() {
@@ -433,16 +466,8 @@ func main() {
 	apiRouter.HandleFunc("/metrics/history", metricsHistoryHandler.GetMetricHistory).Methods("GET")
 	apiRouter.HandleFunc("/metrics/available", metricsHistoryHandler.GetAvailableMetrics).Methods("GET")
 	
-	// Start background metrics collector with configurable interval
-	metricsInterval := 30 * time.Second // default
-	if intervalStr := os.Getenv("ENTITYDB_METRICS_INTERVAL"); intervalStr != "" {
-		if interval, err := time.ParseDuration(intervalStr); err == nil {
-			metricsInterval = interval
-			logger.Info("Metrics collection interval set to %v", metricsInterval)
-		} else {
-			logger.Warn("Invalid ENTITYDB_METRICS_INTERVAL format: %s, using default 30s", intervalStr)
-		}
-	}
+	// Start background metrics collector with configured interval
+	logger.Info("Metrics collection interval set to %v", metricsInterval)
 	
 	backgroundCollector := api.NewBackgroundMetricsCollector(server.entityRepo, metricsInterval)
 	backgroundCollector.Start()
@@ -457,14 +482,9 @@ func main() {
 	// Initialize error metrics collector
 	api.InitErrorMetrics(server.entityRepo)
 	
-	// Initialize metrics aggregator for UI display
-	aggregatorInterval := 30 * time.Second // Aggregate every 30 seconds
-	if intervalStr := os.Getenv("ENTITYDB_METRICS_AGGREGATION_INTERVAL"); intervalStr != "" {
-		if interval, err := time.ParseDuration(intervalStr); err == nil {
-			aggregatorInterval = interval
-			logger.Info("Metrics aggregation interval set to %v", aggregatorInterval)
-		}
-	}
+	// Initialize metrics aggregator for UI display  
+	aggregatorInterval := getEnvDuration("ENTITYDB_METRICS_AGGREGATION_INTERVAL", 30)
+	logger.Info("Metrics aggregation interval set to %v", aggregatorInterval)
 	
 	metricsAggregator := api.NewMetricsAggregator(server.entityRepo, aggregatorInterval)
 	metricsAggregator.Start()
@@ -547,9 +567,9 @@ func main() {
 		server.server = &http.Server{
 			Addr:         fmt.Sprintf(":%d", server.config.SSLPort),
 			Handler:      corsHandler(requestMetrics.Middleware(router)),
-			ReadTimeout:  15 * time.Second,
-			WriteTimeout: 15 * time.Second,
-			IdleTimeout:  60 * time.Second,
+			ReadTimeout:  httpReadTimeout,
+			WriteTimeout: httpWriteTimeout,
+			IdleTimeout:  httpIdleTimeout,
 		}
 		
 		// Start HTTPS server
@@ -568,9 +588,9 @@ func main() {
 		server.server = &http.Server{
 			Addr:         fmt.Sprintf(":%d", server.config.Port),
 			Handler:      corsHandler(requestMetrics.Middleware(router)),
-			ReadTimeout:  15 * time.Second,
-			WriteTimeout: 15 * time.Second,
-			IdleTimeout:  60 * time.Second,
+			ReadTimeout:  httpReadTimeout,
+			WriteTimeout: httpWriteTimeout,
+			IdleTimeout:  httpIdleTimeout,
 		}
 		
 		// Start HTTP server
@@ -591,7 +611,7 @@ func main() {
 	logger.Info("Shutting down server...")
 	
 	// Create a context with timeout for shutdown
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
 
 	// Shutdown the server

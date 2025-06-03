@@ -7,6 +7,7 @@ import (
 	"log"
 	"strings"
 
+	"entitydb/config"
 	"entitydb/models"
 	"entitydb/storage/binary"
 )
@@ -20,8 +21,11 @@ type MetricAnalysis struct {
 }
 
 func main() {
+	// Load configuration for default database path
+	cfg := config.Load()
+	
 	var (
-		dbPath    = flag.String("db", "/opt/entitydb/var/data/entities.db", "Path to entity database")
+		dbPath    = flag.String("db", cfg.DatabasePath(), "Path to entity database")
 		dryRun    = flag.Bool("dry-run", true, "Run in dry-run mode (don't delete)")
 		verbose   = flag.Bool("v", false, "Verbose output")
 		force     = flag.Bool("force", false, "Force deletion without confirmation")

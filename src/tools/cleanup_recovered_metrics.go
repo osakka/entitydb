@@ -1,27 +1,23 @@
 package main
 
 import (
+	"entitydb/config"
 	"entitydb/storage/binary"
 	"log"
-	"os"
 	"strings"
 )
 
 func main() {
-	// logger.InitLogger("INFO", false)
+	// Load configuration from environment
+	cfg := config.Load()
 	
-	dataPath := os.Getenv("ENTITYDB_DATA_PATH")
-	if dataPath == "" {
-		dataPath = "/opt/entitydb/var"
-	}
-	
-	log.Printf("Loading repository from %s...", dataPath)
+	log.Printf("Loading repository from %s...", cfg.DataPath)
 	
 	// Create repository factory
 	factory := &binary.RepositoryFactory{}
 	
 	// Create temporal repository
-	repo, err := factory.CreateRepository(dataPath)
+	repo, err := factory.CreateRepository(cfg.DataPath)
 	if err != nil {
 		log.Fatalf("Failed to create repository: %v", err)
 	}
