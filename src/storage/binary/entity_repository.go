@@ -391,8 +391,8 @@ func (r *EntityRepository) Create(entity *models.Entity) error {
 	// Check if we need to perform checkpoint
 	r.checkAndPerformCheckpoint()
 	
-	// Track write metrics
-	if storageMetrics != nil {
+	// Track write metrics (skip metric entities to avoid recursion)
+	if storageMetrics != nil && !strings.HasPrefix(entity.ID, "metric_") {
 		duration := time.Since(startTime)
 		size := int64(len(entity.Content))
 		storageMetrics.TrackWrite("create_entity", size, duration, nil)
@@ -481,8 +481,8 @@ func (r *EntityRepository) GetByID(id string) (*models.Entity, error) {
 		entity, err := reader.GetEntity(id)
 		readDuration := time.Since(readStart)
 		
-		// Track read metrics
-		if storageMetrics != nil {
+		// Track read metrics (skip metric entities to avoid recursion)
+		if storageMetrics != nil && !strings.HasPrefix(id, "metric_") {
 			size := int64(0)
 			if entity != nil {
 				size = int64(len(entity.Content))
@@ -671,8 +671,8 @@ func (r *EntityRepository) Update(entity *models.Entity) error {
 	// Check if we need to perform checkpoint
 	r.checkAndPerformCheckpoint()
 	
-	// Track write metrics
-	if storageMetrics != nil {
+	// Track write metrics (skip metric entities to avoid recursion)
+	if storageMetrics != nil && !strings.HasPrefix(entity.ID, "metric_") {
 		duration := time.Since(startTime)
 		size := int64(len(entity.Content))
 		storageMetrics.TrackWrite("update_entity", size, duration, nil)
@@ -897,6 +897,8 @@ func (r *EntityRepository) Rollback(tx interface{}) error {
 
 // List lists all entities
 func (r *EntityRepository) List() ([]*models.Entity, error) {
+	startTime := time.Now()
+	
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	
@@ -906,18 +908,58 @@ func (r *EntityRepository) List() ([]*models.Entity, error) {
 	}
 	defer reader.Close()
 	
-	return reader.GetAllEntities()
+	entities, err := reader.GetAllEntities()
+	
+	// Track read metrics (skip if we're listing metric entities)
+	if storageMetrics != nil {
+		// Don't track metrics for metric operations to avoid recursion
+		hasMetricEntities := false
+		if entities != nil {
+			for _, entity := range entities {
+				if strings.HasPrefix(entity.ID, "metric_") {
+					hasMetricEntities = true
+					break
+				}
+			}
+		}
+		
+		if !hasMetricEntities {
+			totalSize := int64(0)
+			if entities != nil {
+				for _, entity := range entities {
+					totalSize += int64(len(entity.Content))
+				}
+			}
+			storageMetrics.TrackRead("list_entities", totalSize, time.Since(startTime), err)
+		}
+	}
+	
+	return entities, err
 }
 
 // ListByTag lists entities with a specific tag
 func (r *EntityRepository) ListByTag(tag string) ([]*models.Entity, error) {
+	startTime := time.Now()
 	logger.Trace("ListByTag: %s", tag)
 	
 	// Check cache first
 	cacheKey := fmt.Sprintf("tag:%s", tag)
 	if cached, found := r.cache.Get(cacheKey); found {
 		logger.Trace("Cache hit for tag: %s", tag)
-		return cached.([]*models.Entity), nil
+		entities := cached.([]*models.Entity)
+		
+		// Track cache hit (skip metric-related tags to avoid recursion)
+		if storageMetrics != nil && !strings.HasPrefix(tag, "name:") && !strings.HasPrefix(tag, "type:metric") {
+			storageMetrics.TrackCacheOperation("tag_query", true)
+			// Still track the read with 0 duration since it was from cache
+			totalSize := int64(0)
+			for _, entity := range entities {
+				totalSize += int64(len(entity.Content))
+			}
+			storageMetrics.TrackRead("list_by_tag_cached", totalSize, time.Since(startTime), nil)
+		}
+		
+		return entities, nil
 	}
 	
 	logger.Trace("Cache miss for tag: %s", tag)
@@ -1008,6 +1050,18 @@ func (r *EntityRepository) ListByTag(tag string) ([]*models.Entity, error) {
 	}
 	
 	logger.Trace("Fetched %d entities", len(entities))
+	
+	// Track metrics (skip metric-related tags to avoid recursion)
+	if storageMetrics != nil && !strings.HasPrefix(tag, "name:") && !strings.HasPrefix(tag, "type:metric") {
+		storageMetrics.TrackCacheOperation("tag_query", false) // Cache miss
+		totalSize := int64(0)
+		if entities != nil {
+			for _, entity := range entities {
+				totalSize += int64(len(entity.Content))
+			}
+		}
+		storageMetrics.TrackRead("list_by_tag", totalSize, time.Since(startTime), err)
+	}
 	
 	// Cache the result
 	r.cache.Set(cacheKey, entities)
@@ -2336,32 +2390,50 @@ func (r *EntityRepository) persistWALEntries() error {
 	}
 	defer r.writerManager.ReleaseWriter()
 	
-	// Replay WAL and write each entity to the binary file
-	// This ensures all operations in the WAL are durably stored
+	// Track which entities need to be persisted
+	entitiesToPersist := make(map[string]bool)
+	
+	// First pass: identify all entities mentioned in the WAL
 	err = r.wal.Replay(func(entry WALEntry) error {
 		switch entry.OpType {
 		case WALOpCreate, WALOpUpdate:
-			if entry.Entity != nil {
-				// Write entity directly to binary file without triggering checkpoint
-				// This avoids infinite recursion since checkpoints call this function
-				if err := writer.WriteEntity(entry.Entity); err != nil {
-					logger.Error("Failed to persist entity %s: %v", entry.EntityID, err)
-					return fmt.Errorf("failed to persist entity %s: %w", entry.EntityID, err)
-				}
-				entitiesPersisted++
-				logger.Trace("Persisted entity %s with %d tags", entry.EntityID, len(entry.Entity.Tags))
-			}
+			entitiesToPersist[entry.EntityID] = true
 		case WALOpDelete:
-			// Delete operations are handled by marking entities as deleted
-			// For now, we skip them during persistence as they're handled
-			// through tombstone records in the main storage
-			logger.Trace("Skipping delete operation for entity %s", entry.EntityID)
+			// Mark for deletion
+			entitiesToPersist[entry.EntityID] = false
 		}
 		return nil
 	})
 	
 	if err != nil {
-		return fmt.Errorf("WAL persistence failed: %w", err)
+		return fmt.Errorf("failed to scan WAL: %w", err)
+	}
+	
+	// Second pass: persist the current in-memory state of each entity
+	for entityID, shouldPersist := range entitiesToPersist {
+		if !shouldPersist {
+			// Handle deletions if needed
+			logger.Trace("Skipping deleted entity %s", entityID)
+			continue
+		}
+		
+		// Get the current in-memory state with all accumulated tags
+		r.mu.RLock()
+		currentEntity, exists := r.entities[entityID]
+		r.mu.RUnlock()
+		
+		if !exists {
+			logger.Warn("Entity %s in WAL but not in memory, skipping", entityID)
+			continue
+		}
+		
+		// Write the current state to binary file
+		if err := writer.WriteEntity(currentEntity); err != nil {
+			logger.Error("Failed to persist entity %s: %v", entityID, err)
+			return fmt.Errorf("failed to persist entity %s: %w", entityID, err)
+		}
+		entitiesPersisted++
+		logger.Trace("Persisted entity %s with %d tags (current state)", entityID, len(currentEntity.Tags))
 	}
 	
 	// Sync the writer to ensure all data is on disk

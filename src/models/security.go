@@ -266,10 +266,22 @@ func (sm *SecurityManager) AuthenticateUser(username, password string) (*Securit
 	}
 	
 	// Verify password
+	logger.Debug("Starting password verification for user %s", username)
+	logger.Debug("Credential content length: %d bytes", len(credentialEntity.Content))
+	logger.Debug("Salt: %s", salt)
+	logger.Debug("Password+salt length: %d", len(password+salt))
+	
+	startTime := time.Now()
 	err = bcrypt.CompareHashAndPassword(credentialEntity.Content, []byte(password+salt))
+	elapsed := time.Since(startTime)
+	
+	logger.Debug("Password verification completed in %v", elapsed)
+	
 	if err != nil {
+		logger.Debug("Password verification failed: %v", err)
 		return nil, fmt.Errorf("invalid password")
 	}
+	logger.Debug("Password verification successful")
 	
 	// Extract user details
 	var email string

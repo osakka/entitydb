@@ -5093,7 +5093,11 @@
                     this.loginError = '';
 
                     try {
-                        const response = await fetch('/api/v1/auth/login', {
+                        // Use the EntityDB server URL - adjust if needed
+                        const apiBaseUrl = window.location.hostname === 'claude-code.uk.home.arpa' 
+                            ? 'https://claude-code.uk.home.arpa:8085' 
+                            : '';
+                        const response = await fetch(`${apiBaseUrl}/api/v1/auth/login`, {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json'
@@ -5174,6 +5178,11 @@
                         setTimeout(() => {
                             this.initBasicCharts();
                         }, 100);
+                    }
+                    
+                    // Load system metrics for performance-related tabs
+                    if (['overview', 'performance', 'storage', 'system'].includes(tab)) {
+                        this.loadSystemMetrics();
                     }
                     
                     // Special handling for RBAC metrics tab
@@ -6004,6 +6013,21 @@
                                 goroutines: data.system?.num_goroutines || 0,
                                 lastUpdated: new Date().toLocaleTimeString()
                             };
+                            
+                            // Update performance metrics from system metrics (aggregated values)
+                            if (data.performance) {
+                                // Merge aggregated system metrics into performance metrics
+                                this.performanceMetrics = {
+                                    ...this.performanceMetrics,
+                                    avgQueryTime: data.performance.query_execution_time_ms ? `${data.performance.query_execution_time_ms.toFixed(2)} ms` : '0 ms',
+                                    avgStorageTime: data.performance.storage_write_duration_ms ? `${data.performance.storage_write_duration_ms.toFixed(2)} ms` : '0 ms',
+                                    avgResponseTime: data.performance.http_request_duration_ms ? `${data.performance.http_request_duration_ms.toFixed(2)} ms` : '0 ms',
+                                    errorCount: data.performance.error_count || 0,
+                                    // Add additional aggregated metrics
+                                    httpRequestsTotal: data.performance.http_requests_total || 0,
+                                    storageReadDuration: data.performance.storage_read_duration_ms ? `${data.performance.storage_read_duration_ms.toFixed(2)} ms` : '0 ms'
+                                };
+                            }
 
                             // Update storage stats
                             this.storageStats = {
@@ -6069,6 +6093,9 @@
 
                 async loadPerformanceMetrics() {
                     try {
+                        // First load system metrics to get aggregated values
+                        await this.loadSystemMetrics();
+                        
                         // Load various performance metrics
                         const [queryMetrics, storageMetrics, requestMetrics, errorMetrics] = await Promise.all([
                             this.fetchMetricValues('query_execution_time_ms'),

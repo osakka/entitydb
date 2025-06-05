@@ -8,9 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 	
-	"entitydb/models"
 	"entitydb/storage/binary"
 )
 
@@ -40,7 +38,7 @@ func main() {
 	}
 
 	// Initialize the repository
-	repo, err := binary.NewEntityRepository("../../var", &models.DefaultStorageConfig)
+	repo, err := binary.NewEntityRepository("/opt/entitydb/var")
 	if err != nil {
 		log.Fatalf("Failed to initialize repository: %v", err)
 	}

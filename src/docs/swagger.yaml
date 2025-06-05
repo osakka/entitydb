@@ -374,9 +374,18 @@ definitions:
   api.PerformanceMetrics:
     description: Performance and runtime metrics
     properties:
+      error_count:
+        example: 0
+        type: number
       gc_runs:
         example: 3
         type: integer
+      http_request_duration_ms:
+        example: 223.4
+        type: number
+      http_requests_total:
+        example: 15
+        type: number
       index_lookups:
         example: 0
         type: integer
@@ -389,6 +398,15 @@ definitions:
       query_cache_miss:
         example: 0
         type: integer
+      query_execution_time_ms:
+        example: 2.1
+        type: number
+      storage_read_duration_ms:
+        example: 1.2
+        type: number
+      storage_write_duration_ms:
+        example: 5.8
+        type: number
       total_gc_pause_ns:
         example: 236206
         type: integer
@@ -557,15 +575,29 @@ definitions:
     type: object
   api.StorageMetrics:
     properties:
+      avg_read_latency_ms:
+        type: number
+      avg_write_latency_ms:
+        type: number
+      cache_hit_rate:
+        type: number
       compression_ratio:
         type: number
       database_size_bytes:
         type: integer
       index_size_bytes:
         type: integer
+      read_bytes:
+        type: integer
+      read_operations:
+        type: integer
       total_storage_bytes:
         type: integer
       wal_size_bytes:
+        type: integer
+      write_bytes:
+        type: integer
+      write_operations:
         type: integer
     type: object
   api.SuccessResponse:

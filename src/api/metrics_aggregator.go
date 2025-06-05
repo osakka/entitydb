@@ -111,7 +111,7 @@ func (a *MetricsAggregator) aggregateMetric(metricName, unit, aggregation, descr
 	
 	// Collect recent values from all labeled metrics
 	now := time.Now()
-	cutoff := now.Add(-30 * time.Minute) // Look at last 30 minutes for better coverage
+	cutoff := now.Add(-24 * time.Hour) // Look at last 24 hours for better coverage
 	logger.Info("Aggregating %s - now=%s, cutoff=%s", metricName, now.Format(time.RFC3339), cutoff.Format(time.RFC3339))
 	
 	var values []float64

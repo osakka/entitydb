@@ -88,6 +88,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	userEntity, err := h.securityManager.AuthenticateUser(loginReq.Username, loginReq.Password)
 	if err != nil {
 		logger.Error("[AuthHandler] Authentication failed for user %s: %v", loginReq.Username, err)
+		TrackHTTPError("auth_handler.Login", http.StatusUnauthorized, err)
 		
 		// Track failed authentication event
 		authEvent := &models.Entity{
@@ -145,8 +146,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 
-	// Track successful authentication event - TEMPORARILY DISABLED for performance
-	/*
+	// Track successful authentication event
 	authEvent := &models.Entity{
 		ID: "auth_event_" + loginReq.Username + "_" + time.Now().Format("20060102150405"),
 		Tags: []string{
@@ -160,7 +160,6 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	if err := h.securityManager.GetEntityRepo().Create(authEvent); err != nil {
 		logger.Error("Failed to track auth event: %v", err)
 	}
-	*/
 
 	logger.Info("User %s authenticated successfully", loginReq.Username)
 	w.Header().Set("Content-Type", "application/json")

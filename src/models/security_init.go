@@ -450,6 +450,7 @@ func (si *SecurityInitializer) ensureAdminUserRelationships(adminUserID string) 
 
 	hasMemberOfAdminGroup := false
 	hasAdminRole := false
+	hasCredential := false
 
 	for _, rel := range adminGroupRels {
 		if relationship, ok := rel.(*EntityRelationship); ok {
@@ -458,6 +459,9 @@ func (si *SecurityInitializer) ensureAdminUserRelationships(adminUserID string) 
 			}
 			if relationship.Type == RelationshipHasRole && relationship.TargetID == "role_admin" {
 				hasAdminRole = true
+			}
+			if relationship.Type == RelationshipHasCredential {
+				hasCredential = true
 			}
 		}
 	}
@@ -496,6 +500,36 @@ func (si *SecurityInitializer) ensureAdminUserRelationships(adminUserID string) 
 
 		if err := si.entityRepo.CreateRelationship(adminRoleRelationship); err != nil {
 			return fmt.Errorf("failed to create admin-role relationship: %v", err)
+		}
+	}
+	
+	// Ensure admin user has credential relationship
+	if !hasCredential {
+		// Find the admin user's credential
+		credentialEntities, err := si.entityRepo.ListByTag("user:" + adminUserID)
+		if err != nil {
+			return fmt.Errorf("failed to find admin credential: %v", err)
+		}
+		
+		if len(credentialEntities) > 0 {
+			credentialID := credentialEntities[0].ID
+			adminCredentialRelationship := &EntityRelationship{
+				ID:       "rel_" + adminUserID + "_has_credential_" + credentialID,
+				SourceID: adminUserID,
+				TargetID: credentialID,
+				Type:     RelationshipHasCredential,
+				Properties: map[string]string{
+					"primary": "true",
+				},
+				CreatedAt: Now(),
+			}
+			
+			logger.Info("Creating missing credential relationship for admin user")
+			if err := si.entityRepo.CreateRelationship(adminCredentialRelationship); err != nil {
+				return fmt.Errorf("failed to create admin-credential relationship: %v", err)
+			}
+		} else {
+			logger.Warn("Admin user exists but no credential found - this may cause authentication issues")
 		}
 	}
 	

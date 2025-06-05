@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -40,11 +41,21 @@ func (h *TemporalRBACMetricsHandler) GetPublicRBACMetrics(w http.ResponseWriter,
 	failureCount := 0
 	
 	for _, entity := range authEventEntities {
-		content := getStringFromContent(entity.Content)
-		if content == "success" {
-			successCount++
-		} else if content == "failure" {
-			failureCount++
+		// Check tags for status (handle temporal tags)
+		for _, tag := range entity.Tags {
+			// Remove temporal timestamp if present
+			cleanTag := tag
+			if idx := strings.Index(tag, "|"); idx != -1 {
+				cleanTag = tag[idx+1:]
+			}
+			
+			if cleanTag == "status:success" {
+				successCount++
+				break
+			} else if cleanTag == "status:failed" {
+				failureCount++
+				break
+			}
 		}
 	}
 	

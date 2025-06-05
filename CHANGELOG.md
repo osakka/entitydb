@@ -5,6 +5,32 @@ All notable changes to the EntityDB Platform will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.25.0] - 2025-06-05
+
+### Fixed
+- **Complete Metrics System Overhaul**: Fixed all performance metrics showing 0 values
+  - Fixed WAL persistence to save current in-memory entity state instead of initial WAL entry state
+  - Re-enabled auth event tracking that was disabled for performance
+  - Added error tracking with `TrackHTTPError` throughout entity and auth handlers
+  - Fixed query metrics tracking in `ListEntities` function
+  - Fixed temporal tag parsing in public RBAC metrics handler
+  - Changed metrics aggregation window from 30 minutes to 24 hours for better coverage
+  - All metrics now show real values: HTTP duration, query time, storage operations, error counts
+
+### Added
+- **Metrics History API**: Registered previously unconnected endpoints
+  - `/api/v1/metrics/history` - Get historical values for specific metrics
+  - `/api/v1/metrics/available` - List all available metrics
+  - Enables UI charts to display historical data properly
+
+### Changed
+- **Code Quality**: Comprehensive audit and cleanup
+  - Removed all temporary debug tools and test scripts
+  - Consolidated duplicate implementations into single source of truth
+  - Moved obsolete files to trash directory
+  - Updated placeholder comments to indicate unimplemented features
+  - Clean build with zero warnings
+
 ## [2.24.0] - 2025-06-03
 
 ### Fixed

@@ -9,13 +9,13 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 # EntityDB API URL
-API_URL="http://localhost:8085/api/v1"
+API_URL="https://localhost:8085/api/v1"
 
 echo -e "${YELLOW}Testing metric entity recovery fix...${NC}"
 
 # Login
 echo "Logging in..."
-TOKEN=$(curl -s -X POST "$API_URL/auth/login" \
+TOKEN=$(curl -sk -X POST "$API_URL/auth/login" \
   -H "Content-Type: application/json" \
   -d '{"username":"admin","password":"admin"}' | \
   jq -r '.token')
@@ -32,18 +32,18 @@ echo -e "\nCreating test metric entity..."
 METRIC_ID="metric_test_recovery_fix"
 
 # First, check if the metric already exists
-EXISTING=$(curl -s -X GET "$API_URL/entities/get?id=$METRIC_ID" \
+EXISTING=$(curl -sk -X GET "$API_URL/entities/get?id=$METRIC_ID" \
   -H "Authorization: Bearer $TOKEN" | \
   jq -r '.error // empty')
 
 if [ -z "$EXISTING" ]; then
     echo "Metric already exists, deleting it first..."
-    curl -s -X DELETE "$API_URL/entities/delete?id=$METRIC_ID" \
+    curl -sk -X DELETE "$API_URL/entities/delete?id=$METRIC_ID" \
         -H "Authorization: Bearer $TOKEN"
 fi
 
 # Create the metric
-RESPONSE=$(curl -s -X POST "$API_URL/entities/create" \
+RESPONSE=$(curl -sk -X POST "$API_URL/entities/create" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d "{
@@ -63,7 +63,7 @@ echo "Create response: $RESPONSE"
 
 # Immediately try to get the metric
 echo -e "\nFetching metric immediately after creation..."
-METRIC=$(curl -s -X GET "$API_URL/entities/get?id=$METRIC_ID" \
+METRIC=$(curl -sk -X GET "$API_URL/entities/get?id=$METRIC_ID" \
   -H "Authorization: Bearer $TOKEN")
 
 echo "Get response: $METRIC"
@@ -92,7 +92,7 @@ fi
 
 # Clean up
 echo -e "\nCleaning up test metric..."
-curl -s -X DELETE "$API_URL/entities/delete?id=$METRIC_ID" \
+curl -sk -X DELETE "$API_URL/entities/delete?id=$METRIC_ID" \
     -H "Authorization: Bearer $TOKEN"
 
 echo -e "\n${GREEN}All tests passed! Metric recovery fix is working correctly.${NC}"

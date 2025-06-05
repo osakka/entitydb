@@ -1967,9 +1967,21 @@ const docTemplate = `{
             "description": "Performance and runtime metrics",
             "type": "object",
             "properties": {
+                "error_count": {
+                    "type": "number",
+                    "example": 0
+                },
                 "gc_runs": {
                     "type": "integer",
                     "example": 3
+                },
+                "http_request_duration_ms": {
+                    "type": "number",
+                    "example": 223.4
+                },
+                "http_requests_total": {
+                    "type": "number",
+                    "example": 15
                 },
                 "index_lookups": {
                     "type": "integer",
@@ -1986,6 +1998,18 @@ const docTemplate = `{
                 "query_cache_miss": {
                     "type": "integer",
                     "example": 0
+                },
+                "query_execution_time_ms": {
+                    "type": "number",
+                    "example": 2.1
+                },
+                "storage_read_duration_ms": {
+                    "type": "number",
+                    "example": 1.2
+                },
+                "storage_write_duration_ms": {
+                    "type": "number",
+                    "example": 5.8
                 },
                 "total_gc_pause_ns": {
                     "type": "integer",
@@ -2238,6 +2262,15 @@ const docTemplate = `{
         "api.StorageMetrics": {
             "type": "object",
             "properties": {
+                "avg_read_latency_ms": {
+                    "type": "number"
+                },
+                "avg_write_latency_ms": {
+                    "type": "number"
+                },
+                "cache_hit_rate": {
+                    "type": "number"
+                },
                 "compression_ratio": {
                     "type": "number"
                 },
@@ -2247,10 +2280,22 @@ const docTemplate = `{
                 "index_size_bytes": {
                     "type": "integer"
                 },
+                "read_bytes": {
+                    "type": "integer"
+                },
+                "read_operations": {
+                    "type": "integer"
+                },
                 "total_storage_bytes": {
                     "type": "integer"
                 },
                 "wal_size_bytes": {
+                    "type": "integer"
+                },
+                "write_bytes": {
+                    "type": "integer"
+                },
+                "write_operations": {
                     "type": "integer"
                 }
             }

@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 	
+	"entitydb/logger"
 	"entitydb/models"
 )
 
@@ -67,10 +69,50 @@ func RBACMiddleware(entityRepo models.EntityRepository, sessionManager *models.S
 			hasPermission := isAdmin || models.HasPermission(permissions, requiredPermTag)
 			
 			if !hasPermission {
+				// Track permission denied event
+				go func() {
+					permEvent := &models.Entity{
+						ID: fmt.Sprintf("perm_event_%s_%d", session.UserID, time.Now().UnixNano()),
+						Tags: []string{
+							"type:permission_event",
+							"status:denied",
+							"user:" + session.UserID,
+							"permission:" + requiredPermTag,
+							"resource:" + requiredPerm.Resource,
+							"action:" + requiredPerm.Action,
+						},
+						Content: []byte(fmt.Sprintf(`{"user":"%s","permission":"%s","granted":false,"timestamp":"%s"}`, 
+							session.UserID, requiredPermTag, time.Now().Format(time.RFC3339))),
+					}
+					if err := entityRepo.Create(permEvent); err != nil {
+						logger.Error("Failed to track permission event: %v", err)
+					}
+				}()
+				
 				RespondError(w, http.StatusForbidden, 
 					fmt.Sprintf("Insufficient permissions: %s required", requiredPermTag))
 				return
 			}
+			
+			// Track permission granted event
+			go func() {
+				permEvent := &models.Entity{
+					ID: fmt.Sprintf("perm_event_%s_%d", session.UserID, time.Now().UnixNano()),
+					Tags: []string{
+						"type:permission_event", 
+						"status:granted",
+						"user:" + session.UserID,
+						"permission:" + requiredPermTag,
+						"resource:" + requiredPerm.Resource,
+						"action:" + requiredPerm.Action,
+					},
+					Content: []byte(fmt.Sprintf(`{"user":"%s","permission":"%s","granted":true,"timestamp":"%s"}`, 
+						session.UserID, requiredPermTag, time.Now().Format(time.RFC3339))),
+				}
+				if err := entityRepo.Create(permEvent); err != nil {
+					logger.Error("Failed to track permission event: %v", err)
+				}
+			}()
 			
 			// Add RBAC context to request
 			rbacCtx := &RBACContext{

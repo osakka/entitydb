@@ -109,10 +109,10 @@ func getEnvDuration(key string, defaultSeconds int) time.Duration {
 
 // Version information (can be overridden at build time via ldflags)
 var (
-	Version    = "2.24.0"  // Build-time version, set via -ldflags "-X main.Version=x.y.z"
+	Version    = "2.25.0"  // Build-time version, set via -ldflags "-X main.Version=x.y.z"
 	BuildDate  = "unknown" // Build-time date, set via -ldflags "-X main.BuildDate=YYYY-MM-DD"
 	AppName    = getEnv("ENTITYDB_APP_NAME", "EntityDB Server")
-	AppVersion = getEnv("ENTITYDB_APP_VERSION", "2.24.0")
+	AppVersion = getEnv("ENTITYDB_APP_VERSION", "2.25.0")
 )
 
 // Command line flags for server configuration
@@ -254,6 +254,10 @@ func main() {
 	
 	logger.Info("Starting EntityDB with log level: %s", logger.GetLogLevel())
 
+	// Initialize storage metrics early with nil repository
+	// This allows metrics tracking during repository initialization
+	binary.InitStorageMetrics(nil)
+	
 	// Initialize binary repositories
 	// Use factory to create appropriate repository based on settings
 	factory := &binary.RepositoryFactory{}
@@ -268,6 +272,9 @@ func main() {
 	if err != nil {
 		logger.Fatalf("Failed to create entity repository: %v", err)
 	}
+	
+	// Now update storage metrics with the actual repository
+	binary.SetStorageMetricsRepository(entityRepo)
 	
 	// Create binary relationship repository
 	// Handle high-performance repository case - it embeds EntityRepository
@@ -509,8 +516,7 @@ func main() {
 	// Initialize query metrics collector
 	api.InitQueryMetrics(server.entityRepo)
 	
-	// Initialize storage metrics collector
-	binary.InitStorageMetrics(server.entityRepo)
+	// Storage metrics already initialized early, no need to reinitialize
 	
 	// Initialize error metrics collector
 	api.InitErrorMetrics(server.entityRepo)

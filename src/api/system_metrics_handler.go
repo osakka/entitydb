@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -62,12 +63,18 @@ type DatabaseMetrics struct {
 // PerformanceMetrics contains performance statistics
 // @Description Performance and runtime metrics
 type PerformanceMetrics struct {
-	GCRuns          uint32 `json:"gc_runs" example:"3"`
-	LastGCPause     int64  `json:"last_gc_pause_ns" example:"140707"`
-	TotalGCPause    int64  `json:"total_gc_pause_ns" example:"236206"`
-	QueryCacheHits  int    `json:"query_cache_hits" example:"0"`
-	QueryCacheMiss  int    `json:"query_cache_miss" example:"0"`
-	IndexLookups    int64  `json:"index_lookups" example:"0"`
+	GCRuns              uint32  `json:"gc_runs" example:"3"`
+	LastGCPause         int64   `json:"last_gc_pause_ns" example:"140707"`
+	TotalGCPause        int64   `json:"total_gc_pause_ns" example:"236206"`
+	QueryCacheHits      int     `json:"query_cache_hits" example:"0"`
+	QueryCacheMiss      int     `json:"query_cache_miss" example:"0"`
+	IndexLookups        int64   `json:"index_lookups" example:"0"`
+	HTTPRequestDuration float64 `json:"http_request_duration_ms" example:"223.40"`
+	HTTPRequestsTotal   float64 `json:"http_requests_total" example:"15"`
+	StorageReadDuration float64 `json:"storage_read_duration_ms" example:"1.2"`
+	StorageWriteDuration float64 `json:"storage_write_duration_ms" example:"5.8"`
+	QueryExecutionTime  float64 `json:"query_execution_time_ms" example:"2.1"`
+	ErrorCount          float64 `json:"error_count" example:"0"`
 }
 
 // DetailedMemoryMetrics contains comprehensive memory usage information
@@ -84,11 +91,18 @@ type DetailedMemoryMetrics struct {
 }
 
 type StorageMetrics struct {
-	DatabaseSizeBytes    int64 `json:"database_size_bytes"`
-	WALSizeBytes        int64 `json:"wal_size_bytes"`
-	IndexSizeBytes      int64 `json:"index_size_bytes"`
-	TotalStorageBytes   int64 `json:"total_storage_bytes"`
-	CompressionRatio    float64 `json:"compression_ratio"`
+	DatabaseSizeBytes    int64    `json:"database_size_bytes"`
+	WALSizeBytes        int64    `json:"wal_size_bytes"`
+	IndexSizeBytes      int64    `json:"index_size_bytes"`
+	TotalStorageBytes   int64    `json:"total_storage_bytes"`
+	CompressionRatio    float64  `json:"compression_ratio"`
+	ReadOperations      *int     `json:"read_operations,omitempty"`
+	WriteOperations     *int     `json:"write_operations,omitempty"`
+	ReadBytes           *int64   `json:"read_bytes,omitempty"`
+	WriteBytes          *int64   `json:"write_bytes,omitempty"`
+	AvgReadLatencyMs    *float64 `json:"avg_read_latency_ms,omitempty"`
+	AvgWriteLatencyMs   *float64 `json:"avg_write_latency_ms,omitempty"`
+	CacheHitRate        *float64 `json:"cache_hit_rate,omitempty"`
 }
 
 type TemporalMetrics struct {
@@ -211,14 +225,29 @@ func (h *SystemMetricsHandler) SystemMetrics(w http.ResponseWriter, r *http.Requ
 	var memStats runtime.MemStats
 	runtime.ReadMemStats(&memStats)
 	
+	httpDuration := h.getLatestMetricValue("metric_http_request_duration_ms")
+	httpTotal := h.getLatestMetricValue("metric_http_requests_total")
+	storageRead := h.getLatestMetricValue("metric_storage_read_duration_ms")
+	storageWrite := h.getLatestMetricValue("metric_storage_write_duration_ms")
+	queryTime := h.getLatestMetricValue("metric_query_execution_time_ms")
+	errorCount := h.getLatestMetricValue("metric_error_count")
+	
+	logger.Info("Performance metrics values: httpDuration=%.2f, httpTotal=%.2f, storageRead=%.2f, storageWrite=%.2f", 
+		httpDuration, httpTotal, storageRead, storageWrite)
+	
 	perfMetrics := PerformanceMetrics{
-		GCRuns:       memStats.NumGC,
-		LastGCPause:  int64(memStats.PauseNs[(memStats.NumGC+255)%256]),
-		TotalGCPause: int64(memStats.PauseTotalNs),
-		// Note: Query cache metrics would need to be implemented in the repository
-		QueryCacheHits: 0, // Placeholder
-		QueryCacheMiss: 0, // Placeholder
-		IndexLookups:   0, // Placeholder
+		GCRuns:              memStats.NumGC,
+		LastGCPause:         int64(memStats.PauseNs[(memStats.NumGC+255)%256]),
+		TotalGCPause:        int64(memStats.PauseTotalNs),
+		QueryCacheHits:      0, // Not implemented - no query cache in current version
+		QueryCacheMiss:      0, // Not implemented - no query cache in current version
+		IndexLookups:        0, // Not implemented - index lookup tracking not available
+		HTTPRequestDuration: httpDuration,
+		HTTPRequestsTotal:   httpTotal,
+		StorageReadDuration: storageRead,
+		StorageWriteDuration: storageWrite,
+		QueryExecutionTime:  queryTime,
+		ErrorCount:          errorCount,
 	}
 	
 	// Memory metrics
@@ -386,12 +415,111 @@ func (h *SystemMetricsHandler) calculateStorageMetrics() StorageMetrics {
 	total := dbSize + walSize + indexSize
 	compressionRatio := 1.0 // Placeholder
 	
+	// Aggregate storage operation metrics from metric entities
+	var readOps, writeOps int
+	var readBytes, writeBytes int64
+	var totalReadLatency, totalWriteLatency float64
+	var readLatencyCount, writeLatencyCount int
+	var cacheHits, cacheMisses int
+	
+	// Query storage_read_duration_ms metrics
+	if readDurationMetrics, err := h.entityRepo.ListByTag("name:storage_read_duration_ms"); err == nil {
+		for _, metric := range readDurationMetrics {
+			readOps++ // Each metric represents at least one operation
+			// Get the latest value tag
+			for _, tag := range metric.Tags {
+				if strings.HasPrefix(tag, "value:") {
+					if val, err := strconv.ParseFloat(strings.TrimPrefix(tag, "value:"), 64); err == nil {
+						totalReadLatency += val
+						readLatencyCount++
+					}
+				}
+			}
+		}
+	}
+	
+	// Query storage_write_duration_ms metrics
+	if writeDurationMetrics, err := h.entityRepo.ListByTag("name:storage_write_duration_ms"); err == nil {
+		for _, metric := range writeDurationMetrics {
+			writeOps++ // Each metric represents at least one operation
+			// Get the latest value tag
+			for _, tag := range metric.Tags {
+				if strings.HasPrefix(tag, "value:") {
+					if val, err := strconv.ParseFloat(strings.TrimPrefix(tag, "value:"), 64); err == nil {
+						totalWriteLatency += val
+						writeLatencyCount++
+					}
+				}
+			}
+		}
+	}
+	
+	// Query storage_read_bytes metrics
+	if readBytesMetrics, err := h.entityRepo.ListByTag("name:storage_read_bytes"); err == nil {
+		for _, metric := range readBytesMetrics {
+			// Get the latest value tag
+			for _, tag := range metric.Tags {
+				if strings.HasPrefix(tag, "value:") {
+					if val, err := strconv.ParseFloat(strings.TrimPrefix(tag, "value:"), 64); err == nil {
+						readBytes += int64(val)
+					}
+				}
+			}
+		}
+	}
+	
+	// Query storage_write_bytes metrics
+	if writeBytesMetrics, err := h.entityRepo.ListByTag("name:storage_write_bytes"); err == nil {
+		for _, metric := range writeBytesMetrics {
+			// Get the latest value tag
+			for _, tag := range metric.Tags {
+				if strings.HasPrefix(tag, "value:") {
+					if val, err := strconv.ParseFloat(strings.TrimPrefix(tag, "value:"), 64); err == nil {
+						writeBytes += int64(val)
+					}
+				}
+			}
+		}
+	}
+	
+	// Query cache metrics
+	if cacheHitMetrics, err := h.entityRepo.ListByTag("name:storage_cache_hits"); err == nil {
+		cacheHits = len(cacheHitMetrics)
+	}
+	if cacheMissMetrics, err := h.entityRepo.ListByTag("name:storage_cache_misses"); err == nil {
+		cacheMisses = len(cacheMissMetrics)
+	}
+	
+	// Calculate averages
+	avgReadLatency := 0.0
+	if readLatencyCount > 0 {
+		avgReadLatency = totalReadLatency / float64(readLatencyCount)
+	}
+	avgWriteLatency := 0.0
+	if writeLatencyCount > 0 {
+		avgWriteLatency = totalWriteLatency / float64(writeLatencyCount)
+	}
+	
+	// Calculate cache hit rate
+	cacheHitRate := 0.0
+	totalCacheOps := cacheHits + cacheMisses
+	if totalCacheOps > 0 {
+		cacheHitRate = float64(cacheHits) / float64(totalCacheOps) * 100
+	}
+	
 	return StorageMetrics{
 		DatabaseSizeBytes: dbSize,
 		WALSizeBytes:     walSize,
 		IndexSizeBytes:   indexSize,
 		TotalStorageBytes: total,
 		CompressionRatio: compressionRatio,
+		ReadOperations:   &readOps,
+		WriteOperations:  &writeOps,
+		ReadBytes:        &readBytes,
+		WriteBytes:       &writeBytes,
+		AvgReadLatencyMs: &avgReadLatency,
+		AvgWriteLatencyMs: &avgWriteLatency,
+		CacheHitRate:     &cacheHitRate,
 	}
 }
 
@@ -526,4 +654,67 @@ func (h *SystemMetricsHandler) calculateEntityStats(entities []*models.Entity) E
 	}
 	
 	return stats
+}
+
+// getLatestMetricValue retrieves the latest value tag from an aggregated metric entity
+func (h *SystemMetricsHandler) getLatestMetricValue(metricID string) float64 {
+	entity, err := h.entityRepo.GetByID(metricID)
+	if err != nil {
+		logger.Debug("Failed to get metric %s: %v", metricID, err)
+		return 0.0
+	}
+	
+	// Find the most recent value tag
+	var latestValue float64
+	var latestTime time.Time
+	foundValue := false
+	valueCount := 0
+	
+	logger.Debug("Searching for value tags in metric %s with %d total tags", metricID, len(entity.Tags))
+	
+	for _, tag := range entity.Tags {
+		// Handle temporal tags
+		actualTag := tag
+		tagTime := time.Now()
+		
+		// Temporal tags have format: "TIMESTAMP|tag"
+		if idx := strings.Index(tag, "|"); idx != -1 {
+			// Extract timestamp and tag
+			timestampStr := tag[:idx]
+			actualTag = tag[idx+1:]
+			
+			if ts, err := strconv.ParseInt(timestampStr, 10, 64); err == nil {
+				tagTime = time.Unix(0, ts)
+			} else {
+				continue
+			}
+		}
+		
+		// Look for value tags
+		if strings.HasPrefix(actualTag, "value:") {
+			valueStr := strings.TrimPrefix(actualTag, "value:")
+			if value, err := strconv.ParseFloat(valueStr, 64); err == nil {
+				valueCount++
+				if valueCount <= 5 {
+					logger.Debug("Found value tag #%d: value=%.2f, time=%s", valueCount, value, tagTime.Format(time.RFC3339))
+				}
+				if !foundValue || tagTime.After(latestTime) {
+					logger.Debug("Updating latest value from %.2f to %.2f (time: %s -> %s)", latestValue, value, latestTime.Format(time.RFC3339), tagTime.Format(time.RFC3339))
+					latestValue = value
+					latestTime = tagTime
+					foundValue = true
+				}
+			}
+		}
+	}
+	
+	logger.Debug("Total value tags found: %d, latest value: %.2f at %s", valueCount, latestValue, latestTime.Format(time.RFC3339))
+	
+	if !foundValue {
+		logger.Debug("No value tags found for metric %s", metricID)
+		return 0.0
+	}
+	
+	logger.Trace("Found latest value %.2f for metric %s at time %s", latestValue, metricID, latestTime.Format(time.RFC3339))
+	return latestValue
 }

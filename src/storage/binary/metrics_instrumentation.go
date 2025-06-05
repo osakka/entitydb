@@ -198,11 +198,19 @@ func (m *StorageMetrics) getSizeBucket(size int64) string {
 
 // storeMetric stores a metric value with labels
 func (m *StorageMetrics) storeMetric(name string, value float64, unit string, description string, labels map[string]string) {
+	// Check if repository is available
+	if m.repo == nil {
+		logger.Trace("StorageMetrics.storeMetric: repository is nil, skipping %s", name)
+		return
+	}
+	
 	// Build metric ID with labels
 	metricID := "metric_" + name
 	for k, v := range labels {
 		metricID += "_" + k + "_" + v
 	}
+	
+	logger.Trace("StorageMetrics.storeMetric: storing metric %s = %.2f", metricID, value)
 	
 	// Check if metric exists
 	entity, err := m.repo.GetByID(metricID)
@@ -234,9 +242,10 @@ func (m *StorageMetrics) storeMetric(name string, value float64, unit string, de
 		}
 		
 		if err := m.repo.Create(newEntity); err != nil {
-			// Don't log error to avoid recursion
+			logger.Warn("Failed to create metric entity %s: %v", metricID, err)
 			return
 		}
+		logger.Debug("Successfully created metric entity %s", metricID)
 		return
 	}
 	
@@ -272,4 +281,13 @@ func InitStorageMetrics(repo models.EntityRepository) {
 // GetStorageMetrics returns the global storage metrics instance
 func GetStorageMetrics() *StorageMetrics {
 	return storageMetrics
+}
+
+// SetRepository updates the repository for the global storage metrics
+// This is used when metrics need to be initialized before the repository is available
+func SetStorageMetricsRepository(repo models.EntityRepository) {
+	if storageMetrics != nil {
+		storageMetrics.repo = repo
+		logger.Info("Updated storage metrics repository")
+	}
 }

@@ -90,6 +90,7 @@ func (h *EntityHandler) CreateEntity(w http.ResponseWriter, r *http.Request) {
 	// Parse request body
 	var req CreateEntityRequest
 	if err := DecodeJSON(r, &req); err != nil {
+		TrackHTTPError("entity_handler.CreateEntity", http.StatusBadRequest, err)
 		RespondError(w, http.StatusBadRequest, "Invalid request body")
 		return
 	}
@@ -188,6 +189,7 @@ func (h *EntityHandler) CreateEntity(w http.ResponseWriter, r *http.Request) {
 	err := h.repo.Create(entity)
 	if err != nil {
 		logger.Error("Failed to create entity %s: %v", entity.ID, err)
+		TrackHTTPError("entity_handler.CreateEntity", http.StatusInternalServerError, err)
 		RespondError(w, http.StatusInternalServerError, "Failed to create entity")
 		return
 	}
@@ -226,6 +228,7 @@ func (h *EntityHandler) GetEntity(w http.ResponseWriter, r *http.Request) {
 	// Get entity ID from query parameter
 	id := r.URL.Query().Get("id")
 	if id == "" {
+		TrackHTTPError("entity_handler.GetEntity", http.StatusBadRequest, fmt.Errorf("entity ID is required"))
 		RespondError(w, http.StatusBadRequest, "Entity ID is required")
 		return
 	}
@@ -234,6 +237,7 @@ func (h *EntityHandler) GetEntity(w http.ResponseWriter, r *http.Request) {
 	entity, err := h.repo.GetByID(id)
 	if err != nil {
 		logger.Warn("Entity not found: id=%s", id)
+		TrackHTTPError("entity_handler.GetEntity", http.StatusNotFound, err)
 		RespondError(w, http.StatusNotFound, "Entity not found")
 		return
 	}
@@ -419,6 +423,8 @@ func (h *EntityHandler) StreamEntity(w http.ResponseWriter, r *http.Request) {
 // @Success 200 {array} models.Entity
 // @Router /api/v1/entities/list [get]
 func (h *EntityHandler) ListEntities(w http.ResponseWriter, r *http.Request) {
+	startTime := time.Now()
+	
 	// Check if timestamps should be included in response
 	includeTimestamps := r.URL.Query().Get("include_timestamps") == "true"
 	
@@ -431,6 +437,29 @@ func (h *EntityHandler) ListEntities(w http.ResponseWriter, r *http.Request) {
 	
 	var entities []*models.Entity
 	var err error
+	
+	// Collect query tags for metrics
+	var queryTags []string
+	var queryType string
+	if tag != "" {
+		queryTags = append(queryTags, tag)
+		queryType = "tag_filter"
+	}
+	if wildcard != "" {
+		queryTags = append(queryTags, wildcard)
+		queryType = "wildcard"
+	}
+	if search != "" {
+		queryTags = append(queryTags, "search:"+search)
+		queryType = "search"
+	}
+	if namespace != "" {
+		queryTags = append(queryTags, "namespace:"+namespace)
+		queryType = "namespace"
+	}
+	if queryType == "" {
+		queryType = "list_all"
+	}
 	
 	// Use appropriate query method based on parameters
 	switch {
@@ -472,10 +501,16 @@ func (h *EntityHandler) ListEntities(w http.ResponseWriter, r *http.Request) {
 			queryContext = "all entities"
 		}
 		logger.Error("Failed to list entities %s: %v", queryContext, err)
+		TrackHTTPError("entity_handler.ListEntities", http.StatusInternalServerError, err)
 		RespondError(w, http.StatusInternalServerError, "Failed to list entities")
 		return
 	}
 
+	// Track query metrics
+	if queryMetrics != nil {
+		queryMetrics.TrackQuery(queryType, queryTags, startTime, len(entities), err)
+	}
+	
 	// Strip timestamps from all entities if not requested
 	responseEntities := make([]*models.Entity, len(entities))
 	for i, entity := range entities {

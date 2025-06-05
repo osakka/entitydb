@@ -121,11 +121,19 @@ func isStaticFile(path string) bool {
 
 // storeRequestMetrics stores the collected metrics
 func (m *RequestMetricsMiddleware) storeRequestMetrics(method, path string, statusCode int, duration time.Duration, requestSize, responseSize int64) {
+	// Add panic recovery to ensure goroutine doesn't crash
+	defer func() {
+		if r := recover(); r != nil {
+			logger.Error("Panic in storeRequestMetrics: %v", r)
+		}
+	}()
+	
 	logger.Debug("Storing request metrics: method=%s, path=%s, status=%d, duration=%v", method, path, statusCode, duration)
 	
 	// Store multiple metrics for comprehensive monitoring
 	
 	// 1. Request count by endpoint
+	logger.Debug("Storing metric 1: http_requests_total")
 	m.storeMetric("http_requests_total", 1, "count", 
 		"Total HTTP requests",
 		map[string]string{
@@ -133,26 +141,32 @@ func (m *RequestMetricsMiddleware) storeRequestMetrics(method, path string, stat
 			"path": path,
 			"status": strconv.Itoa(statusCode),
 		})
+	logger.Debug("Completed storing metric 1")
 	
 	// 2. Request duration
+	logger.Debug("Storing metric 2: http_request_duration_ms = %v ms", duration.Milliseconds())
 	m.storeMetric("http_request_duration_ms", float64(duration.Milliseconds()), "milliseconds",
 		"HTTP request duration",
 		map[string]string{
 			"method": method,
 			"path": path,
 		})
+	logger.Debug("Completed storing metric 2")
 	
 	// 3. Request size
 	if requestSize > 0 {
+		logger.Debug("Storing metric 3: http_request_size_bytes = %v bytes", requestSize)
 		m.storeMetric("http_request_size_bytes", float64(requestSize), "bytes",
 			"HTTP request size",
 			map[string]string{
 				"method": method,
 				"path": path,
 			})
+		logger.Debug("Completed storing metric 3")
 	}
 	
 	// 4. Response size
+	logger.Debug("Storing metric 4: http_response_size_bytes = %v bytes", responseSize)
 	m.storeMetric("http_response_size_bytes", float64(responseSize), "bytes",
 		"HTTP response size",
 		map[string]string{
@@ -160,6 +174,7 @@ func (m *RequestMetricsMiddleware) storeRequestMetrics(method, path string, stat
 			"path": path,
 			"status": strconv.Itoa(statusCode),
 		})
+	logger.Debug("Completed storing metric 4")
 	
 	// 5. Error count (4xx and 5xx)
 	if statusCode >= 400 {
@@ -237,9 +252,8 @@ func (m *RequestMetricsMiddleware) storeMetric(name string, value float64, unit 
 		
 		if err := m.repo.Create(newEntity); err != nil {
 			logger.Error("Failed to create request metric %s: %v", metricID, err)
-			return
+			// Don't return - entity might already exist, continue to add temporal value
 		}
-		// Don't return here - we need to add the temporal value tag
 	} else {
 		// Entity exists - for counters, we need to increment the current value
 		if unit == "count" {
