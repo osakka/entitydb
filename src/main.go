@@ -37,7 +37,7 @@ import (
 )
 
 // @title EntityDB API
-// @version 2.27.0
+// @version 2.28.0
 // @description A temporal database with pure entity-based architecture
 // @termsOfService https://github.com/osakka/entitydb
 
@@ -61,7 +61,7 @@ import (
 
 // Version information (can be overridden at build time via ldflags)
 var (
-	Version    = "2.27.0"  // Build-time version, set via -ldflags "-X main.Version=x.y.z"
+	Version    = "2.28.0"  // Build-time version, set via -ldflags "-X main.Version=x.y.z"
 	BuildDate  = "unknown" // Build-time date, set via -ldflags "-X main.BuildDate=YYYY-MM-DD"
 )
 

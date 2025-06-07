@@ -93,7 +93,7 @@ This documentation follows industry-standard practices:
 
 - **Consistent Naming**: All files use kebab-case naming (e.g., `guide-quick-start.md`)
 - **Cross-References**: Extensive linking between related topics
-- **Accuracy**: All documentation verified against actual codebase (v2.27.0)
+- **Accuracy**: All documentation verified against actual codebase (v2.28.0)
 - **Maintenance**: Regular updates ensure documentation stays current
 - **Accessibility**: Clear structure suitable for all experience levels
 
@@ -108,7 +108,7 @@ Found an error or want to improve the documentation? See our [Contributing Guide
 
 ---
 
-**Version**: 2.27.0  
+**Version**: 2.28.0  
 **Last Updated**: June 7, 2025  
 **Next Review**: December 2025
 

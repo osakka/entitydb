@@ -126,7 +126,7 @@ func Load() *Config {
 		
 		// Application Info
 		AppName:          getEnv("ENTITYDB_APP_NAME", "EntityDB Server"),
-		AppVersion:       getEnv("ENTITYDB_APP_VERSION", "2.24.0"),
+		AppVersion:       getEnv("ENTITYDB_APP_VERSION", "2.28.0"),
 	}
 }
 

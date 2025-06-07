@@ -202,6 +202,32 @@ The server automatically creates a default admin user if none exists:
   - No regression or parallel implementations
   - Repository structure follows clean workspace guidelines
 
+## Recent Changes (v2.28.0)
+
+- **Enhanced Metrics System Implementation**: Comprehensive metrics collection and management system
+  - Added configurable retention policies for raw and aggregated metrics data
+  - Implemented metric types system (Counter, Gauge, Histogram) leveraging temporal storage
+  - Created retention manager for automatic data lifecycle management (raw, 1min, 1hour, daily aggregations)
+  - Added histogram bucket configuration for latency and distribution tracking
+  - Conditional metrics collection with separate flags for request and storage tracking
+  - Created standalone metrics dashboard with auto-refresh and time range selection
+  - Enhanced Chart.js integration with multiple chart types and real-time data updates
+- **Connection Stability Improvements**: Fixed browser connection hangs and stability issues
+  - Added TE header middleware to handle Transfer-Encoding header conflicts
+  - Implemented connection close middleware for proper connection termination
+  - Added comprehensive request tracing for debugging connection issues
+  - Fixed ERR_HTTP2_PROTOCOL_ERROR by disabling HTTP/2 in TLS configuration
+- **Logging System Enhancements**: Professional logging with trace subsystems
+  - Added log bridge to redirect standard library logs through structured logger
+  - Implemented trace subsystem support for targeted debugging
+  - Added lock operation tracing for deadlock detection
+  - Enhanced HTTP request tracing with goroutine IDs
+- **Code Quality and Maintenance**: Repository cleanup and consistency improvements
+  - Updated all version references to v2.28.0 across configuration and documentation
+  - Regenerated Swagger documentation with correct version
+  - Maintained clean build with zero warnings
+  - All metrics features integrated without regression
+
 ## Recent Changes (v2.27.0)
 
 - **Configuration Management Overhaul**: Implemented comprehensive 3-tier configuration system
