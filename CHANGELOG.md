@@ -5,6 +5,34 @@ All notable changes to the EntityDB Platform will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.27.0] - 2025-06-07
+
+### Added
+- **Engineering Excellence Infrastructure**: Complete CI/CD and development tooling
+  - GitHub Actions workflows for automated testing, security scanning, and releases
+  - Production-ready Dockerfile with multi-stage builds and security hardening
+  - One-command developer setup script with all dependencies
+  - Enhanced Makefile with CI/CD targets (test-ci, security-scan, lint, docker)
+  - Hot reload development environment with Air
+  - Pre-commit hooks for code quality enforcement
+- **Documentation Taxonomy**: Professional documentation organization system
+  - Comprehensive documentation audit and reorganization plan
+  - Technical accuracy verification against actual codebase
+  - Industry-standard naming schema and cross-referencing system
+  - API documentation accuracy report with discrepancy analysis
+
+### Changed
+- **Configuration Management Enhancement**: Fine-tuned 3-tier configuration system
+  - Improved database configuration caching with proper expiry handling
+  - Enhanced runtime log level adjustment via multiple interfaces
+  - Consolidated all hardcoded values into configurable parameters
+
+### Fixed
+- **Test Framework Compatibility**: Updated test files to match current Entity model
+  - Fixed temporal tag parsing in test files to use nanosecond epoch format
+  - Added missing Entity model methods (HasTag, GetTagValue) for backward compatibility
+  - Corrected timestamp parsing from RFC3339Nano to nanosecond epoch in repository code
+
 ## [2.26.0] - 2025-06-07
 
 ### Added

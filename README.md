@@ -2,7 +2,7 @@
 
 > A high-performance temporal database where every tag is timestamped with nanosecond precision
 
-[![Version](https://img.shields.io/badge/version-v2.26.0-blue)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-v2.27.0-blue)](./CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
 [![Documentation](https://img.shields.io/badge/docs-comprehensive-brightgreen)](./docs)
 
@@ -35,7 +35,7 @@ cd src && make && cd ..
 ./bin/entitydbd.sh start
 
 # Access the dashboard
-# Web UI: https://localhost:8085
+# Web UI: https://localhost:8085 (HTTP) or https://localhost:8443 (HTTPS)
 # Default credentials: admin/admin
 ```
 
@@ -128,12 +128,12 @@ EntityDB uses a layered architecture optimized for temporal operations:
 
 ## Documentation
 
-- [Quick Start Guide](./docs/guides/quick-start.md)
-- [API Reference](./docs/api/README.md)
-- [Architecture Overview](./docs/architecture/overview.md)
-- [RBAC & Security](./docs/guides/security.md)
-- [Development Guide](./docs/development/contributing.md)
-- [Performance Tuning](./docs/performance/README.md)
+- [Quick Start Guide](./docs/new-structure/guides/guide-quick-start.md)
+- [API Reference](./docs/new-structure/api/api-reference.md)
+- [Architecture Overview](./docs/new-structure/architecture/arch-overview.md)
+- [RBAC & Security](./docs/new-structure/guides/guide-security.md)
+- [Development Guide](./docs/new-structure/development/dev-contributing.md)
+- [Performance Tuning](./docs/new-structure/performance/perf-optimization.md)
 
 ## Project Structure
 
@@ -197,7 +197,7 @@ ENTITYDB_METRICS_INTERVAL=30         # Metrics collection interval
 - **Default**: `/opt/entitydb/share/config/entitydb.env`
 - **Instance**: `/opt/entitydb/var/entitydb.env` (overrides defaults)
 
-For complete configuration documentation, see [Configuration Management Guide](./docs/configuration-management.md).
+For complete configuration documentation, see [Configuration Management Guide](./docs/new-structure/development/dev-configuration.md).
 
 ## Performance
 
@@ -215,7 +215,7 @@ Benchmarks show:
 
 ## Contributing
 
-See [CONTRIBUTING.md](./docs/core/contributing/CONTRIBUTING.md) for development guidelines.
+See [Contributing Guide](./docs/new-structure/development/dev-contributing.md) for development guidelines.
 
 ## License
 
