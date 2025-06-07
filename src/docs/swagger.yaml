@@ -1488,6 +1488,10 @@ paths:
         in: query
         name: limit
         type: integer
+      - description: 'Aggregation level: raw, 1min, 1hour, 1day (default: raw)'
+        in: query
+        name: aggregation
+        type: string
       produces:
       - application/json
       responses:

@@ -366,6 +366,20 @@ func main() {
 	backgroundCollector.Start()
 	defer backgroundCollector.Stop()
 	
+	// Start metrics retention manager if enabled
+	if cfg.MetricsRetentionRaw > 0 {
+		retentionManager := api.NewMetricsRetentionManager(
+			server.entityRepo,
+			cfg.MetricsRetentionRaw,
+			cfg.MetricsRetention1Min,
+			cfg.MetricsRetention1Hour,
+			cfg.MetricsRetention1Day,
+		)
+		retentionManager.Start()
+		defer retentionManager.Stop()
+		logger.Info("Metrics retention manager started")
+	}
+	
 	// Initialize query metrics collector
 	api.InitQueryMetrics(server.entityRepo)
 	

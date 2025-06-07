@@ -1199,6 +1199,12 @@
                         "description": "Maximum number of data points (default: 100)",
                         "name": "limit",
                         "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Aggregation level: raw, 1min, 1hour, 1day (default: raw)",
+                        "name": "aggregation",
+                        "in": "query"
                     }
                 ],
                 "responses": {

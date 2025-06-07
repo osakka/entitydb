@@ -46,6 +46,7 @@ type MetricHistoryResponse struct {
 // @Param metric_name query string true "Metric name (e.g., memory_alloc, entity_count_total)"
 // @Param hours query int false "Number of hours to look back (default: 24)"
 // @Param limit query int false "Maximum number of data points (default: 100)"
+// @Param aggregation query string false "Aggregation level: raw, 1min, 1hour, 1day (default: raw)"
 // @Success 200 {object} MetricHistoryResponse
 // @Router /api/v1/metrics/history [get]
 func (h *MetricsHistoryHandler) GetMetricHistory(w http.ResponseWriter, r *http.Request) {
@@ -72,14 +73,23 @@ func (h *MetricsHistoryHandler) GetMetricHistory(w http.ResponseWriter, r *http.
 		}
 	}
 	
+	// Parse aggregation level
+	aggregation := r.URL.Query().Get("aggregation")
+	if aggregation == "" {
+		aggregation = "raw"
+	}
+	
 	// Calculate time range
 	endTime := time.Now()
 	startTime := endTime.Add(-time.Duration(hours) * time.Hour)
 	
-	logger.Debug("Fetching metric history: name=%s, hours=%d, limit=%d", metricName, hours, limit)
+	logger.Debug("Fetching metric history: name=%s, hours=%d, limit=%d, aggregation=%s", metricName, hours, limit, aggregation)
 	
-	// Get the metric entity
+	// Get the metric entity - check for aggregated version first if requested
 	metricID := fmt.Sprintf("metric_%s", metricName)
+	if aggregation != "raw" {
+		metricID = fmt.Sprintf("metric_%s_agg_%s", metricName, aggregation)
+	}
 	entity, err := h.repo.GetByID(metricID)
 	if err != nil {
 		logger.Warn("Metric entity not found: %s", metricID)
@@ -166,7 +176,19 @@ func (h *MetricsHistoryHandler) GetMetricHistory(w http.ResponseWriter, r *http.
 		// Look for value tags
 		if strings.HasPrefix(actualTag, "value:") {
 			valueStr := strings.TrimPrefix(actualTag, "value:")
-			if value, err := strconv.ParseFloat(valueStr, 64); err == nil {
+			
+			// Handle aggregated values (format: value:avg:min:max:count)
+			var value float64
+			if strings.Contains(valueStr, ":") {
+				// Extract average value from aggregated format
+				parts := strings.Split(valueStr, ":")
+				if len(parts) >= 2 {
+					valueStr = parts[0] // Use the first value (average)
+				}
+			}
+			
+			if v, err := strconv.ParseFloat(valueStr, 64); err == nil {
+				value = v
 				dataPoints = append(dataPoints, MetricDataPoint{
 					Timestamp: tagTime,
 					Value:     value,
