@@ -70,12 +70,12 @@ func Load() *Config {
 		Port:             getEnvInt("ENTITYDB_PORT", 8085),
 		SSLPort:          getEnvInt("ENTITYDB_SSL_PORT", 8085),
 		UseSSL:           getEnvBool("ENTITYDB_USE_SSL", false),
-		SSLCert:          getEnv("ENTITYDB_SSL_CERT", "/etc/ssl/certs/server.pem"),
-		SSLKey:           getEnv("ENTITYDB_SSL_KEY", "/etc/ssl/private/server.key"),
+		SSLCert:          getEnv("ENTITYDB_SSL_CERT", "./certs/server.pem"),
+		SSLKey:           getEnv("ENTITYDB_SSL_KEY", "./certs/server.key"),
 		
-		// Paths
-		DataPath:         getEnv("ENTITYDB_DATA_PATH", "/opt/entitydb/var"),
-		StaticDir:        getEnv("ENTITYDB_STATIC_DIR", "/opt/entitydb/share/htdocs"),
+		// Paths - use relative paths as defaults
+		DataPath:         getEnv("ENTITYDB_DATA_PATH", "./var"),
+		StaticDir:        getEnv("ENTITYDB_STATIC_DIR", "./share/htdocs"),
 		
 		// Security
 		TokenSecret:      getEnv("ENTITYDB_TOKEN_SECRET", "entitydb-secret-key"),

@@ -2,76 +2,134 @@ package api
 
 import (
 	"encoding/json"
+	"entitydb/logger"
 	"net/http"
 	"strings"
-	
-	"entitydb/logger"
 )
 
-// LogLevelRequest represents a log level change request
-type LogLevelRequest struct {
-	Level string   `json:"level"`
-	Trace []string `json:"trace,omitempty"`
+// LogControlHandler manages runtime log configuration
+type LogControlHandler struct{}
+
+// NewLogControlHandler creates a new log control handler
+func NewLogControlHandler() *LogControlHandler {
+	return &LogControlHandler{}
 }
 
-// LogLevelResponse represents the current log configuration
-type LogLevelResponse struct {
-	Level string   `json:"level"`
-	Trace []string `json:"trace"`
+// SetLogLevelRequest represents a log level change request
+type SetLogLevelRequest struct {
+	Level string `json:"level"`
 }
 
-// GetLogLevel returns the current log configuration
-func (h *EntityHandler) GetLogLevel(w http.ResponseWriter, r *http.Request) {
-	response := LogLevelResponse{
-		Level: logger.GetLogLevel(),
-		Trace: logger.GetTraceSubsystems(),
-	}
-	
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(response); err != nil {
-		logger.Error("failed to encode log level response: %v", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-	}
+// SetTraceSubsystemsRequest represents a trace subsystems change request
+type SetTraceSubsystemsRequest struct {
+	Enable  []string `json:"enable,omitempty"`
+	Disable []string `json:"disable,omitempty"`
+	Clear   bool     `json:"clear,omitempty"`
 }
 
-// SetLogLevel updates the log configuration dynamically
-func (h *EntityHandler) SetLogLevel(w http.ResponseWriter, r *http.Request) {
-	var req LogLevelRequest
+// LogStatusResponse represents the current logging configuration
+type LogStatusResponse struct {
+	Level       string   `json:"level"`
+	Subsystems  []string `json:"subsystems"`
+}
+
+// SetLogLevel changes the runtime log level
+// @Summary Set log level
+// @Description Change the runtime log level
+// @Tags admin
+// @Accept json
+// @Produce json
+// @Param request body SetLogLevelRequest true "Log level"
+// @Success 200 {object} SuccessResponse
+// @Failure 400 {object} ErrorResponse
+// @Security BearerAuth
+// @Router /api/v1/admin/log-level [post]
+func (h *LogControlHandler) SetLogLevel(w http.ResponseWriter, r *http.Request) {
+	var req SetLogLevelRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		logger.Warn("invalid log level request: %v", err)
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		RespondError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	
-	// Update log level if provided
-	if req.Level != "" {
-		if err := logger.SetLogLevel(req.Level); err != nil {
-			logger.Warn("invalid log level specified: %s", req.Level)
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-		logger.Info("log level changed to %s", req.Level)
+
+	if err := logger.SetLogLevel(req.Level); err != nil {
+		RespondError(w, http.StatusBadRequest, err.Error())
+		return
 	}
-	
-	// Update trace subsystems if provided
-	if len(req.Trace) > 0 {
-		// Clear existing trace subsystems
+
+	RespondJSON(w, http.StatusOK, SuccessResponse{
+		Success: true,
+		Message: "log level updated to " + strings.ToUpper(req.Level),
+	})
+}
+
+// GetLogLevel returns the current log level
+// @Summary Get log level
+// @Description Get the current log level and trace subsystems
+// @Tags admin
+// @Produce json
+// @Success 200 {object} LogStatusResponse
+// @Security BearerAuth
+// @Router /api/v1/admin/log-level [get]
+func (h *LogControlHandler) GetLogLevel(w http.ResponseWriter, r *http.Request) {
+	RespondJSON(w, http.StatusOK, LogStatusResponse{
+		Level:      logger.GetLogLevel(),
+		Subsystems: logger.GetTraceSubsystems(),
+	})
+}
+
+// SetTraceSubsystems manages trace subsystems
+// @Summary Configure trace subsystems
+// @Description Enable, disable, or clear trace subsystems
+// @Tags admin
+// @Accept json
+// @Produce json
+// @Param request body SetTraceSubsystemsRequest true "Trace configuration"
+// @Success 200 {object} SuccessResponse
+// @Failure 400 {object} ErrorResponse
+// @Security BearerAuth
+// @Router /api/v1/admin/trace-subsystems [post]
+func (h *LogControlHandler) SetTraceSubsystems(w http.ResponseWriter, r *http.Request) {
+	var req SetTraceSubsystemsRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		RespondError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	// Clear all if requested
+	if req.Clear {
 		logger.ClearTrace()
-		
-		// Enable new trace subsystems
-		logger.EnableTrace(req.Trace...)
-		logger.Info("trace subsystems updated: %s", strings.Join(req.Trace, ", "))
+		logger.Info("trace subsystems cleared")
 	}
-	
-	// Return current configuration
-	response := LogLevelResponse{
-		Level: logger.GetLogLevel(),
-		Trace: logger.GetTraceSubsystems(),
+
+	// Enable subsystems
+	if len(req.Enable) > 0 {
+		logger.EnableTrace(req.Enable...)
+		logger.Info("trace subsystems enabled: %v", req.Enable)
 	}
-	
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(response); err != nil {
-		logger.Error("failed to encode log level response: %v", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+
+	// Disable subsystems
+	if len(req.Disable) > 0 {
+		logger.DisableTrace(req.Disable...)
+		logger.Info("trace subsystems disabled: %v", req.Disable)
 	}
+
+	RespondJSON(w, http.StatusOK, SuccessResponse{
+		Success: true,
+		Message: "trace subsystems updated",
+	})
+}
+
+// GetTraceSubsystems returns the current trace subsystems
+// @Summary Get trace subsystems
+// @Description Get the currently enabled trace subsystems
+// @Tags admin
+// @Produce json
+// @Success 200 {object} LogStatusResponse
+// @Security BearerAuth
+// @Router /api/v1/admin/trace-subsystems [get]
+func (h *LogControlHandler) GetTraceSubsystems(w http.ResponseWriter, r *http.Request) {
+	RespondJSON(w, http.StatusOK, LogStatusResponse{
+		Level:      logger.GetLogLevel(),
+		Subsystems: logger.GetTraceSubsystems(),
+	})
 }

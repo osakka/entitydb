@@ -36,7 +36,7 @@ func NewRecoveryManager(dataPath string) *RecoveryManager {
 func (rm *RecoveryManager) RecoverCorruptedEntity(repo *EntityRepository, entityID string) (*models.Entity, error) {
 	// Skip recovery for metric entities - they are created on demand
 	if strings.HasPrefix(entityID, "metric_") {
-		logger.Debug("[Recovery] Skipping recovery for metric entity %s", entityID)
+		logger.TraceIf("storage", "skipping recovery for metric entity %s", entityID)
 		return nil, fmt.Errorf("recovery skipped for metric entity %s", entityID)
 	}
 	
@@ -46,7 +46,7 @@ func (rm *RecoveryManager) RecoverCorruptedEntity(repo *EntityRepository, entity
 	rm.cacheMu.RUnlock()
 	
 	if exists && time.Since(lastAttempt) < 30*time.Second {
-		logger.Debug("[Recovery] Skipping recent recovery attempt for entity %s (last attempt: %v ago)", 
+		logger.TraceIf("storage", "skipping recent recovery attempt for entity %s (last attempt: %v ago)", 
 			entityID, time.Since(lastAttempt))
 		return nil, fmt.Errorf("recent recovery attempt failed for entity %s", entityID)
 	}
@@ -61,26 +61,26 @@ func (rm *RecoveryManager) RecoverCorruptedEntity(repo *EntityRepository, entity
 	})
 	defer op.Complete()
 	
-	logger.Info("[Recovery] Attempting to recover corrupted entity: %s", entityID)
+	logger.Info("attempting to recover corrupted entity: %s", entityID)
 	
 	// Try to read from WAL first
 	walPath := filepath.Join(rm.dataPath, "entitydb.wal")
 	if entity, err := rm.recoverFromWAL(walPath, entityID); err == nil {
-		logger.Info("[Recovery] Successfully recovered entity %s from WAL", entityID)
+		logger.Info("successfully recovered entity %s from wal", entityID)
 		op.SetMetadata("recovery_source", "wal")
 		return entity, nil
 	}
 	
 	// Try to read from backup files
 	if entity, err := rm.recoverFromBackup(entityID); err == nil {
-		logger.Info("[Recovery] Successfully recovered entity %s from backup", entityID)
+		logger.Info("successfully recovered entity %s from backup", entityID)
 		op.SetMetadata("recovery_source", "backup")
 		return entity, nil
 	}
 	
 	// Try partial recovery from main file
 	if entity, err := rm.partialRecovery(repo, entityID); err == nil {
-		logger.Info("[Recovery] Partially recovered entity %s", entityID)
+		logger.Info("partially recovered entity %s", entityID)
 		op.SetMetadata("recovery_source", "partial")
 		return entity, nil
 	}
@@ -162,7 +162,7 @@ func (rm *RecoveryManager) partialRecovery(repo *EntityRepository, entityID stri
 	
 	// Try to find entity by scanning the file
 	// This is a last-resort method when index is corrupted
-	logger.Warn("[Recovery] Attempting partial recovery by file scan for entity %s", entityID)
+	logger.Warn("attempting partial recovery by file scan for entity %s", entityID)
 	
 	// For now, create a placeholder entity indicating recovery failure
 	// In a production system, you would implement actual file scanning
@@ -191,17 +191,17 @@ func (rm *RecoveryManager) RepairIndex(repo *EntityRepository) error {
 	})
 	defer op.Complete()
 	
-	logger.Info("[Recovery] Starting index repair")
+	logger.Info("starting index repair")
 	
 	// Use the repository's existing RepairIndex functionality
 	// The EntityRepository has its own RepairIndex method that handles the writer
 	if err := repo.buildIndexes(); err != nil {
 		op.Fail(err)
-		logger.Error("[Recovery] Failed to rebuild indexes: %v", err)
+		logger.Error("failed to rebuild indexes: %v", err)
 		return err
 	}
 	
-	logger.Info("[Recovery] Index repair complete")
+	logger.Info("index repair complete")
 	return nil
 }
 
@@ -293,14 +293,14 @@ func (rm *RecoveryManager) RepairWAL() error {
 	})
 	defer op.Complete()
 	
-	logger.Info("[Recovery] Starting WAL repair")
+	logger.Info("starting wal repair")
 	
 	walPath := filepath.Join(rm.dataPath, "entitydb.wal")
 	backupPath := filepath.Join(rm.dataPath, "entitydb.wal.backup")
 	
 	// Create backup of current WAL
 	if err := rm.copyFile(walPath, backupPath); err != nil {
-		logger.Warn("[Recovery] Failed to backup WAL: %v", err)
+		logger.Warn("failed to backup wal: %v", err)
 	}
 	
 	// Open WAL for reading
@@ -373,7 +373,7 @@ func (rm *RecoveryManager) RepairWAL() error {
 	op.SetMetadata("valid_entries", validEntries)
 	op.SetMetadata("corrupted_entries", corruptedEntries)
 	
-	logger.Info("[Recovery] WAL repair complete: %d valid entries, %d corrupted entries", 
+	logger.Info("wal repair complete: %d valid entries, %d corrupted entries", 
 		validEntries, corruptedEntries)
 	
 	return nil

@@ -75,3 +75,23 @@ func (h *EntityHandlerRBAC) GetEntityTimeseries() http.HandlerFunc {
 func (h *EntityHandlerRBAC) SimpleCreateEntity() http.HandlerFunc {
 	return RequirePermission(h.sessionManager, h.repo, PermEntityCreate)(h.handler.SimpleCreateEntity)
 }
+
+// ListByTag wraps ListByTag with permission check
+func (h *EntityHandlerRBAC) ListByTag() http.HandlerFunc {
+	return RequirePermission(h.sessionManager, h.repo, PermEntityView)(h.handler.ListEntities)
+}
+
+// GetEntityChanges wraps GetEntityChanges with permission check
+func (h *EntityHandlerRBAC) GetEntityChanges() http.HandlerFunc {
+	return RequirePermission(h.sessionManager, h.repo, PermEntityView)(h.handler.GetRecentChanges)
+}
+
+// GetChunk wraps GetChunk with permission check
+func (h *EntityHandlerRBAC) GetChunk() http.HandlerFunc {
+	return RequirePermission(h.sessionManager, h.repo, PermEntityView)(h.handler.HandleRawChunkRetrieval)
+}
+
+// StreamContent wraps StreamContent with permission check
+func (h *EntityHandlerRBAC) StreamContent() http.HandlerFunc {
+	return RequirePermission(h.sessionManager, h.repo, PermEntityView)(h.handler.StreamChunkedEntityContent)
+}

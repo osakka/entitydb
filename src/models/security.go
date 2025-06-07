@@ -93,7 +93,7 @@ type SecurityPermission struct {
 
 // CreateUser creates a new user entity with separate credential entity
 func (sm *SecurityManager) CreateUser(username, password, email string) (*SecurityUser, error) {
-	logger.Debug("CreateUser called for username: %s", username)
+	logger.TraceIf("auth", "creating user for username: %s", username)
 	
 	// Check if user already exists
 	existingUsers, err := sm.entityRepo.ListByTag("identity:username:" + username)
@@ -102,13 +102,13 @@ func (sm *SecurityManager) CreateUser(username, password, email string) (*Securi
 	}
 	
 	if len(existingUsers) > 0 {
-		logger.Debug("User %s already exists with ID: %s", username, existingUsers[0].ID)
+		logger.TraceIf("auth", "user %s already exists with id: %s", username, existingUsers[0].ID)
 		return nil, fmt.Errorf("user with username '%s' already exists", username)
 	}
 	
 	// Generate secure UUID for user
 	userID := "user_" + generateSecureUUID()
-	logger.Debug("Generated user ID: %s", userID)
+	logger.TraceIf("auth", "generated user id: %s", userID)
 	
 	// Create user entity (no sensitive data)
 	tags := []string{
@@ -136,10 +136,10 @@ func (sm *SecurityManager) CreateUser(username, password, email string) (*Securi
 	
 	// Create user entity
 	if err := sm.entityRepo.Create(userEntity); err != nil {
-		logger.Error("Failed to create user entity: %v", err)
+		logger.Error("failed to create user entity: %v", err)
 		return nil, fmt.Errorf("failed to create user entity: %v", err)
 	}
-	logger.Debug("Successfully created user entity")
+	logger.TraceIf("auth", "successfully created user entity")
 	
 	// Create separate credential entity
 	credentialID := "cred_" + generateSecureUUID()
@@ -196,17 +196,19 @@ func (sm *SecurityManager) CreateUser(username, password, email string) (*Securi
 // AuthenticateUser performs relationship-based authentication
 func (sm *SecurityManager) AuthenticateUser(username, password string) (*SecurityUser, error) {
 	// Find user by username tag
-	logger.Debug("Looking for user with tag: identity:username:%s", username)
+	logger.TraceIf("auth", "looking for user with tag: identity:username:%s", username)
+	logger.TraceIf("auth", "about to call ListByTag for user lookup")
 	userEntities, err := sm.entityRepo.ListByTag("identity:username:" + username)
+	logger.TraceIf("auth", "ListByTag returned %d entities", len(userEntities))
 	if err != nil {
-		logger.Error("Error finding user: %v", err)
+		logger.Error("error finding user: %v", err)
 		return nil, fmt.Errorf("user not found: %v", err)
 	}
 	if len(userEntities) == 0 {
-		logger.Debug("No user entities found with username: %s", username)
+		logger.TraceIf("auth", "no user entities found with username: %s", username)
 		return nil, fmt.Errorf("user not found")
 	}
-	logger.Debug("Found %d user entities for username: %s", len(userEntities), username)
+	logger.TraceIf("auth", "found %d user entities for username: %s", len(userEntities), username)
 	
 	userEntity := userEntities[0]
 	
@@ -225,27 +227,29 @@ func (sm *SecurityManager) AuthenticateUser(username, password string) (*Securit
 	}
 	
 	// Get credential entity via relationship
-	logger.Debug("Getting relationships for user ID: %s", userEntity.ID)
+	logger.TraceIf("auth", "getting relationships for user id: %s", userEntity.ID)
+	logger.TraceIf("auth", "about to call GetRelationshipsBySource")
 	credentialEntities, err := sm.entityRepo.GetRelationshipsBySource(userEntity.ID)
+	logger.TraceIf("auth", "GetRelationshipsBySource returned %d relationships", len(credentialEntities))
 	if err != nil {
-		logger.Error("Failed to get relationships for user %s: %v", userEntity.ID, err)
+		logger.Error("failed to get relationships for user %s: %v", userEntity.ID, err)
 		return nil, fmt.Errorf("failed to get user credentials: %v", err)
 	}
-	logger.Debug("Found %d relationships for user %s", len(credentialEntities), userEntity.ID)
+	logger.TraceIf("auth", "found %d relationships for user %s", len(credentialEntities), userEntity.ID)
 	
 	var credentialEntity *Entity
 	for _, rel := range credentialEntities {
 		if relationship, ok := rel.(*EntityRelationship); ok {
-			logger.Debug("Checking relationship %s of type %s/%s", relationship.ID, relationship.Type, relationship.RelationshipType)
+			logger.TraceIf("auth", "checking relationship %s of type %s/%s", relationship.ID, relationship.Type, relationship.RelationshipType)
 			if relationship.Type == RelationshipHasCredential || relationship.RelationshipType == RelationshipHasCredential {
-				logger.Debug("Found has_credential relationship, fetching credential entity %s", relationship.TargetID)
+				logger.TraceIf("auth", "found has_credential relationship, fetching credential entity %s", relationship.TargetID)
 				credEntity, err := sm.entityRepo.GetByID(relationship.TargetID)
 				if err == nil {
 					credentialEntity = credEntity
-					logger.Debug("Successfully fetched credential entity %s", relationship.TargetID)
+					logger.TraceIf("auth", "successfully fetched credential entity %s", relationship.TargetID)
 					break
 				} else {
-					logger.Error("Failed to fetch credential entity %s: %v", relationship.TargetID, err)
+					logger.Error("failed to fetch credential entity %s: %v", relationship.TargetID, err)
 				}
 			}
 		}
@@ -266,22 +270,50 @@ func (sm *SecurityManager) AuthenticateUser(username, password string) (*Securit
 	}
 	
 	// Verify password
-	logger.Debug("Starting password verification for user %s", username)
-	logger.Debug("Credential content length: %d bytes", len(credentialEntity.Content))
-	logger.Debug("Salt: %s", salt)
-	logger.Debug("Password+salt length: %d", len(password+salt))
+	logger.TraceIf("auth", "starting password verification for user %s", username)
+	logger.TraceIf("auth", "credential content length: %d bytes", len(credentialEntity.Content))
+	logger.TraceIf("auth", "salt: %s", salt)
+	logger.TraceIf("auth", "password+salt length: %d", len(password+salt))
 	
-	startTime := time.Now()
-	err = bcrypt.CompareHashAndPassword(credentialEntity.Content, []byte(password+salt))
-	elapsed := time.Since(startTime)
-	
-	logger.Debug("Password verification completed in %v", elapsed)
-	
-	if err != nil {
-		logger.Debug("Password verification failed: %v", err)
-		return nil, fmt.Errorf("invalid password")
+	// Validate credential content before bcrypt operation
+	if len(credentialEntity.Content) == 0 {
+		logger.Error("credential content is empty for user %s", username)
+		return nil, fmt.Errorf("invalid credentials")
 	}
-	logger.Debug("Password verification successful")
+	
+	// Check if content looks like a bcrypt hash (should start with $2a$, $2b$, or $2y$)
+	if len(credentialEntity.Content) < 4 || credentialEntity.Content[0] != '$' {
+		logger.Error("credential content does not appear to be a bcrypt hash for user %s (first bytes: %v)", 
+			username, credentialEntity.Content[:min(4, len(credentialEntity.Content))])
+		return nil, fmt.Errorf("invalid credential format")
+	}
+	
+	// Use a goroutine with timeout to prevent indefinite hang
+	type bcryptResult struct {
+		err error
+	}
+	resultChan := make(chan bcryptResult, 1)
+	
+	go func() {
+		startTime := time.Now()
+		err := bcrypt.CompareHashAndPassword(credentialEntity.Content, []byte(password+salt))
+		elapsed := time.Since(startTime)
+		logger.TraceIf("auth", "password verification completed in %v", elapsed)
+		resultChan <- bcryptResult{err: err}
+	}()
+	
+	// Wait for bcrypt result with timeout
+	select {
+	case result := <-resultChan:
+		if result.err != nil {
+			logger.TraceIf("auth", "password verification failed: %v", result.err)
+			return nil, fmt.Errorf("invalid password")
+		}
+		logger.TraceIf("auth", "password verification successful")
+	case <-time.After(5 * time.Second):
+		logger.Error("password verification timed out after 5 seconds for user %s", username)
+		return nil, fmt.Errorf("authentication timeout")
+	}
 	
 	// Extract user details
 	var email string
@@ -729,4 +761,12 @@ func generateSalt() string {
 	bytes := make([]byte, 16)
 	rand.Read(bytes)
 	return hex.EncodeToString(bytes)
+}
+
+// min returns the smaller of two integers
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }

@@ -30,8 +30,8 @@ SSL_PORT="${ENTITYDB_SSL_PORT:-8085}"
 HOST="${ENTITYDB_HOST:-0.0.0.0}"
 DB_PATH="${ENTITYDB_DATA_PATH:-$EntityDB_DIR/var}"
 STATIC_DIR="${ENTITYDB_STATIC_DIR:-$EntityDB_DIR/share/htdocs}"
-SSL_CERT="${ENTITYDB_SSL_CERT:-/etc/ssl/certs/server.pem}"
-SSL_KEY="${ENTITYDB_SSL_KEY:-/etc/ssl/private/server.key}"
+SSL_CERT="${ENTITYDB_SSL_CERT:-$EntityDB_DIR/certs/server.pem}"
+SSL_KEY="${ENTITYDB_SSL_KEY:-$EntityDB_DIR/certs/server.key}"
 
 # Colors for output
 GREEN='\033[0;32m'
@@ -77,7 +77,7 @@ init_database() {
     print_message "$BLUE" "Default admin user not found or not working. Creating..."
     
     # Generate bcrypt hash for "admin" password
-    cd /opt/entitydb/src
+    cd "$EntityDB_DIR/src"
     cat > generate_admin_hash.go << 'EOF'
 package main
 
@@ -203,17 +203,18 @@ start_server() {
     fi
 
     # Build command line arguments from environment
+    # All flags now use long names for clarity and consistency
     CMD_ARGS=""
-    [ -n "$ENTITYDB_USE_SSL" ] && [ "$ENTITYDB_USE_SSL" = "true" ] && CMD_ARGS="$CMD_ARGS --use-ssl"
-    [ -n "$SSL_CERT" ] && CMD_ARGS="$CMD_ARGS --ssl-cert $SSL_CERT"
-    [ -n "$SSL_KEY" ] && CMD_ARGS="$CMD_ARGS --ssl-key $SSL_KEY"
-    [ -n "$SSL_PORT" ] && CMD_ARGS="$CMD_ARGS --ssl-port $SSL_PORT"
-    [ -n "$DB_PATH" ] && CMD_ARGS="$CMD_ARGS -data $DB_PATH"
-    [ -n "$STATIC_DIR" ] && CMD_ARGS="$CMD_ARGS -static-dir $STATIC_DIR"
-    [ -n "$ENTITYDB_PORT" ] && CMD_ARGS="$CMD_ARGS -port $ENTITYDB_PORT"
-    [ -n "$ENTITYDB_LOG_LEVEL" ] && CMD_ARGS="$CMD_ARGS -log-level $ENTITYDB_LOG_LEVEL"
-    [ -n "$ENTITYDB_TOKEN_SECRET" ] && CMD_ARGS="$CMD_ARGS -token-secret $ENTITYDB_TOKEN_SECRET"
-    [ -n "$ENTITYDB_HIGH_PERFORMANCE" ] && [ "$ENTITYDB_HIGH_PERFORMANCE" = "true" ] && CMD_ARGS="$CMD_ARGS --high-performance"
+    [ -n "$ENTITYDB_USE_SSL" ] && [ "$ENTITYDB_USE_SSL" = "true" ] && CMD_ARGS="$CMD_ARGS --entitydb-use-ssl"
+    [ -n "$SSL_CERT" ] && CMD_ARGS="$CMD_ARGS --entitydb-ssl-cert $SSL_CERT"
+    [ -n "$SSL_KEY" ] && CMD_ARGS="$CMD_ARGS --entitydb-ssl-key $SSL_KEY"
+    [ -n "$SSL_PORT" ] && CMD_ARGS="$CMD_ARGS --entitydb-ssl-port $SSL_PORT"
+    [ -n "$DB_PATH" ] && CMD_ARGS="$CMD_ARGS --entitydb-data-path $DB_PATH"
+    [ -n "$STATIC_DIR" ] && CMD_ARGS="$CMD_ARGS --entitydb-static-dir $STATIC_DIR"
+    [ -n "$ENTITYDB_PORT" ] && CMD_ARGS="$CMD_ARGS --entitydb-port $ENTITYDB_PORT"
+    [ -n "$ENTITYDB_LOG_LEVEL" ] && CMD_ARGS="$CMD_ARGS --entitydb-log-level $ENTITYDB_LOG_LEVEL"
+    [ -n "$ENTITYDB_TOKEN_SECRET" ] && CMD_ARGS="$CMD_ARGS --entitydb-token-secret $ENTITYDB_TOKEN_SECRET"
+    [ -n "$ENTITYDB_HIGH_PERFORMANCE" ] && [ "$ENTITYDB_HIGH_PERFORMANCE" = "true" ] && CMD_ARGS="$CMD_ARGS --entitydb-high-performance"
     
     # Start the server
     "$ACTIVE_SERVER" $CMD_ARGS > "$LOG_FILE" 2>&1 &

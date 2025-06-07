@@ -48,6 +48,13 @@ func (m *RequestMetricsMiddleware) Middleware(next http.Handler) http.Handler {
 			return
 		}
 		
+		// TEMPORARY: Skip auth endpoints to avoid potential deadlock
+		if strings.HasPrefix(r.URL.Path, "/api/v1/auth/") {
+			logger.Debug("Skipping metrics for auth endpoint: %s", r.URL.Path)
+			next.ServeHTTP(w, r)
+			return
+		}
+		
 		logger.Debug("RequestMetricsMiddleware: Processing request %s %s", r.Method, r.URL.Path)
 		
 		start := time.Now()

@@ -47,13 +47,13 @@ func (h *AdminHandler) ReindexHandler(w http.ResponseWriter, r *http.Request) {
 		json.NewDecoder(r.Body).Decode(&req)
 	}
 	
-	logger.Info("Admin reindex requested (force=%v)", req.Force)
+	logger.Info("admin reindex requested with force=%v", req.Force)
 	
 	// Call the repository's reindex method
 	if reindexer, ok := h.repo.(interface{ ReindexTags() error }); ok {
 		err := reindexer.ReindexTags()
 		if err != nil {
-			logger.Error("Reindex failed: %v", err)
+			logger.Error("reindex failed: %v", err)
 			RespondJSON(w, http.StatusInternalServerError, ReindexResponse{
 				Success: false,
 				Message: "Reindex failed",

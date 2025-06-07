@@ -1,0 +1,134 @@
+# Add these targets to the existing Makefile in src/
+
+# =============================================================================
+# CI/CD and Automation Targets
+# =============================================================================
+
+.PHONY: test-ci security-scan lint docker docker-test
+
+# CI-friendly test target
+test-ci: ## Run tests suitable for CI environment
+	@echo "[1;33mRunning CI tests...[0m"
+	go test -race -coverprofile=coverage.out ./...
+	go tool cover -func=coverage.out
+	go tool cover -html=coverage.out -o coverage.html
+	@echo "[0;32mCI tests completed[0m"
+
+# Security scanning
+security-scan: ## Run security analysis
+	@echo "[1;33mRunning security scan...[0m"
+	@if ! which gosec > /dev/null; then \
+		echo "Installing gosec..."; \
+		go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest; \
+	fi
+	gosec -fmt json -out security-report.json ./...
+	@echo "[0;32mSecurity scan completed[0m"
+
+# Code quality checks
+lint: ## Run comprehensive code quality checks
+	@echo "[1;33mRunning code quality checks...[0m"
+	@if ! which golangci-lint > /dev/null; then \
+		echo "Installing golangci-lint..."; \
+		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $$(go env GOPATH)/bin v1.55.2; \
+	fi
+	golangci-lint run --timeout=5m
+	@echo "Checking formatting..."
+	@if [ "$$(gofmt -s -l . | wc -l)" -gt 0 ]; then \
+		echo "The following files need formatting:"; \
+		gofmt -s -l .; \
+		exit 1; \
+	fi
+	@echo "[0;32mCode quality checks passed[0m"
+
+# Format code
+fmt: ## Format Go code
+	@echo "[1;33mFormatting code...[0m"
+	gofmt -w .
+	@if which goimports > /dev/null; then \
+		goimports -w .; \
+	fi
+	@echo "[0;32mCode formatted[0m"
+
+# Docker build
+docker: ## Build Docker image
+	@echo "[1;33mBuilding Docker image...[0m"
+	cd .. && docker build -t entitydb:latest \
+		--build-arg VERSION=$$(git describe --tags --always) \
+		--build-arg BUILD_DATE=$$(date -u +%Y-%m-%dT%H:%M:%SZ) \
+		-f Dockerfile .
+	@echo "[0;32mDocker image built: entitydb:latest[0m"
+
+# Test Docker image
+docker-test: docker ## Build and test Docker image
+	@echo "[1;33mTesting Docker image...[0m"
+	docker run --rm entitydb:latest --version
+	@echo "[0;32mDocker image test completed[0m"
+
+# Integration tests
+test-integration: build ## Run integration tests
+	@echo "[1;33mRunning integration tests...[0m"
+	@if [ -f run_all_tests.sh ]; then \
+		chmod +x run_all_tests.sh; \
+		./run_all_tests.sh; \
+	else \
+		echo "No integration tests found"; \
+	fi
+	@echo "[0;32mIntegration tests completed[0m"
+
+# Pre-commit checks (run before committing)
+pre-commit: fmt lint security-scan test-ci ## Run all pre-commit checks
+	@echo "[0;32mAll pre-commit checks passed![0m"
+
+# Release build
+build-release: ## Build release binaries for multiple platforms
+	@echo "[1;33mBuilding release binaries...[0m"
+	@mkdir -p ../dist
+	
+	# Linux AMD64
+	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build \
+		-ldflags "-X main.Version=$$(git describe --tags --always) -X main.BuildDate=$$(date -u +%Y-%m-%d)" \
+		-o ../dist/entitydb-linux-amd64 main.go
+	
+	# Linux ARM64
+	GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build \
+		-ldflags "-X main.Version=$$(git describe --tags --always) -X main.BuildDate=$$(date -u +%Y-%m-%d)" \
+		-o ../dist/entitydb-linux-arm64 main.go
+	
+	# macOS AMD64
+	GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build \
+		-ldflags "-X main.Version=$$(git describe --tags --always) -X main.BuildDate=$$(date -u +%Y-%m-%d)" \
+		-o ../dist/entitydb-darwin-amd64 main.go
+	
+	# macOS ARM64 (Apple Silicon)
+	GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build \
+		-ldflags "-X main.Version=$$(git describe --tags --always) -X main.BuildDate=$$(date -u +%Y-%m-%d)" \
+		-o ../dist/entitydb-darwin-arm64 main.go
+	
+	# Windows AMD64
+	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build \
+		-ldflags "-X main.Version=$$(git describe --tags --always) -X main.BuildDate=$$(date -u +%Y-%m-%d)" \
+		-o ../dist/entitydb-windows-amd64.exe main.go
+	
+	@echo "[0;32mRelease binaries built in ../dist/[0m"
+	@ls -la ../dist/
+
+# Clean CI artifacts
+clean-ci: ## Clean CI-related artifacts
+	@echo "[1;33mCleaning CI artifacts...[0m"
+	rm -f coverage.out coverage.html security-report.json
+	rm -rf ../dist
+	@echo "[0;32mCI artifacts cleaned[0m"
+
+# Help for new targets
+help-ci: ## Show CI/CD related targets
+	@echo "CI/CD Targets:"
+	@echo "  test-ci          Run tests suitable for CI"
+	@echo "  security-scan    Run security analysis"
+	@echo "  lint            Run code quality checks"
+	@echo "  fmt             Format Go code"
+	@echo "  docker          Build Docker image"
+	@echo "  docker-test     Build and test Docker image"
+	@echo "  test-integration Run integration tests"
+	@echo "  pre-commit      Run all pre-commit checks"
+	@echo "  build-release   Build release binaries"
+	@echo "  clean-ci        Clean CI artifacts"

@@ -3,7 +3,7 @@
 > [!IMPORTANT]
 > EntityDB is a high-performance temporal database where every tag is timestamped with nanosecond precision. All data is stored in a custom binary format (EBF) with Write-Ahead Logging for durability and concurrent access support.
 
-## Current State (v2.25.0)
+## Current State (v2.27.0)
 
 EntityDB now features a unified Entity model with autochunking:
 - **Unified Entity Model**: Single content field ([]byte) per entity
@@ -63,11 +63,22 @@ EntityDB now features a unified Entity model with autochunking:
 │   │   ├── metrics_handler.go       # Prometheus metrics endpoint
 │   │   ├── system_metrics_handler.go # EntityDB system metrics
 │   │   ├── rbac_metrics_handler.go  # RBAC & session metrics
-│   │   └── rbac_middleware.go       # RBAC enforcement middleware
+│   │   ├── rbac_middleware.go       # RBAC enforcement middleware
+│   │   ├── connection_close_middleware.go # Prevents hanging connections
+│   │   ├── te_header_middleware.go  # Fixes TE header hangs
+│   │   ├── trace_middleware.go      # Request tracing and debugging
+│   │   └── trace_context.go         # Trace context management
 │   ├── models/                      # Entity models
+│   ├── logger/                      # Enhanced logging system
+│   │   ├── logger.go               # Main logging implementation
+│   │   ├── log_bridge.go           # Standard library log redirection
+│   │   └── trace.go                # Request tracing utilities
 │   └── storage/binary/              # Binary format implementation
 │       ├── entity_repository.go
-│       └── relationship_repository.go  # Binary relationships
+│       ├── relationship_repository.go  # Binary relationships
+│       ├── sharded_lock.go         # Sharded locking for high concurrency
+│       ├── lock_tracer.go          # Lock operation tracing
+│       └── traced_locks.go         # Deadlock detection and debugging
 ├── bin/
 │   ├── entitydb                     # Server binary
 │   └── entitydbd.sh                 # Daemon script
@@ -138,6 +149,8 @@ make install        # Install scripts
 ./bin/entitydbd.sh stop    # Stop server
 ```
 
+> **Important**: SSL must be enabled (ENTITYDB_USE_SSL=true) for proper CORS functionality. Without SSL, browsers may block API requests from web applications due to mixed content policies.
+
 ### Default Admin User
 The server automatically creates a default admin user if none exists:
 - Username: `admin`
@@ -164,7 +177,38 @@ The server automatically creates a default admin user if none exists:
 - Audit logging
 - Aggregation queries (beyond sorting/filtering)
 
-## Recent Changes (v2.25.0)
+## Recent Changes (v2.27.0)
+
+- **Configuration Management Overhaul**: Implemented comprehensive 3-tier configuration system
+  - Database configuration takes highest priority, followed by command-line flags, then environment variables
+  - Eliminated ALL hardcoded paths, filenames, flags, options, and IDs throughout the codebase
+  - Converted all short flags to long format (--entitydb-xxx), reserving short flags for -h and -v only
+  - Created centralized ConfigManager with proper database caching and 5-minute expiry
+  - Added runtime configuration updates via API for production troubleshooting
+  - Comprehensive documentation in docs/development/configuration-management.md
+- **Logging Standards Implementation**: Complete logging system standardization
+  - Implemented unified format: "timestamp [pid:tid] [LEVEL] function.file:line: message"
+  - Separated TRACE from regular logging with fine-grained subsystem control
+  - Removed all redundant prefixes and inappropriate log levels throughout codebase
+  - Added runtime log level and trace subsystem adjustment via API, flags, and environment
+  - Thread-safe implementation with atomic operations for zero overhead when disabled
+  - Comprehensive documentation in docs/development/logging-standards.md
+- **HTTP Connection Stability**: Comprehensive fixes for authentication hangs and connection issues
+  - Added `ConnectionCloseMiddleware` to prevent hanging connections with browsers and curl
+  - Added `TEHeaderMiddleware` to strip problematic TE: trailers header that causes server hangs
+  - Enhanced logging system with `LogBridge` for proper HTTP error categorization
+  - Added request tracing with `TraceMiddleware` for debugging authentication flows
+- **Advanced Concurrency Control**: Sharded locking system for high-performance scenarios
+  - Implemented `ShardedLockManager` to distribute lock contention across multiple shards
+  - Added `TracedLocks` with deadlock detection and comprehensive operation tracking
+  - Fixed ListByTag deadlock issues in high-concurrency scenarios with proper lock ordering
+- **Repository Maintenance**: Major cleanup following single source of truth principle
+  - Moved 40+ debug tools, test scripts, and analysis utilities to trash directory
+  - Retained only essential repair tools (force reindex, rebuild tag index, recovery tool)
+  - Consolidated all authentication and performance fixes into main codebase
+  - Clean build with zero warnings and no redundant implementations
+
+## Previous Changes (v2.25.0)
 
 - **Complete Metrics System Fix**: All performance metrics now show real values
   - Fixed WAL persistence to save current in-memory entity state with all accumulated tags

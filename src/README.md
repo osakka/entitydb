@@ -28,6 +28,10 @@ This directory contains the source code for the EntityDB platform. This document
 │   ├── relationship_handler_rbac.go # RBAC wrapper for relationships
 │   ├── user_handler.go       # User management API
 │   ├── user_handler_rbac.go  # RBAC wrapper for user API
+│   ├── connection_close_middleware.go # Connection stability middleware
+│   ├── te_header_middleware.go # TE header fix middleware
+│   ├── trace_middleware.go     # Request tracing middleware
+│   ├── trace_context.go        # Trace context management
 │   ├── auth_middleware.go    # Authentication middleware
 │   ├── rbac_middleware.go    # RBAC enforcement middleware
 │   ├── metrics_handler.go    # Prometheus metrics endpoint

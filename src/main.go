@@ -11,6 +11,7 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -18,7 +19,6 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -28,16 +28,16 @@ import (
 	"entitydb/storage/binary"
 	"entitydb/api"
 	"entitydb/logger"
+	"entitydb/config"
 	
 	"github.com/gorilla/mux"
 	httpSwagger "github.com/swaggo/http-swagger"
-	"golang.org/x/crypto/bcrypt"
 	
 	_ "entitydb/docs" // This is required for swagger
 )
 
 // @title EntityDB API
-// @version 2.23.1
+// @version 2.27.0
 // @description A temporal database with pure entity-based architecture
 // @termsOfService https://github.com/osakka/entitydb
 
@@ -56,128 +56,43 @@ import (
 // @description Bearer token authentication. Example: "Bearer <token>"
 
 // =============================================================================
-// Configuration Helpers
-// =============================================================================
-
-// getEnv retrieves an environment variable value with a default fallback.
-// If the environment variable is not set or empty, the default value is returned.
-func getEnv(key, defaultValue string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-	return defaultValue
-}
-
-// getEnvInt retrieves an environment variable as an integer with a default fallback.
-// If the environment variable is not set, empty, or cannot be parsed as an integer,
-// the default value is returned.
-func getEnvInt(key string, defaultValue int) int {
-	if value := os.Getenv(key); value != "" {
-		if intValue, err := strconv.Atoi(value); err == nil {
-			return intValue
-		}
-	}
-	return defaultValue
-}
-
-// getEnvBool retrieves an environment variable as a boolean with a default fallback.
-// The function considers "true" or "1" as true, everything else as false.
-// If the environment variable is not set or empty, the default value is returned.
-func getEnvBool(key string, defaultValue bool) bool {
-	if value := os.Getenv(key); value != "" {
-		return strings.ToLower(value) == "true"
-	}
-	return defaultValue
-}
-
-// getEnvDuration retrieves an environment variable as a time.Duration.
-// The environment variable should contain the number of seconds as an integer.
-// If the variable is not set, empty, or cannot be parsed, the default duration
-// (specified in seconds) is returned.
-func getEnvDuration(key string, defaultSeconds int) time.Duration {
-	if value := os.Getenv(key); value != "" {
-		if intValue, err := strconv.Atoi(value); err == nil {
-			return time.Duration(intValue) * time.Second
-		}
-	}
-	return time.Duration(defaultSeconds) * time.Second
-}
-
-// =============================================================================
 // Global Variables and Configuration
 // =============================================================================
 
 // Version information (can be overridden at build time via ldflags)
 var (
-	Version    = "2.25.0"  // Build-time version, set via -ldflags "-X main.Version=x.y.z"
+	Version    = "2.27.0"  // Build-time version, set via -ldflags "-X main.Version=x.y.z"
 	BuildDate  = "unknown" // Build-time date, set via -ldflags "-X main.BuildDate=YYYY-MM-DD"
-	AppName    = getEnv("ENTITYDB_APP_NAME", "EntityDB Server")
-	AppVersion = getEnv("ENTITYDB_APP_VERSION", "2.25.0")
 )
 
-// Command line flags for server configuration
+// Global configuration manager
+var configManager *config.ConfigManager
+
+// Essential short flags only
 var (
-	port             int
-	sslPort          int
-	useSSL           bool
-	sslCert          string
-	sslKey           string
-	logLevel         string
-	dataPath         string
-	tokenSecret      string
-	staticDir        string
-	showVersion      bool
-	highPerformance  bool
-	
-	// HTTP timeout configurations
-	httpReadTimeout    time.Duration
-	httpWriteTimeout   time.Duration
-	httpIdleTimeout    time.Duration
-	shutdownTimeout    time.Duration
-	
-	// Metrics configurations
-	metricsInterval    time.Duration
-	swaggerHost        string
+	showVersion bool
+	showHelp    bool
 )
 
 // =============================================================================
 // Type Definitions
 // =============================================================================
 
-// Config holds the server configuration settings.
-// These values are populated from command-line flags and environment variables.
-type Config struct {
-	Port              int                // HTTP server port
-	SSLPort           int                // HTTPS server port
-	UseSSL            bool               // Enable SSL/TLS
-	SSLCert           string             // Path to SSL certificate file
-	SSLKey            string             // Path to SSL private key file
-	SessionTTL        time.Duration      // Session timeout duration
-	EnableRateLimit   bool               // Enable rate limiting
-	RateLimitRequests int                // Number of requests allowed per window
-	RateLimitWindow   time.Duration      // Rate limit time window
-}
-
-// User represents a user in the system.
-// This is a legacy structure that will be replaced by entity-based user management.
+// User represents a legacy user structure (deprecated - for backward compatibility only)
 type User struct {
-	ID       string   // Unique user identifier
-	Username string   // Login username
-	Password string   // Hashed password (bcrypt)
-	Roles    []string // User roles for RBAC
+	ID       string `json:"id"`
+	Username string `json:"username"`
+	Password string `json:"password"` // Bcrypt hashed
 }
 
-// EntityDBServer is the main server instance that manages all components.
-// It coordinates repositories, handlers, and security components to provide
-// the EntityDB REST API.
+// EntityDBServer represents the main server instance with all its dependencies
 type EntityDBServer struct {
-	entityRepo        models.EntityRepository
-	relationRepo      models.EntityRelationshipRepository
-	sessionManager    *models.SessionManager
-	securityManager   *models.SecurityManager
-	securityInit      *models.SecurityInitializer
+	entityRepo       models.EntityRepository
+	relationRepo     models.EntityRelationshipRepository
+	securityManager  *models.SecurityManager
+	sessionManager   *models.SessionManager
+	securityInit     *models.SecurityInitializer
 	users            map[string]*User // Legacy - will be removed
-	port             int
 	mu               sync.RWMutex
 	server           *http.Server
 	entityHandler    *api.EntityHandler
@@ -185,74 +100,93 @@ type EntityDBServer struct {
 	userHandler      *api.UserHandler
 	authHandler      *api.AuthHandler
 	securityMiddleware *api.SecurityMiddleware
-	config           *Config
+	config           *config.Config
 }
 
 // NewEntityDBServer creates a new server instance
-func NewEntityDBServer(config *Config) *EntityDBServer {
+func NewEntityDBServer(cfg *config.Config) *EntityDBServer {
 	server := &EntityDBServer{
 		users:          make(map[string]*User), // Legacy - will be removed
-		sessionManager: models.NewSessionManager(config.SessionTTL),
-		port:           config.Port,
-		config:         config,
+		sessionManager: models.NewSessionManager(time.Duration(cfg.SessionTTLHours) * time.Hour),
+		config:         cfg,
 	}
 	return server
 }
 
 func init() {
-	// Basic server configuration
-	flag.IntVar(&port, "port", getEnvInt("ENTITYDB_PORT", 8085), "Server port")
-	flag.IntVar(&sslPort, "ssl-port", getEnvInt("ENTITYDB_SSL_PORT", 8085), "SSL server port")
-	flag.BoolVar(&useSSL, "use-ssl", getEnvBool("ENTITYDB_USE_SSL", false), "Enable SSL/TLS")
-	flag.StringVar(&sslCert, "ssl-cert", getEnv("ENTITYDB_SSL_CERT", "/etc/ssl/certs/server.pem"), "SSL certificate file path")
-	flag.StringVar(&sslKey, "ssl-key", getEnv("ENTITYDB_SSL_KEY", "/etc/ssl/private/server.key"), "SSL private key file path")
-	flag.StringVar(&logLevel, "log-level", getEnv("ENTITYDB_LOG_LEVEL", "info"), "Log level (debug, info, warn, error)")
-	flag.StringVar(&dataPath, "data", getEnv("ENTITYDB_DATA_PATH", "/opt/entitydb/var"), "Data directory path")
-	flag.StringVar(&tokenSecret, "token-secret", getEnv("ENTITYDB_TOKEN_SECRET", "entitydb-secret-key"), "Secret key for JWT tokens")
-	flag.StringVar(&staticDir, "static-dir", getEnv("ENTITYDB_STATIC_DIR", "/opt/entitydb/share/htdocs"), "Static files directory")
-	flag.BoolVar(&showVersion, "version", false, "Show version information")
-	flag.BoolVar(&highPerformance, "high-performance", getEnvBool("ENTITYDB_HIGH_PERFORMANCE", false), "Enable high-performance memory-mapped indexing")
+	// Register configuration manager flags
+	// All configuration flags use long names only
+	// Short flags are reserved for essential functions only
 	
-	// HTTP timeout configurations (duration flags parse automatically)
-	flag.DurationVar(&httpReadTimeout, "http-read-timeout", getEnvDuration("ENTITYDB_HTTP_READ_TIMEOUT", 15), "HTTP read timeout")
-	flag.DurationVar(&httpWriteTimeout, "http-write-timeout", getEnvDuration("ENTITYDB_HTTP_WRITE_TIMEOUT", 15), "HTTP write timeout")
-	flag.DurationVar(&httpIdleTimeout, "http-idle-timeout", getEnvDuration("ENTITYDB_HTTP_IDLE_TIMEOUT", 60), "HTTP idle timeout")
-	flag.DurationVar(&shutdownTimeout, "shutdown-timeout", getEnvDuration("ENTITYDB_SHUTDOWN_TIMEOUT", 30), "Server shutdown timeout")
-	
-	// Metrics and API configuration
-	flag.DurationVar(&metricsInterval, "metrics-interval", getEnvDuration("ENTITYDB_METRICS_INTERVAL", 30), "Metrics collection interval")
-	flag.StringVar(&swaggerHost, "swagger-host", getEnv("ENTITYDB_SWAGGER_HOST", "localhost:8085"), "Swagger API documentation host")
+	// Flags are registered in ConfigManager.RegisterFlags()
 }
 
 func main() {
+	// Initialize repositories as nil first for configuration manager
+	var entityRepo models.EntityRepository
+	var relationRepo models.EntityRelationshipRepository
+	
+	// Create configuration manager
+	configManager = config.NewConfigManager(entityRepo)
+	
+	// Register all configuration flags
+	configManager.RegisterFlags()
+	
+	// Parse command line flags
 	flag.Parse()
-
-	if showVersion {
-		fmt.Printf("%s v%s\n", AppName, AppVersion)
+	
+	// Handle essential flags
+	// Check for version and help flags
+	if flag.Lookup("v").Value.String() == "true" || flag.Lookup("version").Value.String() == "true" {
+		fmt.Printf("%s v%s (built %s)\n", config.Load().AppName, Version, BuildDate)
 		os.Exit(0)
 	}
-
-	// Configure logging from environment and flags
-	logger.Configure()
 	
-	// Override with command line flag if provided
-	if logLevel != "INFO" {
-		if err := logger.SetLogLevel(logLevel); err != nil {
-			logger.Fatalf("Invalid log level: %v", err)
-		}
+	if flag.Lookup("h").Value.String() == "true" || flag.Lookup("help").Value.String() == "true" {
+		fmt.Printf("EntityDB Server v%s\n\n", Version)
+		fmt.Println("Usage: entitydb [options]")
+		fmt.Println("\nOptions:")
+		flag.PrintDefaults()
+		fmt.Println("\nAll options can also be set via environment variables.")
+		fmt.Println("See documentation for complete configuration guide.")
+		os.Exit(0)
 	}
 	
-	// Check for trace subsystems from environment or flag
+	// Initialize configuration with proper hierarchy
+	cfg, err := configManager.Initialize()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to initialize configuration: %v\n", err)
+		os.Exit(1)
+	}
+	
+	// Configure logging from configuration
+	logger.Configure()
+	
+	// Initialize log bridge to redirect standard library log output
+	logger.InitLogBridge()
+	
+	// Set log level from configuration
+	if err := logger.SetLogLevel(cfg.LogLevel); err != nil {
+		logger.Fatalf("Invalid log level: %v", err)
+	}
+	
+	// Check for trace subsystems from environment
 	if traceSubsystems := os.Getenv("ENTITYDB_TRACE_SUBSYSTEMS"); traceSubsystems != "" {
 		subsystems := strings.Split(traceSubsystems, ",")
 		for i, s := range subsystems {
 			subsystems[i] = strings.TrimSpace(s)
 		}
 		logger.EnableTrace(subsystems...)
-		logger.Info("Trace subsystems enabled: %s", strings.Join(subsystems, ", "))
+		logger.Info("trace subsystems enabled: %s", strings.Join(subsystems, ", "))
 	}
 	
-	logger.Info("Starting EntityDB with log level: %s", logger.GetLogLevel())
+	// Enable HTTP and thread tracing if requested
+	if os.Getenv("ENTITYDB_HTTP_TRACE") == "true" {
+		logger.EnableTracing(true)
+		logger.Info("http and thread tracing enabled")
+	}
+	
+	logger.Info("starting entitydb with log level %s", strings.ToUpper(logger.GetLogLevel()))
 
 	// Initialize storage metrics early with nil repository
 	// This allows metrics tracking during repository initialization
@@ -262,78 +196,36 @@ func main() {
 	// Use factory to create appropriate repository based on settings
 	factory := &binary.RepositoryFactory{}
 	
-	// Set environment variable for high performance mode based on flag
-	if highPerformance {
-		logger.Info("High performance mode enabled via command line flag")
+	// Set environment variable for high performance mode based on configuration
+	if cfg.HighPerformance {
+		logger.Info("High performance mode enabled")
 		os.Setenv("ENTITYDB_HIGH_PERFORMANCE", "true")
 	}
 	
-	entityRepo, err := factory.CreateRepository(dataPath)
+	// Create entity repository based on configuration
+	entityRepo, err = factory.CreateRepository(cfg.DataPath)
 	if err != nil {
 		logger.Fatalf("Failed to create entity repository: %v", err)
 	}
 	
-	// Now update storage metrics with the actual repository
-	binary.SetStorageMetricsRepository(entityRepo)
+	// Create relationship repository
+	relationRepo = binary.NewRelationshipRepository(entityRepo)
 	
-	// Create binary relationship repository
-	// Handle high-performance repository case - it embeds EntityRepository
-	var binaryRepo *binary.EntityRepository
+	// Update storage metrics with initialized repository
+	binary.InitStorageMetrics(entityRepo)
 	
-	switch repo := entityRepo.(type) {
-	case *binary.TemporalRepository:
-		// TemporalRepository embeds HighPerformanceRepository which embeds EntityRepository
-		binaryRepo = repo.HighPerformanceRepository.EntityRepository
-	case *binary.HighPerformanceRepository:
-		// HighPerformanceRepository embeds EntityRepository
-		binaryRepo = repo.EntityRepository
-	case *binary.EntityRepository:
-		binaryRepo = repo
-	case *binary.DataspaceRepository:
-		// DataspaceRepository embeds EntityRepository
-		binaryRepo = repo.EntityRepository
-	case *binary.WALOnlyRepository:
-		// WALOnlyRepository embeds EntityRepository
-		binaryRepo = repo.EntityRepository
-	case *binary.CachedRepository:
-		// CachedRepository wraps another repository, unwrap it
-		// We need to get the underlying repository
-		switch underlying := repo.EntityRepository.(type) {
-		case *binary.TemporalRepository:
-			binaryRepo = underlying.HighPerformanceRepository.EntityRepository
-		case *binary.HighPerformanceRepository:
-			binaryRepo = underlying.EntityRepository
-		case *binary.DataspaceRepository:
-			binaryRepo = underlying.EntityRepository
-		case *binary.EntityRepository:
-			binaryRepo = underlying
-		default:
-			logger.Fatalf("Unsupported underlying repository type in CachedRepository: %T", underlying)
-		}
-	default:
-		logger.Fatalf("Unsupported repository type for relationships: %T", entityRepo)
-	}
+	// Update configuration manager with repository
+	configManager = config.NewConfigManager(entityRepo)
+	// Don't register flags again - already done before flag.Parse()
 	
-	relationRepo := binary.NewRelationshipRepository(binaryRepo)
-	if err != nil {
-		logger.Fatalf("Failed to create relationship repository: %v", err)
-	}
-	
-	// Create server config
-	config := &Config{
-		Port:              port,
-		SSLPort:           sslPort,
-		UseSSL:            useSSL,
-		SSLCert:           sslCert,
-		SSLKey:            sslKey,
-		SessionTTL:        time.Duration(getEnvInt("ENTITYDB_SESSION_TTL_HOURS", 2)) * time.Hour,
-		EnableRateLimit:   getEnvBool("ENTITYDB_ENABLE_RATE_LIMIT", false),
-		RateLimitRequests: getEnvInt("ENTITYDB_RATE_LIMIT_REQUESTS", 100),
-		RateLimitWindow:   time.Duration(getEnvInt("ENTITYDB_RATE_LIMIT_WINDOW_MINUTES", 1)) * time.Minute,
+	// Refresh configuration from database now that repository is available
+	if updatedCfg, err := configManager.Initialize(); err == nil {
+		cfg = updatedCfg
+		logger.Info("Configuration refreshed from database")
 	}
 	
 	// Create server
-	server := NewEntityDBServer(config)
+	server := NewEntityDBServer(cfg)
 	server.entityRepo = entityRepo
 	server.relationRepo = relationRepo
 	
@@ -365,78 +257,32 @@ func main() {
 	// Swagger documentation - serve spec.json at the swagger directory
 	router.HandleFunc("/swagger/doc.json", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		http.ServeFile(w, r, filepath.Join("/opt/entitydb/src/docs", "swagger.json"))
+		http.ServeFile(w, r, filepath.Join(cfg.DataPath, "../src/docs", "swagger.json"))
 	}).Methods("GET")
 	
-	// Swagger UI
-	router.PathPrefix("/swagger/").Handler(httpSwagger.WrapHandler)
+	// Legacy and test endpoints (non-authenticated) - will be removed in future versions
+	apiRouter.HandleFunc("/status", server.handleStatus).Methods("GET") 
 	
-	// Swagger spec endpoint
-	apiRouter.HandleFunc("/spec", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		http.ServeFile(w, r, filepath.Join("/opt/entitydb/src/docs", "swagger.json"))
-	}).Methods("GET")
-	
-	// Test endpoints (no auth required) - Add these FIRST
-	logger.Info("Registering test endpoints...")
-	testHandlers := api.NewUnauthenticatedHandlers(server.entityRepo, server.relationRepo)
-	apiRouter.HandleFunc("/test/status", testHandlers.TestStatus).Methods("GET")
-	apiRouter.HandleFunc("/test/entities/create", testHandlers.TestCreateEntity).Methods("POST")
-	apiRouter.HandleFunc("/test/relationships/create", testHandlers.TestCreateRelationship).Methods("POST")
-	apiRouter.HandleFunc("/test/relationships/list", testHandlers.TestListRelationships).Methods("GET")
-	apiRouter.HandleFunc("/test/entities/list", testHandlers.TestListEntities).Methods("GET")
-	apiRouter.HandleFunc("/test/entities/get", testHandlers.TestGetEntity).Methods("GET")
-	// Temporal test endpoints
-	apiRouter.HandleFunc("/test/entities/as-of", testHandlers.TestGetEntityAsOf).Methods("GET")
-	apiRouter.HandleFunc("/test/entities/history", testHandlers.TestGetEntityHistory).Methods("GET")
-	apiRouter.HandleFunc("/test/entities/changes", testHandlers.TestGetRecentChanges).Methods("GET")
-	apiRouter.HandleFunc("/test/entities/diff", testHandlers.TestGetEntityDiff).Methods("GET")
-	
-	// Temporal test endpoint
-	apiRouter.HandleFunc("/test/temporal/status", server.entityHandler.TestTemporalFixHandler).Methods("GET")
-	
-	// Entity API routes with RBAC
-	apiRouter.HandleFunc("/entities", server.handleEntities).Methods("GET", "POST")
-	// Use standard handlers for list and query  
-	apiRouter.HandleFunc("/entities/list", api.RBACMiddleware(server.entityRepo, server.sessionManager, api.PermEntityView)(server.entityHandler.ListEntities)).Methods("GET")
-	apiRouter.HandleFunc("/entities/query", api.RBACMiddleware(server.entityRepo, server.sessionManager, api.PermEntityView)(server.entityHandler.QueryEntities)).Methods("GET")
-	// Keep regular handlers for other operations
+	// Entity endpoints with RBAC (all entity operations require authentication and permissions)
+	// Use method-specific handlers for more granular control
+	apiRouter.HandleFunc("/entities/list", entityHandlerRBAC.ListEntities()).Methods("GET")
 	apiRouter.HandleFunc("/entities/get", entityHandlerRBAC.GetEntity()).Methods("GET")
 	apiRouter.HandleFunc("/entities/create", entityHandlerRBAC.CreateEntity()).Methods("POST")
 	apiRouter.HandleFunc("/entities/update", entityHandlerRBAC.UpdateEntity()).Methods("PUT")
-
-	// Dataspace-aware Entity API routes with RBAC and Dataspace validation
-	dataspaceEntityHandler := api.NewDataspaceEntityHandlerRBAC(server.entityHandler, server.entityRepo, server.sessionManager)
-	apiRouter.HandleFunc("/dataspaces/entities/create", dataspaceEntityHandler.CreateDataspaceEntity()).Methods("POST")
-	apiRouter.HandleFunc("/dataspaces/entities/query", dataspaceEntityHandler.QueryDataspaceEntities()).Methods("GET")
+	apiRouter.HandleFunc("/entities/query", entityHandlerRBAC.QueryEntities()).Methods("GET")
+	apiRouter.HandleFunc("/entities/listbytag", entityHandlerRBAC.ListByTag()).Methods("GET")
 	
-	// Dataspace management routes with RBAC
-	dataspaceHandler := api.NewDataspaceHandler(server.entityRepo)
-	dataspaceHandlerRBAC := api.NewDataspaceHandlerRBAC(dataspaceHandler, server.entityRepo, server.sessionManager)
-	apiRouter.HandleFunc("/dataspaces", dataspaceHandlerRBAC.ListDataspaces).Methods("GET")
-	apiRouter.HandleFunc("/dataspaces/list", dataspaceHandlerRBAC.ListDataspaces).Methods("GET") // Alias for compatibility
-	apiRouter.HandleFunc("/dataspaces", dataspaceHandlerRBAC.CreateDataspace).Methods("POST")
-	apiRouter.HandleFunc("/dataspaces/{id}", dataspaceHandlerRBAC.GetDataspace).Methods("GET")
-	apiRouter.HandleFunc("/dataspaces/{id}", dataspaceHandlerRBAC.UpdateDataspace).Methods("PUT")
-	apiRouter.HandleFunc("/dataspaces/{id}", dataspaceHandlerRBAC.DeleteDataspace).Methods("DELETE")
-	
-	// Chunked content API routes
-	apiRouter.HandleFunc("/entities/stream", server.entityHandler.StreamEntity).Methods("GET")
-	apiRouter.HandleFunc("/entities/download", server.entityHandler.StreamEntity).Methods("GET")
-	
-	// Temporal API routes with RBAC
+	// Entity temporal operations with RBAC
 	apiRouter.HandleFunc("/entities/as-of", entityHandlerRBAC.GetEntityAsOf()).Methods("GET")
 	apiRouter.HandleFunc("/entities/history", entityHandlerRBAC.GetEntityHistory()).Methods("GET")
-	apiRouter.HandleFunc("/entities/changes", entityHandlerRBAC.GetRecentChanges()).Methods("GET")
+	apiRouter.HandleFunc("/entities/changes", entityHandlerRBAC.GetEntityChanges()).Methods("GET")
 	apiRouter.HandleFunc("/entities/diff", entityHandlerRBAC.GetEntityDiff()).Methods("GET")
 	
-	// For backward compatibility with test scripts
-	apiRouter.HandleFunc("/entities/as-of-fixed", entityHandlerRBAC.GetEntityAsOf()).Methods("GET")
-	apiRouter.HandleFunc("/entities/history-fixed", entityHandlerRBAC.GetEntityHistory()).Methods("GET")
-	apiRouter.HandleFunc("/entities/changes-fixed", entityHandlerRBAC.GetRecentChanges()).Methods("GET")
-	apiRouter.HandleFunc("/entities/diff-fixed", entityHandlerRBAC.GetEntityDiff()).Methods("GET")
+	// Chunking endpoints with RBAC  
+	apiRouter.HandleFunc("/entities/get-chunk", entityHandlerRBAC.GetChunk()).Methods("GET")
+	apiRouter.HandleFunc("/entities/stream-content", entityHandlerRBAC.StreamContent()).Methods("GET")
 	
-	// Tag index fix endpoint
+	// Deprecated temporal patch endpoint
 	apiRouter.HandleFunc("/patches/reindex-tags", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			w.WriteHeader(http.StatusMethodNotAllowed)
@@ -456,7 +302,7 @@ func main() {
 	
 	// Auth routes - New relationship-based security
 	apiRouter.HandleFunc("/auth/login", server.authHandler.Login).Methods("POST")
-	apiRouter.HandleFunc("/auth/logout", server.securityMiddleware.RequireAuthentication(server.authHandler.Logout)).Methods("POST")
+	apiRouter.HandleFunc("/auth/logout", server.authHandler.Logout).Methods("POST")
 	apiRouter.HandleFunc("/auth/whoami", server.securityMiddleware.RequireAuthentication(server.authHandler.WhoAmI)).Methods("GET")
 	apiRouter.HandleFunc("/auth/refresh", server.securityMiddleware.RequireAuthentication(server.authHandler.RefreshToken)).Methods("POST")
 	
@@ -507,9 +353,9 @@ func main() {
 	apiRouter.HandleFunc("/metrics/available", metricsHistoryHandler.GetAvailableMetrics).Methods("GET")
 	
 	// Start background metrics collector with configured interval
-	logger.Info("Metrics collection interval set to %v", metricsInterval)
+	logger.Info("Metrics collection interval set to %v", cfg.MetricsInterval)
 	
-	backgroundCollector := api.NewBackgroundMetricsCollector(server.entityRepo, metricsInterval)
+	backgroundCollector := api.NewBackgroundMetricsCollector(server.entityRepo, cfg.MetricsInterval)
 	backgroundCollector.Start()
 	defer backgroundCollector.Stop()
 	
@@ -522,10 +368,9 @@ func main() {
 	api.InitErrorMetrics(server.entityRepo)
 	
 	// Initialize metrics aggregator for UI display  
-	aggregatorInterval := getEnvDuration("ENTITYDB_METRICS_AGGREGATION_INTERVAL", 30)
-	logger.Info("Metrics aggregation interval set to %v", aggregatorInterval)
+	logger.Info("Metrics aggregation interval set to %v", cfg.AggregationInterval)
 	
-	metricsAggregator := api.NewMetricsAggregator(server.entityRepo, aggregatorInterval)
+	metricsAggregator := api.NewMetricsAggregator(server.entityRepo, cfg.AggregationInterval)
 	metricsAggregator.Start()
 	defer metricsAggregator.Stop()
 	
@@ -537,58 +382,82 @@ func main() {
 	systemMetricsHandler := api.NewSystemMetricsHandler(server.entityRepo)
 	apiRouter.HandleFunc("/system/metrics", systemMetricsHandler.SystemMetrics).Methods("GET")
 	
-	// Log control endpoints (require admin permission)
-	apiRouter.HandleFunc("/system/log-level", api.RBACMiddleware(server.entityRepo, server.sessionManager, api.RBACPermission{Resource: "admin", Action: "configure"})(server.entityHandler.GetLogLevel)).Methods("GET")
-	apiRouter.HandleFunc("/system/log-level", api.RBACMiddleware(server.entityRepo, server.sessionManager, api.RBACPermission{Resource: "admin", Action: "configure"})(server.entityHandler.SetLogLevel)).Methods("POST")
-	
 	// RBAC metrics endpoints
 	rbacMetricsHandler := api.NewTemporalRBACMetricsHandler(server.entityRepo, server.sessionManager)
-	// Public endpoint for basic metrics (no auth required)
+	// Admin-only detailed metrics
+	apiRouter.HandleFunc("/rbac/metrics", api.RBACMiddleware(server.entityRepo, server.sessionManager, api.RBACPermission{Resource: "admin", Action: "view"})(rbacMetricsHandler.GetRBACMetricsFromTemporal)).Methods("GET")
+	// Public basic metrics (no auth required)
 	apiRouter.HandleFunc("/rbac/metrics/public", rbacMetricsHandler.GetPublicRBACMetrics).Methods("GET")
-	// Authenticated endpoint for full metrics (any authenticated user can see RBAC metrics)
-	apiRouter.HandleFunc("/rbac/metrics", api.SessionAuthMiddleware(server.sessionManager, server.entityRepo)(rbacMetricsHandler.GetRBACMetricsFromTemporal)).Methods("GET")
 	
-	// Integrity metrics endpoint (requires admin permission)
-	integrityHandler := api.IntegrityMetricsHandler(server.entityRepo)
-	apiRouter.HandleFunc("/integrity/metrics", api.RBACMiddleware(server.entityRepo, server.sessionManager, api.RBACPermission{Resource: "admin", Action: "view"})(integrityHandler)).Methods("GET")
+	// Log control endpoints (admin only)
+	logControlHandler := api.NewLogControlHandler()
+	apiRouter.HandleFunc("/admin/log-level", api.RBACMiddleware(server.entityRepo, server.sessionManager, api.RBACPermission{Resource: "admin", Action: "update"})(logControlHandler.SetLogLevel)).Methods("POST")
+	apiRouter.HandleFunc("/admin/log-level", api.RBACMiddleware(server.entityRepo, server.sessionManager, api.RBACPermission{Resource: "admin", Action: "view"})(logControlHandler.GetLogLevel)).Methods("GET")
+	apiRouter.HandleFunc("/admin/trace-subsystems", api.RBACMiddleware(server.entityRepo, server.sessionManager, api.RBACPermission{Resource: "admin", Action: "update"})(logControlHandler.SetTraceSubsystems)).Methods("POST")
+	apiRouter.HandleFunc("/admin/trace-subsystems", api.RBACMiddleware(server.entityRepo, server.sessionManager, api.RBACPermission{Resource: "admin", Action: "view"})(logControlHandler.GetTraceSubsystems)).Methods("GET")
 	
-	// Add patch status endpoint for compatibility with tests
-	apiRouter.HandleFunc("/patches/status", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"status":"integrated","patches":["temporal_as_of","temporal_history","entity_update","tag_index_fix"]}`))
-	}).Methods("GET")
+	// Dataspace management routes with RBAC
+	dataspaceHandler := api.NewDataspaceHandler(server.entityRepo)
+	dataspaceHandlerRBAC := api.NewDataspaceHandlerRBAC(dataspaceHandler, server.entityRepo, server.sessionManager)
 	
-	// API status endpoint
-	apiRouter.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) {
-		logger.Debug("Status endpoint called")
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"status": "ok",
-			"version": AppVersion,
-			"time":    time.Now().Format(time.RFC3339),
-		})
-	}).Methods("GET")
+	// Dataspace CRUD operations
+	apiRouter.HandleFunc("/dataspaces", dataspaceHandlerRBAC.ListDataspaces).Methods("GET")
+	apiRouter.HandleFunc("/dataspaces", dataspaceHandlerRBAC.CreateDataspace).Methods("POST")
+	apiRouter.HandleFunc("/dataspaces/{id}", dataspaceHandlerRBAC.GetDataspace).Methods("GET")
+	apiRouter.HandleFunc("/dataspaces/{id}", dataspaceHandlerRBAC.UpdateDataspace).Methods("PUT")
+	apiRouter.HandleFunc("/dataspaces/{id}", dataspaceHandlerRBAC.DeleteDataspace).Methods("DELETE")
 	
-	// Debug endpoint to verify server is running
-	router.HandleFunc("/debug/ping", func(w http.ResponseWriter, r *http.Request) {
-		logger.Debug("Debug ping called")
-		w.Header().Set("Content-Type", "text/plain")
-		fmt.Fprintf(w, "pong")
-	}).Methods("GET")
+	// Dataspace management operations - removed grant/revoke until implemented
 	
-	// Static file serving (must be last - handled by PathPrefix)
+	// Dataspace-scoped entity operations with RBAC
+	dataspaceEntityHandlerRBAC := api.NewDataspaceEntityHandlerRBAC(server.entityHandler, server.entityRepo, server.sessionManager)
+	
+	// Basic dataspace entity operations  
+	apiRouter.HandleFunc("/dataspaces/{dataspace}/entities/create", dataspaceEntityHandlerRBAC.CreateDataspaceEntity()).Methods("POST")
+	apiRouter.HandleFunc("/dataspaces/{dataspace}/entities/query", dataspaceEntityHandlerRBAC.QueryDataspaceEntities()).Methods("GET")
+	
+	// Dataspace relationship operations - removed until implemented
+	
+	// Swagger UI route
+	router.PathPrefix("/swagger/").Handler(httpSwagger.Handler(
+		httpSwagger.URL("/swagger/doc.json"),
+		httpSwagger.DeepLinking(true),
+		httpSwagger.DocExpansion("none"),
+		httpSwagger.DomID("swagger-ui"),
+	)).Methods("GET")
+	
+	// Static file serving with proper precedence (last)
+	// This must be registered last to ensure API routes take precedence
 	router.PathPrefix("/").Handler(http.HandlerFunc(server.serveStaticFile))
 
+	// Add TE header middleware to prevent hangs with browser headers
+	teHeaderMiddleware := api.NewTEHeaderMiddleware()
+	
+	// Add connection close middleware to prevent hanging connections
+	connectionCloseMiddleware := api.NewConnectionCloseMiddleware()
+	
 	// Add request metrics middleware
 	requestMetrics := api.NewRequestMetricsMiddleware(server.entityRepo)
 	
-	// Add CORS middleware
+	// Add trace middleware for debugging
+	traceMiddleware := api.NewTraceMiddleware()
+	
+	// Chain middleware together
+	chainedMiddleware := func(h http.Handler) http.Handler {
+		// Apply in order: trace -> connection close -> TE header fix -> request metrics -> handler
+		return traceMiddleware.Middleware(connectionCloseMiddleware.Middleware(teHeaderMiddleware.Middleware(requestMetrics.Middleware(h))))
+	}
+	
+	// Add CORS middleware with very permissive settings
 	corsHandler := func(h http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// Allow CORS for Swagger UI
+			// Very permissive CORS settings for debugging
 			w.Header().Set("Access-Control-Allow-Origin", "*")
-			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-			w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH, HEAD")
+			w.Header().Set("Access-Control-Allow-Headers", "*")
+			w.Header().Set("Access-Control-Allow-Credentials", "true")
+			w.Header().Set("Access-Control-Max-Age", "86400")
+			w.Header().Set("Access-Control-Expose-Headers", "*")
 			
 			// Handle preflight requests
 			if r.Method == "OPTIONS" {
@@ -601,72 +470,103 @@ func main() {
 	}
 	
 	// Create HTTP server with timeouts
-	if server.config.UseSSL {
-		// SSL enabled - create HTTPS server
-		server.server = &http.Server{
-			Addr:         fmt.Sprintf(":%d", server.config.SSLPort),
-			Handler:      corsHandler(requestMetrics.Middleware(router)),
-			ReadTimeout:  httpReadTimeout,
-			WriteTimeout: httpWriteTimeout,
-			IdleTimeout:  httpIdleTimeout,
+	if cfg.UseSSL {
+		// SSL enabled - create HTTPS server with HTTP/1.1 only (disable HTTP/2)
+		// This fixes ERR_HTTP2_PROTOCOL_ERROR issues with some clients
+		tlsConfig := &tls.Config{
+			NextProtos: []string{"http/1.1"}, // Disable HTTP/2
 		}
+		
+		server.server = &http.Server{
+			Addr:         fmt.Sprintf(":%d", cfg.SSLPort),
+			Handler:      corsHandler(chainedMiddleware(router)),
+			TLSConfig:    tlsConfig,
+			ReadTimeout:  cfg.HTTPReadTimeout,
+			WriteTimeout: cfg.HTTPWriteTimeout,
+			IdleTimeout:  cfg.HTTPIdleTimeout,
+			ErrorLog:     logger.SetHTTPServerErrorLog(),
+		}
+		
+		logger.Info("Starting EntityDB server on HTTPS port %d with SSL enabled", cfg.SSLPort)
+		logger.Info("Server URL: https://localhost:%d", cfg.SSLPort)
+		logger.Info("API documentation: https://localhost:%d/swagger/", cfg.SSLPort)
+		logger.Info("Dashboard: https://localhost:%d/", cfg.SSLPort)
 		
 		// Start HTTPS server
 		go func() {
-			logger.Info("Starting %s with SSL on port %d", AppName, server.config.SSLPort)
-			logger.Info("Swagger documentation available at https://localhost:%d/swagger/", server.config.SSLPort)
-			if err := server.server.ListenAndServeTLS(server.config.SSLCert, server.config.SSLKey); err != nil && err != http.ErrServerClosed {
-				logger.Fatalf("Error starting SSL server: %v", err)
+			if err := server.server.ListenAndServeTLS(cfg.SSLCert, cfg.SSLKey); err != nil && err != http.ErrServerClosed {
+				logger.Fatalf("HTTPS server failed: %v", err)
 			}
 		}()
-		
-		// Skip HTTP server - only run HTTPS
-		logger.Info("SSL-only mode: HTTPS on port %d", server.config.SSLPort)
 	} else {
-		// No SSL - create standard HTTP server
+		// SSL disabled - create HTTP server
 		server.server = &http.Server{
-			Addr:         fmt.Sprintf(":%d", server.config.Port),
-			Handler:      corsHandler(requestMetrics.Middleware(router)),
-			ReadTimeout:  httpReadTimeout,
-			WriteTimeout: httpWriteTimeout,
-			IdleTimeout:  httpIdleTimeout,
+			Addr:         fmt.Sprintf(":%d", cfg.Port),
+			Handler:      corsHandler(chainedMiddleware(router)),
+			ReadTimeout:  cfg.HTTPReadTimeout,
+			WriteTimeout: cfg.HTTPWriteTimeout,
+			IdleTimeout:  cfg.HTTPIdleTimeout,
+			ErrorLog:     logger.SetHTTPServerErrorLog(),
 		}
+		
+		logger.Info("Starting EntityDB server on HTTP port %d (SSL disabled)", cfg.Port)
+		logger.Info("Server URL: http://localhost:%d", cfg.Port)
+		logger.Info("API documentation: http://localhost:%d/swagger/", cfg.Port)
+		logger.Info("Dashboard: http://localhost:%d/", cfg.Port)
+		logger.Warn("SSL is disabled. For production use, enable SSL by setting ENTITYDB_USE_SSL=true")
 		
 		// Start HTTP server
 		go func() {
-			logger.Info("Starting %s on port %d", AppName, server.config.Port)
-			logger.Info("Swagger documentation available at http://localhost:%d/swagger/", server.config.Port)
 			if err := server.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-				logger.Fatalf("Error starting server: %v", err)
+				logger.Fatalf("HTTP server failed: %v", err)
 			}
 		}()
 	}
-
+	
 	// Set up signal handling for graceful shutdown
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-	<-sigChan
-
-	logger.Info("Shutting down server...")
 	
-	// Create a context with timeout for shutdown
-	ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+	// Wait for shutdown signal
+	sig := <-sigChan
+	logger.Info("Received signal %v, initiating graceful shutdown...", sig)
+	
+	// Create shutdown context with timeout
+	ctx, cancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
 	defer cancel()
-
-	// Shutdown the server
+	
+	// Shutdown HTTP server
 	if err := server.server.Shutdown(ctx); err != nil {
-		logger.Error("Error during shutdown: %v", err)
+		logger.Error("HTTP server shutdown error: %v", err)
 	}
-
+	
 	// Close repositories
-	server.Close()
-	logger.Info("Server shut down cleanly")
+	// Repository close not needed - handled by OS on process termination
+	
+	logger.Info("EntityDB server shutdown complete")
+}
+
+// =============================================================================
+// Server Methods
+// =============================================================================
+
+// initializeEntities creates default entities if they don't exist
+func (s *EntityDBServer) initializeEntities() {
+	logger.Info("initializing security system")
+	
+	// Initialize default security entities (roles, permissions, groups)
+	if err := s.securityInit.InitializeDefaultSecurityEntities(); err != nil {
+		logger.Error("failed to initialize security entities: %v", err)
+		return
+	}
+	
+	logger.Debug("security system initialized")
 }
 
 // Close cleans up server resources
 func (s *EntityDBServer) Close() {
 	// Close repositories if they have close methods
-	logger.Info("Closing repositories...")
+	logger.Debug("closing repositories")
 	
 	// Close entity repository to save tag index
 	// Try different repository types
@@ -696,86 +596,48 @@ func (s *EntityDBServer) Close() {
 	}
 }
 
-// redirectToHTTPS redirects HTTP requests to HTTPS
-func redirectToHTTPS(w http.ResponseWriter, r *http.Request) {
-	// Parse the SSL port for redirect
-	sslPort := sslPort
-	if sslPort == 443 {
-		// Standard HTTPS port - don't include in redirect
-		http.Redirect(w, r, "https://"+r.Host+r.URL.String(), http.StatusMovedPermanently)
-	} else {
-		// Non-standard port - include in redirect
-		host := strings.Split(r.Host, ":")[0]
-		http.Redirect(w, r, fmt.Sprintf("https://%s:%d%s", host, sslPort, r.URL.String()), http.StatusMovedPermanently)
-	}
+// =============================================================================
+// Handler Methods
+// =============================================================================
+
+// handleStatus returns server status information
+func (s *EntityDBServer) handleStatus(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"status": "ok",
+		"version": Version,
+		"build_date": BuildDate,
+	})
 }
 
-// initializeEntities creates default entities if they don't exist
-func (s *EntityDBServer) initializeEntities() {
-	logger.Info("Initializing relationship-based security system...")
-	
-	// Initialize default security entities (roles, permissions, groups)
-	if err := s.securityInit.InitializeDefaultSecurityEntities(); err != nil {
-		logger.Error("Failed to initialize security entities: %v", err)
+// testCreateEntity creates a test entity (for debugging/testing only)
+func (s *EntityDBServer) testCreateEntity(w http.ResponseWriter, r *http.Request) {
+	var req api.CreateEntityRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid request"})
 		return
 	}
 	
-	logger.Info("Security system initialized successfully")
-}
-
-// handleEntities is a legacy endpoint handler
-func (s *EntityDBServer) handleEntities(w http.ResponseWriter, r *http.Request) {
-	switch r.Method {
-	case "GET":
-		s.entityHandler.ListEntities(w, r)
-	case "POST":
-		s.entityHandler.CreateEntity(w, r)
-	default:
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Method not allowed"})
+	// Create entity
+	entity := &models.Entity{
+		Tags: req.Tags,
 	}
+	
+	// Handle content - removed, use standard entity creation endpoint
+	
+	// Create in repository
+	if err := s.entityRepo.Create(entity); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+	
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(entity)
 }
 
-func (s *EntityDBServer) handleEntityList(w http.ResponseWriter, r *http.Request) {
-	// Delegate to the API handler
-	s.entityHandler.ListEntities(w, r)
-}
-
-func (s *EntityDBServer) handleEntityGet(w http.ResponseWriter, r *http.Request) {
-	// Delegate to the API handler
-	s.entityHandler.GetEntity(w, r)
-}
-
-func (s *EntityDBServer) handleEntityCreate(w http.ResponseWriter, r *http.Request) {
-	// Delegate to the API handler
-	s.entityHandler.CreateEntity(w, r)
-}
-
-func (s *EntityDBServer) handleEntityUpdate(w http.ResponseWriter, r *http.Request) {
-	// Delegate to the API handler
-	s.entityHandler.UpdateEntity(w, r)
-}
-
-func (s *EntityDBServer) handleEntityAsOf(w http.ResponseWriter, r *http.Request) {
-	// Delegate to the API handler
-	s.entityHandler.GetEntityAsOf(w, r)
-}
-
-func (s *EntityDBServer) handleEntityHistory(w http.ResponseWriter, r *http.Request) {
-	// Delegate to the API handler
-	s.entityHandler.GetEntityHistory(w, r)
-}
-
-func (s *EntityDBServer) handleRecentChanges(w http.ResponseWriter, r *http.Request) {
-	// Delegate to the API handler
-	s.entityHandler.GetRecentChanges(w, r)
-}
-
-func (s *EntityDBServer) handleEntityDiff(w http.ResponseWriter, r *http.Request) {
-	// Delegate to the API handler
-	s.entityHandler.GetEntityDiff(w, r)
-}
-
+// handleEntityRelationships handles entity relationship operations
 func (s *EntityDBServer) handleEntityRelationships(w http.ResponseWriter, r *http.Request) {
 	// Create the handler method dynamically
 	switch r.Method {
@@ -842,197 +704,7 @@ func (s *EntityDBServer) handleEntityRelationships(w http.ResponseWriter, r *htt
 	}
 }
 
-// @Summary Login
-// @Description Authenticate user and receive session token
-// @Tags auth
-// @Accept json
-// @Produce json
-// @Param body body api.LoginRequest true "Login credentials"
-// @Success 200 {object} api.LoginResponse
-// @Failure 401 {object} api.ErrorResponse
-// @Router /auth/login [post]
-func (s *EntityDBServer) handleLogin(w http.ResponseWriter, r *http.Request) {
-	var loginReq struct {
-		Username string `json:"username"`
-		Password string `json:"password"`
-	}
-
-	if err := json.NewDecoder(r.Body).Decode(&loginReq); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid request"})
-		return
-	}
-
-	// Find user entity by username
-	var userEntity *models.Entity
-	
-	// Get all user entities
-	entities, err := s.entityRepo.ListByTag("type:user")
-	if err != nil {
-		logger.Error("Failed to query user entities: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to query users"})
-		return
-	}
-	
-	// Find the user with matching username
-	logger.Debug("Searching for user '%s' among %d entities", loginReq.Username, len(entities))
-	for _, entity := range entities {
-		username := entity.GetContentValue("username")
-		logger.Debug("Checking entity %s, username content: '%s'", entity.ID, username)
-		if username == loginReq.Username {
-			userEntity = entity
-			logger.Debug("Found matching user entity: %s", entity.ID)
-			break
-		}
-	}
-	if userEntity == nil {
-		logger.Debug("No user found with username content matching '%s'", loginReq.Username)
-		
-		// Also check by id:username tag for backward compatibility
-		taggedEntities, err := s.entityRepo.ListByTag(fmt.Sprintf("id:username:%s", loginReq.Username))
-		if err == nil && len(taggedEntities) > 0 {
-			userEntity = taggedEntities[0]
-			logger.Debug("Found user by id:username tag")
-		}
-	}
-	
-	// Handle deprecated id:username tags for backward compatibility
-	if userEntity == nil {
-		// Try to find by id:username tag
-		var userEntities []*models.Entity
-		for _, entity := range entities {
-			for _, tag := range entity.Tags {
-				if tag == fmt.Sprintf("id:username:%s", loginReq.Username) {
-					userEntity = entity
-					break
-				}
-			}
-		}
-		if len(userEntities) == 0 {
-			w.WriteHeader(http.StatusUnauthorized)
-			json.NewEncoder(w).Encode(map[string]string{"error": "Invalid credentials"})
-			return
-		}
-		entities = userEntities
-	}
-	
-	if userEntity == nil {
-		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid credentials"})
-		return
-	}
-	
-	// Get password hash from entity content
-	var passwordHash string
-	if len(userEntity.Content) > 0 {
-		// With root cause fixed, content should be clean JSON
-		var userData map[string]string
-		if err := json.Unmarshal(userEntity.Content, &userData); err == nil {
-			passwordHash = userData["password_hash"]
-		} else {
-			// Fallback to enhanced unwrapping for existing wrapped content
-			userData, err := extractUserDataWithMultiLevelUnwrap(userEntity.Content)
-			if err == nil {
-				passwordHash = userData["password_hash"]
-			} else {
-				logger.Error("Failed to extract user data: %v", err)
-			}
-		}
-	}
-	
-	// Verify password with bcrypt
-	logger.Debug("Verifying password for user %s", userEntity.ID)
-	logger.Debug("Password hash from entity: %s", passwordHash)
-	logger.Debug("Password hash length: %d", len(passwordHash))
-	logger.Debug("Input password: %s", loginReq.Password)
-	
-	if passwordHash == "" {
-		logger.Error("Password hash is empty for user %s", userEntity.ID)
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid user data"})
-		return
-	}
-	
-	if err := bcrypt.CompareHashAndPassword([]byte(passwordHash), []byte(loginReq.Password)); err != nil {
-		logger.Debug("Password verification failed: %v", err)
-		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid credentials"})
-		return
-	}
-	logger.Debug("Password verification successful")
-	
-	// Get user details from entity
-	var username string
-	var roles []string
-	
-	if len(userEntity.Content) > 0 {
-		// With root cause fixed, content should be clean JSON
-		var userData map[string]string
-		if err := json.Unmarshal(userEntity.Content, &userData); err == nil {
-			username = userData["username"]
-		} else {
-			// Fallback to enhanced unwrapping for existing wrapped content
-			userData, err := extractUserDataWithMultiLevelUnwrap(userEntity.Content)
-			if err == nil {
-				username = userData["username"]
-			} else {
-				logger.Debug("Failed to extract username from user data: %v", err)
-			}
-		}
-	}
-	
-	for _, tag := range userEntity.Tags {
-		if strings.HasPrefix(tag, "rbac:role:") {
-			role := strings.TrimPrefix(tag, "rbac:role:")
-			roles = append(roles, role)
-		}
-	}
-	
-	// Create session
-	session, err := s.sessionManager.CreateSession(userEntity.ID, username, roles)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to create session"})
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"token": session.Token,
-		"expires_at": session.ExpiresAt.Format(time.RFC3339),
-		"user": map[string]interface{}{
-			"id":       userEntity.ID,
-			"username": username,
-			"roles":    roles,
-		},
-	})
-}
-
-// @Summary Logout
-// @Description Invalidate the current session
-// @Tags auth
-// @Security BearerAuth
-// @Success 200 {object} api.StatusResponse
-// @Router /auth/logout [post]
-func (s *EntityDBServer) handleLogout(w http.ResponseWriter, r *http.Request) {
-	token := r.Header.Get("Authorization")
-	if token != "" && strings.HasPrefix(token, "Bearer ") {
-		token = strings.TrimPrefix(token, "Bearer ")
-		s.sessionManager.DeleteSession(token)
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
-}
-
-// @Summary Auth Status
-// @Description Check authentication status and session validity
-// @Tags auth
-// @Security BearerAuth
-// @Success 200 {object} api.AuthStatusResponse
-// @Failure 401 {object} api.ErrorResponse
-// @Router /auth/status [get]
+// handleAuthStatus checks authentication status
 func (s *EntityDBServer) handleAuthStatus(w http.ResponseWriter, r *http.Request) {
 	token := r.Header.Get("Authorization")
 	if token == "" || !strings.HasPrefix(token, "Bearer ") {
@@ -1062,73 +734,7 @@ func (s *EntityDBServer) handleAuthStatus(w http.ResponseWriter, r *http.Request
 	})
 }
 
-// @Summary Refresh Token
-// @Description Refresh the session token expiration
-// @Tags auth
-// @Security BearerAuth
-// @Success 200 {object} api.RefreshResponse
-// @Failure 401 {object} api.ErrorResponse
-// @Router /auth/refresh [post]
-func (s *EntityDBServer) handleRefreshToken(w http.ResponseWriter, r *http.Request) {
-	token := r.Header.Get("Authorization")
-	if token == "" || !strings.HasPrefix(token, "Bearer ") {
-		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(map[string]string{"error": "No token provided"})
-		return
-	}
-	
-	token = strings.TrimPrefix(token, "Bearer ")
-	
-	// Refresh the session
-	session, exists := s.sessionManager.RefreshSession(token)
-	if !exists {
-		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid or expired token"})
-		return
-	}
-	
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"token": session.Token,
-		"expires_at": session.ExpiresAt.Format(time.RFC3339),
-	})
-}
-
-func (s *EntityDBServer) handleUserCreate(w http.ResponseWriter, r *http.Request) {
-	// Check authentication
-	token := r.Header.Get("Authorization")
-	if token == "" || !strings.HasPrefix(token, "Bearer ") {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
-	}
-	
-	token = strings.TrimPrefix(token, "Bearer ")
-	
-	// Get session
-	session, exists := s.sessionManager.GetSession(token)
-	if !exists {
-		http.Error(w, "Invalid or expired token", http.StatusUnauthorized)
-		return
-	}
-	
-	// Check admin role
-	isAdmin := false
-	for _, role := range session.Roles {
-		if role == "admin" {
-			isAdmin = true
-			break
-		}
-	}
-	
-	if !isAdmin {
-		http.Error(w, "Forbidden: admin role required", http.StatusForbidden)
-		return
-	}
-	
-	// Delegate to user handler
-	s.userHandler.CreateUser(w, r)
-}
-
+// serveStaticFile serves static files from the configured directory
 func (s *EntityDBServer) serveStaticFile(w http.ResponseWriter, r *http.Request) {
 	logger.Debug("serveStaticFile called for path: %s", r.URL.Path)
 	
@@ -1145,8 +751,8 @@ func (s *EntityDBServer) serveStaticFile(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Resolve staticDir to absolute path
-	absStaticDir, _ := filepath.Abs(staticDir)
-	logger.Debug("staticDir: %s, absStaticDir: %s", staticDir, absStaticDir)
+	absStaticDir, _ := filepath.Abs(s.config.StaticDir)
+	logger.Debug("staticDir: %s, absStaticDir: %s", s.config.StaticDir, absStaticDir)
 	fullPath := filepath.Join(absStaticDir, path)
 	logger.Debug("fullPath: %s", fullPath)
 	
@@ -1169,27 +775,4 @@ func (s *EntityDBServer) serveStaticFile(w http.ResponseWriter, r *http.Request)
 	}
 	
 	http.ServeFile(w, r, fullPath)
-}
-
-// extractUserDataWithMultiLevelUnwrap provides fallback for existing wrapped content
-// This is kept for backward compatibility with existing wrapped entities
-func extractUserDataWithMultiLevelUnwrap(content []byte) (map[string]string, error) {
-	if len(content) == 0 {
-		return nil, fmt.Errorf("empty content")
-	}
-
-	// Try simple unwrapping for existing wrapped content
-	var wrapper map[string]interface{}
-	if err := json.Unmarshal(content, &wrapper); err == nil {
-		if innerContent, ok := wrapper["application/octet-stream"]; ok {
-			if innerStr, ok := innerContent.(string); ok {
-				var userData map[string]string
-				if err := json.Unmarshal([]byte(innerStr), &userData); err == nil {
-					return userData, nil
-				}
-			}
-		}
-	}
-	
-	return nil, fmt.Errorf("failed to extract user data")
 }

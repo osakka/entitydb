@@ -5,6 +5,41 @@ All notable changes to the EntityDB Platform will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.26.0] - 2025-06-07
+
+### Added
+- **HTTP Connection Hang Fixes**: Comprehensive authentication and connection stability improvements
+  - `ConnectionCloseMiddleware`: Forces connection closure to prevent hanging connections 
+  - `TEHeaderMiddleware`: Strips problematic TE header that causes server hangs
+  - `TraceMiddleware`: Request tracing for debugging connection and authentication issues
+  - `LogBridge`: Redirects standard library HTTP error logs to EntityDB logger with proper categorization
+- **Advanced Locking System**: Enhanced concurrency control for high-performance scenarios
+  - `ShardedLockManager`: Distributed locking across multiple shards to reduce contention
+  - `TracedLocks`: Lock tracing and deadlock detection for debugging concurrent access issues
+  - `LockTracer`: Comprehensive lock operation tracking and timing analysis
+- **Implementation Documentation**: Detailed records of authentication and performance fixes
+  - Authentication hang fix analysis and implementation plan
+  - ListByTag deadlock detection and prevention strategy
+  - TE header hang root cause analysis and solution
+  - Performance optimization implementation guide
+
+### Fixed
+- **Authentication System Stability**: Resolved login hangs and timeouts
+  - Fixed browser-specific hanging when TE: trailers header is present
+  - Prevented connection pooling issues that caused authentication delays
+  - Enhanced error logging for TLS and authentication failures
+- **Concurrent Access Issues**: Eliminated deadlocks in high-concurrency scenarios
+  - Fixed ListByTag method deadlock when acquiring multiple entity locks
+  - Improved lock ordering to prevent circular wait conditions
+  - Enhanced lock timeout handling and error recovery
+
+### Changed
+- **Development Workflow**: Major cleanup of debug and temporary tools
+  - Moved 40+ debug tools, test scripts, and analysis utilities to trash
+  - Retained only essential repair tools for maintenance operations
+  - Consolidated all fixes into main codebase following single source of truth principle
+  - Clean repository structure with clear separation of production vs debug code
+
 ## [2.25.0] - 2025-06-05
 
 ### Fixed

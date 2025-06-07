@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -64,11 +65,17 @@ type AuthErrorResponse struct {
 // @Failure 500 {object} ErrorResponse
 // @Router /api/v1/auth/login [post]
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
+	// Get trace ID from context
+	traceID := GetTraceID(r.Context())
+	if traceID != "" {
+		logger.TraceIf("auth", "login request started with trace id %s", traceID)
+	}
+	
 	var loginReq AuthLoginRequest
 	
 	// Parse request body
 	if err := json.NewDecoder(r.Body).Decode(&loginReq); err != nil {
-		logger.Error("Failed to decode login request: %v", err)
+		logger.Warn("failed to decode login request: %v", err)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(AuthErrorResponse{Error: "Invalid request body"})
@@ -84,33 +91,42 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Authenticate user using relationship-based security
-	logger.Debug("[AuthHandler] Attempting to authenticate user: %s", loginReq.Username)
+	logger.Debug("authenticating user %s", loginReq.Username)
+	if traceID != "" {
+		logger.TraceIf("auth", "before authenticate call for user %s, trace id %s", loginReq.Username, traceID)
+	}
+	logger.TraceIf("auth", "calling AuthenticateUser")
 	userEntity, err := h.securityManager.AuthenticateUser(loginReq.Username, loginReq.Password)
+	logger.TraceIf("auth", "AuthenticateUser returned")
+	if traceID != "" {
+		logger.TraceIf("auth", "after authenticate call, success=%v, trace id %s", err == nil, traceID)
+	}
 	if err != nil {
-		logger.Error("[AuthHandler] Authentication failed for user %s: %v", loginReq.Username, err)
+		logger.Warn("authentication failed for user %s: %v", loginReq.Username, err)
 		TrackHTTPError("auth_handler.Login", http.StatusUnauthorized, err)
 		
 		// Track failed authentication event
-		authEvent := &models.Entity{
-			ID: "auth_event_" + loginReq.Username + "_" + time.Now().Format("20060102150405"),
-			Tags: []string{
-				"type:auth_event",
-				"status:failed",
-				"user:" + loginReq.Username,
-				"event:failed_login",
-			},
-			Content: []byte(`{"username":"` + loginReq.Username + `","success":false,"details":"Invalid credentials","timestamp":"` + time.Now().Format(time.RFC3339) + `"}`),
-		}
-		if err := h.securityManager.GetEntityRepo().Create(authEvent); err != nil {
-			logger.Error("Failed to track auth event: %v", err)
-		}
+		// TODO: Fix deadlock issue - auth event creation blocks response
+		// authEvent := &models.Entity{
+		// 	ID: "auth_event_" + loginReq.Username + "_" + time.Now().Format("20060102150405"),
+		// 	Tags: []string{
+		// 		"type:auth_event",
+		// 		"status:failed",
+		// 		"user:" + loginReq.Username,
+		// 		"event:failed_login",
+		// 	},
+		// 	Content: []byte(`{"username":"` + loginReq.Username + `","success":false,"details":"Invalid credentials","timestamp":"` + time.Now().Format(time.RFC3339) + `"}`),
+		// }
+		// if err := h.securityManager.GetEntityRepo().Create(authEvent); err != nil {
+		// 	logger.Error("Failed to track auth event: %v", err)
+		// }
 		
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnauthorized)
 		json.NewEncoder(w).Encode(AuthErrorResponse{Error: "Invalid credentials"})
 		return
 	}
-	logger.Debug("[AuthHandler] User authenticated successfully: %s", userEntity.ID)
+	logger.Debug("user %s authenticated successfully", loginReq.Username)
 
 	// Extract user roles from entity tags
 	// Roles are stored as tags with the format "rbac:role:rolename"
@@ -126,7 +142,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	// Sessions are managed with TTL and automatic cleanup
 	session, err := h.sessionManager.CreateSession(userEntity.ID, userEntity.Username, roles)
 	if err != nil {
-		logger.Error("[AuthHandler] Failed to create session for user %s: %v", userEntity.ID, err)
+		logger.Error("failed to create session for user %s: %v", userEntity.ID, err)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(AuthErrorResponse{Error: "Failed to create session"})
@@ -147,21 +163,22 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Track successful authentication event
-	authEvent := &models.Entity{
-		ID: "auth_event_" + loginReq.Username + "_" + time.Now().Format("20060102150405"),
-		Tags: []string{
-			"type:auth_event",
-			"status:success",
-			"user:" + loginReq.Username,
-			"event:login",
-		},
-		Content: []byte(`{"username":"` + loginReq.Username + `","success":true,"details":"Login successful","timestamp":"` + time.Now().Format(time.RFC3339) + `"}`),
-	}
-	if err := h.securityManager.GetEntityRepo().Create(authEvent); err != nil {
-		logger.Error("Failed to track auth event: %v", err)
-	}
+	// TODO: Fix deadlock issue - auth event creation blocks response
+	// authEvent := &models.Entity{
+	// 	ID: "auth_event_" + loginReq.Username + "_" + time.Now().Format("20060102150405"),
+	// 	Tags: []string{
+	// 		"type:auth_event",
+	// 		"status:success",
+	// 		"user:" + loginReq.Username,
+	// 		"event:login",
+	// 	},
+	// 	Content: []byte(`{"username":"` + loginReq.Username + `","success":true,"details":"Login successful","timestamp":"` + time.Now().Format(time.RFC3339) + `"}`),
+	// }
+	// if err := h.securityManager.GetEntityRepo().Create(authEvent); err != nil {
+	// 	logger.Error("Failed to track auth event: %v", err)
+	// }
 
-	logger.Info("User %s authenticated successfully", loginReq.Username)
+	logger.Debug("user %s authenticated, session created", loginReq.Username)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
 }
@@ -178,26 +195,45 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 // @Failure 500 {object} ErrorResponse
 // @Router /api/v1/auth/logout [post]
 func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
-	// Get security context
-	securityCtx, ok := GetSecurityContext(r)
-	if !ok {
+	// Get token from Authorization header directly
+	authHeader := r.Header.Get("Authorization")
+	if authHeader == "" {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(AuthErrorResponse{Error: "Authentication required"})
+		json.NewEncoder(w).Encode(AuthErrorResponse{Error: "No token provided"})
 		return
 	}
+	
+	// Extract token
+	parts := strings.Split(authHeader, " ")
+	if len(parts) != 2 || parts[0] != "Bearer" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(AuthErrorResponse{Error: "Invalid token format"})
+		return
+	}
+	token := parts[1]
+	
+	// Get session info for logging
+	session, exists := h.sessionManager.GetSession(token)
+	var username string
+	if exists {
+		username = session.Username
+	}
 
-	// Invalidate session (delete session entity and relationships)
-	err := h.invalidateSession(securityCtx.Token)
+	// Invalidate session
+	err := h.invalidateSession(token)
 	if err != nil {
-		logger.Error("Failed to invalidate session: %v", err)
+		logger.Error("failed to invalidate session: %v", err)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(AuthErrorResponse{Error: "Failed to logout"})
 		return
 	}
 
-	logger.Info("User %s logged out", securityCtx.User.Username)
+	if username != "" {
+		logger.Info("User %s logged out", username)
+	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{"message": "Logged out successfully"})
@@ -362,10 +398,32 @@ func (h *AuthHandler) getGroupRoles(groupID string) ([]*models.SecurityRole, err
 
 // invalidateSession invalidates a session by deleting the session entity and its relationships
 func (h *AuthHandler) invalidateSession(token string) error {
-	// Find session entity by token
-	// Delete session entity and its relationships
-	// This would be implemented using the EntityRepository
-	return nil // Placeholder
+	// Get session info before deletion (if available) for audit purposes
+	session, exists := h.sessionManager.GetSession(token)
+	
+	// Delete the session from the session manager
+	h.sessionManager.DeleteSession(token)
+	
+	// Track logout event for audit purposes
+	if exists {
+		logoutEvent := &models.Entity{
+			ID: "auth_event_logout_" + session.UserID + "_" + time.Now().Format("20060102150405"),
+			Tags: []string{
+				"type:auth_event",
+				"status:success",
+				"user:" + session.UserID,
+				"event:logout",
+				"username:" + session.Username,
+			},
+			Content: []byte(fmt.Sprintf(`{"user_id":"%s","username":"%s","success":true,"details":"Logout successful","timestamp":"%s"}`, 
+				session.UserID, session.Username, time.Now().Format(time.RFC3339))),
+		}
+		if err := h.securityManager.GetEntityRepo().Create(logoutEvent); err != nil {
+			logger.Error("Failed to track logout event: %v", err)
+		}
+	}
+	
+	return nil
 }
 
 // getClientIP extracts the client IP address from the request

@@ -67,14 +67,19 @@ func SetLogLevel(level string) error {
 	switch strings.ToUpper(level) {
 	case "TRACE":
 		currentLevel.Store(int32(TRACE))
+		Info("log level changed to TRACE")
 	case "DEBUG":
 		currentLevel.Store(int32(DEBUG))
+		Info("log level changed to DEBUG")
 	case "INFO":
 		currentLevel.Store(int32(INFO))
+		Info("log level changed to INFO")
 	case "WARN":
 		currentLevel.Store(int32(WARN))
+		Info("log level changed to WARN")
 	case "ERROR":
 		currentLevel.Store(int32(ERROR))
+		Info("log level changed to ERROR")
 	default:
 		return fmt.Errorf("invalid log level: %s", level)
 	}

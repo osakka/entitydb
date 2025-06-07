@@ -31,18 +31,6 @@ definitions:
       total:
         type: integer
     type: object
-  api.AuthStatusResponse:
-    description: Current authentication status
-    properties:
-      authenticated:
-        example: true
-        type: boolean
-      expires_at:
-        example: "2025-01-01T12:00:00Z"
-        type: string
-      user:
-        $ref: '#/definitions/api.UserInfo'
-    type: object
   api.ChangePasswordRequest:
     properties:
       current_password:
@@ -296,6 +284,15 @@ definitions:
       total:
         type: integer
     type: object
+  api.LogStatusResponse:
+    properties:
+      level:
+        type: string
+      subsystems:
+        items:
+          type: string
+        type: array
+    type: object
   api.LoginRequest:
     description: Login credentials
     properties:
@@ -455,16 +452,6 @@ definitions:
       users:
         $ref: '#/definitions/api.SimplifiedUserMetrics'
     type: object
-  api.RefreshResponse:
-    description: Refreshed session information
-    properties:
-      expires_at:
-        example: "2025-01-01T14:00:00Z"
-        type: string
-      token:
-        example: token_xyz789...
-        type: string
-    type: object
   api.RelationshipListResponse:
     description: List of entity relationships
     properties:
@@ -531,6 +518,24 @@ definitions:
         type: string
       username:
         type: string
+    type: object
+  api.SetLogLevelRequest:
+    properties:
+      level:
+        type: string
+    type: object
+  api.SetTraceSubsystemsRequest:
+    properties:
+      clear:
+        type: boolean
+      disable:
+        items:
+          type: string
+        type: array
+      enable:
+        items:
+          type: string
+        type: array
     type: object
   api.SimplifiedAuthMetrics:
     properties:
@@ -720,8 +725,92 @@ info:
     url: https://github.com/osakka/entitydb/blob/main/LICENSE
   termsOfService: https://github.com/osakka/entitydb
   title: EntityDB API
-  version: 2.23.1
+  version: 2.26.0
 paths:
+  /api/v1/admin/log-level:
+    get:
+      description: Get the current log level and trace subsystems
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.LogStatusResponse'
+      security:
+      - BearerAuth: []
+      summary: Get log level
+      tags:
+      - admin
+    post:
+      consumes:
+      - application/json
+      description: Change the runtime log level
+      parameters:
+      - description: Log level
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.SetLogLevelRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Set log level
+      tags:
+      - admin
+  /api/v1/admin/trace-subsystems:
+    get:
+      description: Get the currently enabled trace subsystems
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.LogStatusResponse'
+      security:
+      - BearerAuth: []
+      summary: Get trace subsystems
+      tags:
+      - admin
+    post:
+      consumes:
+      - application/json
+      description: Enable, disable, or clear trace subsystems
+      parameters:
+      - description: Trace configuration
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.SetTraceSubsystemsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Configure trace subsystems
+      tags:
+      - admin
   /api/v1/auth/login:
     post:
       consumes:
@@ -1519,79 +1608,6 @@ paths:
       summary: Reset user password (admin only)
       tags:
       - users
-  /auth/login:
-    post:
-      consumes:
-      - application/json
-      description: Authenticate user and receive session token
-      parameters:
-      - description: Login credentials
-        in: body
-        name: body
-        required: true
-        schema:
-          $ref: '#/definitions/api.LoginRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/api.LoginResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/api.ErrorResponse'
-      summary: Login
-      tags:
-      - auth
-  /auth/logout:
-    post:
-      description: Invalidate the current session
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/api.StatusResponse'
-      security:
-      - BearerAuth: []
-      summary: Logout
-      tags:
-      - auth
-  /auth/refresh:
-    post:
-      description: Refresh the session token expiration
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/api.RefreshResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/api.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Refresh Token
-      tags:
-      - auth
-  /auth/status:
-    get:
-      description: Check authentication status and session validity
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/api.AuthStatusResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/api.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Auth Status
-      tags:
-      - auth
   /health:
     get:
       consumes:
