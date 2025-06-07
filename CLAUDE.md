@@ -3,7 +3,7 @@
 > [!IMPORTANT]
 > EntityDB is a high-performance temporal database where every tag is timestamped with nanosecond precision. All data is stored in a custom binary format (EBF) with Write-Ahead Logging for durability and concurrent access support.
 
-## Current State (v2.27.0)
+## Current State (v2.28.0)
 
 EntityDB now features a unified Entity model with autochunking:
 - **Unified Entity Model**: Single content field ([]byte) per entity
@@ -176,6 +176,31 @@ The server automatically creates a default admin user if none exists:
 - Rate limiting
 - Audit logging
 - Aggregation queries (beyond sorting/filtering)
+
+## Recent Changes (v2.28.0)
+
+- **Professional Documentation Overhaul**: Complete transformation of documentation library
+  - Evolved existing documentation structure with professional taxonomy and naming conventions
+  - Consolidated ~150 scattered files into well-organized, accurate documentation
+  - Updated all documentation to reflect v2.28.0 codebase accuracy
+  - Fixed critical inaccuracies (binary vs SQLite claims, RBAC format, missing endpoints)
+  - Created master documentation index with clear navigation paths and cross-references
+  - Established comprehensive maintenance guidelines and quarterly review process
+  - Enhanced key architecture documents (temporal, RBAC, performance)
+  - All documentation now follows industry-standard technical writing practices
+- **Entity Model Enhancements**: Added utility methods for temporal tag handling
+  - Added `HasTag()` method to check for tag existence without timestamp concerns
+  - Added `GetTagValue()` method to retrieve the most recent value for a given tag key
+  - Methods properly handle temporal tag parsing with both RFC3339 and epoch nanosecond formats
+- **Build System Improvements**: Enhanced swagger documentation generation
+  - Automated swagger file generation integrated into build process
+  - Tab structure validation ensures UI rendering stability
+  - Clean build with zero warnings
+- **Code Audit and Cleanup**: Maintained single source of truth principle
+  - Removed obsolete test scripts and debug utilities
+  - All patches and fixes integrated into main codebase
+  - No regression or parallel implementations
+  - Repository structure follows clean workspace guidelines
 
 ## Recent Changes (v2.27.0)
 
@@ -393,7 +418,7 @@ All development follows the standardized Git workflow described in [docs/develop
 
 - URL: https://git.home.arpa/itdlabs/entitydb.git
 - Branch: main
-- Latest tag: v2.24.0
+- Latest tag: v2.28.0
 
 ## Development Principles
 

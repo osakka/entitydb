@@ -258,3 +258,148 @@ help:
 	@echo ""
 	@$(ECHO) "$(YELLOW)All compiled tools are prefixed with '$(TOOLS_PREFIX)' and installed in $(BUILD_DIR)/$(NC)\n"
 	@$(ECHO) "$(BLUE)========================================$(NC)\n"
+
+# =============================================================================
+# CI/CD and Automation Targets
+# =============================================================================
+
+.PHONY: test-ci security-scan lint docker docker-test fmt pre-commit build-release clean-ci help-ci dev
+
+# Development server with hot reload (enhanced version)
+dev-watch: ## Start development server with hot reload
+	@echo "$(YELLOW)Starting development server with hot reload...$(NC)"
+	@if command -v air >/dev/null 2>&1; then \
+		cd .. && air -c .air.toml; \
+	else \
+		echo "$(RED)Air not installed. Install with: go install github.com/cosmtrek/air@latest$(NC)"; \
+		echo "$(YELLOW)Falling back to standard build and run...$(NC)"; \
+		$(MAKE) build && ./$(BIN_DIR)/$(NAME) --entitydb-log-level debug; \
+	fi
+
+# CI-friendly test target
+test-ci: ## Run tests suitable for CI environment
+	@echo "$(YELLOW)Running CI tests...$(NC)"
+	go test -race -coverprofile=coverage.out ./...
+	go tool cover -func=coverage.out
+	go tool cover -html=coverage.out -o coverage.html
+	@echo "$(GREEN)CI tests completed$(NC)"
+
+# Security scanning
+security-scan: ## Run security analysis
+	@echo "$(YELLOW)Running security scan...$(NC)"
+	@if ! which gosec > /dev/null; then \
+		echo "Installing gosec..."; \
+		go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest; \
+	fi
+	gosec -fmt json -out security-report.json ./...
+	@echo "$(GREEN)Security scan completed$(NC)"
+
+# Code quality checks
+lint: ## Run comprehensive code quality checks
+	@echo "$(YELLOW)Running code quality checks...$(NC)"
+	@if ! which golangci-lint > /dev/null; then \
+		echo "Installing golangci-lint..."; \
+		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $$(go env GOPATH)/bin v1.55.2; \
+	fi
+	golangci-lint run --timeout=5m
+	@echo "Checking formatting..."
+	@if [ "$$(gofmt -s -l . | wc -l)" -gt 0 ]; then \
+		echo "The following files need formatting:"; \
+		gofmt -s -l .; \
+		exit 1; \
+	fi
+	@echo "$(GREEN)Code quality checks passed$(NC)"
+
+# Format code
+fmt: ## Format Go code
+	@echo "$(YELLOW)Formatting code...$(NC)"
+	gofmt -w .
+	@if which goimports > /dev/null; then \
+		goimports -w .; \
+	fi
+	@echo "$(GREEN)Code formatted$(NC)"
+
+# Docker build
+docker: ## Build Docker image
+	@echo "$(YELLOW)Building Docker image...$(NC)"
+	cd .. && docker build -t entitydb:latest \
+		--build-arg VERSION=$$(git describe --tags --always) \
+		--build-arg BUILD_DATE=$$(date -u +%Y-%m-%dT%H:%M:%SZ) \
+		-f Dockerfile .
+	@echo "$(GREEN)Docker image built: entitydb:latest$(NC)"
+
+# Test Docker image
+docker-test: docker ## Build and test Docker image
+	@echo "$(YELLOW)Testing Docker image...$(NC)"
+	docker run --rm entitydb:latest --version
+	@echo "$(GREEN)Docker image test completed$(NC)"
+
+# Integration tests
+test-integration: build ## Run integration tests
+	@echo "$(YELLOW)Running integration tests...$(NC)"
+	@if [ -f tests/run_all_tests.sh ]; then \
+		chmod +x tests/run_all_tests.sh; \
+		cd tests && ./run_all_tests.sh; \
+	else \
+		echo "No integration tests found"; \
+	fi
+	@echo "$(GREEN)Integration tests completed$(NC)"
+
+# Pre-commit checks (run before committing)
+pre-commit: fmt lint security-scan test-ci ## Run all pre-commit checks
+	@echo "$(GREEN)All pre-commit checks passed!$(NC)"
+
+# Release build
+build-release: ## Build release binaries for multiple platforms
+	@echo "$(YELLOW)Building release binaries...$(NC)"
+	@mkdir -p ../dist
+	
+	# Linux AMD64
+	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build \
+		-ldflags "-X main.Version=$$(git describe --tags --always) -X main.BuildDate=$$(date -u +%Y-%m-%d)" \
+		-o ../dist/entitydb-linux-amd64 main.go
+	
+	# Linux ARM64
+	GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build \
+		-ldflags "-X main.Version=$$(git describe --tags --always) -X main.BuildDate=$$(date -u +%Y-%m-%d)" \
+		-o ../dist/entitydb-linux-arm64 main.go
+	
+	# macOS AMD64
+	GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build \
+		-ldflags "-X main.Version=$$(git describe --tags --always) -X main.BuildDate=$$(date -u +%Y-%m-%d)" \
+		-o ../dist/entitydb-darwin-amd64 main.go
+	
+	# macOS ARM64 (Apple Silicon)
+	GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build \
+		-ldflags "-X main.Version=$$(git describe --tags --always) -X main.BuildDate=$$(date -u +%Y-%m-%d)" \
+		-o ../dist/entitydb-darwin-arm64 main.go
+	
+	# Windows AMD64
+	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build \
+		-ldflags "-X main.Version=$$(git describe --tags --always) -X main.BuildDate=$$(date -u +%Y-%m-%d)" \
+		-o ../dist/entitydb-windows-amd64.exe main.go
+	
+	@echo "$(GREEN)Release binaries built in ../dist/$(NC)"
+	@ls -la ../dist/
+
+# Clean CI artifacts
+clean-ci: ## Clean CI-related artifacts
+	@echo "$(YELLOW)Cleaning CI artifacts...$(NC)"
+	rm -f coverage.out coverage.html security-report.json
+	rm -rf ../dist
+	@echo "$(GREEN)CI artifacts cleaned$(NC)"
+
+# Help for new targets
+help-ci: ## Show CI/CD related targets
+	@echo "$(BLUE)CI/CD Targets:$(NC)"
+	@echo "  dev-watch        Start development server with hot reload"
+	@echo "  test-ci          Run tests suitable for CI"
+	@echo "  security-scan    Run security analysis"
+	@echo "  lint            Run code quality checks"
+	@echo "  fmt             Format Go code"
+	@echo "  docker          Build Docker image"
+	@echo "  docker-test     Build and test Docker image"
+	@echo "  test-integration Run integration tests"
+	@echo "  pre-commit      Run all pre-commit checks"
+	@echo "  build-release   Build release binaries"
+	@echo "  clean-ci        Clean CI artifacts"

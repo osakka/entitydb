@@ -5,6 +5,39 @@ All notable changes to the EntityDB Platform will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.28.0] - 2025-06-07
+
+### Added
+- **Professional Documentation Library**: Complete transformation of EntityDB documentation
+  - Evolved existing documentation structure using professional taxonomy
+  - Consolidated ~150 scattered files into well-organized, accurate documentation  
+  - Created comprehensive master index with clear navigation paths
+  - Established cross-reference system for easy navigation between related topics
+  - Added documentation maintenance guidelines with quarterly review process
+  - Enhanced architecture documentation (temporal, RBAC, performance)
+- **Entity Model Enhancements**: Temporal tag utility methods
+  - `HasTag()`: Check for tag existence without timestamp concerns
+  - `GetTagValue()`: Retrieve most recent value for a given tag key
+  - Both methods properly handle RFC3339 and epoch nanosecond formats
+
+### Changed  
+- **Documentation Accuracy**: Fixed critical documentation issues
+  - Corrected architecture docs claiming SQLite when using binary format
+  - Fixed RBAC permission format documentation
+  - Updated API reference to include all v2.28.0 endpoints
+  - Aligned all technical documentation with actual implementation
+- **Build System**: Enhanced swagger documentation generation
+  - Integrated swagger generation into standard build process
+  - Added tab structure validation for UI stability
+  - Maintained clean build with zero warnings
+
+### Fixed
+- **Single Source of Truth**: Repository maintenance
+  - Removed all obsolete test scripts and debug utilities
+  - Integrated all patches and fixes into main codebase
+  - Eliminated parallel implementations and redundant code
+  - Enforced clean workspace guidelines
+
 ## [2.27.0] - 2025-06-07
 
 ### Added

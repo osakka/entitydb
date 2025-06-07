@@ -318,8 +318,9 @@ func (r *EntityRepository) updateIndexes(entity *models.Entity) {
 		if strings.Contains(tag, "|") {
 			parts := strings.SplitN(tag, "|", 2)
 			if len(parts) == 2 {
-				// Try to parse timestamp
-				if timestamp, err := time.Parse(time.RFC3339Nano, parts[0]); err == nil {
+				// Try to parse timestamp as nanosecond epoch
+				if timestampNanos, err := strconv.ParseInt(parts[0], 10, 64); err == nil {
+					timestamp := time.Unix(0, timestampNanos)
 					r.temporalIndex.AddEntry(entity.ID, tag, timestamp)
 					logger.Trace("Added to temporal index: %s", entity.ID)
 				} else {
@@ -2399,8 +2400,9 @@ func (r *EntityRepository) ReindexTags() error {
 			if strings.Contains(tag, "|") {
 				parts := strings.SplitN(tag, "|", 2)
 				if len(parts) == 2 {
-					// Try to parse timestamp for temporal index
-					if timestamp, err := time.Parse(time.RFC3339Nano, parts[0]); err == nil {
+					// Try to parse timestamp for temporal index as nanosecond epoch
+					if timestampNanos, err := strconv.ParseInt(parts[0], 10, 64); err == nil {
+						timestamp := time.Unix(0, timestampNanos)
 						r.temporalIndex.AddEntry(entity.ID, tag, timestamp)
 					}
 					

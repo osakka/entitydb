@@ -1,6 +1,7 @@
 package models_test
 
 import (
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -27,9 +28,9 @@ func TestEntityTemporalTags(t *testing.T) {
 		t.Errorf("Tag not formatted correctly: %s", tag)
 	}
 	
-	// Verify timestamp is valid RFC3339Nano format
+	// Verify timestamp is valid nanosecond epoch format
 	timestamp := parts[0]
-	_, err := time.Parse(time.RFC3339Nano, timestamp)
+	_, err := strconv.ParseInt(timestamp, 10, 64)
 	if err != nil {
 		t.Errorf("Invalid timestamp format: %s", timestamp)
 	}

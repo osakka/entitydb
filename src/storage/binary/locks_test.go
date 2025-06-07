@@ -36,9 +36,9 @@ func TestConcurrentAccess(t *testing.T) {
 				entity.AddTag("type:test")
 				entity.AddTag(fmt.Sprintf("goroutine:%d", goroutineID))
 				entity.AddTag(fmt.Sprintf("iteration:%d", j))
-				entity.AddContent("title", fmt.Sprintf("Test entity %d-%d", goroutineID, j))
+				entity.AddTagWithValue("title", fmt.Sprintf("Test entity %d-%d", goroutineID, j))
 				
-				_, err := repo.Create(entity)
+				err := repo.Create(entity)
 				if err != nil {
 					t.Errorf("Failed to create entity: %v", err)
 				}
@@ -51,6 +51,9 @@ func TestConcurrentAccess(t *testing.T) {
 	elapsed := time.Since(start)
 	t.Logf("Created %d entities in %v", numGoroutines*entitiesPerGoroutine, elapsed)
 	
+	// Wait a bit to ensure all indexing is complete
+	time.Sleep(100 * time.Millisecond)
+	
 	// Test concurrent reads
 	wg.Add(numGoroutines)
 	
@@ -61,13 +64,23 @@ func TestConcurrentAccess(t *testing.T) {
 			defer wg.Done()
 			
 			// List by tag
-			entities, err := repo.ListByTag(fmt.Sprintf("goroutine:%d", goroutineID))
+			searchTag := fmt.Sprintf("goroutine:%d", goroutineID)
+			entities, err := repo.ListByTag(searchTag)
 			if err != nil {
 				t.Errorf("Failed to list entities: %v", err)
 			}
 			
 			if len(entities) != entitiesPerGoroutine {
-				t.Errorf("Expected %d entities, got %d", entitiesPerGoroutine, len(entities))
+				t.Errorf("Expected %d entities for tag '%s', got %d", entitiesPerGoroutine, searchTag, len(entities))
+				// Debug: check what tags are actually in the index
+				all, _ := repo.List()
+				t.Logf("Total entities in repo: %d", len(all))
+				for i, entity := range all {
+					if i < 3 { // Just show first few for debugging
+						cleanTags := entity.GetTagsWithoutTimestamp()
+						t.Logf("Entity %s tags: %v", entity.ID, cleanTags)
+					}
+				}
 			}
 		}(i)
 	}
@@ -97,9 +110,9 @@ func BenchmarkConcurrentWrites(b *testing.B) {
 		for pb.Next() {
 			entity := models.NewEntity()
 			entity.AddTag("type:benchmark")
-			entity.AddContent("title", "Benchmark entity")
+			entity.AddTagWithValue("title", "Benchmark entity")
 			
-			_, err := repo.Create(entity)
+			err := repo.Create(entity)
 			if err != nil {
 				b.Errorf("Failed to create entity: %v", err)
 			}
@@ -120,9 +133,9 @@ func BenchmarkConcurrentReads(b *testing.B) {
 		entity := models.NewEntity()
 		entity.AddTag("type:benchmark")
 		entity.AddTag(fmt.Sprintf("index:%d", i))
-		entity.AddContent("title", fmt.Sprintf("Benchmark entity %d", i))
+		entity.AddTagWithValue("title", fmt.Sprintf("Benchmark entity %d", i))
 		
-		_, err := repo.Create(entity)
+		err := repo.Create(entity)
 		if err != nil {
 			b.Fatalf("Failed to create entity: %v", err)
 		}

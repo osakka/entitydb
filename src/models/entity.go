@@ -172,6 +172,55 @@ func (e *Entity) GetTagsWithoutTimestamp() []string {
 	return result
 }
 
+// HasTag checks if entity has a tag (checks without timestamp)
+func (e *Entity) HasTag(tag string) bool {
+	cleanTags := e.GetTagsWithoutTimestamp()
+	for _, cleanTag := range cleanTags {
+		if cleanTag == tag {
+			return true
+		}
+	}
+	return false
+}
+
+// GetTagValue returns the most recent value for a tag key (gets latest value with timestamp)
+func (e *Entity) GetTagValue(key string) string {
+	// Look for the most recent tag with the given key prefix
+	var latestValue string
+	var latestTimestamp int64
+	
+	for _, tag := range e.Tags {
+		parts := strings.Split(tag, "|")
+		if len(parts) >= 2 {
+			// Parse timestamp 
+			timestampStr := parts[0]
+			timestamp, err := time.Parse(time.RFC3339Nano, timestampStr)
+			if err != nil {
+				// Try parsing as epoch nanoseconds
+				if nanos, err := strconv.ParseInt(timestampStr, 10, 64); err == nil {
+					timestamp = time.Unix(0, nanos)
+				} else {
+					continue
+				}
+			}
+			
+			// Check if this tag matches our key
+			actualTag := parts[len(parts)-1]
+			if strings.HasPrefix(actualTag, key+":") {
+				tagParts := strings.SplitN(actualTag, ":", 2)
+				if len(tagParts) == 2 && tagParts[0] == key {
+					timestampNanos := timestamp.UnixNano()
+					if timestampNanos > latestTimestamp {
+						latestTimestamp = timestampNanos
+						latestValue = tagParts[1]
+					}
+				}
+			}
+		}
+	}
+	return latestValue
+}
+
 // SetContent sets content with automatic chunking if needed
 func (e *Entity) SetContent(reader io.Reader, mimeType string, config ChunkConfig) ([]string, error) {
 	// First, determine the size
