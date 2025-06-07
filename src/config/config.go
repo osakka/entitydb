@@ -13,6 +13,7 @@ package config
 import (
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -43,6 +44,15 @@ type Config struct {
 	// Metrics
 	MetricsInterval  time.Duration
 	AggregationInterval time.Duration
+	
+	// Enhanced Metrics Configuration
+	MetricsRetentionRaw    time.Duration // Raw data retention period
+	MetricsRetention1Min   time.Duration // 1-minute aggregates retention
+	MetricsRetention1Hour  time.Duration // 1-hour aggregates retention
+	MetricsRetention1Day   time.Duration // Daily aggregates retention
+	MetricsHistogramBuckets []float64     // Histogram bucket boundaries
+	MetricsEnableRequestTracking bool     // Enable HTTP request metrics
+	MetricsEnableStorageTracking bool     // Enable storage operation metrics
 	
 	// API
 	SwaggerHost      string
@@ -90,6 +100,15 @@ func Load() *Config {
 		// Metrics
 		MetricsInterval:  getEnvDuration("ENTITYDB_METRICS_INTERVAL", 30),
 		AggregationInterval: getEnvDuration("ENTITYDB_METRICS_AGGREGATION_INTERVAL", 30),
+		
+		// Enhanced Metrics Configuration
+		MetricsRetentionRaw:    getEnvDuration("ENTITYDB_METRICS_RETENTION_RAW", 24*60), // 24 hours in minutes
+		MetricsRetention1Min:   getEnvDuration("ENTITYDB_METRICS_RETENTION_1MIN", 7*24*60), // 7 days in minutes
+		MetricsRetention1Hour:  getEnvDuration("ENTITYDB_METRICS_RETENTION_1HOUR", 30*24*60), // 30 days in minutes
+		MetricsRetention1Day:   getEnvDuration("ENTITYDB_METRICS_RETENTION_1DAY", 365*24*60), // 365 days in minutes
+		MetricsHistogramBuckets: getEnvFloatSlice("ENTITYDB_METRICS_HISTOGRAM_BUCKETS", []float64{0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1, 5, 10}),
+		MetricsEnableRequestTracking: getEnvBool("ENTITYDB_METRICS_ENABLE_REQUEST_TRACKING", true),
+		MetricsEnableStorageTracking: getEnvBool("ENTITYDB_METRICS_ENABLE_STORAGE_TRACKING", true),
 		
 		// API
 		SwaggerHost:      getEnv("ENTITYDB_SWAGGER_HOST", "localhost:8085"),
@@ -148,4 +167,20 @@ func getEnvDuration(key string, defaultSeconds int) time.Duration {
 		}
 	}
 	return time.Duration(defaultSeconds) * time.Second
+}
+
+func getEnvFloatSlice(key string, defaultValue []float64) []float64 {
+	if value := os.Getenv(key); value != "" {
+		parts := strings.Split(value, ",")
+		result := make([]float64, 0, len(parts))
+		for _, part := range parts {
+			if f, err := strconv.ParseFloat(strings.TrimSpace(part), 64); err == nil {
+				result = append(result, f)
+			}
+		}
+		if len(result) > 0 {
+			return result
+		}
+	}
+	return defaultValue
 }

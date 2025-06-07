@@ -188,9 +188,14 @@ func main() {
 	
 	logger.Info("starting entitydb with log level %s", strings.ToUpper(logger.GetLogLevel()))
 
-	// Initialize storage metrics early with nil repository
+	// Initialize storage metrics early with nil repository (conditionally)
 	// This allows metrics tracking during repository initialization
-	binary.InitStorageMetrics(nil)
+	if cfg.MetricsEnableStorageTracking {
+		binary.InitStorageMetrics(nil)
+		logger.Info("Storage metrics tracking enabled")
+	} else {
+		logger.Info("Storage metrics tracking disabled")
+	}
 	
 	// Initialize binary repositories
 	// Use factory to create appropriate repository based on settings
@@ -211,8 +216,10 @@ func main() {
 	// Create relationship repository
 	relationRepo = binary.NewRelationshipRepository(entityRepo)
 	
-	// Update storage metrics with initialized repository
-	binary.InitStorageMetrics(entityRepo)
+	// Update storage metrics with initialized repository (conditionally)
+	if cfg.MetricsEnableStorageTracking {
+		binary.InitStorageMetrics(entityRepo)
+	}
 	
 	// Update configuration manager with repository
 	configManager = config.NewConfigManager(entityRepo)
@@ -436,8 +443,14 @@ func main() {
 	// Add connection close middleware to prevent hanging connections
 	connectionCloseMiddleware := api.NewConnectionCloseMiddleware()
 	
-	// Add request metrics middleware
-	requestMetrics := api.NewRequestMetricsMiddleware(server.entityRepo)
+	// Add request metrics middleware (conditionally)
+	var requestMetrics *api.RequestMetricsMiddleware
+	if cfg.MetricsEnableRequestTracking {
+		requestMetrics = api.NewRequestMetricsMiddleware(server.entityRepo)
+		logger.Info("Request metrics tracking enabled")
+	} else {
+		logger.Info("Request metrics tracking disabled")
+	}
 	
 	// Add trace middleware for debugging
 	traceMiddleware := api.NewTraceMiddleware()
@@ -445,7 +458,13 @@ func main() {
 	// Chain middleware together
 	chainedMiddleware := func(h http.Handler) http.Handler {
 		// Apply in order: trace -> connection close -> TE header fix -> request metrics -> handler
-		return traceMiddleware.Middleware(connectionCloseMiddleware.Middleware(teHeaderMiddleware.Middleware(requestMetrics.Middleware(h))))
+		h = teHeaderMiddleware.Middleware(h)
+		if requestMetrics != nil {
+			h = requestMetrics.Middleware(h)
+		}
+		h = connectionCloseMiddleware.Middleware(h)
+		h = traceMiddleware.Middleware(h)
+		return h
 	}
 	
 	// Add CORS middleware with very permissive settings
