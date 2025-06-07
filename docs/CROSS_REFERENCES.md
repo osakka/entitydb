@@ -5,16 +5,16 @@ This document establishes the cross-referencing system between related documenta
 ## Core Documentation Flow
 
 ### For New Users
-**Entry Point**: [Quick Start Guide](guides/guide-quick-start.md)
+**Entry Point**: [Quick Start Guide](guides/quick-start.md)
 **Flow**: Quick Start → [API Reference](api/api-reference.md) → [Architecture Overview](architecture/arch-overview.md)
 
 ### For Developers  
-**Entry Point**: [Developer Setup](development/dev-setup.md)
-**Flow**: Dev Setup → [Contributing Guide](development/dev-contributing.md) → [Implementation Guides](implementation/README.md)
+**Entry Point**: [Contributing Guide](development/contributing.md)
+**Flow**: Contributing → [Git Workflow](development/git-workflow.md) → [Implementation Guides](implementation/README.md)
 
 ### For Operations
-**Entry Point**: [Installation Guide](deployment/ops-installation.md)
-**Flow**: Installation → [Configuration](deployment/ops-configuration.md) → [Monitoring](deployment/ops-monitoring.md)
+**Entry Point**: [Deployment Guide](guides/deployment.md)
+**Flow**: Deployment → [Configuration](development/configuration-management.md) → [Admin Interface](guides/admin-interface.md)
 
 ## Architecture Cross-References
 
@@ -23,31 +23,32 @@ This document establishes the cross-referencing system between related documenta
 - **Related Documents**:
   - [Temporal Architecture](architecture/arch-temporal.md) - Time-based storage system
   - [RBAC Architecture](architecture/arch-rbac.md) - Security and permissions
-  - [Dataspace Architecture](architecture/arch-dataspace.md) - Multi-tenant design
+  - [Entity Architecture](architecture/entities.md) - Entity model design
+  - [Tag System](architecture/tags.md) - Tag-based data model
   - [Storage Layer Implementation](implementation/impl-performance.md) - Performance optimizations
 
 ### Temporal System
 - **Main Document**: [Temporal Architecture](architecture/arch-temporal.md)
 - **Related Documents**:
   - [Temporal Implementation](implementation/impl-temporal.md) - Technical implementation details
-  - [Temporal API Guide](api/api-temporal.md) - API usage for time-travel queries
+  - [Temporal Demo](api/auth_temporal_demo.md) - Time-travel query examples
   - [Performance Optimization](implementation/impl-performance.md) - Temporal query performance
-  - [Troubleshooting Temporal Issues](troubleshooting/trouble-temporal.md) - Common problems
+  - [Temporal Tag Fix](troubleshooting/temporal-tag-fix.md) - Common problems
 
 ### Security & RBAC
 - **Main Document**: [RBAC Architecture](architecture/arch-rbac.md)
 - **Related Documents**:
-  - [Authentication API](api/api-authentication.md) - Login and session management
-  - [Security Configuration](guides/guide-security.md) - Security setup guide
-  - [User Management](guides/guide-user-management.md) - User administration
-  - [RBAC Troubleshooting](troubleshooting/trouble-auth.md) - Permission issues
+  - [Authentication API](api/auth.md) - Login and session management
+  - [Security Guide](guides/security.md) - Security setup guide
+  - [Admin Interface](guides/admin-interface.md) - User administration
+  - [Security Implementation](development/security-implementation.md) - Security details
 
 ## API Documentation Cross-References
 
 ### Complete API Reference
 - **Main Document**: [API Reference](api/api-reference.md)
 - **Related Documents**:
-  - [Authentication Flow](api/api-authentication.md) - Login and session details
+  - [Authentication Flow](api/auth.md) - Login and session details
   - [Entity Operations](api/api-entities.md) - CRUD operations detail
   - [Temporal Queries](api/api-temporal.md) - Time-travel API usage
   - [Relationship API](api/api-relationships.md) - Entity relationships

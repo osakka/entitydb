@@ -128,12 +128,12 @@ EntityDB uses a layered architecture optimized for temporal operations:
 
 ## Documentation
 
-- [Quick Start Guide](./docs/new-structure/guides/guide-quick-start.md)
-- [API Reference](./docs/new-structure/api/api-reference.md)
-- [Architecture Overview](./docs/new-structure/architecture/arch-overview.md)
-- [RBAC & Security](./docs/new-structure/guides/guide-security.md)
-- [Development Guide](./docs/new-structure/development/dev-contributing.md)
-- [Performance Tuning](./docs/new-structure/performance/perf-optimization.md)
+- [Quick Start Guide](./docs/guides/quick-start.md)
+- [API Reference](./docs/api/api-reference.md)
+- [Architecture Overview](./docs/architecture/arch-overview.md)
+- [RBAC & Security](./docs/guides/security.md)
+- [Development Guide](./docs/development/contributing.md)
+- [Performance Tuning](./docs/performance/performance.md)
 
 ## Project Structure
 
@@ -197,7 +197,7 @@ ENTITYDB_METRICS_INTERVAL=30         # Metrics collection interval
 - **Default**: `/opt/entitydb/share/config/entitydb.env`
 - **Instance**: `/opt/entitydb/var/entitydb.env` (overrides defaults)
 
-For complete configuration documentation, see [Configuration Management Guide](./docs/new-structure/development/dev-configuration.md).
+For complete configuration documentation, see [Configuration Management Guide](./docs/development/configuration-management.md).
 
 ## Performance
 
@@ -215,7 +215,7 @@ Benchmarks show:
 
 ## Contributing
 
-See [Contributing Guide](./docs/new-structure/development/dev-contributing.md) for development guidelines.
+See [Contributing Guide](./docs/development/contributing.md) for development guidelines.
 
 ## License
 
