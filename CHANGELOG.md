@@ -8,6 +8,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [2.28.0] - 2025-06-07
 
 ### Added
+- **Enhanced Metrics System**: Comprehensive metrics collection and management
+  - Configurable retention policies for raw and aggregated metrics data
+  - Metric types system (Counter, Gauge, Histogram) leveraging temporal storage
+  - Retention manager with automatic data lifecycle management (raw, 1min, 1hour, daily)
+  - Histogram bucket configuration for latency and distribution tracking
+  - Conditional metrics collection with separate flags for request/storage tracking
+  - Standalone metrics dashboard with auto-refresh and time range selection
+  - Enhanced Chart.js integration with multiple chart types and real-time updates
+- **Connection Stability Improvements**: Fixed browser connection hangs
+  - TE header middleware to handle Transfer-Encoding header conflicts
+  - Connection close middleware for proper connection termination
+  - Comprehensive request tracing for debugging connection issues
+  - Disabled HTTP/2 in TLS configuration to fix ERR_HTTP2_PROTOCOL_ERROR
+- **Logging System Enhancements**: Professional logging with trace subsystems
+  - Log bridge to redirect standard library logs through structured logger
+  - Trace subsystem support for targeted debugging
+  - Lock operation tracing for deadlock detection
+  - HTTP request tracing with goroutine IDs
 - **Professional Documentation Library**: Complete transformation of EntityDB documentation
   - Evolved existing documentation structure using professional taxonomy
   - Consolidated ~150 scattered files into well-organized, accurate documentation  
@@ -37,6 +55,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Integrated all patches and fixes into main codebase
   - Eliminated parallel implementations and redundant code
   - Enforced clean workspace guidelines
+- **Version Consistency**: Updated all version references to v2.28.0
+  - Configuration files, documentation, and code all use consistent version
+  - Regenerated Swagger documentation with correct version
 
 ## [2.27.0] - 2025-06-07
 
