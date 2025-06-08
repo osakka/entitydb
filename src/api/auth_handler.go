@@ -65,11 +65,6 @@ type AuthErrorResponse struct {
 // @Failure 500 {object} ErrorResponse
 // @Router /api/v1/auth/login [post]
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
-	// Get trace ID from context
-	traceID := GetTraceID(r.Context())
-	if traceID != "" {
-		logger.TraceIf("auth", "login request started with trace id %s", traceID)
-	}
 	
 	var loginReq AuthLoginRequest
 	
@@ -92,17 +87,12 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 
 	// Authenticate user using relationship-based security
 	logger.Debug("authenticating user %s", loginReq.Username)
-	if traceID != "" {
-		logger.TraceIf("auth", "before authenticate call for user %s, trace id %s", loginReq.Username, traceID)
-	}
 	logger.TraceIf("auth", "calling AuthenticateUser")
 	userEntity, err := h.securityManager.AuthenticateUser(loginReq.Username, loginReq.Password)
 	logger.TraceIf("auth", "AuthenticateUser returned")
-	if traceID != "" {
-		logger.TraceIf("auth", "after authenticate call, success=%v, trace id %s", err == nil, traceID)
-	}
 	if err != nil {
 		logger.Warn("authentication failed for user %s: %v", loginReq.Username, err)
+		// Track error asynchronously - no longer causes hangs
 		TrackHTTPError("auth_handler.Login", http.StatusUnauthorized, err)
 		
 		// Track failed authentication event

@@ -162,8 +162,6 @@ func main() {
 	// Configure logging from configuration
 	logger.Configure()
 	
-	// Initialize log bridge to redirect standard library log output
-	logger.InitLogBridge()
 	
 	// Set log level from configuration
 	if err := logger.SetLogLevel(cfg.LogLevel); err != nil {
@@ -180,11 +178,6 @@ func main() {
 		logger.Info("trace subsystems enabled: %s", strings.Join(subsystems, ", "))
 	}
 	
-	// Enable HTTP and thread tracing if requested
-	if os.Getenv("ENTITYDB_HTTP_TRACE") == "true" {
-		logger.EnableTracing(true)
-		logger.Info("http and thread tracing enabled")
-	}
 	
 	logger.Info("starting entitydb with log level %s", strings.ToUpper(logger.GetLogLevel()))
 
@@ -454,9 +447,6 @@ func main() {
 	// Add TE header middleware to prevent hangs with browser headers
 	teHeaderMiddleware := api.NewTEHeaderMiddleware()
 	
-	// Add connection close middleware to prevent hanging connections
-	connectionCloseMiddleware := api.NewConnectionCloseMiddleware()
-	
 	// Add request metrics middleware (conditionally)
 	var requestMetrics *api.RequestMetricsMiddleware
 	if cfg.MetricsEnableRequestTracking {
@@ -466,18 +456,13 @@ func main() {
 		logger.Info("Request metrics tracking disabled")
 	}
 	
-	// Add trace middleware for debugging
-	traceMiddleware := api.NewTraceMiddleware()
-	
 	// Chain middleware together
 	chainedMiddleware := func(h http.Handler) http.Handler {
-		// Apply in order: trace -> connection close -> TE header fix -> request metrics -> handler
+		// Apply in order: TE header fix -> request metrics -> handler
 		h = teHeaderMiddleware.Middleware(h)
 		if requestMetrics != nil {
 			h = requestMetrics.Middleware(h)
 		}
-		h = connectionCloseMiddleware.Middleware(h)
-		h = traceMiddleware.Middleware(h)
 		return h
 	}
 	
@@ -517,7 +502,6 @@ func main() {
 			ReadTimeout:  cfg.HTTPReadTimeout,
 			WriteTimeout: cfg.HTTPWriteTimeout,
 			IdleTimeout:  cfg.HTTPIdleTimeout,
-			ErrorLog:     logger.SetHTTPServerErrorLog(),
 		}
 		
 		logger.Info("Starting EntityDB server on HTTPS port %d with SSL enabled", cfg.SSLPort)
@@ -539,7 +523,6 @@ func main() {
 			ReadTimeout:  cfg.HTTPReadTimeout,
 			WriteTimeout: cfg.HTTPWriteTimeout,
 			IdleTimeout:  cfg.HTTPIdleTimeout,
-			ErrorLog:     logger.SetHTTPServerErrorLog(),
 		}
 		
 		logger.Info("Starting EntityDB server on HTTP port %d (SSL disabled)", cfg.Port)

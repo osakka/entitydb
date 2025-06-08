@@ -19,9 +19,15 @@ EntityDB (EntityDB) is a distributed system designed to manage AI agents, issues
 
 ### 3. API-First Architecture
 - All operations go through RESTful API
-- JWT-based authentication
+- Embedded credential authentication (v2.29.0+)
 - Tag-based permission checks
 - No direct database access
+
+### 4. Embedded Authentication (v2.29.0+)
+- User credentials stored directly in entity content field
+- No separate credential entities or relationships needed
+- Simple format: `salt|bcrypt_hash` in user entity content
+- Users marked with `has:credentials` tag for identification
 
 ## System Components
 
@@ -100,9 +106,9 @@ Client → HTTP Server → Router → Middleware → Handler → Repository → 
                             Permission Check
 ```
 
-### 2. Authentication Flow
+### 2. Authentication Flow (v2.29.0+)
 ```
-Login → JWT Generation → Token Storage → Request Headers → Validation
+Login → Content-based Credential Check → JWT Generation → Token Storage → Request Headers → Validation
 ```
 
 ### 3. Entity Operations
@@ -155,11 +161,12 @@ Tags are resolved hierarchically:
 
 ## Security Architecture
 
-### Authentication
+### Authentication (v2.29.0+)
+- Embedded credentials in user entity content
+- Username/password validation via bcrypt
 - JWT tokens with configurable expiry
-- Username/password validation
 - Token refresh mechanism
-- Secure password hashing (bcrypt)
+- Secure password hashing with unique salts
 
 ### Authorization
 - Tag-based permission system

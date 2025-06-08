@@ -110,7 +110,14 @@ func (sm *SecurityManager) CreateUser(username, password, email string) (*Securi
 	userID := "user_" + generateSecureUUID()
 	logger.TraceIf("auth", "generated user id: %s", userID)
 	
-	// Create user entity (no sensitive data)
+	// Generate password hash and salt
+	salt := generateSalt()
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password+salt), bcrypt.DefaultCost)
+	if err != nil {
+		return nil, fmt.Errorf("failed to hash password: %v", err)
+	}
+	
+	// Create user entity with credentials in content
 	tags := []string{
 		"type:" + EntityTypeUser,
 		"dataspace:_system",
@@ -119,6 +126,7 @@ func (sm *SecurityManager) CreateUser(username, password, email string) (*Securi
 		"status:active",
 		"profile:email:" + email,
 		"created:" + NowString(),
+		"has:credentials", // Tag to indicate this user has embedded credentials
 	}
 	
 	// Add rbac:role:admin tag directly for admin user
@@ -126,63 +134,24 @@ func (sm *SecurityManager) CreateUser(username, password, email string) (*Securi
 		tags = append(tags, "rbac:role:admin")
 	}
 	
+	// Store credentials in content as a simple format: salt|hash
+	// This keeps it simple and efficient
+	credentialContent := fmt.Sprintf("%s|%s", salt, string(hashedPassword))
+	
 	userEntity := &Entity{
 		ID:        userID,
 		Tags:      tags,
-		Content:   nil, // No content for user entities
+		Content:   []byte(credentialContent),
 		CreatedAt: Now(),
 		UpdatedAt: Now(),
 	}
 	
-	// Create user entity
+	// Create user entity with embedded credentials
 	if err := sm.entityRepo.Create(userEntity); err != nil {
 		logger.Error("failed to create user entity: %v", err)
 		return nil, fmt.Errorf("failed to create user entity: %v", err)
 	}
-	logger.TraceIf("auth", "successfully created user entity")
-	
-	// Create separate credential entity
-	credentialID := "cred_" + generateSecureUUID()
-	salt := generateSalt()
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password+salt), bcrypt.DefaultCost)
-	if err != nil {
-		return nil, fmt.Errorf("failed to hash password: %v", err)
-	}
-	
-	credentialEntity := &Entity{
-		ID: credentialID,
-		Tags: []string{
-			"type:" + EntityTypeCredential,
-			"dataspace:_system",
-			"algorithm:bcrypt",
-			"user:" + userID,
-			"salt:" + salt,
-			"created:" + NowString(),
-		},
-		Content:   hashedPassword,
-		CreatedAt: Now(),
-		UpdatedAt: Now(),
-	}
-	
-	// Create credential entity
-	if err := sm.entityRepo.Create(credentialEntity); err != nil {
-		return nil, fmt.Errorf("failed to create credential entity: %v", err)
-	}
-	
-	// Create relationship between user and credential
-	relationship := &EntityRelationship{
-		ID:               "rel_" + generateSecureUUID(),
-		SourceID:         userID,
-		TargetID:         credentialID,
-		Type:             RelationshipHasCredential,
-		RelationshipType: RelationshipHasCredential,
-		Properties:       map[string]string{"primary": "true"},
-		CreatedAt:        Now(),
-	}
-	
-	if err := sm.entityRepo.CreateRelationship(relationship); err != nil {
-		return nil, fmt.Errorf("failed to create user-credential relationship: %v", err)
-	}
+	logger.TraceIf("auth", "successfully created user entity with embedded credentials")
 	
 	return &SecurityUser{
 		ID:       userID,
@@ -212,13 +181,16 @@ func (sm *SecurityManager) AuthenticateUser(username, password string) (*Securit
 	
 	userEntity := userEntities[0]
 	
-	// Check if user is active
+	// Check if user is active and has credentials
 	userTags := userEntity.GetTagsWithoutTimestamp()
 	isActive := false
+	hasCredentials := false
 	for _, tag := range userTags {
 		if tag == "status:active" {
 			isActive = true
-			break
+		}
+		if tag == "has:credentials" {
+			hasCredentials = true
 		}
 	}
 	
@@ -226,65 +198,38 @@ func (sm *SecurityManager) AuthenticateUser(username, password string) (*Securit
 		return nil, fmt.Errorf("user account is not active")
 	}
 	
-	// Get credential entity via relationship
-	logger.TraceIf("auth", "getting relationships for user id: %s", userEntity.ID)
-	logger.TraceIf("auth", "about to call GetRelationshipsBySource")
-	credentialEntities, err := sm.entityRepo.GetRelationshipsBySource(userEntity.ID)
-	logger.TraceIf("auth", "GetRelationshipsBySource returned %d relationships", len(credentialEntities))
-	if err != nil {
-		logger.Error("failed to get relationships for user %s: %v", userEntity.ID, err)
-		return nil, fmt.Errorf("failed to get user credentials: %v", err)
-	}
-	logger.TraceIf("auth", "found %d relationships for user %s", len(credentialEntities), userEntity.ID)
-	
-	var credentialEntity *Entity
-	for _, rel := range credentialEntities {
-		if relationship, ok := rel.(*EntityRelationship); ok {
-			logger.TraceIf("auth", "checking relationship %s of type %s/%s", relationship.ID, relationship.Type, relationship.RelationshipType)
-			if relationship.Type == RelationshipHasCredential || relationship.RelationshipType == RelationshipHasCredential {
-				logger.TraceIf("auth", "found has_credential relationship, fetching credential entity %s", relationship.TargetID)
-				credEntity, err := sm.entityRepo.GetByID(relationship.TargetID)
-				if err == nil {
-					credentialEntity = credEntity
-					logger.TraceIf("auth", "successfully fetched credential entity %s", relationship.TargetID)
-					break
-				} else {
-					logger.Error("failed to fetch credential entity %s: %v", relationship.TargetID, err)
-				}
-			}
-		}
-	}
-	
-	if credentialEntity == nil {
+	if !hasCredentials {
+		logger.TraceIf("auth", "user does not have embedded credentials")
 		return nil, fmt.Errorf("no credentials found for user")
 	}
 	
-	// Extract salt from credential tags
-	credTags := credentialEntity.GetTagsWithoutTimestamp()
-	var salt string
-	for _, tag := range credTags {
-		if strings.HasPrefix(tag, "salt:") {
-			salt = strings.TrimPrefix(tag, "salt:")
-			break
-		}
-	}
-	
-	// Verify password
-	logger.TraceIf("auth", "starting password verification for user %s", username)
-	logger.TraceIf("auth", "credential content length: %d bytes", len(credentialEntity.Content))
-	logger.TraceIf("auth", "salt: %s", salt)
-	logger.TraceIf("auth", "password+salt length: %d", len(password+salt))
-	
-	// Validate credential content before bcrypt operation
-	if len(credentialEntity.Content) == 0 {
-		logger.Error("credential content is empty for user %s", username)
+	// Extract credentials from user entity content
+	logger.TraceIf("auth", "extracting credentials from user entity content")
+	if len(userEntity.Content) == 0 {
+		logger.Error("user entity has no content for user %s", username)
 		return nil, fmt.Errorf("invalid credentials")
 	}
 	
+	// Parse content format: salt|hash
+	credentialParts := strings.SplitN(string(userEntity.Content), "|", 2)
+	if len(credentialParts) != 2 {
+		logger.Error("invalid credential format in user entity for user %s", username)
+		return nil, fmt.Errorf("invalid credential format")
+	}
+	
+	salt := credentialParts[0]
+	hashedPassword := []byte(credentialParts[1])
+	
+	// Verify password
+	logger.TraceIf("auth", "starting password verification for user %s", username)
+	logger.TraceIf("auth", "credential hash length: %d bytes", len(hashedPassword))
+	logger.TraceIf("auth", "salt: %s", salt)
+	logger.TraceIf("auth", "password+salt length: %d", len(password+salt))
+	
 	// Check if content looks like a bcrypt hash (should start with $2a$, $2b$, or $2y$)
-	if len(credentialEntity.Content) < 4 || credentialEntity.Content[0] != '$' {
+	if len(hashedPassword) < 4 || hashedPassword[0] != '$' {
 		logger.Error("credential content does not appear to be a bcrypt hash for user %s (first bytes: %v)", 
-			username, credentialEntity.Content[:min(4, len(credentialEntity.Content))])
+			username, hashedPassword[:min(4, len(hashedPassword))])
 		return nil, fmt.Errorf("invalid credential format")
 	}
 	
@@ -296,7 +241,7 @@ func (sm *SecurityManager) AuthenticateUser(username, password string) (*Securit
 	
 	go func() {
 		startTime := time.Now()
-		err := bcrypt.CompareHashAndPassword(credentialEntity.Content, []byte(password+salt))
+		err := bcrypt.CompareHashAndPassword(hashedPassword, []byte(password+salt))
 		elapsed := time.Since(startTime)
 		logger.TraceIf("auth", "password verification completed in %v", elapsed)
 		resultChan <- bcryptResult{err: err}

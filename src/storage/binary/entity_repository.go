@@ -158,25 +158,32 @@ func NewEntityRepository(dataPath string) (*EntityRepository, error) {
 	logger.Info("Initialized: %d entities, %d tag index entries", 
 		len(repo.entities), len(repo.tagIndex))
 	
-	// Replay WAL to catch any entries not yet in the data file
-	// Skip WAL replay if we successfully loaded a persistent index
-	if repo.persistentIndexLoaded {
-		logger.Debug("Persistent index loaded, skipping WAL replay")
-	} else {
-		logger.Debug("Replaying WAL to rebuild tag index")
-		if err := repo.replayWAL(); err != nil {
-			logger.Error("Failed to replay WAL: %v", err)
-			// Continue anyway - we may have partial data
-		}
-		
-		// Log entity count after WAL replay
-		logger.Info("WAL replay complete: %d entities, %d tag entries", 
-			len(repo.entities), len(repo.tagIndex))
+	// ALWAYS replay WAL to ensure index is synchronized
+	// The WAL may contain operations not yet persisted to disk
+	logger.Debug("Replaying WAL to ensure index synchronization")
+	if err := repo.replayWAL(); err != nil {
+		logger.Error("Failed to replay WAL: %v", err)
+		// Continue anyway - we may have partial data
 	}
+	
+	// Log entity count after WAL replay
+	logger.Info("WAL replay complete: %d entities, %d tag entries", 
+		len(repo.entities), len(repo.tagIndex))
 	
 	// Verify index health
 	if err := repo.VerifyIndexHealth(); err != nil {
 		logger.Warn("Index health check failed: %v", err)
+		// Attempt to repair the index
+		logger.Info("Attempting automatic index repair")
+		if repairErr := repo.RepairIndexes(); repairErr != nil {
+			logger.Error("Index repair failed: %v", repairErr)
+		} else {
+			logger.Info("Index repair completed successfully")
+			// Verify again after repair
+			if verifyErr := repo.VerifyIndexHealth(); verifyErr != nil {
+				logger.Error("Index still unhealthy after repair: %v", verifyErr)
+			}
+		}
 	}
 	
 	// Open the current file for use with readers
@@ -293,8 +300,51 @@ func (r *EntityRepository) buildIndexes() error {
 }
 
 // updateIndexes updates in-memory indexes for a new or updated entity
+// This function MUST be called with the mutex already locked
 func (r *EntityRepository) updateIndexes(entity *models.Entity) {
 	logger.Trace("Updating indexes for entity %s (%d tags)", entity.ID, len(entity.Tags))
+	
+	// CRITICAL: First remove all existing index entries for this entity
+	// This prevents duplicate entries when updating
+	if existingEntity, exists := r.entities[entity.ID]; exists {
+		for _, tag := range existingEntity.Tags {
+			// Remove from tag index
+			if ids, ok := r.tagIndex[tag]; ok {
+				newIDs := make([]string, 0, len(ids))
+				for _, id := range ids {
+					if id != entity.ID {
+						newIDs = append(newIDs, id)
+					}
+				}
+				if len(newIDs) > 0 {
+					r.tagIndex[tag] = newIDs
+				} else {
+					delete(r.tagIndex, tag)
+				}
+			}
+			
+			// Also remove non-timestamped version
+			if strings.Contains(tag, "|") {
+				parts := strings.SplitN(tag, "|", 2)
+				if len(parts) == 2 {
+					actualTag := parts[1]
+					if ids, ok := r.tagIndex[actualTag]; ok {
+						newIDs := make([]string, 0, len(ids))
+						for _, id := range ids {
+							if id != entity.ID {
+								newIDs = append(newIDs, id)
+							}
+						}
+						if len(newIDs) > 0 {
+							r.tagIndex[actualTag] = newIDs
+						} else {
+							delete(r.tagIndex, actualTag)
+						}
+					}
+				}
+			}
+		}
+	}
 	
 	// Helper function to add entity ID to tag if not already present
 	addEntityToTag := func(tag, entityID string) {
@@ -389,17 +439,33 @@ func (r *EntityRepository) Create(entity *models.Entity) error {
 	r.lockManager.AcquireEntityLock(entity.ID, WriteLock)
 	defer r.lockManager.ReleaseEntityLock(entity.ID, WriteLock)
 	
-	// Write entity using WriterManager (which handles checkpoints)
-	if err := r.writerManager.WriteEntity(entity); err != nil {
-		return err
-	}
-	
-	// Update indexes
+	// CRITICAL: Update indexes BEFORE writing to ensure atomicity
+	// This prevents the entity from being written without indexes
 	r.mu.Lock()
 	r.updateIndexes(entity)
 	// Store entity in-memory as well
 	r.entities[entity.ID] = entity
 	r.mu.Unlock()
+	
+	// Write entity using WriterManager (which handles checkpoints)
+	if err := r.writerManager.WriteEntity(entity); err != nil {
+		// Rollback index changes on write failure
+		r.mu.Lock()
+		delete(r.entities, entity.ID)
+		// Remove from all indexes
+		for _, tag := range entity.Tags {
+			r.removeFromTagIndex(tag, entity.ID)
+			// Also remove non-timestamped version
+			if strings.Contains(tag, "|") {
+				parts := strings.SplitN(tag, "|", 2)
+				if len(parts) == 2 {
+					r.removeFromTagIndex(parts[1], entity.ID)
+				}
+			}
+		}
+		r.mu.Unlock()
+		return err
+	}
 	
 	// Invalidate cache
 	r.cache.Clear()
@@ -478,6 +544,10 @@ func (r *EntityRepository) GetByID(id string) (*models.Entity, error) {
 	
 	if !found {
 		logger.Trace("Not found in index, checking disk: %s", id)
+		// Attempt to detect and fix index corruption
+		if err := r.detectAndFixIndexCorruption(id); err != nil {
+			logger.Warn("Failed to fix potential index corruption for %s: %v", id, err)
+		}
 	}
 	
 	// Skip flush and checkpoint for metric entities to avoid infinite recursion
@@ -2450,35 +2520,8 @@ func (r *EntityRepository) replayWAL() error {
 				r.mu.Lock()
 				r.entities[entry.EntityID] = entry.Entity
 				
-				// Update tag index
-				for _, tag := range entry.Entity.Tags {
-					if r.tagIndex[tag] == nil {
-						r.tagIndex[tag] = []string{}
-					}
-					// Check if entity ID already exists in this tag's index
-					found := false
-					for _, id := range r.tagIndex[tag] {
-						if id == entry.EntityID {
-							found = true
-							break
-						}
-					}
-					if !found {
-						r.tagIndex[tag] = append(r.tagIndex[tag], entry.EntityID)
-					}
-				}
-				
-				// Update temporal index
-				// TODO: Add temporal index update when methods are available
-				// if r.temporalIndex != nil {
-				//     r.temporalIndex.AddEntity(entry.Entity)
-				// }
-				
-				// Update namespace index  
-				// TODO: Add namespace index update when methods are available
-				// if r.namespaceIndex != nil {
-				//     r.namespaceIndex.IndexEntity(entry.Entity)
-				// }
+				// Update tag index - use the updateIndexes method for consistency
+				r.updateIndexes(entry.Entity)
 				
 				r.mu.Unlock()
 				entitiesReplayed++
@@ -2666,6 +2709,162 @@ func (r *EntityRepository) VerifyIndexHealth() error {
 	}
 	
 	logger.Info("Index health check passed: %d entities indexed, all repository layers synchronized", entityCount)
+	return nil
+}
+
+// RepairIndexes rebuilds the tag indexes from the entity data
+func (r *EntityRepository) RepairIndexes() error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	
+	logger.Info("Starting index repair")
+	
+	// Clear existing indexes
+	r.tagIndex = make(map[string][]string)
+	r.contentIndex = make(map[string][]string)
+	r.temporalIndex = NewTemporalIndex()
+	r.namespaceIndex = NewNamespaceIndex()
+	
+	// Clear sharded index if enabled
+	if r.useShardedIndex {
+		r.shardedTagIndex = NewShardedTagIndex()
+	}
+	
+	// Rebuild from entities in memory
+	for entityID, entity := range r.entities {
+		logger.Trace("Re-indexing entity %s", entityID)
+		
+		// Re-index all tags
+		for _, tag := range entity.Tags {
+			if r.useShardedIndex {
+				// Add to sharded index
+				r.shardedTagIndex.AddTag(tag, entity.ID)
+				
+				// Also index the non-timestamped version for temporal tags
+				if strings.Contains(tag, "|") {
+					parts := strings.SplitN(tag, "|", 2)
+					if len(parts) == 2 {
+						r.shardedTagIndex.AddTag(parts[1], entity.ID)
+					}
+				}
+			} else {
+				// Legacy indexing
+				r.tagIndex[tag] = append(r.tagIndex[tag], entity.ID)
+				
+				// CRITICAL: Also index the non-timestamped version for temporal tags
+				if strings.Contains(tag, "|") {
+					parts := strings.SplitN(tag, "|", 2)
+					if len(parts) == 2 {
+						actualTag := parts[1]
+						r.tagIndex[actualTag] = append(r.tagIndex[actualTag], entity.ID)
+						
+						// Add to temporal index
+						if timestampNanos, err := strconv.ParseInt(parts[0], 10, 64); err == nil {
+							timestamp := time.Unix(0, timestampNanos)
+							r.temporalIndex.AddEntry(entity.ID, tag, timestamp)
+						}
+					}
+				}
+			}
+			
+			// Add to namespace index
+			r.namespaceIndex.AddTag(entity.ID, tag)
+		}
+		
+		// Update content index
+		if len(entity.Content) > 0 {
+			contentStr := string(entity.Content)
+			r.contentIndex[contentStr] = append(r.contentIndex[contentStr], entity.ID)
+		}
+	}
+	
+	// Mark index as dirty to force persistence
+	r.tagIndexDirty = true
+	
+	// Save the repaired index immediately
+	if err := r.SaveTagIndex(); err != nil {
+		logger.Error("Failed to save repaired index: %v", err)
+		return fmt.Errorf("failed to save repaired index: %w", err)
+	}
+	
+	logger.Info("Index repair completed: %d entities re-indexed", len(r.entities))
+	return nil
+}
+
+// detectAndFixIndexCorruption attempts to detect and fix index corruption for a specific entity
+func (r *EntityRepository) detectAndFixIndexCorruption(entityID string) error {
+	logger.Debug("Checking for index corruption for entity %s", entityID)
+	
+	// Try to read the entity from disk
+	reader, err := NewReader(r.getDataFile())
+	if err != nil {
+		return fmt.Errorf("failed to create reader: %w", err)
+	}
+	defer reader.Close()
+	
+	entity, err := reader.GetEntity(entityID)
+	if err != nil || entity == nil {
+		// Entity doesn't exist on disk either
+		return nil
+	}
+	
+	logger.Warn("Entity %s found on disk but missing from indexes - fixing corruption", entityID)
+	
+	// Lock for index updates
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	
+	// Add entity to memory cache
+	r.entities[entityID] = entity
+	
+	// Re-index the entity
+	for _, tag := range entity.Tags {
+		// Add to tag index
+		if r.useShardedIndex {
+			r.shardedTagIndex.AddTag(tag, entity.ID)
+			// Also index the non-timestamped version for temporal tags
+			if strings.Contains(tag, "|") {
+				parts := strings.SplitN(tag, "|", 2)
+				if len(parts) == 2 {
+					r.shardedTagIndex.AddTag(parts[1], entity.ID)
+				}
+			}
+		} else {
+			r.addToTagIndex(tag, entity.ID)
+			// Also index the non-timestamped version for temporal tags
+			if strings.Contains(tag, "|") {
+				parts := strings.SplitN(tag, "|", 2)
+				if len(parts) == 2 {
+					r.addToTagIndex(parts[1], entity.ID)
+				}
+			}
+		}
+		
+		// Add to temporal index if applicable
+		if strings.Contains(tag, "|") {
+			parts := strings.SplitN(tag, "|", 2)
+			if len(parts) == 2 {
+				if timestampNanos, err := strconv.ParseInt(parts[0], 10, 64); err == nil {
+					timestamp := time.Unix(0, timestampNanos)
+					r.temporalIndex.AddEntry(entity.ID, tag, timestamp)
+				}
+			}
+		}
+		
+		// Add to namespace index
+		r.namespaceIndex.AddTag(entity.ID, tag)
+	}
+	
+	// Update content index
+	if len(entity.Content) > 0 {
+		contentStr := string(entity.Content)
+		r.contentIndex[contentStr] = append(r.contentIndex[contentStr], entity.ID)
+	}
+	
+	// Mark index as dirty
+	r.tagIndexDirty = true
+	
+	logger.Info("Fixed index corruption for entity %s - entity re-indexed", entityID)
 	return nil
 }
 

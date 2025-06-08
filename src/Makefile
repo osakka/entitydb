@@ -2,7 +2,7 @@
 
 # Variables
 NAME := entitydb
-VERSION := 2.28.0
+VERSION := 2.29.0
 BUILD_DIR := ../bin
 BIN_DIR := $(shell realpath ../bin)
 SHARE_DIR := $(shell realpath ../share)
@@ -196,6 +196,7 @@ maintenance-tools:
 	@chmod +x $(BUILD_DIR)/$(TOOLS_PREFIX)fix_index $(BUILD_DIR)/$(TOOLS_PREFIX)check_entities $(BUILD_DIR)/$(TOOLS_PREFIX)clean_entities $(BUILD_DIR)/$(TOOLS_PREFIX)scan_data $(BUILD_DIR)/$(TOOLS_PREFIX)check_admin
 	@$(ECHO) "$(GREEN)Maintenance tools built successfully$(NC)\n"
 
+
 test-utils:
 	@$(ECHO) "$(YELLOW)Available EntityDB tools$(NC)\n"
 	@$(ECHO) "$(BLUE)=======================================$(NC)\n"
@@ -218,9 +219,15 @@ test-utils:
 	@$(ECHO) "$(YELLOW)Maintenance tools:$(NC)\n"
 	@echo "  - $(TOOLS_PREFIX)fix_index: Repairs the entity index"
 	@echo "  - $(TOOLS_PREFIX)check_entities: Checks for corrupted entities"
-	@echo "  - $(TOOLS_PREFIX)clean_entities: Removes corrupted entries"
+	@echo "  - $(TOOLS_PREFIX)clean_entities: Cleans corrupted entries"
 	@echo "  - $(TOOLS_PREFIX)scan_data: Scans entity data"
-	@echo "  - $(TOOLS_PREFIX)check_admin: Verifies admin user"
+	@echo "  - $(TOOLS_PREFIX)check_admin: Checks admin user"
+	@echo ""
+	
+	@$(ECHO) "$(YELLOW)Debug tools:$(NC)\n"
+	@echo "  - $(TOOLS_PREFIX)debug_header_hang: Debug HTTP header processing hangs"
+	@echo "  - $(TOOLS_PREFIX)test_single_header: Test a single header combination"
+	@echo "  - $(TOOLS_PREFIX)trace_header_processing: Low-level TCP/TLS header tracing"
 	@echo ""
 	
 	@$(ECHO) "$(YELLOW)Usage examples:$(NC)\n"

@@ -1,7 +1,7 @@
 # EntityDB API Reference (Complete)
 
-**Version**: 2.19.0  
-**Last Updated**: 2025-05-30
+**Version**: 2.29.0  
+**Last Updated**: 2025-06-08
 
 ## Table of Contents
 1. [Overview](#overview)
@@ -40,6 +40,8 @@ Authorization: Bearer <token>
 ```
 
 ## Authentication
+
+> **Authentication Architecture v2.29.0+**: EntityDB now uses embedded credentials stored directly in user entity content. No separate credential entities or relationships are needed.
 
 ### Login
 Authenticate and receive a session token.
@@ -562,7 +564,7 @@ Authorization: Bearer <token>
 ## User Management
 
 ### Create User
-Create a new user (requires admin permission).
+Create a new user with embedded credentials (requires admin permission). Creates a single user entity with credentials stored in the content field.
 
 ```http
 POST /api/v1/users/create

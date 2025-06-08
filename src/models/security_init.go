@@ -196,92 +196,18 @@ func (si *SecurityInitializer) createDefaultRoles() error {
 		}
 	}
 
-	// Create role-permission relationships
-	if err := si.createRolePermissionRelationships(); err != nil {
-		return fmt.Errorf("failed to create role-permission relationships: %v", err)
-	}
+	// No relationship creation needed - RBAC is tag-based
+	logger.Debug("Roles created successfully - permissions handled via tags")
 
 	return nil
 }
 
-// createRolePermissionRelationships creates the relationships between roles and permissions
+// createRolePermissionRelationships is deprecated in v2.29.0+
+// RBAC is now handled via direct tags on user entities
 func (si *SecurityInitializer) createRolePermissionRelationships() error {
-	// Admin role gets all permissions
-	adminPermissions := []string{
-		"perm_all", // Global wildcard permission
-	}
-
-	for _, permID := range adminPermissions {
-		relationship := &EntityRelationship{
-			ID:       "rel_role_admin_grants_" + permID,
-			SourceID: "role_admin",
-			TargetID: permID,
-			Type:     RelationshipGrants,
-			Properties: map[string]string{
-				"inherited": "false",
-				"scope":     "global",
-			},
-			CreatedAt: Now(),
-		}
-
-		if err := si.entityRepo.CreateRelationship(relationship); err != nil {
-			return fmt.Errorf("failed to create admin-permission relationship: %v", err)
-		}
-	}
-
-	// User role gets basic permissions
-	userPermissions := []string{
-		"perm_entity_view",
-		"perm_entity_create",
-		"perm_entity_update",
-		"perm_entity_delete",
-		"perm_relation_view",
-		"perm_relation_create",
-		"perm_system_view",
-	}
-
-	for _, permID := range userPermissions {
-		relationship := &EntityRelationship{
-			ID:       "rel_role_user_grants_" + permID,
-			SourceID: "role_user",
-			TargetID: permID,
-			Type:     RelationshipGrants,
-			Properties: map[string]string{
-				"inherited": "false",
-				"scope":     "user",
-			},
-			CreatedAt: Now(),
-		}
-
-		if err := si.entityRepo.CreateRelationship(relationship); err != nil {
-			return fmt.Errorf("failed to create user-permission relationship: %v", err)
-		}
-	}
-
-	// Guest role gets minimal permissions
-	guestPermissions := []string{
-		"perm_entity_view",
-		"perm_system_view",
-	}
-
-	for _, permID := range guestPermissions {
-		relationship := &EntityRelationship{
-			ID:       "rel_role_guest_grants_" + permID,
-			SourceID: "role_guest",
-			TargetID: permID,
-			Type:     RelationshipGrants,
-			Properties: map[string]string{
-				"inherited": "false",
-				"scope":     "read_only",
-			},
-			CreatedAt: Now(),
-		}
-
-		if err := si.entityRepo.CreateRelationship(relationship); err != nil {
-			return fmt.Errorf("failed to create guest-permission relationship: %v", err)
-		}
-	}
-
+	// This function is no longer used in v2.29.0+
+	// All role permissions are handled via direct RBAC tags on entities
+	logger.Debug("Role-permission relationships are handled via tags in v2.29.0+")
 	return nil
 }
 
@@ -320,40 +246,18 @@ func (si *SecurityInitializer) createDefaultGroups() error {
 		}
 	}
 
-	// Create group-role relationships
-	if err := si.createGroupRoleRelationships(); err != nil {
-		return fmt.Errorf("failed to create group-role relationships: %v", err)
-	}
+	// No relationship creation needed - RBAC is tag-based
+	logger.Debug("Groups created successfully - roles handled via tags")
 
 	return nil
 }
 
-// createGroupRoleRelationships creates the relationships between groups and roles
+// createGroupRoleRelationships is deprecated in v2.29.0+
+// RBAC is now handled via direct tags on user entities
 func (si *SecurityInitializer) createGroupRoleRelationships() error {
-	groupRoleMap := map[string]string{
-		"group_administrators": "role_admin",
-		"group_users":          "role_user",
-		"group_guests":         "role_guest",
-	}
-
-	for groupID, roleID := range groupRoleMap {
-		relationship := &EntityRelationship{
-			ID:       "rel_" + groupID + "_has_" + roleID,
-			SourceID: groupID,
-			TargetID: roleID,
-			Type:     RelationshipHasRole,
-			Properties: map[string]string{
-				"inherited": "true",
-				"default":   "true",
-			},
-			CreatedAt: Now(),
-		}
-
-		if err := si.entityRepo.CreateRelationship(relationship); err != nil {
-			return fmt.Errorf("failed to create group-role relationship: %v", err)
-		}
-	}
-
+	// This function is no longer used in v2.29.0+
+	// Group-role associations are handled via direct RBAC tags on entities
+	logger.Debug("Group-role relationships are handled via tags in v2.29.0+")
 	return nil
 }
 
@@ -361,50 +265,14 @@ func (si *SecurityInitializer) createGroupRoleRelationships() error {
 func (si *SecurityInitializer) createDefaultAdminUser() error {
 	logger.Debug("Creating default admin user...")
 	// Get or create admin user (with uniqueness check)
-	adminUser, err := si.getOrCreateAdminUser()
+	_, err := si.getOrCreateAdminUser()
 	if err != nil {
 		return fmt.Errorf("failed to get or create admin user: %v", err)
 	}
 
-	// Add admin to administrators group
-	adminGroupRelationship := &EntityRelationship{
-		ID:       "rel_" + adminUser.ID + "_member_of_group_administrators",
-		SourceID: adminUser.ID,
-		TargetID: "group_administrators",
-		Type:     RelationshipMemberOf,
-		Properties: map[string]string{
-			"role_in_group": "admin",
-			"primary":       "true",
-		},
-		CreatedAt: Now(),
-	}
-
-	if err := si.entityRepo.CreateRelationship(adminGroupRelationship); err != nil {
-		return fmt.Errorf("failed to create admin-group relationship: %v", err)
-	}
-
-	// Give admin user direct admin role as well
-	adminRoleRelationship := &EntityRelationship{
-		ID:       "rel_" + adminUser.ID + "_has_role_admin",
-		SourceID: adminUser.ID,
-		TargetID: "role_admin",
-		Type:     RelationshipHasRole,
-		Properties: map[string]string{
-			"direct":    "true",
-			"inherited": "false",
-		},
-		CreatedAt: Now(),
-	}
-
-	if err := si.entityRepo.CreateRelationship(adminRoleRelationship); err != nil {
-		return fmt.Errorf("failed to create admin-role relationship: %v", err)
-	}
-	
-	// Also add direct RBAC tags to the admin user entity
-	rbacTagManager := NewRBACTagManager(si.entityRepo)
-	if err := rbacTagManager.AssignRoleToUser(adminUser.ID, "admin"); err != nil {
-		return fmt.Errorf("failed to assign admin role tag: %v", err)
-	}
+	// Admin user now has embedded credentials and direct RBAC tags
+	// No relationships needed - everything is in the user entity
+	logger.Debug("Admin user created successfully with embedded credentials and RBAC tags")
 
 	return nil
 }
@@ -440,100 +308,14 @@ func (si *SecurityInitializer) getOrCreateAdminUser() (*SecurityUser, error) {
 	return adminUser, nil
 }
 
-// ensureAdminUserRelationships ensures existing admin user has proper relationships
+// ensureAdminUserRelationships is deprecated in v2.29.0+
+// Admin users now have embedded credentials and direct RBAC tags
 func (si *SecurityInitializer) ensureAdminUserRelationships(adminUserID string) error {
-	// Check if admin is member of administrators group
-	adminGroupRels, err := si.entityRepo.GetRelationshipsBySource(adminUserID)
-	if err != nil {
-		return err
-	}
-
-	hasMemberOfAdminGroup := false
-	hasAdminRole := false
-	hasCredential := false
-
-	for _, rel := range adminGroupRels {
-		if relationship, ok := rel.(*EntityRelationship); ok {
-			if relationship.Type == RelationshipMemberOf && relationship.TargetID == "group_administrators" {
-				hasMemberOfAdminGroup = true
-			}
-			if relationship.Type == RelationshipHasRole && relationship.TargetID == "role_admin" {
-				hasAdminRole = true
-			}
-			if relationship.Type == RelationshipHasCredential {
-				hasCredential = true
-			}
-		}
-	}
-
-	// Add missing relationships
-	if !hasMemberOfAdminGroup {
-		adminGroupRelationship := &EntityRelationship{
-			ID:       "rel_" + adminUserID + "_member_of_group_administrators",
-			SourceID: adminUserID,
-			TargetID: "group_administrators",
-			Type:     RelationshipMemberOf,
-			Properties: map[string]string{
-				"role_in_group": "admin",
-				"primary":       "true",
-			},
-			CreatedAt: Now(),
-		}
-
-		if err := si.entityRepo.CreateRelationship(adminGroupRelationship); err != nil {
-			return fmt.Errorf("failed to create admin-group relationship: %v", err)
-		}
-	}
-
-	if !hasAdminRole {
-		adminRoleRelationship := &EntityRelationship{
-			ID:       "rel_" + adminUserID + "_has_role_admin",
-			SourceID: adminUserID,
-			TargetID: "role_admin",
-			Type:     RelationshipHasRole,
-			Properties: map[string]string{
-				"direct":    "true",
-				"inherited": "false",
-			},
-			CreatedAt: Now(),
-		}
-
-		if err := si.entityRepo.CreateRelationship(adminRoleRelationship); err != nil {
-			return fmt.Errorf("failed to create admin-role relationship: %v", err)
-		}
-	}
+	// This function is no longer used in v2.29.0+
+	// Admin users are created with embedded credentials and direct RBAC tags
+	logger.Debug("Admin user relationships are handled via embedded credentials and RBAC tags in v2.29.0+")
 	
-	// Ensure admin user has credential relationship
-	if !hasCredential {
-		// Find the admin user's credential
-		credentialEntities, err := si.entityRepo.ListByTag("user:" + adminUserID)
-		if err != nil {
-			return fmt.Errorf("failed to find admin credential: %v", err)
-		}
-		
-		if len(credentialEntities) > 0 {
-			credentialID := credentialEntities[0].ID
-			adminCredentialRelationship := &EntityRelationship{
-				ID:       "rel_" + adminUserID + "_has_credential_" + credentialID,
-				SourceID: adminUserID,
-				TargetID: credentialID,
-				Type:     RelationshipHasCredential,
-				Properties: map[string]string{
-					"primary": "true",
-				},
-				CreatedAt: Now(),
-			}
-			
-			logger.Info("Creating missing credential relationship for admin user")
-			if err := si.entityRepo.CreateRelationship(adminCredentialRelationship); err != nil {
-				return fmt.Errorf("failed to create admin-credential relationship: %v", err)
-			}
-		} else {
-			logger.Warn("Admin user exists but no credential found - this may cause authentication issues")
-		}
-	}
-	
-	// Ensure admin user has direct RBAC tags
+	// Ensure admin user has direct RBAC tags (this is still needed)
 	rbacTagManager := NewRBACTagManager(si.entityRepo)
 	if err := rbacTagManager.AssignRoleToUser(adminUserID, "admin"); err != nil {
 		return fmt.Errorf("failed to assign admin role tag: %v", err)

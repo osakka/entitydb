@@ -3,7 +3,13 @@
 > [!IMPORTANT]
 > EntityDB is a high-performance temporal database where every tag is timestamped with nanosecond precision. All data is stored in a custom binary format (EBF) with Write-Ahead Logging for durability and concurrent access support.
 
-## Current State (v2.28.0)
+> [!CRITICAL]
+> **Authentication Architecture Change (v2.29.0+)**
+> User credentials are now stored directly in the user entity's content field as `salt|bcrypt_hash`.
+> This eliminates separate credential entities and relationships. Users with credentials have the `has:credentials` tag.
+> NO BACKWARD COMPATIBILITY - all users must be recreated.
+
+## Current State (v2.29.0)
 
 EntityDB now features a unified Entity model with autochunking:
 - **Unified Entity Model**: Single content field ([]byte) per entity

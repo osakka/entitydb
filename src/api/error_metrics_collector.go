@@ -16,31 +16,71 @@ type ErrorMetricsCollector struct {
 	repo          models.EntityRepository
 	mu            sync.Mutex
 	errorPatterns map[string]int // Track error patterns for categorization
+	errorChan     chan errorEvent
+	stopChan      chan struct{}
+}
+
+// errorEvent represents an error to be tracked asynchronously
+type errorEvent struct {
+	component string
+	err       error
+	severity  string
 }
 
 // NewErrorMetricsCollector creates a new error metrics collector
 func NewErrorMetricsCollector(repo models.EntityRepository) *ErrorMetricsCollector {
-	return &ErrorMetricsCollector{
+	c := &ErrorMetricsCollector{
 		repo:          repo,
 		errorPatterns: make(map[string]int),
+		errorChan:     make(chan errorEvent, 1000), // Buffered channel to prevent blocking
+		stopChan:      make(chan struct{}),
 	}
+	
+	// Start background goroutine to process errors
+	go c.processErrors()
+	
+	return c
 }
 
-// TrackError tracks an error occurrence
+// TrackError tracks an error occurrence asynchronously
 func (c *ErrorMetricsCollector) TrackError(component string, err error, severity string) {
 	if err == nil {
 		return
 	}
 	
-	errorType := c.categorizeError(err)
-	errorMsg := err.Error()
+	// Send error to channel for async processing
+	select {
+	case c.errorChan <- errorEvent{component: component, err: err, severity: severity}:
+		// Successfully queued
+	default:
+		// Channel is full, log but don't block
+		logger.Warn("Error tracking channel full, dropping error event for %s: %v", component, err)
+	}
+}
+
+// processErrors processes errors in the background
+func (c *ErrorMetricsCollector) processErrors() {
+	for {
+		select {
+		case event := <-c.errorChan:
+			c.processError(event)
+		case <-c.stopChan:
+			return
+		}
+	}
+}
+
+// processError processes a single error event
+func (c *ErrorMetricsCollector) processError(event errorEvent) {
+	errorType := c.categorizeError(event.err)
+	errorMsg := event.err.Error()
 	
 	// Track error count
 	c.storeMetric("error_count", 1, "count", "Total error count",
 		map[string]string{
-			"component": component,
+			"component": event.component,
 			"type":      errorType,
-			"severity":  severity,
+			"severity":  event.severity,
 		})
 	
 	// Track error patterns
@@ -60,15 +100,15 @@ func (c *ErrorMetricsCollector) TrackError(component string, err error, severity
 	}
 	
 	// Log errors with appropriate severity
-	switch severity {
+	switch event.severity {
 	case "critical":
-		logger.Error("[%s] Critical error: %v", component, err)
+		logger.Error("[%s] Critical error: %v", event.component, event.err)
 	case "error":
-		logger.Error("[%s] Error: %v", component, err)
+		logger.Error("[%s] Error: %v", event.component, event.err)
 	case "warning":
-		logger.Warn("[%s] Warning: %v", component, err)
+		logger.Warn("[%s] Warning: %v", event.component, event.err)
 	default:
-		logger.Debug("[%s] Error: %v", component, err)
+		logger.Debug("[%s] Error: %v", event.component, event.err)
 	}
 }
 
@@ -238,6 +278,11 @@ func InitErrorMetrics(repo models.EntityRepository) {
 // GetErrorMetrics returns the global error metrics instance
 func GetErrorMetrics() *ErrorMetricsCollector {
 	return errorMetrics
+}
+
+// Stop gracefully shuts down the error collector
+func (c *ErrorMetricsCollector) Stop() {
+	close(c.stopChan)
 }
 
 // TrackHTTPError is a convenience function for tracking HTTP errors
