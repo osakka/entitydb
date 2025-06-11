@@ -1,10 +1,10 @@
 #!/bin/bash
-# Test dataspace management API
+# Test dataset management API
 
 BASE_URL="https://localhost:8085/api/v1"
 CURL_OPTS="-k -s"
 
-echo "=== EntityDB Dataspace Management Test ==="
+echo "=== EntityDB Dataset Management Test ==="
 echo
 
 # Login as admin
@@ -22,21 +22,21 @@ fi
 echo "✓ Logged in successfully"
 echo
 
-# List existing dataspaces
-echo "2. Listing existing dataspaces..."
-LIST_RESPONSE=$(curl $CURL_OPTS -X GET $BASE_URL/dataspaces \
+# List existing datasets
+echo "2. Listing existing datasets..."
+LIST_RESPONSE=$(curl $CURL_OPTS -X GET $BASE_URL/datasets \
   -H "Authorization: Bearer $TOKEN")
 echo "Response: $LIST_RESPONSE" | jq .
 echo
 
-# Create a new dataspace
-echo "3. Creating 'worca' dataspace..."
-CREATE_RESPONSE=$(curl $CURL_OPTS -X POST $BASE_URL/dataspaces \
+# Create a new dataset
+echo "3. Creating 'worca' dataset..."
+CREATE_RESPONSE=$(curl $CURL_OPTS -X POST $BASE_URL/datasets \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "worca",
-    "description": "Workforce Orchestrator Application Dataspace",
+    "description": "Workforce Orchestrator Application Dataset",
     "settings": {
       "theme": "oceanic",
       "features": "kanban,projects,teams"
@@ -46,16 +46,16 @@ echo "Response: $CREATE_RESPONSE" | jq .
 DATASPACE_ID=$(echo $CREATE_RESPONSE | jq -r '.id')
 echo
 
-# Get the created dataspace
-echo "4. Getting dataspace details..."
-GET_RESPONSE=$(curl $CURL_OPTS -X GET $BASE_URL/dataspaces/$DATASPACE_ID \
+# Get the created dataset
+echo "4. Getting dataset details..."
+GET_RESPONSE=$(curl $CURL_OPTS -X GET $BASE_URL/datasets/$DATASPACE_ID \
   -H "Authorization: Bearer $TOKEN")
 echo "Response: $GET_RESPONSE" | jq .
 echo
 
-# Update the dataspace
-echo "5. Updating dataspace..."
-UPDATE_RESPONSE=$(curl $CURL_OPTS -X PUT $BASE_URL/dataspaces/$DATASPACE_ID \
+# Update the dataset
+echo "5. Updating dataset..."
+UPDATE_RESPONSE=$(curl $CURL_OPTS -X PUT $BASE_URL/datasets/$DATASPACE_ID \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -70,37 +70,37 @@ UPDATE_RESPONSE=$(curl $CURL_OPTS -X PUT $BASE_URL/dataspaces/$DATASPACE_ID \
 echo "Response: $UPDATE_RESPONSE" | jq .
 echo
 
-# Create another dataspace for testing
-echo "6. Creating 'test' dataspace..."
-CREATE_TEST_RESPONSE=$(curl $CURL_OPTS -X POST $BASE_URL/dataspaces \
+# Create another dataset for testing
+echo "6. Creating 'test' dataset..."
+CREATE_TEST_RESPONSE=$(curl $CURL_OPTS -X POST $BASE_URL/datasets \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "test",
-    "description": "Test Dataspace",
+    "description": "Test Dataset",
     "settings": {}
   }')
 TEST_DATASPACE_ID=$(echo $CREATE_TEST_RESPONSE | jq -r '.id')
 echo "Response: $CREATE_TEST_RESPONSE" | jq .
 echo
 
-# List all dataspaces
-echo "7. Listing all dataspaces..."
-LIST_ALL_RESPONSE=$(curl $CURL_OPTS -X GET $BASE_URL/dataspaces \
+# List all datasets
+echo "7. Listing all datasets..."
+LIST_ALL_RESPONSE=$(curl $CURL_OPTS -X GET $BASE_URL/datasets \
   -H "Authorization: Bearer $TOKEN")
 echo "Response: $LIST_ALL_RESPONSE" | jq .
 echo
 
-# Delete the test dataspace
-echo "8. Deleting test dataspace..."
-DELETE_RESPONSE=$(curl $CURL_OPTS -X DELETE $BASE_URL/dataspaces/$TEST_DATASPACE_ID \
+# Delete the test dataset
+echo "8. Deleting test dataset..."
+DELETE_RESPONSE=$(curl $CURL_OPTS -X DELETE $BASE_URL/datasets/$TEST_DATASPACE_ID \
   -H "Authorization: Bearer $TOKEN")
 echo "Delete status: $?"
 echo
 
-# List dataspaces again to confirm deletion
-echo "9. Listing dataspaces after deletion..."
-LIST_FINAL_RESPONSE=$(curl $CURL_OPTS -X GET $BASE_URL/dataspaces \
+# List datasets again to confirm deletion
+echo "9. Listing datasets after deletion..."
+LIST_FINAL_RESPONSE=$(curl $CURL_OPTS -X GET $BASE_URL/datasets \
   -H "Authorization: Bearer $TOKEN")
 echo "Response: $LIST_FINAL_RESPONSE" | jq .
 echo

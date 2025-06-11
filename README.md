@@ -13,7 +13,7 @@ EntityDB is a revolutionary temporal database platform that stores all data as e
 ### Key Features
 
 - ⏱️ **Temporal Storage**: Every tag timestamped with nanosecond precision
-- 🏢 **Dataspace Isolation**: Complete multi-tenancy with isolated namespaces
+- 🏢 **Dataset Isolation**: Complete multi-tenancy with isolated namespaces
 - 🔒 **Enterprise RBAC**: Tag-based permissions with fine-grained access control
 - 📦 **Autochunking**: Handle files of any size without memory limits
 - 🚀 **High Performance**: Memory-mapped files, B-tree indexes, bloom filters
@@ -57,19 +57,19 @@ Every tag is stored with a nanosecond timestamp:
 1748544372285000000|status:inactive
 ```
 
-### Dataspace Isolation
+### Dataset Isolation
 
-Complete multi-tenancy through isolated dataspaces:
+Complete multi-tenancy through isolated datasets:
 ```bash
-# Create a dataspace
-curl -k -X POST https://localhost:8085/api/v1/dataspaces/create \
+# Create a dataset
+curl -k -X POST https://localhost:8085/api/v1/datasets/create \
   -H "Authorization: Bearer $TOKEN" \
   -d '{"name":"myapp","description":"My Application"}'
 
-# Create entity in dataspace
+# Create entity in dataset
 curl -k -X POST https://localhost:8085/api/v1/entities/create \
   -H "Authorization: Bearer $TOKEN" \
-  -d '{"tags":["dataspace:myapp","type:task"],"content":"Task data"}'
+  -d '{"tags":["dataset:myapp","type:task"],"content":"Task data"}'
 ```
 
 ## API Overview

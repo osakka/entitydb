@@ -22,7 +22,7 @@ Example metric entity structure:
   "id": "metric_memory_alloc",
   "tags": [
     "1749280047573038838|type:metric",
-    "1749280047573041144|dataspace:system",
+    "1749280047573041144|dataset:system",
     "1749280047573042321|name:memory_alloc",
     "1749280047573044785|unit:bytes",
     "1749280047573045692|description:Memory currently allocated",

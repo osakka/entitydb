@@ -323,6 +323,22 @@ func (s *ShardedTagIndex) GetShardStats() map[string]interface{} {
 	return stats
 }
 
+// ToMap converts the sharded index to a regular map for persistence
+func (idx *ShardedTagIndex) ToMap() map[string][]string {
+	result := make(map[string][]string)
+	
+	// Collect all tags from all shards
+	for _, shard := range idx.shards {
+		shard.mu.RLock()
+		for tag, entities := range shard.tags {
+			result[tag] = append(result[tag], entities...)
+		}
+		shard.mu.RUnlock()
+	}
+	
+	return result
+}
+
 // ShardedLock provides fine-grained locking with multiple shards
 // This is used by TemporalRepository for entity and bucket locks
 type ShardedLock struct {

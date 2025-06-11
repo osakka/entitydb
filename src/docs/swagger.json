@@ -12,7 +12,7 @@
             "name": "MIT",
             "url": "https://github.com/osakka/entitydb/blob/main/LICENSE"
         },
-        "version": "2.29.0"
+        "version": "2.28.0"
     },
     "host": "localhost:8085",
     "basePath": "/api/v1",
@@ -155,7 +155,7 @@
         },
         "/api/v1/auth/login": {
             "post": {
-                "description": "Authenticate user with username and password using embedded credentials (v2.29.0+)",
+                "description": "Authenticate user with username and password using relationship-based security",
                 "consumes": [
                     "application/json"
                 ],
@@ -1321,7 +1321,7 @@
         },
         "/api/v1/users/create": {
             "post": {
-                "description": "Create a new user entity with embedded authentication credentials (v2.29.0+)",
+                "description": "Create a new user entity with authentication credentials",
                 "consumes": [
                     "application/json"
                 ],
@@ -1699,7 +1699,7 @@
                 "ENTITYDB_COMPRESSION": {
                     "type": "string"
                 },
-                "ENTITYDB_DATASPACE_DEFAULT": {
+                "ENTITYDB_DATASET_DEFAULT": {
                     "type": "string"
                 },
                 "ENTITYDB_HIGH_PERFORMANCE": {

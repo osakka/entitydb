@@ -48,7 +48,7 @@ echo
 time_request "GET" "https://localhost:8085/health" "" ""
 time_request "POST" "$BASE_URL/auth/login" '{"username":"admin","password":"admin"}' ""
 time_request "GET" "$BASE_URL/entities/list" "" "$TOKEN"
-time_request "GET" "$BASE_URL/dataspaces" "" "$TOKEN"
+time_request "GET" "$BASE_URL/datasets" "" "$TOKEN"
 time_request "GET" "$BASE_URL/entities/query?limit=10" "" "$TOKEN"
 
 # Test server under load

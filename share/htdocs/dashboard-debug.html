@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Debug - EntityDB</title>
+    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.12.3/dist/cdn.min.js" defer></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .debug-section {
+            background: white;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .log-entry {
+            padding: 8px;
+            margin: 4px 0;
+            background: #f9f9f9;
+            border-left: 3px solid #ddd;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .log-entry.error {
+            border-color: #dc3545;
+            background: #ffe6e6;
+        }
+        .log-entry.success {
+            border-color: #28a745;
+            background: #e6ffe6;
+        }
+        .log-entry.info {
+            border-color: #17a2b8;
+            background: #e6f7ff;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .widget-preview {
+            border: 2px dashed #ccc;
+            padding: 20px;
+            margin: 10px 0;
+            background: #fafafa;
+            min-height: 100px;
+        }
+    </style>
+</head>
+<body>
+    <div x-data="dashboardDebug">
+        <h1>Dashboard Debug Tool</h1>
+        
+        <div class="debug-section">
+            <h2>1. Authentication Status</h2>
+            <button @click="checkAuth()">Check Auth</button>
+            <button @click="login()">Login as Admin</button>
+            <div id="auth-status"></div>
+        </div>
+
+        <div class="debug-section">
+            <h2>2. Dashboard Layout</h2>
+            <button @click="fetchLayout()">Fetch Layout</button>
+            <button @click="createTestLayout()">Create Test Layout</button>
+            <button @click="clearLayout()">Clear Layout</button>
+            <div id="layout-status"></div>
+        </div>
+
+        <div class="debug-section">
+            <h2>3. Widget System</h2>
+            <button @click="testWidgetSystem()">Test Widget System</button>
+            <button @click="addTestWidget()">Add Test Widget</button>
+            <div id="widget-status"></div>
+            <div id="widget-container" class="widget-preview"></div>
+        </div>
+
+        <div class="debug-section">
+            <h2>4. Console Log</h2>
+            <button @click="clearLog()">Clear Log</button>
+            <div id="console-log"></div>
+        </div>
+    </div>
+
+    <script src="/js/widget-system.js"></script>
+    <script>
+        // Simple logging system
+        const log = (message, type = 'info') => {
+            const logContainer = document.getElementById('console-log');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logContainer.appendChild(entry);
+            console.log(`[DEBUG] ${message}`);
+        };
+
+        document.addEventListener('alpine:init', () => {
+            Alpine.data('dashboardDebug', () => ({
+                token: localStorage.getItem('entitydb-admin-token'),
+                widgetSystem: null,
+
+                async checkAuth() {
+                    log('Checking authentication...');
+                    const status = document.getElementById('auth-status');
+                    
+                    if (!this.token) {
+                        status.innerHTML = '<p style="color: red;">❌ No token found in localStorage</p>';
+                        log('No auth token found', 'error');
+                        return;
+                    }
+
+                    try {
+                        const response = await fetch('/api/v1/auth/whoami', {
+                            headers: {
+                                'Authorization': `Bearer ${this.token}`
+                            }
+                        });
+
+                        if (response.ok) {
+                            const user = await response.json();
+                            status.innerHTML = `<p style="color: green;">✅ Authenticated as: ${user.username}</p>`;
+                            log(`Authenticated as ${user.username}`, 'success');
+                        } else {
+                            status.innerHTML = '<p style="color: red;">❌ Token invalid or expired</p>';
+                            log('Token invalid or expired', 'error');
+                        }
+                    } catch (error) {
+                        status.innerHTML = `<p style="color: red;">❌ Error: ${error.message}</p>`;
+                        log(`Auth check error: ${error.message}`, 'error');
+                    }
+                },
+
+                async login() {
+                    log('Attempting login...');
+                    try {
+                        const response = await fetch('/api/v1/auth/login', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                username: 'admin',
+                                password: 'admin'
+                            })
+                        });
+
+                        if (response.ok) {
+                            const data = await response.json();
+                            this.token = data.token;
+                            localStorage.setItem('entitydb-admin-token', data.token);
+                            log('Login successful', 'success');
+                            await this.checkAuth();
+                        } else {
+                            log('Login failed', 'error');
+                        }
+                    } catch (error) {
+                        log(`Login error: ${error.message}`, 'error');
+                    }
+                },
+
+                async fetchLayout() {
+                    log('Fetching dashboard layout...');
+                    const status = document.getElementById('layout-status');
+                    
+                    if (!this.token) {
+                        status.innerHTML = '<p style="color: red;">❌ Not authenticated</p>';
+                        return;
+                    }
+
+                    try {
+                        const response = await fetch('/api/v1/entities/list?tag=type:dashboard_layout', {
+                            headers: {
+                                'Authorization': `Bearer ${this.token}`
+                            }
+                        });
+
+                        if (response.ok) {
+                            const entities = await response.json();
+                            log(`Found ${entities.length} dashboard layout(s)`, 'success');
+                            
+                            const adminLayout = entities.find(e => 
+                                e.tags && e.tags.some(t => t === 'user:admin')
+                            );
+
+                            if (adminLayout) {
+                                const content = JSON.parse(atob(adminLayout.content));
+                                status.innerHTML = `<pre>${JSON.stringify(content, null, 2)}</pre>`;
+                                log('Dashboard layout found', 'success');
+                            } else {
+                                status.innerHTML = '<p style="color: orange;">⚠️ No layout found for admin user</p>';
+                                log('No layout found for admin user', 'info');
+                            }
+                        } else {
+                            const error = await response.text();
+                            status.innerHTML = `<p style="color: red;">❌ Error: ${error}</p>`;
+                            log(`Fetch error: ${error}`, 'error');
+                        }
+                    } catch (error) {
+                        status.innerHTML = `<p style="color: red;">❌ Error: ${error.message}</p>`;
+                        log(`Fetch error: ${error.message}`, 'error');
+                    }
+                },
+
+                async createTestLayout() {
+                    log('Creating test layout...');
+                    const status = document.getElementById('layout-status');
+                    
+                    if (!this.token) {
+                        status.innerHTML = '<p style="color: red;">❌ Not authenticated</p>';
+                        return;
+                    }
+
+                    const layout = {
+                        widgets: [
+                            {
+                                id: 'widget-test-1',
+                                type: 'metrics',
+                                size: 'medium',
+                                config: {
+                                    title: 'Test Metrics Widget'
+                                }
+                            }
+                        ],
+                        theme: 'light',
+                        lastModified: new Date().toISOString()
+                    };
+
+                    try {
+                        const response = await fetch('/api/v1/entities/create', {
+                            method: 'POST',
+                            headers: {
+                                'Authorization': `Bearer ${this.token}`,
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                id: 'dashboard_layout_admin',
+                                tags: ['type:dashboard_layout', 'user:admin', 'version:1'],
+                                content: JSON.stringify(layout)
+                            })
+                        });
+
+                        if (response.ok || response.status === 409) {
+                            log('Test layout created/updated', 'success');
+                            await this.fetchLayout();
+                        } else {
+                            const error = await response.text();
+                            log(`Create error: ${error}`, 'error');
+                        }
+                    } catch (error) {
+                        log(`Create error: ${error.message}`, 'error');
+                    }
+                },
+
+                async clearLayout() {
+                    log('Clearing layout...');
+                    // In a real implementation, you'd delete the entity
+                    log('Layout cleared (not implemented)', 'info');
+                },
+
+                testWidgetSystem() {
+                    log('Testing widget system...');
+                    const status = document.getElementById('widget-status');
+                    
+                    try {
+                        // Initialize widget system
+                        const container = document.getElementById('widget-container');
+                        container.innerHTML = '';
+                        
+                        this.widgetSystem = new WidgetSystem(container, {
+                            editable: true,
+                            animationDuration: 300
+                        });
+
+                        // Register test widget type
+                        this.widgetSystem.registerWidgetType('test', {
+                            render: (widget) => {
+                                return `
+                                    <div style="padding: 20px; background: #f0f0f0; border-radius: 8px;">
+                                        <h3>${widget.config.title || 'Test Widget'}</h3>
+                                        <p>ID: ${widget.id}</p>
+                                        <p>Size: ${widget.size}</p>
+                                        <p>This is a test widget!</p>
+                                    </div>
+                                `;
+                            },
+                            onMount: (widget, element) => {
+                                log(`Widget ${widget.id} mounted`, 'success');
+                            }
+                        });
+
+                        status.innerHTML = '<p style="color: green;">✅ Widget system initialized</p>';
+                        log('Widget system initialized', 'success');
+                    } catch (error) {
+                        status.innerHTML = `<p style="color: red;">❌ Error: ${error.message}</p>`;
+                        log(`Widget system error: ${error.message}`, 'error');
+                    }
+                },
+
+                addTestWidget() {
+                    if (!this.widgetSystem) {
+                        log('Widget system not initialized', 'error');
+                        return;
+                    }
+
+                    const widget = {
+                        id: `widget-${Date.now()}`,
+                        type: 'test',
+                        size: 'medium',
+                        config: {
+                            title: `Test Widget ${new Date().toLocaleTimeString()}`
+                        }
+                    };
+
+                    try {
+                        this.widgetSystem.addWidget(widget);
+                        log(`Added widget: ${widget.id}`, 'success');
+                    } catch (error) {
+                        log(`Add widget error: ${error.message}`, 'error');
+                    }
+                },
+
+                clearLog() {
+                    document.getElementById('console-log').innerHTML = '';
+                    log('Log cleared', 'info');
+                }
+            }));
+        });
+    </script>
+</body>
+</html>

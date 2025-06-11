@@ -9,9 +9,9 @@ import (
 	"entitydb/models"
 )
 
-// DataspaceContext stores hub information in the request context
-type DataspaceContext struct {
-	DataspaceName        string
+// DatasetContext stores hub information in the request context
+type DatasetContext struct {
+	DatasetName        string
 	UserHubs       []string // Hubs user has access to
 	CanAccessHub   bool
 	IsGlobalAdmin  bool
@@ -20,8 +20,8 @@ type DataspaceContext struct {
 // Context key for hub data
 type hubContextKey struct{}
 
-// DataspaceMiddleware creates middleware that enforces hub-based access control
-func DataspaceMiddleware(entityRepo models.EntityRepository, sessionManager *models.SessionManager) MiddlewareFunc {
+// DatasetMiddleware creates middleware that enforces hub-based access control
+func DatasetMiddleware(entityRepo models.EntityRepository, sessionManager *models.SessionManager) MiddlewareFunc {
 	return func(next http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
 			// Get RBAC context (should be set by RBACMiddleware first)
@@ -32,20 +32,20 @@ func DataspaceMiddleware(entityRepo models.EntityRepository, sessionManager *mod
 			}
 
 			// Extract hub from query parameter or request body
-			dataspaceName := extractHubFromRequest(r)
-			if dataspaceName == "" {
+			datasetName := extractHubFromRequest(r)
+			if datasetName == "" {
 				// For create operations, hub might be in request body
 				// This will be handled in individual handlers
-				dataspaceName = "default" // Allow for now, handlers will validate
+				datasetName = "default" // Allow for now, handlers will validate
 			}
 
 			// Check if user has access to this hub
 			userHubs := getUserHubs(rbacCtx.Permissions)
-			canAccessHub := rbacCtx.IsAdmin || containsHub(userHubs, dataspaceName) || dataspaceName == "default"
+			canAccessHub := rbacCtx.IsAdmin || containsHub(userHubs, datasetName) || datasetName == "default"
 
 			// Create hub context
-			hubCtx := &DataspaceContext{
-				DataspaceName:       dataspaceName,
+			hubCtx := &DatasetContext{
+				DatasetName:       datasetName,
 				UserHubs:      userHubs,
 				CanAccessHub:  canAccessHub,
 				IsGlobalAdmin: rbacCtx.IsAdmin,
@@ -58,14 +58,14 @@ func DataspaceMiddleware(entityRepo models.EntityRepository, sessionManager *mod
 	}
 }
 
-// GetDataspaceContext retrieves the hub context from the request
-func GetDataspaceContext(r *http.Request) (*DataspaceContext, bool) {
-	ctx, ok := r.Context().Value(hubContextKey{}).(*DataspaceContext)
+// GetDatasetContext retrieves the hub context from the request
+func GetDatasetContext(r *http.Request) (*DatasetContext, bool) {
+	ctx, ok := r.Context().Value(hubContextKey{}).(*DatasetContext)
 	return ctx, ok
 }
 
-// ValidateEntityDataspace validates that an entity belongs to a hub the user can access
-func ValidateEntityDataspace(rbacCtx *RBACContext, entity *models.Entity) error {
+// ValidateEntityDataset validates that an entity belongs to a hub the user can access
+func ValidateEntityDataset(rbacCtx *RBACContext, entity *models.Entity) error {
 	// Global admin can access all hubs
 	if rbacCtx.IsAdmin {
 		return nil
@@ -99,50 +99,50 @@ func RequireHubTag(entity *models.Entity) error {
 func AddDefaultHubTag(tags []string, defaultHub string) []string {
 	// Check if hub tag already exists
 	for _, tag := range tags {
-		if strings.HasPrefix(tag, "dataspace:") {
+		if strings.HasPrefix(tag, "dataset:") {
 			return tags // Hub tag already exists
 		}
 	}
 
 	// Add default hub tag
-	return append(tags, fmt.Sprintf("dataspace:%s", defaultHub))
+	return append(tags, fmt.Sprintf("dataset:%s", defaultHub))
 }
 
-// CheckDataspacePermission checks if user has specific permission for a hub
-func CheckDataspacePermission(rbacCtx *RBACContext, dataspaceName string, action string) bool {
+// CheckDatasetPermission checks if user has specific permission for a hub
+func CheckDatasetPermission(rbacCtx *RBACContext, datasetName string, action string) bool {
 	// Global admin has all permissions
 	if rbacCtx.IsAdmin {
 		return true
 	}
 
 	// Check hub-specific permission
-	hubPerm := fmt.Sprintf("rbac:perm:entity:%s:dataspace:%s", action, dataspaceName)
+	hubPerm := fmt.Sprintf("rbac:perm:entity:%s:dataset:%s", action, datasetName)
 	if models.HasPermission(rbacCtx.Permissions, hubPerm) {
 		return true
 	}
 
 	// Check general hub permission
-	generalPerm := fmt.Sprintf("rbac:perm:entity:%s:dataspace:*", action)
+	generalPerm := fmt.Sprintf("rbac:perm:entity:%s:dataset:*", action)
 	return models.HasPermission(rbacCtx.Permissions, generalPerm)
 }
 
 // CheckHubManagementPermission checks hub management permissions
-func CheckHubManagementPermission(rbacCtx *RBACContext, action string, dataspaceName string) bool {
+func CheckHubManagementPermission(rbacCtx *RBACContext, action string, datasetName string) bool {
 	// Global admin has all permissions
 	if rbacCtx.IsAdmin {
 		return true
 	}
 
 	// Check specific hub management permission
-	if dataspaceName != "" {
-		hubPerm := fmt.Sprintf("rbac:perm:dataspace:%s:%s", action, dataspaceName)
+	if datasetName != "" {
+		hubPerm := fmt.Sprintf("rbac:perm:dataset:%s:%s", action, datasetName)
 		if models.HasPermission(rbacCtx.Permissions, hubPerm) {
 			return true
 		}
 	}
 
 	// Check general hub management permission
-	generalPerm := fmt.Sprintf("rbac:perm:dataspace:%s", action)
+	generalPerm := fmt.Sprintf("rbac:perm:dataset:%s", action)
 	return models.HasPermission(rbacCtx.Permissions, generalPerm)
 }
 
@@ -167,13 +167,13 @@ func extractHubFromRequest(r *http.Request) string {
 func getUserHubs(permissions []string) []string {
 	var hubs []string
 	for _, perm := range permissions {
-		// Look for permissions like rbac:perm:entity:*:dataspace:worcha
-		if strings.Contains(perm, ":dataspace:") {
+		// Look for permissions like rbac:perm:entity:*:dataset:worcha
+		if strings.Contains(perm, ":dataset:") {
 			parts := strings.Split(perm, ":")
 			if len(parts) >= 6 && parts[4] == "hub" {
-				dataspaceName := parts[5]
-				if dataspaceName != "*" && !containsHub(hubs, dataspaceName) {
-					hubs = append(hubs, dataspaceName)
+				datasetName := parts[5]
+				if datasetName != "*" && !containsHub(hubs, datasetName) {
+					hubs = append(hubs, datasetName)
 				}
 			}
 		}
@@ -184,8 +184,8 @@ func getUserHubs(permissions []string) []string {
 // getEntityHub extracts hub name from entity tags
 func getEntityHub(entity *models.Entity) string {
 	for _, tag := range entity.Tags {
-		if strings.HasPrefix(tag, "dataspace:") {
-			return strings.TrimPrefix(tag, "dataspace:")
+		if strings.HasPrefix(tag, "dataset:") {
+			return strings.TrimPrefix(tag, "dataset:")
 		}
 	}
 	return ""
@@ -201,25 +201,25 @@ func containsHub(hubs []string, hub string) bool {
 	return false
 }
 
-// FormatDataspaceTag creates a hub tag
-func FormatDataspaceTag(dataspaceName string) string {
-	return fmt.Sprintf("dataspace:%s", dataspaceName)
+// FormatDatasetTag creates a hub tag
+func FormatDatasetTag(datasetName string) string {
+	return fmt.Sprintf("dataset:%s", datasetName)
 }
 
 // FormatTraitTag creates a trait tag for a hub
-func FormatTraitTag(dataspaceName, namespace, value string) string {
-	return fmt.Sprintf("%s:trait:%s:%s", dataspaceName, namespace, value)
+func FormatTraitTag(datasetName, namespace, value string) string {
+	return fmt.Sprintf("%s:trait:%s:%s", datasetName, namespace, value)
 }
 
 // FormatSelfTag creates a self tag for a hub
-func FormatSelfTag(dataspaceName, namespace, value string) string {
-	return fmt.Sprintf("%s:self:%s:%s", dataspaceName, namespace, value)
+func FormatSelfTag(datasetName, namespace, value string) string {
+	return fmt.Sprintf("%s:self:%s:%s", datasetName, namespace, value)
 }
 
-// ParseDataspaceTag parses a hub tag and returns the hub name
-func ParseDataspaceTag(tag string) (string, bool) {
-	if strings.HasPrefix(tag, "dataspace:") {
-		return strings.TrimPrefix(tag, "dataspace:"), true
+// ParseDatasetTag parses a hub tag and returns the hub name
+func ParseDatasetTag(tag string) (string, bool) {
+	if strings.HasPrefix(tag, "dataset:") {
+		return strings.TrimPrefix(tag, "dataset:"), true
 	}
 	return "", false
 }

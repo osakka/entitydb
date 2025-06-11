@@ -10,7 +10,7 @@ The server is experiencing significant performance issues:
 ```
 ENTITYDB_HIGH_PERFORMANCE=true  ✓
 ENTITYDB_WAL_ONLY=false
-ENTITYDB_DATASPACE=false
+ENTITYDB_DATASET=false
 SSL enabled on port 8085
 ```
 
@@ -30,7 +30,7 @@ SSL enabled on port 8085
 
 ## Recommendation
 
-The performance issues stem from the core repository implementation. While we've added features like dataspace management and improved the API, the underlying storage layer needs optimization. Consider:
+The performance issues stem from the core repository implementation. While we've added features like dataset management and improved the API, the underlying storage layer needs optimization. Consider:
 
 1. Implementing a proper caching layer
 2. Using connection pooling for file access

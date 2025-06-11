@@ -88,13 +88,13 @@ This document establishes the cross-referencing system between related documenta
   - [Memory Optimization](implementation/impl-memory.md) - Memory management
   - [High-Performance Mode](deployment/ops-performance.md) - Production settings
 
-### Dataspace System
-- **Main Document**: [Dataspace Implementation](implementation/impl-dataspace.md)
+### Dataset System
+- **Main Document**: [Dataset Implementation](implementation/impl-dataset.md)
 - **Related Documents**:
-  - [Dataspace Architecture](architecture/arch-dataspace.md) - Design overview
-  - [Dataspace API](api/api-dataspace.md) - Multi-tenant operations
-  - [Dataspace Security](guides/guide-dataspace-security.md) - Isolation and permissions
-  - [Migration to Dataspaces](guides/guide-dataspace-migration.md) - Upgrade guide
+  - [Dataset Architecture](architecture/arch-dataset.md) - Design overview
+  - [Dataset API](api/api-dataset.md) - Multi-tenant operations
+  - [Dataset Security](guides/guide-dataset-security.md) - Isolation and permissions
+  - [Migration to Datasets](guides/guide-dataset-migration.md) - Upgrade guide
 
 ## Development Cross-References
 
@@ -231,7 +231,7 @@ This document establishes the cross-referencing system between related documenta
 |-------|------------------|----------------------|
 | **Getting Started** | [Quick Start](guides/guide-quick-start.md) | Installation, API Reference, Architecture |
 | **API Usage** | [API Reference](api/api-reference.md) | Authentication, Entities, Temporal, Examples |
-| **Architecture** | [Architecture Overview](architecture/arch-overview.md) | Temporal, RBAC, Dataspace, Performance |
+| **Architecture** | [Architecture Overview](architecture/arch-overview.md) | Temporal, RBAC, Dataset, Performance |
 | **Development** | [Contributing Guide](development/dev-contributing.md) | Setup, Standards, Testing, Logging |
 | **Operations** | [Installation Guide](deployment/ops-installation.md) | Configuration, Monitoring, Scaling |
 | **Performance** | [Performance Benchmarks](performance/perf-benchmarks.md) | Optimization, Tuning, Implementation |

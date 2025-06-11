@@ -94,7 +94,7 @@ Available trace subsystems:
 - `lock` - Lock acquisition and contention
 - `query` - Query execution and optimization
 - `metrics` - Metrics collection
-- `dataspace` - Dataspace operations
+- `dataset` - Dataset operations
 - `relationship` - Entity relationships
 - `chunking` - Content chunking operations
 

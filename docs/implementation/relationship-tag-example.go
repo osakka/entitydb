@@ -192,8 +192,8 @@ func ExampleQueries(repo models.EntityRepository) {
 	// Find all users with admin role
 	users, _ := repo.ListByTag("relationship:has_role:role_admin")
 	
-	// Find all entities that belong to a dataspace
-	entities, _ := repo.ListByTag("relationship:belongs_to:dataspace_123")
+	// Find all entities that belong to a dataset
+	entities, _ := repo.ListByTag("relationship:belongs_to:dataset_123")
 	
 	// Find all credentials for a user (inverse relationship)
 	creds, _ := repo.ListByTag("relationship_inverse:has_credential:user_456")

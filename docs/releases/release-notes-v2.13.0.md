@@ -113,4 +113,4 @@ This release continues the collaboration with Claude AI, implementing a clean co
 ---
 
 For questions or issues, please visit:
-https://gitdataspace.com/osakka/entitydb
+https://gitdataset.com/osakka/entitydb

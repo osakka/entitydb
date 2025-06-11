@@ -54,7 +54,7 @@ time curl -k -s -X GET "https://localhost:8085/api/v1/entities/query?limit=10" \
     -H "Authorization: Bearer $TOKEN" \
     -o /dev/null
 
-echo -n "Dataspace list: "
-time curl -k -s -X GET https://localhost:8085/api/v1/dataspaces \
+echo -n "Dataset list: "
+time curl -k -s -X GET https://localhost:8085/api/v1/datasets \
     -H "Authorization: Bearer $TOKEN" \
     -o /dev/null

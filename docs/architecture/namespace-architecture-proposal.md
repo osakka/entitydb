@@ -2,16 +2,16 @@
 
 ## Executive Summary
 
-Transform EntityDB from a dataspace-centric model to a namespace-isolated architecture, where each namespace is a bounded context with its own index file, providing massive performance improvements and true multi-tenant isolation.
+Transform EntityDB from a dataset-centric model to a namespace-isolated architecture, where each namespace is a bounded context with its own index file, providing massive performance improvements and true multi-tenant isolation.
 
-## Conceptual Shift: Dataspace → Namespace
+## Conceptual Shift: Dataset → Namespace
 
 ### What Changes Fundamentally
 
-**Dataspace Model** (Current):
-- Entities "connect to" dataspaces via tags
+**Dataset Model** (Current):
+- Entities "connect to" datasets via tags
 - Single global index for all data
-- Dataspaces are just filtered views of global data
+- Datasets are just filtered views of global data
 - Mental model: "One database with access points"
 
 **Namespace Model** (Proposed):
@@ -47,7 +47,7 @@ type Entity struct {
 }
 
 // Examples:
-// Old: tags = ["dataspace:worca", "worca:self:type:task", "worca:trait:status:open"]
+// Old: tags = ["dataset:worca", "worca:self:type:task", "worca:trait:status:open"]
 // New: namespace = "worca", tags = ["type:task", "status:open"]
 ```
 
@@ -97,7 +97,7 @@ type NamespaceIndex struct {
 1. Add namespace field to Entity model
 2. Create NamespaceIndex type
 3. Implement namespace-aware repository
-4. Keep backward compatibility with dataspace tags
+4. Keep backward compatibility with dataset tags
 
 ### Phase 2: Per-Namespace Files (Week 2)
 1. Implement .idx file format for namespaces
@@ -108,7 +108,7 @@ type NamespaceIndex struct {
 ### Phase 3: API Migration (Week 3)
 1. Add `/api/v1/namespaces/` endpoints
 2. Update entity APIs to be namespace-aware
-3. Create migration tool for dataspace→namespace
+3. Create migration tool for dataset→namespace
 4. Update documentation
 
 ### Phase 4: Optimization (Week 4)
@@ -145,8 +145,8 @@ POST   /api/v1/query/cross-namespace
 ### Backward Compatibility
 
 ```bash
-# Old dataspace endpoints redirect to namespace endpoints
-GET /api/v1/dataspaces/{dataspace}/entities → GET /api/v1/namespaces/{dataspace}/entities
+# Old dataset endpoints redirect to namespace endpoints
+GET /api/v1/datasets/{dataset}/entities → GET /api/v1/namespaces/{dataset}/entities
 ```
 
 ## Benefits Summary
@@ -182,7 +182,7 @@ GET /api/v1/dataspaces/{dataspace}/entities → GET /api/v1/namespaces/{dataspac
 
 ## Conclusion
 
-The shift from dataspaces to namespaces isn't just a rename - it's a fundamental architectural improvement that:
+The shift from datasets to namespaces isn't just a rename - it's a fundamental architectural improvement that:
 - Provides massive performance gains
 - Enables true multi-tenancy
 - Simplifies the mental model

@@ -214,21 +214,21 @@ Authorization: Bearer {session_token}
 - `target_id` (optional): Filter by target entity
 - `relationship_type` (optional): Filter by relationship type
 
-## Dataspace Operations
+## Dataset Operations
 
-Multi-tenant dataspace operations:
+Multi-tenant dataset operations:
 
-### Create Entity in Dataspace
+### Create Entity in Dataset
 
 ```http
-POST /api/v1/dataspaces/{dataspace}/entities/create
+POST /api/v1/datasets/{dataset}/entities/create
 Authorization: Bearer {session_token}
 ```
 
-### Query Dataspace Entities
+### Query Dataset Entities
 
 ```http
-GET /api/v1/dataspaces/{dataspace}/entities/query
+GET /api/v1/datasets/{dataset}/entities/query
 Authorization: Bearer {session_token}
 ```
 

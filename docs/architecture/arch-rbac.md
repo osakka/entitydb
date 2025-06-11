@@ -27,7 +27,7 @@ rbac:perm:resource:action:scope
 
 **Examples**:
 - `rbac:perm:entity:view` - View entities
-- `rbac:perm:entity:create:dataspace:worca` - Create entities in worca dataspace
+- `rbac:perm:entity:create:dataset:worca` - Create entities in worca dataset
 - `rbac:perm:system:admin` - System administration
 - `rbac:perm:*` - All permissions (global admin)
 
@@ -75,7 +75,7 @@ EntityDB supports hierarchical permissions with inheritance:
 1. **Global Permissions**: `rbac:perm:*` (admin access)
 2. **Resource Permissions**: `rbac:perm:entity:*` (all entity operations)
 3. **Action Permissions**: `rbac:perm:entity:view` (specific operations)
-4. **Scoped Permissions**: `rbac:perm:entity:view:dataspace:worca` (dataspace-specific)
+4. **Scoped Permissions**: `rbac:perm:entity:view:dataset:worca` (dataset-specific)
 
 ### Default Roles
 
@@ -234,20 +234,20 @@ var endpointPermissions = map[string]string{
 }
 ```
 
-### Dataspace Security
+### Dataset Security
 
-Dataspace-scoped permissions provide multi-tenant security:
+Dataset-scoped permissions provide multi-tenant security:
 
 ```go
-// Dataspace permission check
-func checkDataspacePermission(user *User, dataspace, action string) bool {
+// Dataset permission check
+func checkDatasetPermission(user *User, dataset, action string) bool {
     // Global admin override
     if user.HasPermission("rbac:perm:*") {
         return true
     }
     
-    // Dataspace-specific permission
-    perm := fmt.Sprintf("rbac:perm:entity:%s:dataspace:%s", action, dataspace)
+    // Dataset-specific permission
+    perm := fmt.Sprintf("rbac:perm:entity:%s:dataset:%s", action, dataset)
     return user.HasPermission(perm)
 }
 ```
@@ -299,7 +299,7 @@ curl -X POST https://localhost:8085/api/v1/users/create \
     "tags": [
       "rbac:role:user",
       "rbac:perm:entity:view",
-      "rbac:perm:entity:create:dataspace:development"
+      "rbac:perm:entity:create:dataset:development"
     ]
   }'
 ```
@@ -312,7 +312,7 @@ curl -X PUT https://localhost:8085/api/v1/users/update \
   -H "Authorization: Bearer $ADMIN_TOKEN" \
   -d '{
     "user_id": "user_developer_456",
-    "add_tags": ["rbac:perm:entity:update:dataspace:development"]
+    "add_tags": ["rbac:perm:entity:update:dataset:development"]
   }'
 ```
 
@@ -411,7 +411,7 @@ EntityDB automatically creates an admin user on first startup:
 ### Permission Design
 
 1. **Principle of Least Privilege**: Grant minimum required permissions
-2. **Dataspace Isolation**: Use dataspace-scoped permissions for multi-tenancy
+2. **Dataset Isolation**: Use dataset-scoped permissions for multi-tenancy
 3. **Role-Based**: Assign permissions through roles, not directly
 4. **Hierarchical**: Use permission hierarchy for maintainability
 

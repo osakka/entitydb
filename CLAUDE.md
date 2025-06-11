@@ -183,6 +183,21 @@ The server automatically creates a default admin user if none exists:
 - Audit logging
 - Aggregation queries (beyond sorting/filtering)
 
+## Recent Changes (v2.29.0)
+
+- **Major Terminology Update**: Renamed "dataspace" to "dataset" throughout entire codebase
+  - All API endpoints changed from `/dataspace` to `/dataset` with backward compatibility
+  - Environment variables renamed from `ENTITYDB_DATASPACE_*` to `ENTITYDB_DATASET_*`
+  - Go types, functions, and methods updated to use Dataset naming convention
+  - UI components and JavaScript files updated to reflect new terminology
+  - Documentation comprehensively updated for consistency
+  - Created compatibility layer for smooth transition
+- **Repository Cleanup**: Maintained single source of truth principle
+  - Removed duplicate dashboard files (index_new.html, index_simple.html)
+  - Cleaned up old debug and fix binaries from bin directory
+  - Moved obsolete files to trash directory
+  - Ensured clean build with zero warnings
+
 ## Recent Changes (v2.28.0)
 
 - **Professional Documentation Overhaul**: Complete transformation of documentation library

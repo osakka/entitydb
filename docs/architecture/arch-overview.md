@@ -210,19 +210,19 @@ Examples:
 - **WAL monitoring** with size warnings and critical alerts
 - **Index health verification** with automatic repair
 
-## Dataspace Architecture
+## Dataset Architecture
 
 ### Multi-Tenant Design
-- **Logical separation** of data by dataspace
+- **Logical separation** of data by dataset
 - **Shared underlying storage** for efficiency
-- **Index isolation** per dataspace
-- **RBAC enforcement** across dataspace boundaries
+- **Index isolation** per dataset
+- **RBAC enforcement** across dataset boundaries
 
-### Dataspace Operations
-- **Entity operations** scoped to dataspace
-- **Query isolation** between dataspaces
-- **Relationship management** within dataspace context
-- **Metrics collection** per dataspace
+### Dataset Operations
+- **Entity operations** scoped to dataset
+- **Query isolation** between datasets
+- **Relationship management** within dataset context
+- **Metrics collection** per dataset
 
 ## API Design
 
@@ -244,7 +244,7 @@ Examples:
 - **Entity operations**: `/api/v1/entities/*`
 - **Temporal queries**: `/api/v1/entities/as-of`, `/api/v1/entities/history`
 - **Relationships**: `/api/v1/entity-relationships`
-- **Dataspaces**: `/api/v1/dataspaces/{id}/*`
+- **Datasets**: `/api/v1/datasets/{id}/*`
 - **Admin operations**: `/api/v1/admin/*`
 - **Metrics**: `/api/v1/metrics/*`
 

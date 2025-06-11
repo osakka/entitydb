@@ -283,7 +283,7 @@ func (m *MetricsRetentionManager) aggregateMetric(metric *models.Entity, metricN
 			ID: aggMetricID,
 			Tags: []string{
 				"type:metric",
-				"dataspace:system",
+				"dataset:system",
 				fmt.Sprintf("name:%s", metricName),
 				fmt.Sprintf("aggregation:%s", intervalName),
 				fmt.Sprintf("source:%s", metric.ID),

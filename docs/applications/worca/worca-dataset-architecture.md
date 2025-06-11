@@ -1,11 +1,11 @@
-# Worca Dataspace Architecture Design
+# Worca Dataset Architecture Design
 
 ## Overview
-Worca (Workforce Orchestrator) serves as the reference implementation for EntityDB's Multi-Dataspace Platform, demonstrating sophisticated tag-based inheritance and enterprise RBAC patterns.
+Worca (Workforce Orchestrator) serves as the reference implementation for EntityDB's Multi-Dataset Platform, demonstrating sophisticated tag-based inheritance and enterprise RBAC patterns.
 
 ## Core Design Principle
 
-**Dataspace**: `worca` - The workforce orchestrator application space
+**Dataset**: `worca` - The workforce orchestrator application space
 **Self Properties**: What the entity IS (type, status, own attributes)  
 **Trait Properties**: What the entity BELONGS TO (organizational context)
 
@@ -14,7 +14,7 @@ Worca (Workforce Orchestrator) serves as the reference implementation for Entity
 ### 1. Organizations
 ```javascript
 {
-  "dataspace": "worca",
+  "dataset": "worca",
   "self": {
     "type": "organization",
     "name": "TechCorp",
@@ -35,7 +35,7 @@ Worca (Workforce Orchestrator) serves as the reference implementation for Entity
 ```
 
 **Tags Generated:**
-- `dataspace:worca`
+- `dataset:worca`
 - `worca:self:type:organization`
 - `worca:self:name:TechCorp`
 - `worca:self:status:active`
@@ -46,7 +46,7 @@ Worca (Workforce Orchestrator) serves as the reference implementation for Entity
 ### 2. Projects
 ```javascript
 {
-  "dataspace": "worca",
+  "dataset": "worca",
   "self": {
     "type": "project",
     "name": "MobileApp",
@@ -70,7 +70,7 @@ Worca (Workforce Orchestrator) serves as the reference implementation for Entity
 ```
 
 **Tags Generated:**
-- `dataspace:worca`
+- `dataset:worca`
 - `worca:self:type:project`
 - `worca:self:name:MobileApp`
 - `worca:self:status:active`
@@ -84,7 +84,7 @@ Worca (Workforce Orchestrator) serves as the reference implementation for Entity
 ### 3. Epics
 ```javascript
 {
-  "dataspace": "worca",
+  "dataset": "worca",
   "self": {
     "type": "epic",
     "name": "UserAuthentication",
@@ -109,7 +109,7 @@ Worca (Workforce Orchestrator) serves as the reference implementation for Entity
 ### 4. Stories
 ```javascript
 {
-  "dataspace": "worca",
+  "dataset": "worca",
   "self": {
     "type": "story",
     "name": "LoginFlow",
@@ -135,7 +135,7 @@ Worca (Workforce Orchestrator) serves as the reference implementation for Entity
 ### 5. Tasks
 ```javascript
 {
-  "dataspace": "worca",
+  "dataset": "worca",
   "self": {
     "type": "task",
     "title": "Implement OAuth2 callback handler",
@@ -163,7 +163,7 @@ Worca (Workforce Orchestrator) serves as the reference implementation for Entity
 ### 6. Users (Team Members)
 ```javascript
 {
-  "dataspace": "worca",
+  "dataset": "worca",
   "self": {
     "type": "user",
     "username": "john.doe",
@@ -190,7 +190,7 @@ Worca (Workforce Orchestrator) serves as the reference implementation for Entity
 ### 7. Sprints
 ```javascript
 {
-  "dataspace": "worca",
+  "dataset": "worca",
   "self": {
     "type": "sprint",
     "name": "Sprint-24",
@@ -219,49 +219,49 @@ Worca (Workforce Orchestrator) serves as the reference implementation for Entity
 ### 1. Hierarchical Queries
 ```javascript
 // All tasks in TechCorp organization
-GET /api/v1/dataspaces/entities/query?dataspace=worca&self=type:task&traits=org:TechCorp
+GET /api/v1/datasets/entities/query?dataset=worca&self=type:task&traits=org:TechCorp
 
 // All items in MobileApp project
-GET /api/v1/dataspaces/entities/query?dataspace=worca&traits=project:MobileApp
+GET /api/v1/datasets/entities/query?dataset=worca&traits=project:MobileApp
 
 // User authentication work items
-GET /api/v1/dataspaces/entities/query?dataspace=worca&traits=epic:UserAuthentication
+GET /api/v1/datasets/entities/query?dataset=worca&traits=epic:UserAuthentication
 
 // Current sprint tasks
-GET /api/v1/dataspaces/entities/query?dataspace=worca&self=type:task&traits=sprint:Sprint-24
+GET /api/v1/datasets/entities/query?dataset=worca&self=type:task&traits=sprint:Sprint-24
 
 // John's active tasks
-GET /api/v1/dataspaces/entities/query?dataspace=worca&self=type:task,status:doing,assignee:john.doe
+GET /api/v1/datasets/entities/query?dataset=worca&self=type:task,status:doing,assignee:john.doe
 ```
 
 ### 2. Cross-Cutting Queries  
 ```javascript
 // All high-priority work across organization
-GET /api/v1/dataspaces/entities/query?dataspace=worca&self=priority:high&traits=org:TechCorp
+GET /api/v1/datasets/entities/query?dataset=worca&self=priority:high&traits=org:TechCorp
 
 // Mobile team capacity
-GET /api/v1/dataspaces/entities/query?dataspace=worca&self=type:user&traits=team:mobile-development
+GET /api/v1/datasets/entities/query?dataset=worca&self=type:user&traits=team:mobile-development
 
 // Security-related work items
-GET /api/v1/dataspaces/entities/query?dataspace=worca&traits=feature_area:security
+GET /api/v1/datasets/entities/query?dataset=worca&traits=feature_area:security
 
 // Backend component tasks
-GET /api/v1/dataspaces/entities/query?dataspace=worca&self=type:task&traits=component:backend-api
+GET /api/v1/datasets/entities/query?dataset=worca&self=type:task&traits=component:backend-api
 ```
 
 ### 3. Analytics Queries
 ```javascript
 // Project velocity over time
-GET /api/v1/dataspaces/entities/query?dataspace=worca&self=type:sprint&traits=project:MobileApp
+GET /api/v1/datasets/entities/query?dataset=worca&self=type:sprint&traits=project:MobileApp
 
 // Team workload distribution  
-GET /api/v1/dataspaces/entities/query?dataspace=worca&self=type:task,status:doing&traits=team:mobile-development
+GET /api/v1/datasets/entities/query?dataset=worca&self=type:task,status:doing&traits=team:mobile-development
 
 // Epic progress tracking
-GET /api/v1/dataspaces/entities/query?dataspace=worca&traits=epic:UserAuthentication
+GET /api/v1/datasets/entities/query?dataset=worca&traits=epic:UserAuthentication
 
 // Organization-wide metrics
-GET /api/v1/dataspaces/entities/query?dataspace=worca&traits=org:TechCorp
+GET /api/v1/datasets/entities/query?dataset=worca&traits=org:TechCorp
 ```
 
 ## RBAC Permission Mapping
@@ -314,7 +314,7 @@ rbac:perm:entity:read:worca:self:type:task:trait:project:MobileApp
 
 ## Data Migration Strategy
 
-### 1. Current Worca Data → Dataspace Architecture
+### 1. Current Worca Data → Dataset Architecture
 ```javascript
 // OLD FORMAT (current)
 {
@@ -324,9 +324,9 @@ rbac:perm:entity:read:worca:self:type:task:trait:project:MobileApp
   "content": "Task description"
 }
 
-// NEW FORMAT (dataspace architecture)  
+// NEW FORMAT (dataset architecture)  
 {
-  "dataspace": "worca",
+  "dataset": "worca",
   "self": {
     "type": "task", 
     "title": "Implement OAuth2",
@@ -344,11 +344,11 @@ rbac:perm:entity:read:worca:self:type:task:trait:project:MobileApp
 
 ### 2. Backward Compatibility
 - Keep existing API endpoints working
-- Gradually migrate frontend to use dataspace endpoints
+- Gradually migrate frontend to use dataset endpoints
 - Support both tag formats during transition
 - Provide migration utilities for data transformation
 
-## Benefits of Dataspace Architecture for Worca
+## Benefits of Dataset Architecture for Worca
 
 ### 1. **Cleaner Data Model**
 - Clear separation: what entities ARE vs what they BELONG TO
@@ -356,7 +356,7 @@ rbac:perm:entity:read:worca:self:type:task:trait:project:MobileApp
 - Intuitive querying with inheritance
 
 ### 2. **Enhanced Performance**  
-- Dataspace-scoped queries are faster
+- Dataset-scoped queries are faster
 - Trait-based filtering is optimized
 - Better indexing on self vs trait properties
 
@@ -381,7 +381,7 @@ rbac:perm:entity:read:worca:self:type:task:trait:project:MobileApp
 ## Implementation Phases
 
 ### Phase 1: API Wrapper Update
-- Modify `worca-api.js` to use dataspace endpoints
+- Modify `worca-api.js` to use dataset endpoints
 - Transform data between old and new formats
 - Maintain UI compatibility
 
@@ -396,4 +396,4 @@ rbac:perm:entity:read:worca:self:type:task:trait:project:MobileApp
 - Performance optimizations
 - Analytics enhancements
 
-**Worca will become the definitive reference for building sophisticated applications on EntityDB's Multi-Dataspace Platform!** 🚀
+**Worca will become the definitive reference for building sophisticated applications on EntityDB's Multi-Dataset Platform!** 🚀

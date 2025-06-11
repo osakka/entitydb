@@ -17,7 +17,7 @@ Entity {
     ID: "user_123abc...",
     Tags: [
         "type:user",
-        "dataspace:_system",
+        "dataset:_system",
         "identity:username:john",
         "identity:uuid:user_123abc...",
         "status:active",
@@ -56,7 +56,7 @@ func CreateUser(username, password, email string) (*SecurityUser, error) {
         ID: userID,
         Tags: []string{
             "type:user",
-            "dataspace:_system",
+            "dataset:_system",
             "identity:username:" + username,
             "identity:uuid:" + userID,
             "status:active",

@@ -45,10 +45,10 @@ const (
 	RelationshipMemberOf        = "member_of"
 	RelationshipHasRole         = "has_role"
 	RelationshipGrants          = "grants"
-	RelationshipCanAccess       = "can_access"      // User/Role can access Dataspace
-	RelationshipOwns            = "owns"            // User owns Dataspace
-	RelationshipBelongsTo       = "belongs_to"      // Entity belongs to Dataspace
-	RelationshipDelegates       = "delegates"       // Role delegates to another Role in Dataspace
+	RelationshipCanAccess       = "can_access"      // User/Role can access Dataset
+	RelationshipOwns            = "owns"            // User owns Dataset
+	RelationshipBelongsTo       = "belongs_to"      // Entity belongs to Dataset
+	RelationshipDelegates       = "delegates"       // Role delegates to another Role in Dataset
 )
 
 // SecurityUser represents a user in the security system
@@ -120,7 +120,7 @@ func (sm *SecurityManager) CreateUser(username, password, email string) (*Securi
 	// Create user entity with credentials in content
 	tags := []string{
 		"type:" + EntityTypeUser,
-		"dataspace:_system",
+		"dataset:_system",
 		"identity:username:" + username,
 		"identity:uuid:" + userID,
 		"status:active",
@@ -288,7 +288,7 @@ func (sm *SecurityManager) CreateSession(user *SecurityUser, ipAddress, userAgen
 		ID: sessionID,
 		Tags: []string{
 			"type:" + EntityTypeSession,
-			"dataspace:_system",
+			"dataset:_system",
 			"token:" + token,
 			"expires:" + expiresAt.Format(time.RFC3339),
 			"ip:" + ipAddress,
@@ -404,11 +404,11 @@ func (sm *SecurityManager) ValidateSession(token string) (*SecurityUser, error) 
 
 // HasPermission checks if a user has a specific permission via relationship traversal
 func (sm *SecurityManager) HasPermission(user *SecurityUser, resource, action string) (bool, error) {
-	return sm.HasPermissionInDataspace(user, resource, action, "")
+	return sm.HasPermissionInDataset(user, resource, action, "")
 }
 
-// HasPermissionInDataspace checks if a user has a specific permission in a dataspace via relationship traversal
-func (sm *SecurityManager) HasPermissionInDataspace(user *SecurityUser, resource, action, dataspaceID string) (bool, error) {
+// HasPermissionInDataset checks if a user has a specific permission in a dataset via relationship traversal
+func (sm *SecurityManager) HasPermissionInDataset(user *SecurityUser, resource, action, datasetID string) (bool, error) {
 	// First check direct user permissions via user->role->permission
 	userRoles, err := sm.getUserRoles(user.ID)
 	if err != nil {
@@ -416,7 +416,7 @@ func (sm *SecurityManager) HasPermissionInDataspace(user *SecurityUser, resource
 	}
 	
 	for _, role := range userRoles {
-		hasPermission, err := sm.roleHasPermissionInDataspace(role.ID, resource, action, dataspaceID)
+		hasPermission, err := sm.roleHasPermissionInDataset(role.ID, resource, action, datasetID)
 		if err != nil {
 			return false, err
 		}
@@ -438,7 +438,7 @@ func (sm *SecurityManager) HasPermissionInDataspace(user *SecurityUser, resource
 		}
 		
 		for _, role := range groupRoles {
-			hasPermission, err := sm.roleHasPermissionInDataspace(role.ID, resource, action, dataspaceID)
+			hasPermission, err := sm.roleHasPermissionInDataset(role.ID, resource, action, datasetID)
 			if err != nil {
 				continue // Skip this role if we can't check its permissions
 			}
@@ -566,13 +566,13 @@ func (sm *SecurityManager) roleHasPermission(roleID, resource, action string) (b
 	return false, nil
 }
 
-func (sm *SecurityManager) roleHasPermissionInDataspace(roleID, resource, action, dataspaceID string) (bool, error) {
-	// If no dataspace specified, check global permissions
-	if dataspaceID == "" {
+func (sm *SecurityManager) roleHasPermissionInDataset(roleID, resource, action, datasetID string) (bool, error) {
+	// If no dataset specified, check global permissions
+	if datasetID == "" {
 		return sm.roleHasPermission(roleID, resource, action)
 	}
 	
-	// First check if user has global admin permissions (overrides dataspace restrictions)
+	// First check if user has global admin permissions (overrides dataset restrictions)
 	hasGlobal, err := sm.roleHasPermission(roleID, "*", "*")
 	if err != nil {
 		return false, err
@@ -581,16 +581,16 @@ func (sm *SecurityManager) roleHasPermissionInDataspace(roleID, resource, action
 		return true, nil
 	}
 	
-	// Check if role has access to the specific dataspace
-	hasDataspaceAccess, err := sm.roleHasDataspaceAccess(roleID, dataspaceID)
+	// Check if role has access to the specific dataset
+	hasDatasetAccess, err := sm.roleHasDatasetAccess(roleID, datasetID)
 	if err != nil {
 		return false, err
 	}
-	if !hasDataspaceAccess {
-		return false, nil // No access to dataspace at all
+	if !hasDatasetAccess {
+		return false, nil // No access to dataset at all
 	}
 	
-	// Check for dataspace-scoped permissions
+	// Check for dataset-scoped permissions
 	relationships, err := sm.entityRepo.GetRelationshipsBySource(roleID)
 	if err != nil {
 		return false, err
@@ -602,21 +602,21 @@ func (sm *SecurityManager) roleHasPermissionInDataspace(roleID, resource, action
 				permissionEntity, err := sm.entityRepo.GetByID(relationship.TargetID)
 				if err == nil {
 					permTags := permissionEntity.GetTagsWithoutTimestamp()
-					var permResource, permAction, permDataspace string
+					var permResource, permAction, permDataset string
 					for _, tag := range permTags {
 						if strings.HasPrefix(tag, "resource:") {
 							permResource = strings.TrimPrefix(tag, "resource:")
 						} else if strings.HasPrefix(tag, "action:") {
 							permAction = strings.TrimPrefix(tag, "action:")
-						} else if strings.HasPrefix(tag, "dataspace:") {
-							permDataspace = strings.TrimPrefix(tag, "dataspace:")
+						} else if strings.HasPrefix(tag, "dataset:") {
+							permDataset = strings.TrimPrefix(tag, "dataset:")
 						}
 					}
 					
-					// Check for exact match or wildcard permissions in the right dataspace
+					// Check for exact match or wildcard permissions in the right dataset
 					if (permResource == resource || permResource == "*") &&
 						(permAction == action || permAction == "*") &&
-						(permDataspace == dataspaceID || permDataspace == "*") {
+						(permDataset == datasetID || permDataset == "*") {
 						return true, nil
 					}
 				}
@@ -627,7 +627,7 @@ func (sm *SecurityManager) roleHasPermissionInDataspace(roleID, resource, action
 	return false, nil
 }
 
-func (sm *SecurityManager) roleHasDataspaceAccess(roleID, dataspaceID string) (bool, error) {
+func (sm *SecurityManager) roleHasDatasetAccess(roleID, datasetID string) (bool, error) {
 	relationships, err := sm.entityRepo.GetRelationshipsBySource(roleID)
 	if err != nil {
 		return false, err
@@ -635,7 +635,7 @@ func (sm *SecurityManager) roleHasDataspaceAccess(roleID, dataspaceID string) (b
 	
 	for _, rel := range relationships {
 		if relationship, ok := rel.(*EntityRelationship); ok {
-			if relationship.Type == RelationshipCanAccess && relationship.TargetID == dataspaceID {
+			if relationship.Type == RelationshipCanAccess && relationship.TargetID == datasetID {
 				return true, nil
 			}
 		}
@@ -644,8 +644,8 @@ func (sm *SecurityManager) roleHasDataspaceAccess(roleID, dataspaceID string) (b
 	return false, nil
 }
 
-// CanAccessDataspace checks if a user can access a specific dataspace
-func (sm *SecurityManager) CanAccessDataspace(user *SecurityUser, dataspaceID string) (bool, error) {
+// CanAccessDataset checks if a user can access a specific dataset
+func (sm *SecurityManager) CanAccessDataset(user *SecurityUser, datasetID string) (bool, error) {
 	// Check direct user access
 	userRoles, err := sm.getUserRoles(user.ID)
 	if err != nil {
@@ -653,7 +653,7 @@ func (sm *SecurityManager) CanAccessDataspace(user *SecurityUser, dataspaceID st
 	}
 	
 	for _, role := range userRoles {
-		hasAccess, err := sm.roleHasDataspaceAccess(role.ID, dataspaceID)
+		hasAccess, err := sm.roleHasDatasetAccess(role.ID, datasetID)
 		if err != nil {
 			return false, err
 		}
@@ -675,7 +675,7 @@ func (sm *SecurityManager) CanAccessDataspace(user *SecurityUser, dataspaceID st
 		}
 		
 		for _, role := range groupRoles {
-			hasAccess, err := sm.roleHasDataspaceAccess(role.ID, dataspaceID)
+			hasAccess, err := sm.roleHasDatasetAccess(role.ID, datasetID)
 			if err != nil {
 				continue
 			}

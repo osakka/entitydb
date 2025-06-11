@@ -86,7 +86,7 @@ func (h *UserHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 	// Create user as entity
 	tags := []string{
 		"type:user",
-		"dataspace:_system",
+		"dataset:_system",
 		"id:username:" + req.Username,
 		"status:active",
 		"rbac:role:" + getRole(req.Role),

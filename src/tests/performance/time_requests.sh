@@ -49,18 +49,18 @@ ENTITY_COUNT=$(jq '. | length' /tmp/list_response.json)
 echo "Entities returned: $ENTITY_COUNT"
 echo
 
-# 3. Time dataspace list request
+# 3. Time dataset list request
 echo "3. LIST DATASPACES TIMING:"
 echo "--------------------------"
 DS_START=$(date +%s.%N)
-DS_RESPONSE=$(curl $CURL_OPTS -o /tmp/ds_response.json -X GET $BASE_URL/dataspaces \
+DS_RESPONSE=$(curl $CURL_OPTS -o /tmp/ds_response.json -X GET $BASE_URL/datasets \
   -H "Authorization: Bearer $TOKEN" \
   /tmp/curl_timing_format.txt)
 DS_END=$(date +%s.%N)
 echo "$DS_RESPONSE"
 echo "Shell measured time: $(echo "$DS_END - $DS_START" | bc)s"
 DS_COUNT=$(jq '. | length' /tmp/ds_response.json)
-echo "Dataspaces returned: $DS_COUNT"
+echo "Datasets returned: $DS_COUNT"
 echo
 
 # 4. Time create entity request

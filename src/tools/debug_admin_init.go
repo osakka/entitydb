@@ -59,7 +59,7 @@ func main() {
 		allEntities = []*models.Entity{}
 		
 		// Get some entities to check
-		for _, tag := range []string{"dataspace:_system", "algorithm:bcrypt"} {
+		for _, tag := range []string{"dataset:_system", "algorithm:bcrypt"} {
 			entities, err := repo.ListByTag(tag)
 			if err == nil {
 				for _, e := range entities {

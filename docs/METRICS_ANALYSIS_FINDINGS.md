@@ -63,7 +63,7 @@ EntityDB has a basic metrics infrastructure but lacks comprehensive coverage for
 5. **Business Metrics**
    - ❌ Entity creation/update/delete rates
    - ❌ Query patterns and frequencies
-   - ❌ Dataspace usage statistics
+   - ❌ Dataset usage statistics
    - ❌ Relationship operations
 
 6. **Infrastructure Health**

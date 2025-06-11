@@ -1,7 +1,7 @@
 #!/bin/bash
-# Systematic rename of hub to dataspace
+# Systematic rename of hub to dataset
 
-echo "=== Renaming Hub to Dataspace ==="
+echo "=== Renaming Hub to Dataset ==="
 echo
 
 # Step 1: Rename Go files
@@ -9,12 +9,12 @@ echo "Step 1: Renaming Go files..."
 cd /opt/entitydb/src/api
 
 # Rename files
-mv hub_management_handler.go dataspace_management_handler.go 2>/dev/null && echo "✓ Renamed hub_management_handler.go"
-mv hub_management_handler_rbac.go dataspace_management_handler_rbac.go 2>/dev/null && echo "✓ Renamed hub_management_handler_rbac.go"
-mv hub_entity_handler_rbac.go dataspace_entity_handler_rbac.go 2>/dev/null && echo "✓ Renamed hub_entity_handler_rbac.go"
-# entity_handler_hub.go already became entity_handler_dataspace.go
+mv hub_management_handler.go dataset_management_handler.go 2>/dev/null && echo "✓ Renamed hub_management_handler.go"
+mv hub_management_handler_rbac.go dataset_management_handler_rbac.go 2>/dev/null && echo "✓ Renamed hub_management_handler_rbac.go"
+mv hub_entity_handler_rbac.go dataset_entity_handler_rbac.go 2>/dev/null && echo "✓ Renamed hub_entity_handler_rbac.go"
+# entity_handler_hub.go already became entity_handler_dataset.go
 rm -f entity_handler_hub.go 2>/dev/null
-mv hub_middleware.go dataspace_middleware.go 2>/dev/null && echo "✓ Renamed hub_middleware.go"
+mv hub_middleware.go dataset_middleware.go 2>/dev/null && echo "✓ Renamed hub_middleware.go"
 
 cd /opt/entitydb
 
@@ -27,56 +27,56 @@ update_file() {
     local file=$1
     if [ -f "$file" ]; then
         # Type and struct names
-        sed -i 's/HubManagementHandler/DataspaceManagementHandler/g' "$file"
-        sed -i 's/hubManagementHandler/dataspaceManagementHandler/g' "$file"
-        sed -i 's/CreateHubRequest/CreateDataspaceRequest/g' "$file"
-        sed -i 's/CreateHubResponse/CreateDataspaceResponse/g' "$file"
-        sed -i 's/HubInfo/DataspaceInfo/g' "$file"
-        sed -i 's/HubContext/DataspaceContext/g' "$file"
-        sed -i 's/HubMiddleware/DataspaceMiddleware/g' "$file"
+        sed -i 's/HubManagementHandler/DatasetManagementHandler/g' "$file"
+        sed -i 's/hubManagementHandler/datasetManagementHandler/g' "$file"
+        sed -i 's/CreateHubRequest/CreateDatasetRequest/g' "$file"
+        sed -i 's/CreateHubResponse/CreateDatasetResponse/g' "$file"
+        sed -i 's/HubInfo/DatasetInfo/g' "$file"
+        sed -i 's/HubContext/DatasetContext/g' "$file"
+        sed -i 's/HubMiddleware/DatasetMiddleware/g' "$file"
         
         # Function names
-        sed -i 's/CreateHub/CreateDataspace/g' "$file"
-        sed -i 's/DeleteHub/DeleteDataspace/g' "$file"
-        sed -i 's/ListHubs/ListDataspaces/g' "$file"
-        sed -i 's/GetHub/GetDataspace/g' "$file"
-        sed -i 's/FormatHubTag/FormatDataspaceTag/g' "$file"
-        sed -i 's/ParseHubTag/ParseDataspaceTag/g' "$file"
-        sed -i 's/CheckHubPermission/CheckDataspacePermission/g' "$file"
-        sed -i 's/ValidateEntityHub/ValidateEntityDataspace/g' "$file"
-        sed -i 's/GetHubContext/GetDataspaceContext/g' "$file"
-        sed -i 's/QueryHubEntities/QueryDataspaceEntities/g' "$file"
-        sed -i 's/CreateHubEntity/CreateDataspaceEntity/g' "$file"
+        sed -i 's/CreateHub/CreateDataset/g' "$file"
+        sed -i 's/DeleteHub/DeleteDataset/g' "$file"
+        sed -i 's/ListHubs/ListDatasets/g' "$file"
+        sed -i 's/GetHub/GetDataset/g' "$file"
+        sed -i 's/FormatHubTag/FormatDatasetTag/g' "$file"
+        sed -i 's/ParseHubTag/ParseDatasetTag/g' "$file"
+        sed -i 's/CheckHubPermission/CheckDatasetPermission/g' "$file"
+        sed -i 's/ValidateEntityHub/ValidateEntityDataset/g' "$file"
+        sed -i 's/GetHubContext/GetDatasetContext/g' "$file"
+        sed -i 's/QueryHubEntities/QueryDatasetEntities/g' "$file"
+        sed -i 's/CreateHubEntity/CreateDatasetEntity/g' "$file"
         
         # Variables and parameters
-        sed -i 's/hubName/dataspaceName/g' "$file"
-        sed -i 's/hub_name/dataspace_name/g' "$file"
-        sed -i 's/HubName/DataspaceName/g' "$file"
-        sed -i 's/currentHub/currentDataspace/g' "$file"
-        sed -i 's/targetHub/targetDataspace/g' "$file"
+        sed -i 's/hubName/datasetName/g' "$file"
+        sed -i 's/hub_name/dataset_name/g' "$file"
+        sed -i 's/HubName/DatasetName/g' "$file"
+        sed -i 's/currentHub/currentDataset/g' "$file"
+        sed -i 's/targetHub/targetDataset/g' "$file"
         
         # String literals and tags
-        sed -i 's/"hub:/"dataspace:/g' "$file"
-        sed -i 's/`hub:/`dataspace:/g' "$file"
-        sed -i 's/"type:hub"/"type:dataspace"/g' "$file"
-        sed -i 's/"hub_name:/"dataspace_name:/g' "$file"
-        sed -i 's/hub\/entities/dataspace\/entities/g' "$file"
+        sed -i 's/"hub:/"dataset:/g' "$file"
+        sed -i 's/`hub:/`dataset:/g' "$file"
+        sed -i 's/"type:hub"/"type:dataset"/g' "$file"
+        sed -i 's/"hub_name:/"dataset_name:/g' "$file"
+        sed -i 's/hub\/entities/dataset\/entities/g' "$file"
         
         # API paths
-        sed -i 's|/hubs/|/dataspaces/|g' "$file"
-        sed -i 's|/hub/|/dataspace/|g' "$file"
+        sed -i 's|/hubs/|/datasets/|g' "$file"
+        sed -i 's|/hub/|/dataset/|g' "$file"
         
         # RBAC permissions
-        sed -i 's/:hub:/:dataspace:/g' "$file"
-        sed -i 's/rbac:perm:hub:/rbac:perm:dataspace:/g' "$file"
+        sed -i 's/:hub:/:dataset:/g' "$file"
+        sed -i 's/rbac:perm:hub:/rbac:perm:dataset:/g' "$file"
         
         # Error messages and logs
-        sed -i 's/Hub not found/Dataspace not found/g' "$file"
-        sed -i 's/hub not found/dataspace not found/g' "$file"
-        sed -i 's/Failed to create hub/Failed to create dataspace/g' "$file"
-        sed -i 's/Invalid hub/Invalid dataspace/g' "$file"
-        sed -i 's/hub entities/dataspace entities/g' "$file"
-        sed -i 's/Hub entities/Dataspace entities/g' "$file"
+        sed -i 's/Hub not found/Dataset not found/g' "$file"
+        sed -i 's/hub not found/dataset not found/g' "$file"
+        sed -i 's/Failed to create hub/Failed to create dataset/g' "$file"
+        sed -i 's/Invalid hub/Invalid dataset/g' "$file"
+        sed -i 's/hub entities/dataset entities/g' "$file"
+        sed -i 's/Hub entities/Dataset entities/g' "$file"
         
         echo "✓ Updated $file"
     fi
@@ -98,16 +98,16 @@ mv docs/applications/worca/WORCHA_HUB_ARCHITECTURE.md docs/applications/worca/WO
 # Update documentation content
 for file in $(find docs -name "*.md" -type f); do
     if [ -f "$file" ]; then
-        sed -i 's/hub:/dataspace:/g' "$file"
-        sed -i 's/Hub/Dataspace/g' "$file"
-        sed -i 's/hub/dataspace/g' "$file"
+        sed -i 's/hub:/dataset:/g' "$file"
+        sed -i 's/Hub/Dataset/g' "$file"
+        sed -i 's/hub/dataset/g' "$file"
         sed -i 's/HUB/DATASPACE/g' "$file"
     fi
 done
 
 # Update README
-sed -i 's|/hubs/|/dataspaces/|g' README.md
-sed -i 's/hub:/dataspace:/g' README.md
+sed -i 's|/hubs/|/datasets/|g' README.md
+sed -i 's/hub:/dataset:/g' README.md
 
 # Step 4: Update frontend files
 echo
@@ -115,14 +115,14 @@ echo "Step 4: Updating frontend files..."
 
 # Update Worca application
 if [ -f "share/htdocs/worca/worca.js" ]; then
-    sed -i 's/transformHubEntities/transformDataspaceEntities/g' share/htdocs/worca/worca.js
-    sed -i 's/hub:/dataspace:/g' share/htdocs/worca/worca.js
+    sed -i 's/transformHubEntities/transformDatasetEntities/g' share/htdocs/worca/worca.js
+    sed -i 's/hub:/dataset:/g' share/htdocs/worca/worca.js
     echo "✓ Updated worca.js"
 fi
 
 if [ -f "share/htdocs/worca/worca-api.js" ]; then
-    sed -i 's/hub:/dataspace:/g' share/htdocs/worca/worca-api.js
-    sed -i 's/hub format/dataspace format/g' share/htdocs/worca/worca-api.js
+    sed -i 's/hub:/dataset:/g' share/htdocs/worca/worca-api.js
+    sed -i 's/hub format/dataset format/g' share/htdocs/worca/worca-api.js
     echo "✓ Updated worca-api.js"
 fi
 

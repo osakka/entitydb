@@ -1705,7 +1705,7 @@ const docTemplate = `{
                 "ENTITYDB_COMPRESSION": {
                     "type": "string"
                 },
-                "ENTITYDB_DATASPACE_DEFAULT": {
+                "ENTITYDB_DATASET_DEFAULT": {
                     "type": "string"
                 },
                 "ENTITYDB_HIGH_PERFORMANCE": {

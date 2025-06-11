@@ -53,7 +53,7 @@ func main() {
 			ID: adminID,
 			Tags: []string{
 				"type:user",
-				"dataspace:_system",
+				"dataset:_system",
 				"identity:username:admin",
 				"identity:uuid:" + adminID,
 				"status:active",
@@ -84,7 +84,7 @@ func main() {
 		ID: credentialID,
 		Tags: []string{
 			"type:credential",
-			"dataspace:_system",
+			"dataset:_system",
 			"algorithm:bcrypt",
 			"user:" + adminID,
 			"salt:" + salt,

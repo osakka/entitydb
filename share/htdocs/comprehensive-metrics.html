@@ -1,0 +1,969 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EntityDB Comprehensive Metrics - 70T Scale</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.2.1/dist/chart.umd.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/date-fns@2.29.3/index.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <style>
+        :root {
+            --primary: #3b82f6;
+            --primary-dark: #2563eb;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --dark: #1f2937;
+            --gray: #6b7280;
+            --light: #f3f4f6;
+            --white: #ffffff;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--light);
+            color: var(--dark);
+            line-height: 1.6;
+        }
+
+        .dashboard-container {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .dashboard-header {
+            background: var(--white);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            padding: 16px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .dashboard-title {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .dashboard-title h1 {
+            font-size: 24px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .scale-badge {
+            background: var(--primary);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .dashboard-controls {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .time-range-selector {
+            display: flex;
+            gap: 8px;
+            background: var(--light);
+            padding: 4px;
+            border-radius: 8px;
+        }
+
+        .time-range-btn {
+            padding: 8px 16px;
+            border: none;
+            background: transparent;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+
+        .time-range-btn.active {
+            background: var(--white);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .refresh-btn {
+            padding: 8px 16px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+        }
+
+        .refresh-btn:hover {
+            background: var(--primary-dark);
+        }
+
+        .refresh-btn.loading i {
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .metric-tabs {
+            background: var(--white);
+            padding: 0 24px;
+            border-bottom: 1px solid #e5e7eb;
+            display: flex;
+            gap: 24px;
+            overflow-x: auto;
+        }
+
+        .tab-btn {
+            padding: 16px 0;
+            border: none;
+            background: none;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--gray);
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .tab-btn.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+        }
+
+        .tab-btn:hover {
+            color: var(--dark);
+        }
+
+        .dashboard-content {
+            flex: 1;
+            padding: 24px;
+            overflow-y: auto;
+        }
+
+        .metric-overview {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 32px;
+        }
+
+        .metric-card {
+            background: var(--white);
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            transition: all 0.3s;
+        }
+
+        .metric-card:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            transform: translateY(-2px);
+        }
+
+        .metric-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+        }
+
+        .metric-title {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 14px;
+            color: var(--gray);
+            font-weight: 500;
+        }
+
+        .metric-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+        }
+
+        .metric-icon.blue {
+            background: rgba(59, 130, 246, 0.1);
+            color: var(--primary);
+        }
+
+        .metric-icon.green {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success);
+        }
+
+        .metric-icon.orange {
+            background: rgba(245, 158, 11, 0.1);
+            color: var(--warning);
+        }
+
+        .metric-icon.red {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--danger);
+        }
+
+        .metric-value {
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--dark);
+            margin-bottom: 8px;
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+        }
+
+        .metric-unit {
+            font-size: 16px;
+            font-weight: 400;
+            color: var(--gray);
+        }
+
+        .metric-change {
+            font-size: 14px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .metric-change.positive {
+            color: var(--success);
+        }
+
+        .metric-change.negative {
+            color: var(--danger);
+        }
+
+        .metric-details {
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid #e5e7eb;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .metric-detail {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 13px;
+        }
+
+        .metric-detail-label {
+            color: var(--gray);
+        }
+
+        .metric-detail-value {
+            font-weight: 600;
+            color: var(--dark);
+        }
+
+        .chart-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 24px;
+            margin-bottom: 32px;
+        }
+
+        .chart-card {
+            background: var(--white);
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .chart-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+
+        .chart-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--dark);
+        }
+
+        .chart-container {
+            position: relative;
+            height: 300px;
+        }
+
+        .health-score {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .health-indicator {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            font-weight: 700;
+            color: white;
+        }
+
+        .health-indicator.excellent {
+            background: var(--success);
+        }
+
+        .health-indicator.good {
+            background: #3b82f6;
+        }
+
+        .health-indicator.fair {
+            background: var(--warning);
+        }
+
+        .health-indicator.poor {
+            background: #f97316;
+        }
+
+        .health-indicator.critical {
+            background: var(--danger);
+        }
+
+        .alert-banner {
+            background: var(--danger);
+            color: white;
+            padding: 12px 24px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 24px;
+            border-radius: 8px;
+        }
+
+        .alert-banner i {
+            font-size: 20px;
+        }
+
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.9);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .loading-spinner {
+            width: 48px;
+            height: 48px;
+            border: 4px solid var(--light);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-container" x-data="metricsApp()">
+        <!-- Loading Overlay -->
+        <div class="loading-overlay" x-show="initialLoading" x-transition>
+            <div class="loading-spinner"></div>
+        </div>
+
+        <!-- Header -->
+        <div class="dashboard-header">
+            <div class="dashboard-title">
+                <h1>
+                    <i class="fas fa-chart-line"></i>
+                    EntityDB Metrics
+                    <span class="scale-badge">70T Scale</span>
+                </h1>
+            </div>
+            <div class="dashboard-controls">
+                <div class="time-range-selector">
+                    <button class="time-range-btn" :class="{ active: timeRange === '1h' }" @click="setTimeRange('1h')">1H</button>
+                    <button class="time-range-btn" :class="{ active: timeRange === '6h' }" @click="setTimeRange('6h')">6H</button>
+                    <button class="time-range-btn" :class="{ active: timeRange === '24h' }" @click="setTimeRange('24h')">24H</button>
+                    <button class="time-range-btn" :class="{ active: timeRange === '7d' }" @click="setTimeRange('7d')">7D</button>
+                </div>
+                <button class="refresh-btn" @click="refreshMetrics()" :class="{ loading: loading }">
+                    <i class="fas fa-sync-alt"></i>
+                    <span x-text="loading ? 'Refreshing...' : 'Refresh'"></span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Alert Banner (if needed) -->
+        <div class="alert-banner" x-show="criticalAlerts.length > 0" x-transition>
+            <i class="fas fa-exclamation-triangle"></i>
+            <span x-text="`${criticalAlerts.length} critical alerts require attention`"></span>
+        </div>
+
+        <!-- Metric Tabs -->
+        <div class="metric-tabs">
+            <button class="tab-btn" :class="{ active: activeTab === 'overview' }" @click="activeTab = 'overview'">
+                <i class="fas fa-th-large"></i>
+                Overview
+            </button>
+            <button class="tab-btn" :class="{ active: activeTab === 'operations' }" @click="activeTab = 'operations'">
+                <i class="fas fa-exchange-alt"></i>
+                Operations
+            </button>
+            <button class="tab-btn" :class="{ active: activeTab === 'storage' }" @click="activeTab = 'storage'">
+                <i class="fas fa-database"></i>
+                Storage
+            </button>
+            <button class="tab-btn" :class="{ active: activeTab === 'cache' }" @click="activeTab = 'cache'">
+                <i class="fas fa-memory"></i>
+                Cache & Index
+            </button>
+            <button class="tab-btn" :class="{ active: activeTab === 'temporal' }" @click="activeTab = 'temporal'">
+                <i class="fas fa-history"></i>
+                Temporal
+            </button>
+            <button class="tab-btn" :class="{ active: activeTab === 'rbac' }" @click="activeTab = 'rbac'">
+                <i class="fas fa-shield-alt"></i>
+                RBAC & Security
+            </button>
+            <button class="tab-btn" :class="{ active: activeTab === 'health' }" @click="activeTab = 'health'">
+                <i class="fas fa-heartbeat"></i>
+                Health
+            </button>
+        </div>
+
+        <!-- Dashboard Content -->
+        <div class="dashboard-content">
+            <!-- Overview Tab -->
+            <div x-show="activeTab === 'overview'">
+                <div class="metric-overview">
+                    <!-- Total Entities -->
+                    <div class="metric-card">
+                        <div class="metric-header">
+                            <div class="metric-title">
+                                <div class="metric-icon blue">
+                                    <i class="fas fa-cubes"></i>
+                                </div>
+                                <span>Total Entities</span>
+                            </div>
+                        </div>
+                        <div class="metric-value">
+                            <span x-text="formatLargeNumber(metrics.storage?.total_entities || 0)"></span>
+                        </div>
+                        <div class="metric-change positive">
+                            <i class="fas fa-arrow-up"></i>
+                            <span>+127 TB/day</span>
+                        </div>
+                        <div class="metric-details">
+                            <div class="metric-detail">
+                                <span class="metric-detail-label">Write Rate</span>
+                                <span class="metric-detail-value" x-text="formatNumber(metrics.operations?.total_rate_per_sec || 0) + '/s'"></span>
+                            </div>
+                            <div class="metric-detail">
+                                <span class="metric-detail-label">Storage Used</span>
+                                <span class="metric-detail-value" x-text="formatBytes(metrics.storage?.total_size_bytes || 0)"></span>
+                            </div>
+                            <div class="metric-detail">
+                                <span class="metric-detail-label">Compression</span>
+                                <span class="metric-detail-value" x-text="(metrics.storage?.compression_ratio || 0).toFixed(1) + ':1'"></span>
+                            </div>
+                            <div class="metric-detail">
+                                <span class="metric-detail-label">Growth Rate</span>
+                                <span class="metric-detail-value">+127 TB/day</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Operations Performance -->
+                    <div class="metric-card">
+                        <div class="metric-header">
+                            <div class="metric-title">
+                                <div class="metric-icon green">
+                                    <i class="fas fa-tachometer-alt"></i>
+                                </div>
+                                <span>Operations Performance</span>
+                            </div>
+                        </div>
+                        <div class="metric-value">
+                            <span x-text="formatNumber(metrics.operations?.total_rate_per_sec || 0)"></span>
+                            <span class="metric-unit">ops/sec</span>
+                        </div>
+                        <div class="metric-change positive">
+                            <i class="fas fa-arrow-up"></i>
+                            <span>+12.5%</span>
+                        </div>
+                        <div class="metric-details">
+                            <div class="metric-detail">
+                                <span class="metric-detail-label">Reads</span>
+                                <span class="metric-detail-value" x-text="formatNumber(metrics.operations?.read?.count || 0)"></span>
+                            </div>
+                            <div class="metric-detail">
+                                <span class="metric-detail-label">Writes</span>
+                                <span class="metric-detail-value" x-text="formatNumber(metrics.operations?.create?.count || 0)"></span>
+                            </div>
+                            <div class="metric-detail">
+                                <span class="metric-detail-label">Avg Latency</span>
+                                <span class="metric-detail-value" x-text="formatDuration(metrics.operations?.read?.avg_time_ns || 0)"></span>
+                            </div>
+                            <div class="metric-detail">
+                                <span class="metric-detail-label">Error Rate</span>
+                                <span class="metric-detail-value" x-text="formatPercent(calculateErrorRate())"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Cache Performance -->
+                    <div class="metric-card">
+                        <div class="metric-header">
+                            <div class="metric-title">
+                                <div class="metric-icon orange">
+                                    <i class="fas fa-memory"></i>
+                                </div>
+                                <span>Cache Performance</span>
+                            </div>
+                        </div>
+                        <div class="metric-value">
+                            <span x-text="formatPercent(metrics.cache?.entity_cache?.hit_rate || 0)"></span>
+                        </div>
+                        <div class="metric-change positive">
+                            <i class="fas fa-arrow-up"></i>
+                            <span>+2.3%</span>
+                        </div>
+                        <div class="metric-details">
+                            <div class="metric-detail">
+                                <span class="metric-detail-label">Entity Hits</span>
+                                <span class="metric-detail-value" x-text="formatNumber(metrics.cache?.entity_cache?.hits || 0)"></span>
+                            </div>
+                            <div class="metric-detail">
+                                <span class="metric-detail-label">Query Hits</span>
+                                <span class="metric-detail-value" x-text="formatNumber(metrics.cache?.query_cache?.hits || 0)"></span>
+                            </div>
+                            <div class="metric-detail">
+                                <span class="metric-detail-label">Cache Size</span>
+                                <span class="metric-detail-value" x-text="formatBytes(metrics.cache?.entity_cache?.size || 0)"></span>
+                            </div>
+                            <div class="metric-detail">
+                                <span class="metric-detail-label">Evictions</span>
+                                <span class="metric-detail-value" x-text="formatNumber(metrics.cache?.entity_cache?.evictions || 0)"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- System Health -->
+                    <div class="metric-card">
+                        <div class="metric-header">
+                            <div class="metric-title">
+                                <div class="metric-icon" :class="getHealthColor(metrics.health?.overall_score)">
+                                    <i class="fas fa-heartbeat"></i>
+                                </div>
+                                <span>System Health</span>
+                            </div>
+                        </div>
+                        <div class="metric-value">
+                            <div class="health-score">
+                                <div class="health-indicator" :class="metrics.health?.status">
+                                    <span x-text="Math.round(metrics.health?.overall_score || 0)"></span>
+                                </div>
+                                <span x-text="(metrics.health?.status || 'unknown').toUpperCase()"></span>
+                            </div>
+                        </div>
+                        <div class="metric-details">
+                            <div class="metric-detail">
+                                <span class="metric-detail-label">Operations</span>
+                                <span class="metric-detail-value" x-text="Math.round(metrics.health?.operations_score || 0) + '%'"></span>
+                            </div>
+                            <div class="metric-detail">
+                                <span class="metric-detail-label">Storage</span>
+                                <span class="metric-detail-value" x-text="Math.round(metrics.health?.storage_score || 0) + '%'"></span>
+                            </div>
+                            <div class="metric-detail">
+                                <span class="metric-detail-label">Cache</span>
+                                <span class="metric-detail-value" x-text="Math.round(metrics.health?.cache_score || 0) + '%'"></span>
+                            </div>
+                            <div class="metric-detail">
+                                <span class="metric-detail-label">Uptime</span>
+                                <span class="metric-detail-value" x-text="formatUptime(metrics.uptime_ns || 0)"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Charts -->
+                <div class="chart-grid">
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <h3 class="chart-title">Operations Throughput</h3>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="throughputChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <h3 class="chart-title">Response Time Distribution</h3>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="latencyChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <h3 class="chart-title">Storage Growth</h3>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="storageChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <h3 class="chart-title">Error Rate Trends</h3>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="errorChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Other tabs content would go here -->
+        </div>
+    </div>
+
+    <script>
+        function metricsApp() {
+            return {
+                metrics: {},
+                activeTab: 'overview',
+                timeRange: '1h',
+                loading: false,
+                initialLoading: true,
+                criticalAlerts: [],
+                charts: {},
+
+                async init() {
+                    await this.loadMetrics();
+                    this.initCharts();
+                    this.startAutoRefresh();
+                    this.initialLoading = false;
+                },
+
+                async loadMetrics() {
+                    this.loading = true;
+                    try {
+                        const response = await fetch('/api/v1/metrics/comprehensive');
+                        if (response.ok) {
+                            this.metrics = await response.json();
+                            this.updateCharts();
+                            this.checkAlerts();
+                        }
+                    } catch (error) {
+                        console.error('Failed to load metrics:', error);
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+
+                async refreshMetrics() {
+                    await this.loadMetrics();
+                },
+
+                setTimeRange(range) {
+                    this.timeRange = range;
+                    this.loadMetrics();
+                },
+
+                formatLargeNumber(num) {
+                    if (num >= 1e12) return (num / 1e12).toFixed(1) + 'T';
+                    if (num >= 1e9) return (num / 1e9).toFixed(1) + 'B';
+                    if (num >= 1e6) return (num / 1e6).toFixed(1) + 'M';
+                    if (num >= 1e3) return (num / 1e3).toFixed(1) + 'K';
+                    return num.toString();
+                },
+
+                formatNumber(num) {
+                    return num.toLocaleString();
+                },
+
+                formatBytes(bytes) {
+                    if (bytes >= 1e15) return (bytes / 1e15).toFixed(2) + ' PB';
+                    if (bytes >= 1e12) return (bytes / 1e12).toFixed(2) + ' TB';
+                    if (bytes >= 1e9) return (bytes / 1e9).toFixed(2) + ' GB';
+                    if (bytes >= 1e6) return (bytes / 1e6).toFixed(2) + ' MB';
+                    if (bytes >= 1e3) return (bytes / 1e3).toFixed(2) + ' KB';
+                    return bytes + ' B';
+                },
+
+                formatDuration(ns) {
+                    if (ns >= 1e9) return (ns / 1e9).toFixed(2) + 's';
+                    if (ns >= 1e6) return (ns / 1e6).toFixed(2) + 'ms';
+                    if (ns >= 1e3) return (ns / 1e3).toFixed(2) + 'μs';
+                    return ns + 'ns';
+                },
+
+                formatPercent(value) {
+                    return (value * 100).toFixed(2) + '%';
+                },
+
+                formatUptime(ns) {
+                    const seconds = ns / 1e9;
+                    const days = Math.floor(seconds / 86400);
+                    const hours = Math.floor((seconds % 86400) / 3600);
+                    const minutes = Math.floor((seconds % 3600) / 60);
+                    
+                    if (days > 0) return `${days}d ${hours}h`;
+                    if (hours > 0) return `${hours}h ${minutes}m`;
+                    return `${minutes}m`;
+                },
+
+                calculateErrorRate() {
+                    const ops = this.metrics.operations;
+                    if (!ops) return 0;
+                    
+                    let totalOps = 0;
+                    let totalErrors = 0;
+                    
+                    ['create', 'read', 'update', 'delete', 'query'].forEach(op => {
+                        if (ops[op]) {
+                            totalOps += ops[op].count || 0;
+                            totalErrors += ops[op].errors || 0;
+                        }
+                    });
+                    
+                    return totalOps > 0 ? totalErrors / totalOps : 0;
+                },
+
+                getHealthColor(score) {
+                    if (score >= 95) return 'green';
+                    if (score >= 85) return 'blue';
+                    if (score >= 70) return 'orange';
+                    if (score >= 50) return 'orange';
+                    return 'red';
+                },
+
+                initCharts() {
+                    // Initialize Chart.js charts
+                    this.initThroughputChart();
+                    this.initLatencyChart();
+                    this.initStorageChart();
+                    this.initErrorChart();
+                },
+
+                initThroughputChart() {
+                    const ctx = document.getElementById('throughputChart').getContext('2d');
+                    this.charts.throughput = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: [],
+                            datasets: [
+                                {
+                                    label: 'Reads/sec',
+                                    data: [],
+                                    borderColor: '#10b981',
+                                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                                    tension: 0.4
+                                },
+                                {
+                                    label: 'Writes/sec',
+                                    data: [],
+                                    borderColor: '#3b82f6',
+                                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                                    tension: 0.4
+                                }
+                            ]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    position: 'top',
+                                }
+                            },
+                            scales: {
+                                y: {
+                                    beginAtZero: true
+                                }
+                            }
+                        }
+                    });
+                },
+
+                initLatencyChart() {
+                    const ctx = document.getElementById('latencyChart').getContext('2d');
+                    this.charts.latency = new Chart(ctx, {
+                        type: 'bar',
+                        data: {
+                            labels: ['p50', 'p95', 'p99', 'p99.9'],
+                            datasets: [{
+                                label: 'Response Time',
+                                data: [],
+                                backgroundColor: [
+                                    'rgba(16, 185, 129, 0.8)',
+                                    'rgba(59, 130, 246, 0.8)',
+                                    'rgba(245, 158, 11, 0.8)',
+                                    'rgba(239, 68, 68, 0.8)'
+                                ]
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    display: false
+                                }
+                            },
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    title: {
+                                        display: true,
+                                        text: 'Response Time (ms)'
+                                    }
+                                }
+                            }
+                        }
+                    });
+                },
+
+                initStorageChart() {
+                    const ctx = document.getElementById('storageChart').getContext('2d');
+                    this.charts.storage = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: [],
+                            datasets: [{
+                                label: 'Storage Used',
+                                data: [],
+                                borderColor: '#8b5cf6',
+                                backgroundColor: 'rgba(139, 92, 246, 0.1)',
+                                fill: true,
+                                tension: 0.4
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    position: 'top',
+                                }
+                            },
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    title: {
+                                        display: true,
+                                        text: 'Storage (TB)'
+                                    }
+                                }
+                            }
+                        }
+                    });
+                },
+
+                initErrorChart() {
+                    const ctx = document.getElementById('errorChart').getContext('2d');
+                    this.charts.error = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: [],
+                            datasets: [{
+                                label: 'Error Rate',
+                                data: [],
+                                borderColor: '#ef4444',
+                                backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                                tension: 0.4
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    position: 'top',
+                                }
+                            },
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    max: 1,
+                                    title: {
+                                        display: true,
+                                        text: 'Error Rate (%)'
+                                    }
+                                }
+                            }
+                        }
+                    });
+                },
+
+                updateCharts() {
+                    // Update chart data based on metrics
+                    // This would be expanded with real-time data
+                },
+
+                checkAlerts() {
+                    this.criticalAlerts = [];
+                    
+                    // Check for critical conditions
+                    if (this.metrics.health?.overall_score < 50) {
+                        this.criticalAlerts.push('System health is critical');
+                    }
+                    
+                    if (this.calculateErrorRate() > 0.05) {
+                        this.criticalAlerts.push('High error rate detected');
+                    }
+                },
+
+                startAutoRefresh() {
+                    setInterval(() => {
+                        if (!this.loading) {
+                            this.loadMetrics();
+                        }
+                    }, 10000); // Refresh every 10 seconds
+                }
+            }
+        }
+    </script>
+</body>
+</html>

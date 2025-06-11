@@ -8,7 +8,7 @@
 2. [Authentication](#authentication)
 3. [Core Entity Operations](#core-entity-operations)
 4. [Temporal Operations](#temporal-operations)
-5. [Dataspace Management](#dataspace-management)
+5. [Dataset Management](#dataset-management)
 6. [Entity Relationships](#entity-relationships)
 7. [User Management](#user-management)
 8. [Configuration & Feature Flags](#configuration--feature-flags)
@@ -410,13 +410,13 @@ Authorization: Bearer <token>
 }
 ```
 
-## Dataspace Management
+## Dataset Management
 
-### List Dataspaces
-List all dataspaces.
+### List Datasets
+List all datasets.
 
 ```http
-GET /api/v1/dataspaces
+GET /api/v1/datasets
 Authorization: Bearer <token>
 ```
 
@@ -425,18 +425,18 @@ Authorization: Bearer <token>
 [
   {
     "id": "default",
-    "name": "Default Dataspace",
-    "description": "Main dataspace",
+    "name": "Default Dataset",
+    "description": "Main dataset",
     "created_at": "2025-01-01T00:00:00Z"
   }
 ]
 ```
 
-### Create Dataspace
-Create a new dataspace.
+### Create Dataset
+Create a new dataset.
 
 ```http
-POST /api/v1/dataspaces
+POST /api/v1/datasets
 Authorization: Bearer <token>
 ```
 
@@ -444,51 +444,51 @@ Authorization: Bearer <token>
 ```json
 {
   "id": "metrics",
-  "name": "Metrics Dataspace",
-  "description": "Dataspace for system metrics"
+  "name": "Metrics Dataset",
+  "description": "Dataset for system metrics"
 }
 ```
 
-### Get Dataspace
-Get details of a specific dataspace.
+### Get Dataset
+Get details of a specific dataset.
 
 ```http
-GET /api/v1/dataspaces/{id}
+GET /api/v1/datasets/{id}
 Authorization: Bearer <token>
 ```
 
-### Update Dataspace
-Update dataspace details.
+### Update Dataset
+Update dataset details.
 
 ```http
-PUT /api/v1/dataspaces/{id}
+PUT /api/v1/datasets/{id}
 Authorization: Bearer <token>
 ```
 
-### Delete Dataspace
-Delete a dataspace.
+### Delete Dataset
+Delete a dataset.
 
 ```http
-DELETE /api/v1/dataspaces/{id}
+DELETE /api/v1/datasets/{id}
 Authorization: Bearer <token>
 ```
 
-### Create Entity in Dataspace
-Create an entity within a specific dataspace.
+### Create Entity in Dataset
+Create an entity within a specific dataset.
 
 ```http
-POST /api/v1/dataspaces/entities/create
+POST /api/v1/datasets/entities/create
 Authorization: Bearer <token>
-X-Dataspace: <dataspace_id>
+X-Dataset: <dataset_id>
 ```
 
-### Query Entities in Dataspace
-Query entities within a specific dataspace.
+### Query Entities in Dataset
+Query entities within a specific dataset.
 
 ```http
-GET /api/v1/dataspaces/entities/query
+GET /api/v1/datasets/entities/query
 Authorization: Bearer <token>
-X-Dataspace: <dataspace_id>
+X-Dataset: <dataset_id>
 ```
 
 ## Entity Relationships

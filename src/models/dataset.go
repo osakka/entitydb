@@ -4,23 +4,23 @@ import (
 	"time"
 )
 
-// Dataspace represents an isolated data universe with its own indexes and rules
-type Dataspace struct {
+// Dataset represents an isolated data universe with its own indexes and rules
+type Dataset struct {
 	Name        string    `json:"name"`
 	Created     time.Time `json:"created"`
 	Description string    `json:"description"`
-	Config      DataspaceConfig `json:"config"`
+	Config      DatasetConfig `json:"config"`
 }
 
-// DataspaceConfig defines the behavior and optimization strategy for a dataspace
-type DataspaceConfig struct {
-	// Index strategy for this dataspace
+// DatasetConfig defines the behavior and optimization strategy for a dataset
+type DatasetConfig struct {
+	// Index strategy for this dataset
 	IndexStrategy IndexStrategyType `json:"index_strategy"`
 	
 	// Whether to keep indexes in memory
 	InMemoryIndexes bool `json:"in_memory_indexes"`
 	
-	// Custom index fields for this dataspace
+	// Custom index fields for this dataset
 	CustomIndexes []string `json:"custom_indexes,omitempty"`
 	
 	// Retention policy (0 = keep forever)
@@ -30,7 +30,7 @@ type DataspaceConfig struct {
 	OptimizeFor OptimizationType `json:"optimize_for"`
 }
 
-// IndexStrategyType defines how data is indexed in a dataspace
+// IndexStrategyType defines how data is indexed in a dataset
 type IndexStrategyType string
 
 const (
@@ -50,8 +50,8 @@ const (
 	OptimizeForConcurrency OptimizationType = "concurrency"  // Optimize for concurrent access
 )
 
-// DataspaceStats provides metrics about a dataspace
-type DataspaceStats struct {
+// DatasetStats provides metrics about a dataset
+type DatasetStats struct {
 	EntityCount   int64     `json:"entity_count"`
 	IndexSize     int64     `json:"index_size_bytes"`
 	DataSize      int64     `json:"data_size_bytes"`
@@ -60,23 +60,23 @@ type DataspaceStats struct {
 	WriteCount    int64     `json:"write_count"`
 }
 
-// DataspaceManager defines the interface for managing dataspaces
-type DataspaceManager interface {
-	// Dataspace lifecycle
-	CreateDataspace(dataspace *Dataspace) error
-	GetDataspace(name string) (*Dataspace, error)
-	ListDataspaces() ([]*Dataspace, error)
-	DeleteDataspace(name string) error
+// DatasetManager defines the interface for managing datasets
+type DatasetManager interface {
+	// Dataset lifecycle
+	CreateDataset(dataset *Dataset) error
+	GetDataset(name string) (*Dataset, error)
+	ListDatasets() ([]*Dataset, error)
+	DeleteDataset(name string) error
 	
-	// Dataspace statistics
-	GetDataspaceStats(name string) (*DataspaceStats, error)
+	// Dataset statistics
+	GetDatasetStats(name string) (*DatasetStats, error)
 	
-	// Check if entity belongs to a dataspace
-	GetEntityDataspace(entityID string) (string, error)
+	// Check if entity belongs to a dataset
+	GetEntityDataset(entityID string) (string, error)
 }
 
-// DataspaceIndex defines the interface for dataspace-specific indexes
-type DataspaceIndex interface {
+// DatasetIndex defines the interface for dataset-specific indexes
+type DatasetIndex interface {
 	// Index operations
 	AddEntity(entity *Entity) error
 	RemoveEntity(entityID string) error
@@ -92,5 +92,5 @@ type DataspaceIndex interface {
 	
 	// Maintenance
 	Optimize() error
-	GetStats() *DataspaceStats
+	GetStats() *DatasetStats
 }

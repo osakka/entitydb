@@ -234,7 +234,7 @@ func (a *MetricsAggregator) aggregateMetric(metricName, unit, aggregation, descr
 		// Create new simple metric entity
 		tags := []string{
 			"type:metric",
-			"dataspace:system",
+			"dataset:system",
 			fmt.Sprintf("name:%s", metricName),
 			fmt.Sprintf("unit:%s", unit),
 			fmt.Sprintf("description:%s", description),

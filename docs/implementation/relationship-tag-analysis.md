@@ -36,9 +36,9 @@ Security relationships:
 - `member_of` - User member of group/role
 - `has_role` - User has role
 - `grants` - Role grants permission
-- `owns` - User owns dataspace
-- `can_access` - User/Role can access dataspace
-- `belongs_to` - Entity belongs to dataspace
+- `owns` - User owns dataset
+- `can_access` - User/Role can access dataset
+- `belongs_to` - Entity belongs to dataset
 
 General relationships:
 - `depends_on`, `blocks`, `parent_of`, `child_of`

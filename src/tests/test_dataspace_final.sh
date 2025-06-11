@@ -1,9 +1,9 @@
 #!/bin/bash
-# Final test for dataspace isolation
+# Final test for dataset isolation
 
 cd "$(dirname "$0")/../.."
 
-echo "=== Dataspace Isolation Final Test ==="
+echo "=== Dataset Isolation Final Test ==="
 echo
 
 # Clean start
@@ -30,7 +30,7 @@ TOKEN=$(curl -s -X POST http://localhost:8085/api/v1/auth/login \
      -H "Content-Type: application/json" \
      -d '{"username":"admin","password":"admin"}' | jq -r '.token')
 
-echo "Creating test entities in different dataspaces..."
+echo "Creating test entities in different datasets..."
 echo
 
 # Create entities
@@ -40,7 +40,7 @@ for i in 1 2 3; do
          -H "Content-Type: application/json" \
          -d "{
            \"id\": \"worca-$i\",
-           \"tags\": [\"dataspace:worca\", \"type:task\", \"priority:p$i\"],
+           \"tags\": [\"dataset:worca\", \"type:task\", \"priority:p$i\"],
            \"content\": \"Worca task $i\"
          }" > /dev/null
     echo -n "W"
@@ -52,7 +52,7 @@ for i in 1 2; do
          -H "Content-Type: application/json" \
          -d "{
            \"id\": \"metrics-$i\",
-           \"tags\": [\"dataspace:metrics\", \"type:metric\", \"name:metric$i\"],
+           \"tags\": [\"dataset:metrics\", \"type:metric\", \"name:metric$i\"],
            \"content\": \"Metric value $i\"
          }" > /dev/null
     echo -n "M"
@@ -74,26 +74,26 @@ echo
 echo
 
 # Test queries
-echo "Testing dataspace isolation..."
+echo "Testing dataset isolation..."
 echo
 
-echo "1. Worca dataspace (should have 3 tasks):"
-WORCA_COUNT=$(curl -s -X GET "http://localhost:8085/api/v1/entities/list?tags=dataspace:worca" \
+echo "1. Worca dataset (should have 3 tasks):"
+WORCA_COUNT=$(curl -s -X GET "http://localhost:8085/api/v1/entities/list?tags=dataset:worca" \
      -H "Authorization: Bearer $TOKEN" | jq -r 'length')
 echo "   Found: $WORCA_COUNT entities"
-curl -s -X GET "http://localhost:8085/api/v1/entities/list?tags=dataspace:worca" \
+curl -s -X GET "http://localhost:8085/api/v1/entities/list?tags=dataset:worca" \
      -H "Authorization: Bearer $TOKEN" | jq -r '.[] | "   - " + .id + " (" + (.tags | join(", ")) + ")"'
 
 echo
-echo "2. Metrics dataspace (should have 2 metrics):"
-METRICS_COUNT=$(curl -s -X GET "http://localhost:8085/api/v1/entities/list?tags=dataspace:metrics" \
+echo "2. Metrics dataset (should have 2 metrics):"
+METRICS_COUNT=$(curl -s -X GET "http://localhost:8085/api/v1/entities/list?tags=dataset:metrics" \
      -H "Authorization: Bearer $TOKEN" | jq -r 'length')
 echo "   Found: $METRICS_COUNT entities"
-curl -s -X GET "http://localhost:8085/api/v1/entities/list?tags=dataspace:metrics" \
+curl -s -X GET "http://localhost:8085/api/v1/entities/list?tags=dataset:metrics" \
      -H "Authorization: Bearer $TOKEN" | jq -r '.[] | "   - " + .id'
 
 echo
-echo "3. Default dataspace query by type:config (should have 2 configs + admin):"
+echo "3. Default dataset query by type:config (should have 2 configs + admin):"
 CONFIG_COUNT=$(curl -s -X GET "http://localhost:8085/api/v1/entities/list?tags=type:config" \
      -H "Authorization: Bearer $TOKEN" | jq -r 'length')
 echo "   Found: $CONFIG_COUNT entities"
@@ -106,21 +106,21 @@ echo "   Found: $TOTAL_COUNT entities"
 
 echo
 echo "5. Cross-filter: worca + type:task (should have 3):"
-CROSS_COUNT=$(curl -s -X GET "http://localhost:8085/api/v1/entities/list?tags=dataspace:worca,type:task&matchAll=true" \
+CROSS_COUNT=$(curl -s -X GET "http://localhost:8085/api/v1/entities/list?tags=dataset:worca,type:task&matchAll=true" \
      -H "Authorization: Bearer $TOKEN" | jq -r 'length')
 echo "   Found: $CROSS_COUNT entities"
 
 echo
-echo "Dataspace files created:"
-ls -la var/test_final/dataspaces/
+echo "Dataset files created:"
+ls -la var/test_final/datasets/
 
 echo
 echo "Test Summary:"
 echo "============"
 if [ "$WORCA_COUNT" -eq 3 ] && [ "$METRICS_COUNT" -eq 2 ]; then
-    echo "✅ PASS: Dataspace isolation is working correctly!"
+    echo "✅ PASS: Dataset isolation is working correctly!"
 else
-    echo "❌ FAIL: Dataspace isolation not working"
+    echo "❌ FAIL: Dataset isolation not working"
     echo "   Expected: worca=3, metrics=2"
     echo "   Actual: worca=$WORCA_COUNT, metrics=$METRICS_COUNT"
 fi

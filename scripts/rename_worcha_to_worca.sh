@@ -8,11 +8,11 @@ echo
 FILES_TO_UPDATE=(
     # Test files
     "src/tests/test_query_debug.sh"
-    "src/tests/test_dataspace_final.sh"
-    "src/tests/debug_dataspace.sh"
-    "src/tests/test_dataspace.sh"
-    "src/tests/test_dataspace_isolation.sh"
-    "src/tests/test_dataspace_performance.sh"
+    "src/tests/test_dataset_final.sh"
+    "src/tests/debug_dataset.sh"
+    "src/tests/test_dataset.sh"
+    "src/tests/test_dataset_isolation.sh"
+    "src/tests/test_dataset_performance.sh"
     
     # Documentation
     "docs/performance/PERFORMANCE_SOLUTIONS_SUMMARY.md"

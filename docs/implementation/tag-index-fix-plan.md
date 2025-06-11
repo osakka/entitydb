@@ -86,7 +86,7 @@ func (h *AdminHandler) ReindexHandler(w http.ResponseWriter, r *http.Request) {
 1. Create entities
 2. Restart EntityDB
 3. Verify all entities are queryable by tags
-4. Test MetDataspace dashboard shows all metrics
+4. Test Metrics dashboard shows all metrics
 5. Test manual reindex endpoint
 
 ## Rollout Strategy

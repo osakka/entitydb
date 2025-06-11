@@ -84,7 +84,7 @@
 - arch-overview.md ✅
 - arch-temporal.md (from temporal_architecture.md)
 - arch-rbac.md (from tag_based_rbac.md)
-- arch-dataspace.md ✅
+- arch-dataset.md ✅
 
 ### API (Final Location: docs/new-structure/api/)
 - api-reference.md ✅ (comprehensive)
@@ -95,7 +95,7 @@
 ### Implementation (Final Location: docs/new-structure/implementation/)
 - impl-autochunking.md ✅
 - impl-temporal.md ✅
-- impl-dataspace.md ✅
+- impl-dataset.md ✅
 - impl-performance.md ✅
 - impl-logging.md (moved to development/)
 

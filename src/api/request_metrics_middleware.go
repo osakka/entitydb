@@ -102,7 +102,7 @@ func normalizePath(path string) string {
 	}{
 		{"/api/v1/entities/", "/api/v1/entities/:id"},
 		{"/api/v1/users/", "/api/v1/users/:id"},
-		{"/api/v1/dataspaces/", "/api/v1/dataspaces/:id"},
+		{"/api/v1/datasets/", "/api/v1/datasets/:id"},
 		{"/api/v1/entity-relationships/", "/api/v1/entity-relationships/:id"},
 	}
 	
@@ -234,7 +234,7 @@ func (m *RequestMetricsMiddleware) storeMetric(name string, value float64, unit 
 		// Create new metric entity
 		tags := []string{
 			"type:metric",
-			"dataspace:system",
+			"dataset:system",
 			"name:" + name,
 			"unit:" + unit,
 			"description:" + description,

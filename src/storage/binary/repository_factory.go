@@ -21,7 +21,7 @@ func (f *RepositoryFactory) CreateRepository(dataPath string) (models.EntityRepo
 	enableTemporal := os.Getenv("ENTITYDB_TEMPORAL") != "false" // Temporal by default
 	enableWALOnly := os.Getenv("ENTITYDB_WAL_ONLY") == "true" // New WAL-only mode
 	enableCache := os.Getenv("ENTITYDB_ENABLE_CACHE") != "false" // Cache by default
-	enableDataspace := os.Getenv("ENTITYDB_ENABLE_DATASPACE") == "true" // Dataspace isolation
+	enableDataset := os.Getenv("ENTITYDB_ENABLE_DATASET") == "true" // Dataset isolation
 	
 	// Determine cache settings
 	cacheTTL := 5 * time.Minute
@@ -33,11 +33,11 @@ func (f *RepositoryFactory) CreateRepository(dataPath string) (models.EntityRepo
 	
 	// Create the base repository based on configuration
 	switch {
-	case enableDataspace:
-		logger.Info("Creating DataspaceRepository with full dataspace isolation")
-		baseRepo, err = NewDataspaceRepository(dataPath)
+	case enableDataset:
+		logger.Info("Creating DatasetRepository with full dataset isolation")
+		baseRepo, err = NewDatasetRepository(dataPath)
 		if err != nil {
-			logger.Error("Failed to create dataspace repository: %v", err)
+			logger.Error("Failed to create dataset repository: %v", err)
 			return nil, err
 		}
 		

@@ -73,7 +73,7 @@ func (m *MetricsTypeManager) RecordCounter(name string, value float64, labels ma
 		tags := []string{
 			"type:metric",
 			"metric:type:counter",
-			"dataspace:system",
+			"dataset:system",
 			fmt.Sprintf("name:%s", name),
 			fmt.Sprintf("description:%s", help),
 			"unit:count",
@@ -120,7 +120,7 @@ func (m *MetricsTypeManager) RecordGauge(name string, value float64, labels map[
 		tags := []string{
 			"type:metric",
 			"metric:type:gauge",
-			"dataspace:system",
+			"dataset:system",
 			fmt.Sprintf("name:%s", name),
 			fmt.Sprintf("description:%s", help),
 			"unit:value",
@@ -163,7 +163,7 @@ func (m *MetricsTypeManager) RecordHistogram(name string, value float64, labels 
 		tags := []string{
 			"type:metric",
 			"metric:type:histogram",
-			"dataspace:system",
+			"dataset:system",
 			fmt.Sprintf("name:%s", name),
 			fmt.Sprintf("description:%s", help),
 			"unit:value",

@@ -4,9 +4,9 @@
 When EntityDB restarts, the tag index is not persisted or rebuilt, causing queries that depend on tags to return empty results even though the entities exist.
 
 ## Symptoms
-- After restart, dataspace queries return 0 entities
+- After restart, dataset queries return 0 entities
 - Direct tag queries work for newly created entities but not for entities created before restart
-- MetDataspace dashboard shows blank panels because metrics queries return no data
+- MetDataset dashboard shows blank panels because metrics queries return no data
 
 ## Root Cause
 The `tagIndex` map in `EntityRepository` is built in memory as entities are created but:
@@ -16,8 +16,8 @@ The `tagIndex` map in `EntityRepository` is built in memory as entities are crea
 
 ## Debug Evidence
 ```
-2025/05/24 10:36:01.199666 [EntityDB] DEBUG: [ListByTags] ListByTags: Looking for tag 'dataspace:metrics' in index
-2025/05/24 10:36:01.199707 [EntityDB] DEBUG: [ListByTags] ListByTags: Tag 'dataspace:metrics' not found in index
+2025/05/24 10:36:01.199666 [EntityDB] DEBUG: [ListByTags] ListByTags: Looking for tag 'dataset:metrics' in index
+2025/05/24 10:36:01.199707 [EntityDB] DEBUG: [ListByTags] ListByTags: Tag 'dataset:metrics' not found in index
 ```
 
 ## Workaround
@@ -31,7 +31,7 @@ The EntityRepository needs to:
 
 ## Impact
 This affects all tag-based queries including:
-- Dataspace queries
+- Dataset queries
 - RBAC permission checks
 - Entity relationship queries
 - Any query using ListByTags

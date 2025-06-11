@@ -10,165 +10,165 @@ import (
 	"os"
 )
 
-// DataspaceRepository implements per-dataspace index isolation
-type DataspaceRepository struct {
+// DatasetRepository implements per-dataset index isolation
+type DatasetRepository struct {
 	*EntityRepository // Embed base repository for entity storage
 	
-	// Dataspace-specific indexes
-	dataspaceIndexes map[string]*DataspaceIndexImpl
-	dataspaceConfigs map[string]*models.Dataspace
+	// Dataset-specific indexes
+	datasetIndexes map[string]*DatasetIndexImpl
+	datasetConfigs map[string]*models.Dataset
 	dsLock          sync.RWMutex
 	
-	// Dataspace index directory
+	// Dataset index directory
 	indexPath string
 }
 
-// DataspaceIndexImpl implements the DataspaceIndex interface
-type DataspaceIndexImpl struct {
+// DatasetIndexImpl implements the DatasetIndex interface
+type DatasetIndexImpl struct {
 	name      string
 	indexPath string
 	
 	// In-memory indexes
-	entities  map[string]bool           // Entity IDs in this dataspace
+	entities  map[string]bool           // Entity IDs in this dataset
 	tagIndex  map[string][]string       // tag -> entity IDs
 	
 	// Statistics
-	stats     models.DataspaceStats
+	stats     models.DatasetStats
 	
 	// Synchronization
 	mu        sync.RWMutex
 }
 
-// NewDataspaceRepository creates a repository with dataspace isolation
-func NewDataspaceRepository(dataPath string) (*DataspaceRepository, error) {
+// NewDatasetRepository creates a repository with dataset isolation
+func NewDatasetRepository(dataPath string) (*DatasetRepository, error) {
 	baseRepo, err := NewEntityRepository(dataPath)
 	if err != nil {
 		return nil, err
 	}
 	
-	indexPath := filepath.Join(dataPath, "dataspaces")
+	indexPath := filepath.Join(dataPath, "datasets")
 	if err := os.MkdirAll(indexPath, 0755); err != nil {
-		return nil, fmt.Errorf("failed to create dataspace index directory: %w", err)
+		return nil, fmt.Errorf("failed to create dataset index directory: %w", err)
 	}
 	
-	repo := &DataspaceRepository{
+	repo := &DatasetRepository{
 		EntityRepository:  baseRepo,
-		dataspaceIndexes: make(map[string]*DataspaceIndexImpl),
-		dataspaceConfigs: make(map[string]*models.Dataspace),
+		datasetIndexes: make(map[string]*DatasetIndexImpl),
+		datasetConfigs: make(map[string]*models.Dataset),
 		indexPath:        indexPath,
 	}
 	
-	// Load existing dataspace indexes
-	if err := repo.loadDataspaceIndexes(); err != nil {
-		logger.Error("Failed to load dataspace indexes: %v", err)
+	// Load existing dataset indexes
+	if err := repo.loadDatasetIndexes(); err != nil {
+		logger.Error("Failed to load dataset indexes: %v", err)
 	}
 	
-	// Rebuild dataspace indexes from existing entities
-	if err := repo.rebuildDataspaceIndexes(); err != nil {
-		logger.Error("Failed to rebuild dataspace indexes: %v", err)
+	// Rebuild dataset indexes from existing entities
+	if err := repo.rebuildDatasetIndexes(); err != nil {
+		logger.Error("Failed to rebuild dataset indexes: %v", err)
 	}
 	
-	// Create default dataspace if none exists
-	if _, exists := repo.dataspaceIndexes["default"]; !exists {
-		defaultDs := &models.Dataspace{
+	// Create default dataset if none exists
+	if _, exists := repo.datasetIndexes["default"]; !exists {
+		defaultDs := &models.Dataset{
 			Name: "default",
-			Config: models.DataspaceConfig{
+			Config: models.DatasetConfig{
 				IndexStrategy: models.IndexStrategyBTree,
 				OptimizeFor:   models.OptimizeForReads,
 			},
 		}
-		if err := repo.CreateDataspace(defaultDs); err != nil {
-			logger.Error("Failed to create default dataspace: %v", err)
+		if err := repo.CreateDataset(defaultDs); err != nil {
+			logger.Error("Failed to create default dataset: %v", err)
 		}
 	}
 	
 	return repo, nil
 }
 
-// CreateDataspace creates a new dataspace with its own index
-func (r *DataspaceRepository) CreateDataspace(dataspace *models.Dataspace) error {
+// CreateDataset creates a new dataset with its own index
+func (r *DatasetRepository) CreateDataset(dataset *models.Dataset) error {
 	r.dsLock.Lock()
 	defer r.dsLock.Unlock()
 	
-	if _, exists := r.dataspaceIndexes[dataspace.Name]; exists {
-		return fmt.Errorf("dataspace %s already exists", dataspace.Name)
+	if _, exists := r.datasetIndexes[dataset.Name]; exists {
+		return fmt.Errorf("dataset %s already exists", dataset.Name)
 	}
 	
-	// Create dataspace index (use .ebf extension so SaveTagIndexV2 creates .idx)
-	dsIndex := &DataspaceIndexImpl{
-		name:      dataspace.Name,
-		indexPath: filepath.Join(r.indexPath, dataspace.Name+".ebf"),
+	// Create dataset index (use .ebf extension so SaveTagIndexV2 creates .idx)
+	dsIndex := &DatasetIndexImpl{
+		name:      dataset.Name,
+		indexPath: filepath.Join(r.indexPath, dataset.Name+".ebf"),
 		entities:  make(map[string]bool),
 		tagIndex:  make(map[string][]string),
 	}
 	
-	r.dataspaceIndexes[dataspace.Name] = dsIndex
-	r.dataspaceConfigs[dataspace.Name] = dataspace
+	r.datasetIndexes[dataset.Name] = dsIndex
+	r.datasetConfigs[dataset.Name] = dataset
 	
 	// Save index to disk
 	if err := dsIndex.SaveToFile(dsIndex.indexPath); err != nil {
-		return fmt.Errorf("failed to save dataspace index: %w", err)
+		return fmt.Errorf("failed to save dataset index: %w", err)
 	}
 	
-	logger.Info("Created dataspace: %s", dataspace.Name)
+	logger.Info("Created dataset: %s", dataset.Name)
 	return nil
 }
 
-// Create entity in a specific dataspace
-func (r *DataspaceRepository) Create(entity *models.Entity) error {
-	// Extract dataspace from tags
-	dataspaceName := r.extractDataspace(entity)
-	logger.Debug("Creating entity %s in dataspace: %s", entity.ID, dataspaceName)
+// Create entity in a specific dataset
+func (r *DatasetRepository) Create(entity *models.Entity) error {
+	// Extract dataset from tags
+	datasetName := r.extractDataset(entity)
+	logger.Debug("Creating entity %s in dataset: %s", entity.ID, datasetName)
 	
 	// Create in base repository
 	if err := r.EntityRepository.Create(entity); err != nil {
 		return err
 	}
 	
-	// Add to dataspace index
+	// Add to dataset index
 	r.dsLock.RLock()
-	dsIndex, exists := r.dataspaceIndexes[dataspaceName]
+	dsIndex, exists := r.datasetIndexes[datasetName]
 	r.dsLock.RUnlock()
 	
-	if !exists && dataspaceName != "default" {
-		// Create dataspace if it doesn't exist
-		logger.Info("Creating dataspace '%s' on demand", dataspaceName)
-		newDataspace := &models.Dataspace{
-			Name: dataspaceName,
-			Config: models.DataspaceConfig{
+	if !exists && datasetName != "default" {
+		// Create dataset if it doesn't exist
+		logger.Info("Creating dataset '%s' on demand", datasetName)
+		newDataset := &models.Dataset{
+			Name: datasetName,
+			Config: models.DatasetConfig{
 				IndexStrategy: models.IndexStrategyBTree,
 				OptimizeFor:   models.OptimizeForReads,
 			},
 		}
-		if err := r.CreateDataspace(newDataspace); err != nil {
-			logger.Error("Failed to create dataspace: %v", err)
+		if err := r.CreateDataset(newDataset); err != nil {
+			logger.Error("Failed to create dataset: %v", err)
 		} else {
 			// Get the newly created index
 			r.dsLock.RLock()
-			dsIndex, exists = r.dataspaceIndexes[dataspaceName]
+			dsIndex, exists = r.datasetIndexes[datasetName]
 			r.dsLock.RUnlock()
 		}
 	}
 	
 	if exists {
 		if err := dsIndex.AddEntity(entity); err != nil {
-			logger.Error("Failed to add entity to dataspace index: %v", err)
+			logger.Error("Failed to add entity to dataset index: %v", err)
 		} else {
 			// Save index after adding entity
 			if err := dsIndex.SaveToFile(dsIndex.indexPath); err != nil {
-				logger.Error("Failed to save dataspace index: %v", err)
+				logger.Error("Failed to save dataset index: %v", err)
 			}
 		}
-		logger.Debug("Added entity %s to dataspace '%s' index", entity.ID, dataspaceName)
+		logger.Debug("Added entity %s to dataset '%s' index", entity.ID, datasetName)
 	}
 	
 	return nil
 }
 
-// ListByTags with dataspace awareness
-func (r *DataspaceRepository) ListByTags(tags []string, matchAll bool) ([]*models.Entity, error) {
-	// Check if query is dataspace-specific
-	dataspaceName := ""
+// ListByTags with dataset awareness
+func (r *DatasetRepository) ListByTags(tags []string, matchAll bool) ([]*models.Entity, error) {
+	// Check if query is dataset-specific
+	datasetName := ""
 	filteredTags := []string{}
 	
 	for _, tag := range tags {
@@ -178,23 +178,23 @@ func (r *DataspaceRepository) ListByTags(tags []string, matchAll bool) ([]*model
 			actualTag = parts[1]
 		}
 		
-		if strings.HasPrefix(actualTag, "dataspace:") || strings.HasPrefix(actualTag, "dataspace:") {
-			dataspaceName = strings.TrimPrefix(strings.TrimPrefix(actualTag, "dataspace:"), "dataspace:")
+		if strings.HasPrefix(actualTag, "dataset:") || strings.HasPrefix(actualTag, "dataset:") {
+			datasetName = strings.TrimPrefix(strings.TrimPrefix(actualTag, "dataset:"), "dataset:")
 		} else {
 			filteredTags = append(filteredTags, actualTag)
 		}
 	}
 	
-	// If dataspace-specific, use dataspace index
-	if dataspaceName != "" {
-		logger.Debug("Dataspace query for '%s' with tags: %v", dataspaceName, filteredTags)
+	// If dataset-specific, use dataset index
+	if datasetName != "" {
+		logger.Debug("Dataset query for '%s' with tags: %v", datasetName, filteredTags)
 		
 		r.dsLock.RLock()
-		dsIndex, exists := r.dataspaceIndexes[dataspaceName]
+		dsIndex, exists := r.datasetIndexes[datasetName]
 		r.dsLock.RUnlock()
 		
 		if !exists {
-			logger.Debug("Dataspace '%s' not found", dataspaceName)
+			logger.Debug("Dataset '%s' not found", datasetName)
 			return []*models.Entity{}, nil
 		}
 		
@@ -203,7 +203,7 @@ func (r *DataspaceRepository) ListByTags(tags []string, matchAll bool) ([]*model
 			return nil, err
 		}
 		
-		logger.Debug("Found %d entities in dataspace '%s'", len(entityIDs), dataspaceName)
+		logger.Debug("Found %d entities in dataset '%s'", len(entityIDs), datasetName)
 		
 		// Fetch entities using embedded repository's GetByID method
 		entities := make([]*models.Entity, 0, len(entityIDs))
@@ -211,7 +211,7 @@ func (r *DataspaceRepository) ListByTags(tags []string, matchAll bool) ([]*model
 			// Use the proper GetByID method instead of direct map access
 			entity, err := r.EntityRepository.GetByID(id)
 			if err != nil {
-				logger.Trace("Entity %s not found in dataspace '%s': %v", id, dataspaceName, err)
+				logger.Trace("Entity %s not found in dataset '%s': %v", id, datasetName, err)
 				continue
 			}
 			if entity != nil {
@@ -219,7 +219,7 @@ func (r *DataspaceRepository) ListByTags(tags []string, matchAll bool) ([]*model
 			}
 		}
 		
-		logger.Debug("Retrieved %d entities from dataspace '%s'", len(entities), dataspaceName)
+		logger.Debug("Retrieved %d entities from dataset '%s'", len(entities), datasetName)
 		return entities, nil
 	}
 	
@@ -232,7 +232,7 @@ func (r *DataspaceRepository) ListByTags(tags []string, matchAll bool) ([]*model
 			actualTag = parts[1]
 		}
 		
-		// System entities queries (users, permissions, etc.) should query _system dataspace
+		// System entities queries (users, permissions, etc.) should query _system dataset
 		if strings.HasPrefix(actualTag, "identity:username:") || 
 		   strings.HasPrefix(actualTag, "type:user") ||
 		   strings.HasPrefix(actualTag, "type:permission") ||
@@ -240,15 +240,15 @@ func (r *DataspaceRepository) ListByTags(tags []string, matchAll bool) ([]*model
 		   strings.HasPrefix(actualTag, "type:group") ||
 		   strings.HasPrefix(actualTag, "type:session") ||
 		   strings.HasPrefix(actualTag, "token:") {
-			logger.Debug("System query detected, using _system dataspace for: %s", actualTag)
-			dataspaceName = "_system"
+			logger.Debug("System query detected, using _system dataset for: %s", actualTag)
+			datasetName = "_system"
 			
 			r.dsLock.RLock()
-			dsIndex, exists := r.dataspaceIndexes[dataspaceName]
+			dsIndex, exists := r.datasetIndexes[datasetName]
 			r.dsLock.RUnlock()
 			
 			if !exists {
-				logger.Debug("System dataspace not found")
+				logger.Debug("System dataset not found")
 				return []*models.Entity{}, nil
 			}
 			
@@ -273,13 +273,13 @@ func (r *DataspaceRepository) ListByTags(tags []string, matchAll bool) ([]*model
 		}
 	}
 	
-	// No fallback to global search - enforce dataspace isolation
-	logger.Trace("No dataspace tag found in query, returning empty result for isolation")
+	// No fallback to global search - enforce dataset isolation
+	logger.Trace("No dataset tag found in query, returning empty result for isolation")
 	return []*models.Entity{}, nil
 }
 
-// extractDataspace determines which dataspace an entity belongs to
-func (r *DataspaceRepository) extractDataspace(entity *models.Entity) string {
+// extractDataset determines which dataset an entity belongs to
+func (r *DatasetRepository) extractDataset(entity *models.Entity) string {
 	for _, tag := range entity.Tags {
 		// Handle temporal tags (TIMESTAMP|tag format)
 		actualTag := tag
@@ -287,15 +287,15 @@ func (r *DataspaceRepository) extractDataspace(entity *models.Entity) string {
 			actualTag = parts[1]
 		}
 		
-		if strings.HasPrefix(actualTag, "dataspace:") {
-			return strings.TrimPrefix(actualTag, "dataspace:")
+		if strings.HasPrefix(actualTag, "dataset:") {
+			return strings.TrimPrefix(actualTag, "dataset:")
 		}
 	}
 	return "default"
 }
 
-// loadDataspaceIndexes loads all dataspace indexes from disk
-func (r *DataspaceRepository) loadDataspaceIndexes() error {
+// loadDatasetIndexes loads all dataset indexes from disk
+func (r *DatasetRepository) loadDatasetIndexes() error {
 	entries, err := os.ReadDir(r.indexPath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -310,7 +310,7 @@ func (r *DataspaceRepository) loadDataspaceIndexes() error {
 			// Use .ebf extension for consistency with SaveTagIndexV2
 			indexPath := filepath.Join(r.indexPath, name+".ebf")
 			
-			dsIndex := &DataspaceIndexImpl{
+			dsIndex := &DatasetIndexImpl{
 				name:      name,
 				indexPath: indexPath,
 				entities:  make(map[string]bool),
@@ -318,22 +318,22 @@ func (r *DataspaceRepository) loadDataspaceIndexes() error {
 			}
 			
 			if err := dsIndex.LoadFromFile(indexPath); err != nil {
-				logger.Error("Failed to load dataspace index %s: %v", name, err)
+				logger.Error("Failed to load dataset index %s: %v", name, err)
 				continue
 			}
 			
-			r.dataspaceIndexes[name] = dsIndex
-			logger.Info("Loaded dataspace index: %s", name)
+			r.datasetIndexes[name] = dsIndex
+			logger.Info("Loaded dataset index: %s", name)
 		}
 	}
 	
 	return nil
 }
 
-// DataspaceIndex Implementation
+// DatasetIndex Implementation
 
-// AddEntity adds an entity to the dataspace index
-func (d *DataspaceIndexImpl) AddEntity(entity *models.Entity) error {
+// AddEntity adds an entity to the dataset index
+func (d *DatasetIndexImpl) AddEntity(entity *models.Entity) error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	
@@ -347,8 +347,8 @@ func (d *DataspaceIndexImpl) AddEntity(entity *models.Entity) error {
 			actualTag = parts[1]
 		}
 		
-		// Skip dataspace tags
-		if strings.HasPrefix(actualTag, "dataspace:") {
+		// Skip dataset tags
+		if strings.HasPrefix(actualTag, "dataset:") {
 			continue
 		}
 		
@@ -374,13 +374,13 @@ func (d *DataspaceIndexImpl) AddEntity(entity *models.Entity) error {
 	return nil
 }
 
-// QueryByTags queries entities by tags within the dataspace
-func (d *DataspaceIndexImpl) QueryByTags(tags []string, matchAll bool) ([]string, error) {
+// QueryByTags queries entities by tags within the dataset
+func (d *DatasetIndexImpl) QueryByTags(tags []string, matchAll bool) ([]string, error) {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 	
 	if len(tags) == 0 {
-		// Return all entities in dataspace
+		// Return all entities in dataset
 		result := make([]string, 0, len(d.entities))
 		for id := range d.entities {
 			result = append(result, id)
@@ -414,15 +414,15 @@ func (d *DataspaceIndexImpl) QueryByTags(tags []string, matchAll bool) ([]string
 	return result, nil
 }
 
-// SaveToFile persists the dataspace index
-func (d *DataspaceIndexImpl) SaveToFile(filepath string) error {
+// SaveToFile persists the dataset index
+func (d *DatasetIndexImpl) SaveToFile(filepath string) error {
 	// For now, use the same format as tag index persistence
-	// TODO: Implement custom binary format for dataspace indexes
+	// TODO: Implement custom binary format for dataset indexes
 	return SaveTagIndexV2(filepath, d.tagIndex)
 }
 
-// LoadFromFile loads the dataspace index
-func (d *DataspaceIndexImpl) LoadFromFile(filepath string) error {
+// LoadFromFile loads the dataset index
+func (d *DatasetIndexImpl) LoadFromFile(filepath string) error {
 	// For now, use the same format as tag index persistence
 	tagIndex, err := LoadTagIndexV2(filepath)
 	if err != nil {
@@ -443,9 +443,9 @@ func (d *DataspaceIndexImpl) LoadFromFile(filepath string) error {
 	return nil
 }
 
-// rebuildDataspaceIndexes rebuilds dataspace indexes from existing entities
-func (r *DataspaceRepository) rebuildDataspaceIndexes() error {
-	logger.Info("Rebuilding dataspace indexes from existing entities...")
+// rebuildDatasetIndexes rebuilds dataset indexes from existing entities
+func (r *DatasetRepository) rebuildDatasetIndexes() error {
+	logger.Info("Rebuilding dataset indexes from existing entities...")
 	
 	// Get all entities from the base repository
 	allEntities, err := r.EntityRepository.List()
@@ -455,52 +455,52 @@ func (r *DataspaceRepository) rebuildDataspaceIndexes() error {
 	
 	logger.Info("Found %d entities to index", len(allEntities))
 	
-	// Index each entity into its dataspace
+	// Index each entity into its dataset
 	for _, entity := range allEntities {
-		dataspaceName := r.extractDataspace(entity)
+		datasetName := r.extractDataset(entity)
 		
-		// Ensure dataspace index exists
+		// Ensure dataset index exists
 		r.dsLock.RLock()
-		dsIndex, exists := r.dataspaceIndexes[dataspaceName]
+		dsIndex, exists := r.datasetIndexes[datasetName]
 		r.dsLock.RUnlock()
 		
 		if !exists {
-			// Create dataspace on demand
-			logger.Info("Creating dataspace '%s' during rebuild", dataspaceName)
-			newDataspace := &models.Dataspace{
-				Name: dataspaceName,
-				Config: models.DataspaceConfig{
+			// Create dataset on demand
+			logger.Info("Creating dataset '%s' during rebuild", datasetName)
+			newDataset := &models.Dataset{
+				Name: datasetName,
+				Config: models.DatasetConfig{
 					IndexStrategy: models.IndexStrategyBTree,
 					OptimizeFor:   models.OptimizeForReads,
 				},
 			}
-			if err := r.CreateDataspace(newDataspace); err != nil {
-				logger.Error("Failed to create dataspace during rebuild: %v", err)
+			if err := r.CreateDataset(newDataset); err != nil {
+				logger.Error("Failed to create dataset during rebuild: %v", err)
 				continue
 			}
 			
 			// Get the newly created index
 			r.dsLock.RLock()
-			dsIndex, exists = r.dataspaceIndexes[dataspaceName]
+			dsIndex, exists = r.datasetIndexes[datasetName]
 			r.dsLock.RUnlock()
 		}
 		
 		if exists {
 			if err := dsIndex.AddEntity(entity); err != nil {
-				logger.Error("Failed to add entity %s to dataspace %s: %v", entity.ID, dataspaceName, err)
+				logger.Error("Failed to add entity %s to dataset %s: %v", entity.ID, datasetName, err)
 			}
 		}
 	}
 	
-	// Save all dataspace indexes
+	// Save all dataset indexes
 	r.dsLock.RLock()
 	defer r.dsLock.RUnlock()
 	
-	for name, dsIndex := range r.dataspaceIndexes {
+	for name, dsIndex := range r.datasetIndexes {
 		if err := dsIndex.SaveToFile(dsIndex.indexPath); err != nil {
-			logger.Error("Failed to save dataspace index %s: %v", name, err)
+			logger.Error("Failed to save dataset index %s: %v", name, err)
 		} else {
-			logger.Info("Saved dataspace index %s with %d entities", name, len(dsIndex.entities))
+			logger.Info("Saved dataset index %s with %d entities", name, len(dsIndex.entities))
 		}
 	}
 	

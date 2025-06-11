@@ -180,7 +180,7 @@ type EnvironmentVariables struct {
 	
 	// Instance Settings
 	InstanceID         string `json:"ENTITYDB_INSTANCE_ID"`
-	DataspaceDefault   string `json:"ENTITYDB_DATASPACE_DEFAULT"`
+	DatasetDefault   string `json:"ENTITYDB_DATASET_DEFAULT"`
 	AutoBackup         string `json:"ENTITYDB_AUTO_BACKUP"`
 	BackupInterval     string `json:"ENTITYDB_BACKUP_INTERVAL"`
 }
@@ -338,7 +338,7 @@ func (h *SystemMetricsHandler) collectEnvironmentVariables() EnvironmentVariable
 		
 		// Instance Settings - REAL VALUES
 		InstanceID:       "NOT_SET", // No instance ID is actually configured
-		DataspaceDefault: "default", // Default dataspace exists
+		DatasetDefault: "default", // Default dataset exists
 		AutoBackup:       "false",   // No auto backup configured
 		BackupInterval:   "NOT_SET", // No backup interval set
 	}

@@ -177,7 +177,7 @@ func (q *QueryMetricsCollector) storeMetric(name string, value float64, unit str
 		// Create new metric entity
 		tags := []string{
 			"type:metric",
-			"dataspace:system",
+			"dataset:system",
 			"name:" + name,
 			"unit:" + unit,
 			"description:" + description,

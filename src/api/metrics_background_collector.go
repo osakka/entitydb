@@ -157,7 +157,7 @@ func (b *BackgroundMetricsCollector) collectDatabaseMetrics() {
 // collectEntityMetrics collects entity-specific metrics
 func (b *BackgroundMetricsCollector) collectEntityMetrics() {
 	// Count entities by type
-	entityTypes := []string{"user", "metric", "issue", "workspace", "relationship", "dataspace"}
+	entityTypes := []string{"user", "metric", "issue", "workspace", "relationship", "dataset"}
 	
 	for _, entityType := range entityTypes {
 		entities, err := b.repo.ListByTag(fmt.Sprintf("type:%s", entityType))
@@ -240,7 +240,7 @@ func (b *BackgroundMetricsCollector) storeMetric(name string, value float64, uni
 			ID: metricID,
 			Tags: []string{
 				"type:metric",
-				"dataspace:system", // All system entities in system dataspace
+				"dataset:system", // All system entities in system dataset
 				fmt.Sprintf("name:%s", name),
 				fmt.Sprintf("unit:%s", unit),
 				fmt.Sprintf("description:%s", description),

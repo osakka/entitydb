@@ -9,47 +9,47 @@ import (
 	"time"
 )
 
-// DataspaceManagementHandler handles hub management operations
-type DataspaceManagementHandler struct {
+// DatasetManagementHandler handles hub management operations
+type DatasetManagementHandler struct {
 	repo models.EntityRepository
 }
 
-// NewDataspaceManagementHandler creates a new hub management handler
-func NewDataspaceManagementHandler(repo models.EntityRepository) *DataspaceManagementHandler {
-	return &DataspaceManagementHandler{
+// NewDatasetManagementHandler creates a new hub management handler
+func NewDatasetManagementHandler(repo models.EntityRepository) *DatasetManagementHandler {
+	return &DatasetManagementHandler{
 		repo: repo,
 	}
 }
 
-// CreateDataspaceRequest represents a request to create a new hub
-type CreateDataspaceRequest struct {
+// CreateDatasetRequest represents a request to create a new hub
+type CreateDatasetRequest struct {
 	Name        string `json:"name"`        // Hub name (required)
 	Description string `json:"description"` // Hub description
 	AdminUser   string `json:"admin_user"`  // Initial admin user ID (optional)
 }
 
-// CreateDataspaceResponse represents the response from creating a hub
-type CreateDataspaceResponse struct {
-	Hub     DataspaceInfo `json:"hub"`
+// CreateDatasetResponse represents the response from creating a hub
+type CreateDatasetResponse struct {
+	Hub     DatasetInfo `json:"hub"`
 	Message string  `json:"message"`
 }
 
-// DataspaceInfo represents hub information
-type DataspaceInfo struct {
+// DatasetInfo represents hub information
+type DatasetInfo struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
 	CreatedAt   string `json:"created_at"`
 	AdminUser   string `json:"admin_user,omitempty"`
 }
 
-// ListDataspacesResponse represents the response from listing hubs
-type ListDataspacesResponse struct {
-	Hubs  []DataspaceInfo `json:"hubs"`
+// ListDatasetsResponse represents the response from listing hubs
+type ListDatasetsResponse struct {
+	Hubs  []DatasetInfo `json:"hubs"`
 	Total int       `json:"total"`
 }
 
-// CreateDataspace handles creating a new hub
-func (h *DataspaceManagementHandler) CreateDataspace(w http.ResponseWriter, r *http.Request) {
+// CreateDataset handles creating a new hub
+func (h *DatasetManagementHandler) CreateDataset(w http.ResponseWriter, r *http.Request) {
 	// Get RBAC context
 	rbacCtx, hasRBAC := GetRBACContext(r)
 	if !hasRBAC {
@@ -64,7 +64,7 @@ func (h *DataspaceManagementHandler) CreateDataspace(w http.ResponseWriter, r *h
 	}
 
 	// Parse request
-	var req CreateDataspaceRequest
+	var req CreateDatasetRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		RespondError(w, http.StatusBadRequest, "Invalid request body")
 		return
@@ -77,7 +77,7 @@ func (h *DataspaceManagementHandler) CreateDataspace(w http.ResponseWriter, r *h
 	}
 
 	// Check if hub already exists
-	existingHubs, err := h.repo.ListByTags([]string{FormatDataspaceTag(req.Name)}, true)
+	existingHubs, err := h.repo.ListByTags([]string{FormatDatasetTag(req.Name)}, true)
 	if err != nil {
 		logger.Error("Failed to check existing hubs: %v", err)
 		RespondError(w, http.StatusInternalServerError, "Failed to check existing hubs")
@@ -97,9 +97,9 @@ func (h *DataspaceManagementHandler) CreateDataspace(w http.ResponseWriter, r *h
 	}
 
 	// Add hub metadata tags
-	hubEntity.AddTag(fmt.Sprintf("type:dataspace"))
-	hubEntity.AddTag(FormatDataspaceTag(req.Name))
-	hubEntity.AddTag(fmt.Sprintf("dataspace_name:%s", req.Name))
+	hubEntity.AddTag(fmt.Sprintf("type:dataset"))
+	hubEntity.AddTag(FormatDatasetTag(req.Name))
+	hubEntity.AddTag(fmt.Sprintf("dataset_name:%s", req.Name))
 	if req.Description != "" {
 		hubEntity.AddTag(fmt.Sprintf("description:%s", req.Description))
 	}
@@ -120,8 +120,8 @@ func (h *DataspaceManagementHandler) CreateDataspace(w http.ResponseWriter, r *h
 	// Save hub entity
 	err = h.repo.Create(hubEntity)
 	if err != nil {
-		logger.Error("Failed to create dataspace entity: %v", err)
-		RespondError(w, http.StatusInternalServerError, "Failed to create dataspace")
+		logger.Error("Failed to create dataset entity: %v", err)
+		RespondError(w, http.StatusInternalServerError, "Failed to create dataset")
 		return
 	}
 
@@ -137,8 +137,8 @@ func (h *DataspaceManagementHandler) CreateDataspace(w http.ResponseWriter, r *h
 	logger.Info("Hub created: %s by user %s", req.Name, rbacCtx.User.ID)
 
 	// Return response
-	response := CreateDataspaceResponse{
-		Hub: DataspaceInfo{
+	response := CreateDatasetResponse{
+		Hub: DatasetInfo{
 			Name:        req.Name,
 			Description: req.Description,
 			CreatedAt:   time.Unix(0, hubEntity.CreatedAt).Format(time.RFC3339),
@@ -150,8 +150,8 @@ func (h *DataspaceManagementHandler) CreateDataspace(w http.ResponseWriter, r *h
 	RespondJSON(w, http.StatusCreated, response)
 }
 
-// ListDataspaces handles listing all hubs user has access to
-func (h *DataspaceManagementHandler) ListDataspaces(w http.ResponseWriter, r *http.Request) {
+// ListDatasets handles listing all hubs user has access to
+func (h *DatasetManagementHandler) ListDatasets(w http.ResponseWriter, r *http.Request) {
 	// Get RBAC context
 	rbacCtx, hasRBAC := GetRBACContext(r)
 	if !hasRBAC {
@@ -159,8 +159,8 @@ func (h *DataspaceManagementHandler) ListDataspaces(w http.ResponseWriter, r *ht
 		return
 	}
 
-	// Query all dataspace entities
-	hubEntities, err := h.repo.ListByTags([]string{"type:dataspace"}, false) // matchAll = false for single tag
+	// Query all dataset entities
+	hubEntities, err := h.repo.ListByTags([]string{"type:dataset"}, false) // matchAll = false for single tag
 	if err != nil {
 		logger.Error("Failed to list hubs: %v", err)
 		RespondError(w, http.StatusInternalServerError, "Failed to list hubs")
@@ -168,22 +168,22 @@ func (h *DataspaceManagementHandler) ListDataspaces(w http.ResponseWriter, r *ht
 	}
 
 	// Filter hubs user has access to
-	var accessibleHubs []DataspaceInfo
+	var accessibleHubs []DatasetInfo
 	for _, entity := range hubEntities {
-		dataspaceName := h.extractDataspaceName(entity)
-		if dataspaceName == "" {
+		datasetName := h.extractDatasetName(entity)
+		if datasetName == "" {
 			continue
 		}
 
 		// Check if user can view this hub
-		if rbacCtx.IsAdmin || CheckDataspacePermission(rbacCtx, dataspaceName, "view") {
-			hubInfo := h.entityToDataspaceInfo(entity)
+		if rbacCtx.IsAdmin || CheckDatasetPermission(rbacCtx, datasetName, "view") {
+			hubInfo := h.entityToDatasetInfo(entity)
 			accessibleHubs = append(accessibleHubs, hubInfo)
 		}
 	}
 
 	// Return response
-	response := ListDataspacesResponse{
+	response := ListDatasetsResponse{
 		Hubs:  accessibleHubs,
 		Total: len(accessibleHubs),
 	}
@@ -191,8 +191,8 @@ func (h *DataspaceManagementHandler) ListDataspaces(w http.ResponseWriter, r *ht
 	RespondJSON(w, http.StatusOK, response)
 }
 
-// DeleteDataspace handles deleting a hub
-func (h *DataspaceManagementHandler) DeleteDataspace(w http.ResponseWriter, r *http.Request) {
+// DeleteDataset handles deleting a hub
+func (h *DatasetManagementHandler) DeleteDataset(w http.ResponseWriter, r *http.Request) {
 	// Get RBAC context
 	rbacCtx, hasRBAC := GetRBACContext(r)
 	if !hasRBAC {
@@ -201,20 +201,20 @@ func (h *DataspaceManagementHandler) DeleteDataspace(w http.ResponseWriter, r *h
 	}
 
 	// Get hub name from query parameter
-	dataspaceName := r.URL.Query().Get("name")
-	if dataspaceName == "" {
+	datasetName := r.URL.Query().Get("name")
+	if datasetName == "" {
 		RespondError(w, http.StatusBadRequest, "hub name is required")
 		return
 	}
 
 	// Check hub deletion permission
-	if !CheckHubManagementPermission(rbacCtx, "delete", dataspaceName) {
-		RespondError(w, http.StatusForbidden, fmt.Sprintf("No delete permission for hub: %s", dataspaceName))
+	if !CheckHubManagementPermission(rbacCtx, "delete", datasetName) {
+		RespondError(w, http.StatusForbidden, fmt.Sprintf("No delete permission for hub: %s", datasetName))
 		return
 	}
 
 	// Find hub entity
-	hubEntities, err := h.repo.ListByTags([]string{"type:dataspace", FormatDataspaceTag(dataspaceName)}, true)
+	hubEntities, err := h.repo.ListByTags([]string{"type:dataset", FormatDatasetTag(datasetName)}, true)
 	if err != nil {
 		logger.Error("Failed to find hub: %v", err)
 		RespondError(w, http.StatusInternalServerError, "Failed to find hub")
@@ -222,24 +222,24 @@ func (h *DataspaceManagementHandler) DeleteDataspace(w http.ResponseWriter, r *h
 	}
 
 	if len(hubEntities) == 0 {
-		RespondError(w, http.StatusNotFound, fmt.Sprintf("dataspace not found: %s", dataspaceName))
+		RespondError(w, http.StatusNotFound, fmt.Sprintf("dataset not found: %s", datasetName))
 		return
 	}
 
 	// Check if hub has any entities (prevent deletion of non-empty hubs)
-	hubData, err := h.repo.ListByTags([]string{FormatDataspaceTag(dataspaceName)}, false)
+	hubData, err := h.repo.ListByTags([]string{FormatDatasetTag(datasetName)}, false)
 	if err != nil {
 		logger.Error("Failed to check hub contents: %v", err)
 		RespondError(w, http.StatusInternalServerError, "Failed to check hub contents")
 		return
 	}
 
-	// Count non-dataspace entities (exclude the hub entity itself)
+	// Count non-dataset entities (exclude the hub entity itself)
 	nonHubEntities := 0
 	for _, entity := range hubData {
 		isHubEntity := false
 		for _, tag := range entity.GetTagsWithoutTimestamp() {
-			if tag == "type:dataspace" {
+			if tag == "type:dataset" {
 				isHubEntity = true
 				break
 			}
@@ -249,7 +249,7 @@ func (h *DataspaceManagementHandler) DeleteDataspace(w http.ResponseWriter, r *h
 		}
 	}
 
-	if nonHubEntities > 0 { // Any non-dataspace entities exist
+	if nonHubEntities > 0 { // Any non-dataset entities exist
 		RespondError(w, http.StatusConflict, "cannot delete non-empty hub")
 		return
 	}
@@ -262,17 +262,17 @@ func (h *DataspaceManagementHandler) DeleteDataspace(w http.ResponseWriter, r *h
 		return
 	}
 
-	logger.Info("Hub deleted: %s by user %s", dataspaceName, rbacCtx.User.ID)
+	logger.Info("Hub deleted: %s by user %s", datasetName, rbacCtx.User.ID)
 
 	RespondJSON(w, http.StatusOK, map[string]string{
-		"message": fmt.Sprintf("Hub '%s' deleted successfully", dataspaceName),
+		"message": fmt.Sprintf("Hub '%s' deleted successfully", datasetName),
 	})
 }
 
 // Helper functions
 
 // assignHubAdmin assigns hub admin permissions to a user
-func (h *DataspaceManagementHandler) assignHubAdmin(userID, dataspaceName string) error {
+func (h *DatasetManagementHandler) assignHubAdmin(userID, datasetName string) error {
 	// Get user entity
 	user, err := h.repo.GetByID(userID)
 	if err != nil {
@@ -280,33 +280,33 @@ func (h *DataspaceManagementHandler) assignHubAdmin(userID, dataspaceName string
 	}
 
 	// Add hub admin permission tags
-	user.AddTag(fmt.Sprintf("rbac:perm:entity:*:dataspace:%s", dataspaceName))
-	user.AddTag(fmt.Sprintf("rbac:perm:dataspace:manage:%s", dataspaceName))
+	user.AddTag(fmt.Sprintf("rbac:perm:entity:*:dataset:%s", datasetName))
+	user.AddTag(fmt.Sprintf("rbac:perm:dataset:manage:%s", datasetName))
 
 	// Update user entity
 	return h.repo.Update(user)
 }
 
-// extractDataspaceName extracts hub name from entity tags
-func (h *DataspaceManagementHandler) extractDataspaceName(entity *models.Entity) string {
+// extractDatasetName extracts hub name from entity tags
+func (h *DatasetManagementHandler) extractDatasetName(entity *models.Entity) string {
 	for _, tag := range entity.GetTagsWithoutTimestamp() {
-		if dataspaceName, ok := ParseDataspaceTag(tag); ok {
-			return dataspaceName
+		if datasetName, ok := ParseDatasetTag(tag); ok {
+			return datasetName
 		}
 	}
 	return ""
 }
 
-// entityToDataspaceInfo converts entity to hub info
-func (h *DataspaceManagementHandler) entityToDataspaceInfo(entity *models.Entity) DataspaceInfo {
-	info := DataspaceInfo{
+// entityToDatasetInfo converts entity to hub info
+func (h *DatasetManagementHandler) entityToDatasetInfo(entity *models.Entity) DatasetInfo {
+	info := DatasetInfo{
 		CreatedAt: time.Unix(0, entity.CreatedAt).Format(time.RFC3339),
 	}
 
 	// Parse tags for hub information
 	for _, tag := range entity.GetTagsWithoutTimestamp() {
-		if dataspaceName, ok := ParseDataspaceTag(tag); ok {
-			info.Name = dataspaceName
+		if datasetName, ok := ParseDatasetTag(tag); ok {
+			info.Name = datasetName
 		} else if len(tag) > 12 && tag[:12] == "description:" {
 			info.Description = tag[12:]
 		}

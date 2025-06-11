@@ -5,6 +5,28 @@ All notable changes to the EntityDB Platform will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.29.0] - 2025-06-11
+
+### Changed
+- **Major Terminology Update**: Renamed "dataspace" to "dataset" throughout entire codebase
+  - Updated all API endpoints from `/dataspace` to `/dataset`
+  - Renamed environment variables from `ENTITYDB_DATASPACE_*` to `ENTITYDB_DATASET_*`
+  - Changed all Go types and functions to use Dataset naming
+  - Updated UI components and JavaScript files to reflect new terminology
+  - Modified documentation to use consistent "dataset" terminology
+  - Maintains backward compatibility through compatibility layer
+
+### Fixed
+- **Code Quality**: Comprehensive repository cleanup and maintenance
+  - Removed duplicate index.html files (index_new.html, index_simple.html)
+  - Cleaned up old debug and fix binaries from bin directory
+  - Moved obsolete files to trash following single source of truth principle
+  - Ensured clean build with zero warnings
+
+### Documentation
+- Updated all references from "dataspace" to "dataset" in documentation
+- Maintained consistency across READMEs, API docs, and inline comments
+
 ## [2.28.0] - 2025-06-07
 
 ### Added

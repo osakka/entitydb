@@ -78,4 +78,4 @@ This release was developed with assistance from Claude AI, implementing a clean 
 ---
 
 For questions or issues, please visit:
-https://gitdataspace.com/osakka/entitydb
+https://gitdataset.com/osakka/entitydb

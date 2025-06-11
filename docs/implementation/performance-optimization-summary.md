@@ -3,13 +3,13 @@
 ## Completed Tasks
 
 ### 1. Fixed Tag Index Persistence Bug ✅
-- **Problem**: Tag index was not persisted or rebuilt on startup, causing dataspace queries to fail
+- **Problem**: Tag index was not persisted or rebuilt on startup, causing dataset queries to fail
 - **Solution**: 
   - Added WAL replay to rebuild indexes from WAL entries
   - Fixed `buildIndexes` to load entities into memory cache
   - Fixed `ListByTags` to handle temporal tags properly
   - Enhanced logging with function names for debugging
-- **Result**: Dataspace queries now return all metrics correctly (1,137 entities)
+- **Result**: Dataset queries now return all metrics correctly (1,137 entities)
 
 ### 2. Implemented Persistent Tag Index ✅
 - **Problem**: Tag index had to be rebuilt from scratch on every startup
@@ -41,7 +41,7 @@ This doesn't affect the core functionality - the system works correctly, it just
 - **Startup Time**: < 1 second for 1,000+ entities
 - **Query Performance**: Instant for tag-based queries
 - **Memory Usage**: Efficient with indexes in memory
-- **Dataspace Queries**: Working correctly with temporal tag support
+- **Dataset Queries**: Working correctly with temporal tag support
 
 ## Next Steps
 

@@ -100,8 +100,8 @@ func (sm *SecurityMiddleware) RequirePermission(resource, action string) Middlew
 	}
 }
 
-// RequirePermissionInDataspace creates middleware that checks for specific permissions in a dataspace
-func (sm *SecurityMiddleware) RequirePermissionInDataspace(resource, action string) MiddlewareFunc {
+// RequirePermissionInDataset creates middleware that checks for specific permissions in a dataset
+func (sm *SecurityMiddleware) RequirePermissionInDataset(resource, action string) MiddlewareFunc {
 	return func(next http.HandlerFunc) http.HandlerFunc {
 		// First apply authentication middleware
 		authHandler := sm.RequireAuthentication(func(w http.ResponseWriter, r *http.Request) {
@@ -112,30 +112,30 @@ func (sm *SecurityMiddleware) RequirePermissionInDataspace(resource, action stri
 				return
 			}
 
-			// Extract dataspace ID from request path or query parameters
-			dataspaceID := r.URL.Query().Get("dataspace_id")
-			if dataspaceID == "" {
-				// Try to extract from path for REST-style URLs like /dataspaces/{id}/entities
+			// Extract dataset ID from request path or query parameters
+			datasetID := r.URL.Query().Get("dataset_id")
+			if datasetID == "" {
+				// Try to extract from path for REST-style URLs like /datasets/{id}/entities
 				pathParts := strings.Split(r.URL.Path, "/")
 				for i, part := range pathParts {
-					if part == "dataspaces" && i+1 < len(pathParts) {
-						dataspaceID = pathParts[i+1]
+					if part == "datasets" && i+1 < len(pathParts) {
+						datasetID = pathParts[i+1]
 						break
 					}
 				}
 			}
 
-			// Check permission using relationship traversal with dataspace context
-			hasPermission, err := sm.securityManager.HasPermissionInDataspace(securityCtx.User, resource, action, dataspaceID)
+			// Check permission using relationship traversal with dataset context
+			hasPermission, err := sm.securityManager.HasPermissionInDataset(securityCtx.User, resource, action, datasetID)
 			if err != nil {
 				RespondError(w, http.StatusInternalServerError, "Failed to check permissions")
 				return
 			}
 
 			if !hasPermission {
-				if dataspaceID != "" {
+				if datasetID != "" {
 					RespondError(w, http.StatusForbidden,
-						fmt.Sprintf("Insufficient permissions: %s:%s required in dataspace %s", resource, action, dataspaceID))
+						fmt.Sprintf("Insufficient permissions: %s:%s required in dataset %s", resource, action, datasetID))
 				} else {
 					RespondError(w, http.StatusForbidden,
 						fmt.Sprintf("Insufficient permissions: %s:%s required", resource, action))
@@ -150,8 +150,8 @@ func (sm *SecurityMiddleware) RequirePermissionInDataspace(resource, action stri
 	}
 }
 
-// RequireDataspaceAccess creates middleware that checks if user can access a specific dataspace
-func (sm *SecurityMiddleware) RequireDataspaceAccess() MiddlewareFunc {
+// RequireDatasetAccess creates middleware that checks if user can access a specific dataset
+func (sm *SecurityMiddleware) RequireDatasetAccess() MiddlewareFunc {
 	return func(next http.HandlerFunc) http.HandlerFunc {
 		authHandler := sm.RequireAuthentication(func(w http.ResponseWriter, r *http.Request) {
 			securityCtx, ok := GetSecurityContext(r)
@@ -160,34 +160,34 @@ func (sm *SecurityMiddleware) RequireDataspaceAccess() MiddlewareFunc {
 				return
 			}
 
-			// Extract dataspace ID from request
-			dataspaceID := r.URL.Query().Get("dataspace_id")
-			if dataspaceID == "" {
+			// Extract dataset ID from request
+			datasetID := r.URL.Query().Get("dataset_id")
+			if datasetID == "" {
 				// Try to extract from path
 				pathParts := strings.Split(r.URL.Path, "/")
 				for i, part := range pathParts {
-					if part == "dataspaces" && i+1 < len(pathParts) {
-						dataspaceID = pathParts[i+1]
+					if part == "datasets" && i+1 < len(pathParts) {
+						datasetID = pathParts[i+1]
 						break
 					}
 				}
 			}
 
-			if dataspaceID == "" {
-				RespondError(w, http.StatusBadRequest, "Dataspace ID required")
+			if datasetID == "" {
+				RespondError(w, http.StatusBadRequest, "Dataset ID required")
 				return
 			}
 
-			// Check dataspace access
-			hasAccess, err := sm.securityManager.CanAccessDataspace(securityCtx.User, dataspaceID)
+			// Check dataset access
+			hasAccess, err := sm.securityManager.CanAccessDataset(securityCtx.User, datasetID)
 			if err != nil {
-				RespondError(w, http.StatusInternalServerError, "Failed to check dataspace access")
+				RespondError(w, http.StatusInternalServerError, "Failed to check dataset access")
 				return
 			}
 
 			if !hasAccess {
 				RespondError(w, http.StatusForbidden, 
-					fmt.Sprintf("Access denied to dataspace %s", dataspaceID))
+					fmt.Sprintf("Access denied to dataset %s", datasetID))
 				return
 			}
 

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Debug dataspace queries
+# Debug dataset queries
 
 cd "$(dirname "$0")/../.."
 
@@ -32,7 +32,7 @@ curl -s -X POST http://localhost:8085/api/v1/entities/create \
      -H "Content-Type: application/json" \
      -d '{
        "id": "worca-task",
-       "tags": ["dataspace:worca", "type:task"],
+       "tags": ["dataset:worca", "type:task"],
        "content": "A worca task"
      }' > /dev/null
 
@@ -42,21 +42,21 @@ curl -s -X POST http://localhost:8085/api/v1/entities/create \
      -H "Content-Type: application/json" \
      -d '{
        "id": "metrics-cpu",
-       "tags": ["dataspace:metrics", "type:cpu"],
+       "tags": ["dataset:metrics", "type:cpu"],
        "content": "cpu usage"
      }' > /dev/null
 
-echo "Testing dataspace query..."
+echo "Testing dataset query..."
 echo
 
-# Query worca dataspace
-echo "Querying dataspace:worca..."
-curl -s -X GET "http://localhost:8085/api/v1/entities/list?tags=dataspace:worca" \
+# Query worca dataset
+echo "Querying dataset:worca..."
+curl -s -X GET "http://localhost:8085/api/v1/entities/list?tags=dataset:worca" \
      -H "Authorization: Bearer $TOKEN" | jq -r '.[] | .id'
 
 echo
 echo "Relevant logs:"
-grep -E "(Dataspace query|Found.*entities.*dataspace)" /tmp/query_debug.log | tail -10
+grep -E "(Dataset query|Found.*entities.*dataset)" /tmp/query_debug.log | tail -10
 
 kill $SERVER_PID 2>/dev/null
 wait $SERVER_PID 2>/dev/null

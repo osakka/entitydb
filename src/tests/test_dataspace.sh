@@ -1,24 +1,24 @@
 #!/bin/bash
-# Test dataspace functionality
+# Test dataset functionality
 
 cd "$(dirname "$0")/../.."
 
-echo "=== EntityDB Dataspace Test ==="
+echo "=== EntityDB Dataset Test ==="
 echo
 
 # Clean start
 pkill -f entitydb 2>/dev/null
 sleep 1
-rm -rf var/test_dataspace
-mkdir -p var/test_dataspace
+rm -rf var/test_dataset
+mkdir -p var/test_dataset
 
-# Start server with dataspace mode
-export ENTITYDB_DATA_PATH=var/test_dataspace
+# Start server with dataset mode
+export ENTITYDB_DATA_PATH=var/test_dataset
 export ENTITYDB_DATASPACE=true
 export ENTITYDB_LOG_LEVEL=debug
 
-echo "Starting EntityDB with dataspace mode enabled..."
-./bin/entitydb server > /tmp/dataspace_test.log 2>&1 &
+echo "Starting EntityDB with dataset mode enabled..."
+./bin/entitydb server > /tmp/dataset_test.log 2>&1 &
 SERVER_PID=$!
 sleep 3
 
@@ -36,19 +36,19 @@ TOKEN=$(curl -s -X POST http://localhost:8085/api/v1/auth/login \
 echo "Token obtained: ${TOKEN:0:20}..."
 echo
 
-# Test 1: Create entities in different dataspaces
-echo "Test 1: Creating entities in different dataspaces"
+# Test 1: Create entities in different datasets
+echo "Test 1: Creating entities in different datasets"
 echo "================================================"
 
-# Create in worca dataspace
-echo -n "Creating task in 'worca' dataspace... "
+# Create in worca dataset
+echo -n "Creating task in 'worca' dataset... "
 RESULT=$(curl -s -X POST http://localhost:8085/api/v1/entities/create \
      -H "Authorization: Bearer $TOKEN" \
      -H "Content-Type: application/json" \
      -d '{
        "id": "task-001",
-       "tags": ["dataspace:worca", "type:task", "status:open", "priority:high"],
-       "content": "Implement dataspace feature"
+       "tags": ["dataset:worca", "type:task", "status:open", "priority:high"],
+       "content": "Implement dataset feature"
      }')
 if [ -n "$RESULT" ]; then
     echo "Response: $RESULT"
@@ -56,19 +56,19 @@ else
     echo "OK"
 fi
 
-# Create in metrics dataspace
-echo -n "Creating metric in 'metrics' dataspace... "
+# Create in metrics dataset
+echo -n "Creating metric in 'metrics' dataset... "
 curl -s -X POST http://localhost:8085/api/v1/entities/create \
      -H "Authorization: Bearer $TOKEN" \
      -H "Content-Type: application/json" \
      -d '{
        "id": "metric-001",
-       "tags": ["dataspace:metrics", "type:cpu", "host:server1"],
+       "tags": ["dataset:metrics", "type:cpu", "host:server1"],
        "content": "cpu.usage=45.2"
      }' > /dev/null && echo "OK"
 
-# Create in default dataspace
-echo -n "Creating config in 'default' dataspace... "
+# Create in default dataset
+echo -n "Creating config in 'default' dataset... "
 curl -s -X POST http://localhost:8085/api/v1/entities/create \
      -H "Authorization: Bearer $TOKEN" \
      -H "Content-Type: application/json" \
@@ -80,18 +80,18 @@ curl -s -X POST http://localhost:8085/api/v1/entities/create \
 
 echo
 
-# Test 2: Query specific dataspaces
-echo "Test 2: Querying specific dataspaces"
+# Test 2: Query specific datasets
+echo "Test 2: Querying specific datasets"
 echo "===================================="
 
-# Query worca dataspace
-echo "Querying 'worca' dataspace:"
-curl -s -X GET "http://localhost:8085/api/v1/entities/list?tags=dataspace:worca" \
+# Query worca dataset
+echo "Querying 'worca' dataset:"
+curl -s -X GET "http://localhost:8085/api/v1/entities/list?tags=dataset:worca" \
      -H "Authorization: Bearer $TOKEN" | jq -r '.[] | "  - \(.id): \(.tags | join(", "))"'
 
 echo
-echo "Querying 'metrics' dataspace:"
-curl -s -X GET "http://localhost:8085/api/v1/entities/list?tags=dataspace:metrics" \
+echo "Querying 'metrics' dataset:"
+curl -s -X GET "http://localhost:8085/api/v1/entities/list?tags=dataset:metrics" \
      -H "Authorization: Bearer $TOKEN" | jq -r '.[] | "  - \(.id): \(.tags | join(", "))"'
 
 echo
@@ -118,20 +118,20 @@ curl -s -X GET "http://localhost:8085/api/v1/entities/list?tags=hub:worca" \
 
 echo
 
-# Test 4: Check dataspace isolation
-echo "Test 4: Dataspace isolation"
+# Test 4: Check dataset isolation
+echo "Test 4: Dataset isolation"
 echo "=========================="
 
 # Check index files created
-echo "Checking dataspace index files:"
-ls -la var/test_dataspace/dataspaces/ 2>/dev/null || echo "  No dataspace directory yet"
+echo "Checking dataset index files:"
+ls -la var/test_dataset/datasets/ 2>/dev/null || echo "  No dataset directory yet"
 
 echo
 
 # Check server logs
 echo
 echo "Server logs (last 20 lines):"
-tail -20 /tmp/dataspace_test.log
+tail -20 /tmp/dataset_test.log
 
 # Cleanup
 echo
@@ -140,10 +140,10 @@ kill $SERVER_PID 2>/dev/null
 wait $SERVER_PID 2>/dev/null
 
 echo
-echo "=== Dataspace Test Complete ==="
+echo "=== Dataset Test Complete ==="
 echo
 echo "Summary:"
-echo "- Entities can be organized into dataspaces"
-echo "- Each dataspace will have its own index file (pending full implementation)"
+echo "- Entities can be organized into datasets"
+echo "- Each dataset will have its own index file (pending full implementation)"
 echo "- Backward compatibility with 'hub:' tags maintained"
-echo "- Queries can be scoped to specific dataspaces for better performance"
+echo "- Queries can be scoped to specific datasets for better performance"

@@ -23,14 +23,14 @@ func NewSecurityInitializer(securityManager *SecurityManager, entityRepo EntityR
 
 // InitializeDefaultSecurityEntities creates the default roles, permissions, and admin user
 func (si *SecurityInitializer) InitializeDefaultSecurityEntities() error {
-	// Create default dataspaces first (system infrastructure)
-	if err := si.createDefaultDataspaces(); err != nil {
-		return fmt.Errorf("failed to create default dataspaces: %v", err)
+	// Create default datasets first (system infrastructure)
+	if err := si.createDefaultDatasets(); err != nil {
+		return fmt.Errorf("failed to create default datasets: %v", err)
 	}
 	
-	// Force sync after creating dataspaces
+	// Force sync after creating datasets
 	if err := si.forceSync(); err != nil {
-		return fmt.Errorf("failed to sync after creating dataspaces: %v", err)
+		return fmt.Errorf("failed to sync after creating datasets: %v", err)
 	}
 
 	// Create default permissions
@@ -115,13 +115,13 @@ func (si *SecurityInitializer) createDefaultPermissions() error {
 		{"perm_relation_delete", "relation", "delete", "global"},
 		{"perm_relation_all", "relation", "*", "global"},
 
-		// Dataspace permissions
-		{"perm_dataspace_view", "dataspace", "view", "global"},
-		{"perm_dataspace_create", "dataspace", "create", "global"},
-		{"perm_dataspace_update", "dataspace", "update", "global"},
-		{"perm_dataspace_delete", "dataspace", "delete", "global"},
-		{"perm_dataspace_manage", "dataspace", "manage", "global"},
-		{"perm_dataspace_all", "dataspace", "*", "global"},
+		// Dataset permissions
+		{"perm_dataset_view", "dataset", "view", "global"},
+		{"perm_dataset_create", "dataset", "create", "global"},
+		{"perm_dataset_update", "dataset", "update", "global"},
+		{"perm_dataset_delete", "dataset", "delete", "global"},
+		{"perm_dataset_manage", "dataset", "manage", "global"},
+		{"perm_dataset_all", "dataset", "*", "global"},
 		
 		// Metrics permissions
 		{"perm_metrics_view", "metrics", "view", "global"},
@@ -140,7 +140,7 @@ func (si *SecurityInitializer) createDefaultPermissions() error {
 			ID: perm.id,
 			Tags: []string{
 				"type:" + EntityTypePermission,
-				"dataspace:_system",
+				"dataset:_system",
 				"resource:" + perm.resource,
 				"action:" + perm.action,
 				"scope:" + perm.scope,
@@ -180,7 +180,7 @@ func (si *SecurityInitializer) createDefaultRoles() error {
 			ID: role.id,
 			Tags: []string{
 				"type:" + EntityTypeRole,
-				"dataspace:_system",
+				"dataset:_system",
 				"name:" + role.name,
 				fmt.Sprintf("level:%d", role.level),
 				"scope:" + role.scope,
@@ -231,7 +231,7 @@ func (si *SecurityInitializer) createDefaultGroups() error {
 			ID: group.id,
 			Tags: []string{
 				"type:" + EntityTypeGroup,
-				"dataspace:_system",
+				"dataset:_system",
 				"name:" + group.name,
 				"level:" + group.level,
 				"created:" + NowString(),
@@ -412,18 +412,18 @@ func (si *SecurityInitializer) forceSync() error {
 	return nil
 }
 
-// createDefaultDataspaces creates the system and default dataspaces
-func (si *SecurityInitializer) createDefaultDataspaces() error {
-	logger.Info("Creating default dataspaces...")
+// createDefaultDatasets creates the system and default datasets
+func (si *SecurityInitializer) createDefaultDatasets() error {
+	logger.Info("Creating default datasets...")
 	
-	// Create system dataspace for system entities (users, permissions, etc.)
-	systemDataspace := &Entity{
-		ID: "dataspace_system",
+	// Create system dataset for system entities (users, permissions, etc.)
+	systemDataset := &Entity{
+		ID: "dataset_system",
 		Tags: []string{
-			"type:dataspace",
-			"dataspace:_system",
+			"type:dataset",
+			"dataset:_system",
 			"name:_system",
-			"description:System dataspace for internal entities",
+			"description:System dataset for internal entities",
 			"system:true",
 			"created:" + NowString(),
 		},
@@ -432,24 +432,24 @@ func (si *SecurityInitializer) createDefaultDataspaces() error {
 		UpdatedAt: Now(),
 	}
 	
-	if err := si.entityRepo.Create(systemDataspace); err != nil {
+	if err := si.entityRepo.Create(systemDataset); err != nil {
 		// Check if already exists
 		if !strings.Contains(err.Error(), "already exists") {
-			return fmt.Errorf("failed to create system dataspace: %v", err)
+			return fmt.Errorf("failed to create system dataset: %v", err)
 		}
-		logger.Debug("System dataspace already exists")
+		logger.Debug("System dataset already exists")
 	} else {
-		logger.Info("Created system dataspace: _system")
+		logger.Info("Created system dataset: _system")
 	}
 	
-	// Create default dataspace for user data
-	defaultDataspace := &Entity{
-		ID: "dataspace_default",
+	// Create default dataset for user data
+	defaultDataset := &Entity{
+		ID: "dataset_default",
 		Tags: []string{
-			"type:dataspace",
-			"dataspace:default",
+			"type:dataset",
+			"dataset:default",
 			"name:default",
-			"description:Default dataspace for user entities",
+			"description:Default dataset for user entities",
 			"system:false",
 			"created:" + NowString(),
 		},
@@ -458,14 +458,14 @@ func (si *SecurityInitializer) createDefaultDataspaces() error {
 		UpdatedAt: Now(),
 	}
 	
-	if err := si.entityRepo.Create(defaultDataspace); err != nil {
+	if err := si.entityRepo.Create(defaultDataset); err != nil {
 		// Check if already exists
 		if !strings.Contains(err.Error(), "already exists") {
-			return fmt.Errorf("failed to create default dataspace: %v", err)
+			return fmt.Errorf("failed to create default dataset: %v", err)
 		}
-		logger.Debug("Default dataspace already exists")
+		logger.Debug("Default dataset already exists")
 	} else {
-		logger.Info("Created default dataspace: default")
+		logger.Info("Created default dataset: default")
 	}
 	
 	return nil

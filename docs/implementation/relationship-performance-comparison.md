@@ -136,7 +136,7 @@ For 10,000 entities with avg 5 relationships:
   - 1 disk read + in-memory filtering
 - **Performance gain: 75%+**
 
-### Scenario 3: Dataspace Entity Listing
+### Scenario 3: Dataset Entity Listing
 - Current: List entities → For each, check relationships
   - N + (N × R) reads where R = avg relationships
 - Tag-based: List entities with tag filter

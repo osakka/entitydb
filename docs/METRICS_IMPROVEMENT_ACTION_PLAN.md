@@ -101,7 +101,7 @@ This action plan addresses the critical gaps identified in the metrics analysis.
 - [ ] Application-level tracking:
   - Entity operations by type
   - Query patterns and performance
-  - Dataspace utilization
+  - Dataset utilization
   - Relationship graph statistics
 
 ### 4.3 Temporal Query Metrics

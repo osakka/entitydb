@@ -64,7 +64,7 @@ EntityDB supports granular trace logging by subsystem:
 - `lock` - Lock acquisition and contention
 - `query` - Query execution and optimization
 - `metrics` - Metrics collection and aggregation
-- `dataspace` - Dataspace operations and isolation
+- `dataset` - Dataset operations and isolation
 - `relationship` - Entity relationships and graph operations
 - `chunking` - Content chunking and streaming
 
@@ -107,7 +107,7 @@ logger.Error("Failed to create entity")
 
 **✅ After (contextual)**:
 ```go
-logger.Error("Failed to create entity %s in dataspace %s: %v", entityID, dataspace, err)
+logger.Error("Failed to create entity %s in dataset %s: %v", entityID, dataset, err)
 ```
 
 ### Appropriate Log Levels
@@ -130,7 +130,7 @@ logger.Trace("Reading entity from WAL offset %d", offset)
 // Use structured fields for important operations
 logger.WithFields(map[string]interface{}{
     "entity_id": entityID,
-    "dataspace": dataspace,
+    "dataset": dataset,
     "operation": "create",
     "user_id": userID,
 }).Info("Entity created successfully")
@@ -266,7 +266,7 @@ func CreateEntity(entity *Entity) error {
         logger.Error("Entity validation failed for ID %s: %v", entity.ID, err)
         return err
     }
-    logger.Info("Entity %s created successfully in dataspace %s", entity.ID, entity.Dataspace)
+    logger.Info("Entity %s created successfully in dataset %s", entity.ID, entity.Dataset)
     return nil
 }
 ```

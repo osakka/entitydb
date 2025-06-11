@@ -1,9 +1,9 @@
 #!/bin/bash
-# Test dataspace isolation in detail
+# Test dataset isolation in detail
 
 cd "$(dirname "$0")/../.."
 
-echo "=== Dataspace Isolation Test ==="
+echo "=== Dataset Isolation Test ==="
 echo
 
 # Clean start
@@ -31,17 +31,17 @@ TOKEN=$(curl -s -X POST http://localhost:8085/api/v1/auth/login \
      -H "Content-Type: application/json" \
      -d '{"username":"admin","password":"admin"}' | jq -r '.token')
 
-echo "Creating entities in different dataspaces..."
+echo "Creating entities in different datasets..."
 echo
 
-# Create in worca dataspace
-echo "Creating in worca dataspace:"
+# Create in worca dataset
+echo "Creating in worca dataset:"
 curl -s -X POST http://localhost:8085/api/v1/entities/create \
      -H "Authorization: Bearer $TOKEN" \
      -H "Content-Type: application/json" \
      -d '{
        "id": "worca-1",
-       "tags": ["dataspace:worca", "type:task", "priority:high"],
+       "tags": ["dataset:worca", "type:task", "priority:high"],
        "content": "Worca task 1"
      }' | jq -r '.id'
 
@@ -50,19 +50,19 @@ curl -s -X POST http://localhost:8085/api/v1/entities/create \
      -H "Content-Type: application/json" \
      -d '{
        "id": "worca-2",
-       "tags": ["dataspace:worca", "type:task", "priority:low"],
+       "tags": ["dataset:worca", "type:task", "priority:low"],
        "content": "Worca task 2"
      }' | jq -r '.id'
 
-# Create in metrics dataspace
+# Create in metrics dataset
 echo
-echo "Creating in metrics dataspace:"
+echo "Creating in metrics dataset:"
 curl -s -X POST http://localhost:8085/api/v1/entities/create \
      -H "Authorization: Bearer $TOKEN" \
      -H "Content-Type: application/json" \
      -d '{
        "id": "metric-1",
-       "tags": ["dataspace:metrics", "type:cpu", "host:server1"],
+       "tags": ["dataset:metrics", "type:cpu", "host:server1"],
        "content": "cpu.usage=45"
      }' | jq -r '.id'
 
@@ -71,13 +71,13 @@ curl -s -X POST http://localhost:8085/api/v1/entities/create \
      -H "Content-Type: application/json" \
      -d '{
        "id": "metric-2",
-       "tags": ["dataspace:metrics", "type:memory", "host:server1"],
+       "tags": ["dataset:metrics", "type:memory", "host:server1"],
        "content": "memory.usage=80"
      }' | jq -r '.id'
 
-# Create without dataspace (should go to default)
+# Create without dataset (should go to default)
 echo
-echo "Creating without dataspace:"
+echo "Creating without dataset:"
 curl -s -X POST http://localhost:8085/api/v1/entities/create \
      -H "Authorization: Bearer $TOKEN" \
      -H "Content-Type: application/json" \
@@ -88,24 +88,24 @@ curl -s -X POST http://localhost:8085/api/v1/entities/create \
      }' | jq -r '.id'
 
 echo
-echo "Checking dataspace indexes created:"
-ls -la var/test_isolation/dataspaces/
+echo "Checking dataset indexes created:"
+ls -la var/test_isolation/datasets/
 
 echo
 echo "Testing queries:"
 echo
 
-echo "1. Query worca dataspace (should return 2 entities):"
-curl -s -X GET "http://localhost:8085/api/v1/entities/list?tags=dataspace:worca" \
+echo "1. Query worca dataset (should return 2 entities):"
+curl -s -X GET "http://localhost:8085/api/v1/entities/list?tags=dataset:worca" \
      -H "Authorization: Bearer $TOKEN" | jq -r 'length'
 
 echo
-echo "2. Query metrics dataspace (should return 2 entities):"
-curl -s -X GET "http://localhost:8085/api/v1/entities/list?tags=dataspace:metrics" \
+echo "2. Query metrics dataset (should return 2 entities):"
+curl -s -X GET "http://localhost:8085/api/v1/entities/list?tags=dataset:metrics" \
      -H "Authorization: Bearer $TOKEN" | jq -r 'length'
 
 echo
-echo "3. Query default dataspace (should return admin + config):"
+echo "3. Query default dataset (should return admin + config):"
 curl -s -X GET "http://localhost:8085/api/v1/entities/list?tags=type:config" \
      -H "Authorization: Bearer $TOKEN" | jq -r 'length'
 
@@ -115,8 +115,8 @@ curl -s -X GET "http://localhost:8085/api/v1/entities/list" \
      -H "Authorization: Bearer $TOKEN" | jq -r 'length'
 
 echo
-echo "Checking debug logs for dataspace operations:"
-grep -i "dataspace" /tmp/isolation_test.log | grep -E "(Creating|Added|query)" | tail -10
+echo "Checking debug logs for dataset operations:"
+grep -i "dataset" /tmp/isolation_test.log | grep -E "(Creating|Added|query)" | tail -10
 
 # Cleanup
 kill $SERVER_PID 2>/dev/null

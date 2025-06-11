@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EntityDB API Diagnostics</title>
+    
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f7fa;
+            padding: 20px;
+            margin: 0;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin: 30px 0;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        .test-result {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .warning { background: #fff3cd; color: #856404; }
+        .info { background: #d1ecf1; color: #0c5460; }
+        .btn {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 10px 5px 10px 0;
+        }
+        .btn:hover { background: #0056b3; }
+        .progress {
+            width: 100%;
+            height: 20px;
+            background: #e9ecef;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        .progress-bar {
+            height: 100%;
+            background: #007bff;
+            transition: width 0.3s;
+        }
+        pre {
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            max-height: 400px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>EntityDB API Diagnostics</h1>
+        <p>This tool helps diagnose performance issues with the EntityDB API endpoints.</p>
+
+        <!-- Quick Status -->
+        <div class="test-section">
+            <h2>Quick Status Check</h2>
+            <button class="btn" onclick="runQuickTests()">Run Quick Tests</button>
+            <div id="quick-results"></div>
+        </div>
+
+        <!-- Authentication Test -->
+        <div class="test-section">
+            <h2>Authentication Test</h2>
+            <div>
+                <input type="text" id="username" placeholder="Username" value="admin" style="margin-right: 10px; padding: 8px;">
+                <input type="password" id="password" placeholder="Password" value="admin" style="margin-right: 10px; padding: 8px;">
+                <button class="btn" onclick="testAuth()">Test Login</button>
+            </div>
+            <div id="auth-results"></div>
+        </div>
+
+        <!-- Entity API Performance Test -->
+        <div class="test-section">
+            <h2>Entity API Performance Test</h2>
+            <button class="btn" onclick="testEntityAPI()">Test Entity Endpoints</button>
+            <button class="btn" onclick="testLimitedEntity()">Test With Limits</button>
+            <button class="btn" onclick="testAlternativeEndpoints()">Test Alternative Endpoints</button>
+            
+            <div>Progress: <span id="test-progress">0%</span></div>
+            <div class="progress">
+                <div id="progress-bar" class="progress-bar" style="width: 0%;"></div>
+            </div>
+            
+            <div id="entity-results"></div>
+        </div>
+
+        <!-- Server Performance -->
+        <div class="test-section">
+            <h2>Server Performance Analysis</h2>
+            <button class="btn" onclick="analyzePerformance()">Analyze Performance</button>
+            <div id="performance-results"></div>
+        </div>
+
+        <!-- Raw Response Inspector -->
+        <div class="test-section">
+            <h2>Raw Response Inspector</h2>
+            <button class="btn" onclick="inspectResponse()">Inspect Entity List Response</button>
+            <div id="response-inspector"></div>
+        </div>
+    </div>
+
+    <script>
+        let authToken = null;
+
+        function log(containerId, message, type = 'info') {
+            const container = document.getElementById(containerId);
+            const div = document.createElement('div');
+            div.className = `test-result ${type}`;
+            div.textContent = new Date().toLocaleTimeString() + ': ' + message;
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function clearResults(containerId) {
+            document.getElementById(containerId).innerHTML = '';
+        }
+
+        function updateProgress(percent) {
+            document.getElementById('test-progress').textContent = percent + '%';
+            document.getElementById('progress-bar').style.width = percent + '%';
+        }
+
+        async function runQuickTests() {
+            clearResults('quick-results');
+            
+            // Test 1: Health endpoint
+            try {
+                const start = Date.now();
+                const response = await fetch('/health');
+                const duration = Date.now() - start;
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    log('quick-results', `✓ Health check: ${duration}ms - ${data.metrics.entity_count} entities`, 'success');
+                } else {
+                    log('quick-results', `✗ Health check failed: ${response.status}`, 'error');
+                }
+            } catch (error) {
+                log('quick-results', `✗ Health check error: ${error.message}`, 'error');
+            }
+
+            // Test 2: Static files
+            try {
+                const start = Date.now();
+                const response = await fetch('/index.html', { method: 'HEAD' });
+                const duration = Date.now() - start;
+                
+                if (response.ok) {
+                    log('quick-results', `✓ Static files: ${duration}ms`, 'success');
+                } else {
+                    log('quick-results', `✗ Static files failed: ${response.status}`, 'error');
+                }
+            } catch (error) {
+                log('quick-results', `✗ Static files error: ${error.message}`, 'error');
+            }
+
+            // Test 3: Simple API call
+            try {
+                const start = Date.now();
+                const response = await fetch('/api/v1/entities/list', { 
+                    method: 'HEAD',
+                    headers: { 'Authorization': 'Bearer fake-token' }
+                });
+                const duration = Date.now() - start;
+                
+                log('quick-results', `API response time: ${duration}ms (status: ${response.status})`, 
+                    duration < 1000 ? 'success' : duration < 5000 ? 'warning' : 'error');
+            } catch (error) {
+                log('quick-results', `✗ API test error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testAuth() {
+            clearResults('auth-results');
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            try {
+                const start = Date.now();
+                const response = await fetch('/api/v1/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                const duration = Date.now() - start;
+
+                if (response.ok) {
+                    const data = await response.json();
+                    authToken = data.token;
+                    log('auth-results', `✓ Login successful in ${duration}ms`, 'success');
+                    log('auth-results', `Token: ${data.token.substring(0, 20)}...`, 'info');
+                    log('auth-results', `User: ${data.user.username} (${data.user.roles.join(', ')})`, 'info');
+                } else {
+                    const errorText = await response.text();
+                    log('auth-results', `✗ Login failed: ${response.status} - ${errorText}`, 'error');
+                }
+            } catch (error) {
+                log('auth-results', `✗ Login error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testEntityAPI() {
+            clearResults('entity-results');
+            updateProgress(0);
+
+            if (!authToken) {
+                log('entity-results', '⚠ No auth token - run authentication test first', 'warning');
+                return;
+            }
+
+            const endpoints = [
+                '/api/v1/entities/list',
+                '/api/v1/entities/query',
+                '/api/v1/entities/list?limit=10',
+                '/api/v1/entities/query?limit=10',
+                '/api/v1/entities/list?tags=type:user'
+            ];
+
+            for (let i = 0; i < endpoints.length; i++) {
+                const endpoint = endpoints[i];
+                updateProgress(Math.round((i / endpoints.length) * 100));
+
+                try {
+                    log('entity-results', `Testing: ${endpoint}`, 'info');
+                    
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 15000);
+                    
+                    const start = Date.now();
+                    const response = await fetch(endpoint, {
+                        headers: { 'Authorization': `Bearer ${authToken}` },
+                        signal: controller.signal
+                    });
+                    const duration = Date.now() - start;
+                    clearTimeout(timeoutId);
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        const count = Array.isArray(data) ? data.length : 
+                                     (data.results ? data.results.length : 
+                                      data.entities ? data.entities.length : 'unknown');
+                        
+                        log('entity-results', `✓ ${endpoint}: ${duration}ms - ${count} entities`, 
+                            duration < 2000 ? 'success' : 'warning');
+                    } else {
+                        const errorText = await response.text();
+                        log('entity-results', `✗ ${endpoint}: ${response.status} - ${errorText}`, 'error');
+                    }
+                } catch (error) {
+                    if (error.name === 'AbortError') {
+                        log('entity-results', `✗ ${endpoint}: Timeout after 15 seconds`, 'error');
+                    } else {
+                        log('entity-results', `✗ ${endpoint}: ${error.message}`, 'error');
+                    }
+                }
+            }
+
+            updateProgress(100);
+        }
+
+        async function testLimitedEntity() {
+            clearResults('entity-results');
+            
+            if (!authToken) {
+                log('entity-results', '⚠ No auth token - run authentication test first', 'warning');
+                return;
+            }
+
+            const limits = [1, 5, 10, 20, 50];
+            
+            for (const limit of limits) {
+                try {
+                    log('entity-results', `Testing with limit=${limit}`, 'info');
+                    
+                    const start = Date.now();
+                    const response = await fetch(`/api/v1/entities/list?limit=${limit}`, {
+                        headers: { 'Authorization': `Bearer ${authToken}` }
+                    });
+                    const duration = Date.now() - start;
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        const count = Array.isArray(data) ? data.length : 'unknown format';
+                        log('entity-results', `✓ Limit ${limit}: ${duration}ms - got ${count} entities`, 'success');
+                    } else {
+                        log('entity-results', `✗ Limit ${limit}: ${response.status}`, 'error');
+                    }
+                } catch (error) {
+                    log('entity-results', `✗ Limit ${limit}: ${error.message}`, 'error');
+                }
+            }
+        }
+
+        async function testAlternativeEndpoints() {
+            clearResults('entity-results');
+            
+            if (!authToken) {
+                log('entity-results', '⚠ No auth token - run authentication test first', 'warning');
+                return;
+            }
+
+            // Test different approaches
+            const tests = [
+                {
+                    name: 'Health metrics',
+                    endpoint: '/health',
+                    headers: {}
+                },
+                {
+                    name: 'System metrics',
+                    endpoint: '/api/v1/system/metrics',
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                },
+                {
+                    name: 'Dashboard stats',
+                    endpoint: '/api/v1/dashboard/stats',
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                }
+            ];
+
+            for (const test of tests) {
+                try {
+                    log('entity-results', `Testing: ${test.name}`, 'info');
+                    
+                    const start = Date.now();
+                    const response = await fetch(test.endpoint, {
+                        headers: test.headers
+                    });
+                    const duration = Date.now() - start;
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        log('entity-results', `✓ ${test.name}: ${duration}ms - response received`, 'success');
+                        
+                        if (data.metrics && data.metrics.entity_count) {
+                            log('entity-results', `  Entity count from ${test.name}: ${data.metrics.entity_count}`, 'info');
+                        }
+                    } else {
+                        log('entity-results', `✗ ${test.name}: ${response.status}`, 'error');
+                    }
+                } catch (error) {
+                    log('entity-results', `✗ ${test.name}: ${error.message}`, 'error');
+                }
+            }
+        }
+
+        async function analyzePerformance() {
+            clearResults('performance-results');
+            
+            try {
+                const response = await fetch('/health');
+                const data = await response.json();
+                
+                log('performance-results', 'Server Performance Analysis:', 'info');
+                log('performance-results', `Entity Count: ${data.metrics.entity_count}`, 'info');
+                log('performance-results', `Database Size: ${(data.metrics.database_size_bytes / 1024 / 1024).toFixed(2)} MB`, 'info');
+                log('performance-results', `Memory Usage: ${(data.metrics.memory_usage.alloc_bytes / 1024 / 1024).toFixed(2)} MB`, 'info');
+                log('performance-results', `Goroutines: ${data.metrics.goroutines}`, 'info');
+                log('performance-results', `Uptime: ${data.uptime}`, 'info');
+                
+                // Analysis
+                if (data.metrics.entity_count > 100) {
+                    log('performance-results', '⚠ High entity count may cause performance issues', 'warning');
+                }
+                if (data.metrics.goroutines > 1000) {
+                    log('performance-results', '⚠ High goroutine count detected', 'warning');
+                }
+                if (data.metrics.database_size_bytes > 50 * 1024 * 1024) {
+                    log('performance-results', '⚠ Large database size may impact query performance', 'warning');
+                }
+                
+            } catch (error) {
+                log('performance-results', `Error analyzing performance: ${error.message}`, 'error');
+            }
+        }
+
+        async function inspectResponse() {
+            const container = document.getElementById('response-inspector');
+            container.innerHTML = '<div class="test-result info">Fetching response...</div>';
+            
+            if (!authToken) {
+                container.innerHTML = '<div class="test-result warning">No auth token - run authentication test first</div>';
+                return;
+            }
+
+            try {
+                const controller = new AbortController();
+                setTimeout(() => controller.abort(), 10000);
+                
+                const response = await fetch('/api/v1/entities/list?limit=1', {
+                    headers: { 'Authorization': `Bearer ${authToken}` },
+                    signal: controller.signal
+                });
+
+                const responseText = await response.text();
+                
+                container.innerHTML = `
+                    <div class="test-result info">Response Status: ${response.status}</div>
+                    <div class="test-result info">Response Headers: ${JSON.stringify(Object.fromEntries(response.headers))}</div>
+                    <pre>${responseText}</pre>
+                `;
+            } catch (error) {
+                container.innerHTML = `<div class="test-result error">Error: ${error.message}</div>`;
+            }
+        }
+
+        // Auto-run quick tests on page load
+        window.onload = () => {
+            runQuickTests();
+        };
+    </script>
+</body>
+</html>

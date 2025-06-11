@@ -50,7 +50,7 @@ RESPONSE=$(curl -sk -X POST "$API_URL/entities/create" \
     \"id\": \"$METRIC_ID\",
     \"tags\": [
       \"type:metric\",
-      \"dataspace:system\",
+      \"dataset:system\",
       \"name:test_recovery\",
       \"unit:count\",
       \"description:Test metric for recovery fix\",

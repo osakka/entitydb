@@ -352,6 +352,10 @@ func main() {
 	apiRouter.HandleFunc("/metrics/history", metricsHistoryHandler.GetMetricHistory).Methods("GET")
 	apiRouter.HandleFunc("/metrics/available", metricsHistoryHandler.GetAvailableMetrics).Methods("GET")
 	
+	// Comprehensive metrics endpoint for 70T scale monitoring
+	comprehensiveMetricsHandler := api.NewComprehensiveMetricsHandler(server.entityRepo)
+	apiRouter.HandleFunc("/metrics/comprehensive", comprehensiveMetricsHandler.ServeHTTP).Methods("GET")
+	
 	// Start background metrics collector with configured interval
 	logger.Info("Metrics collection interval set to %v", cfg.MetricsInterval)
 	
@@ -410,27 +414,27 @@ func main() {
 	apiRouter.HandleFunc("/admin/trace-subsystems", api.RBACMiddleware(server.entityRepo, server.sessionManager, api.RBACPermission{Resource: "admin", Action: "update"})(logControlHandler.SetTraceSubsystems)).Methods("POST")
 	apiRouter.HandleFunc("/admin/trace-subsystems", api.RBACMiddleware(server.entityRepo, server.sessionManager, api.RBACPermission{Resource: "admin", Action: "view"})(logControlHandler.GetTraceSubsystems)).Methods("GET")
 	
-	// Dataspace management routes with RBAC
-	dataspaceHandler := api.NewDataspaceHandler(server.entityRepo)
-	dataspaceHandlerRBAC := api.NewDataspaceHandlerRBAC(dataspaceHandler, server.entityRepo, server.sessionManager)
+	// Dataset management routes with RBAC
+	datasetHandler := api.NewDatasetHandler(server.entityRepo)
+	datasetHandlerRBAC := api.NewDatasetHandlerRBAC(datasetHandler, server.entityRepo, server.sessionManager)
 	
-	// Dataspace CRUD operations
-	apiRouter.HandleFunc("/dataspaces", dataspaceHandlerRBAC.ListDataspaces).Methods("GET")
-	apiRouter.HandleFunc("/dataspaces", dataspaceHandlerRBAC.CreateDataspace).Methods("POST")
-	apiRouter.HandleFunc("/dataspaces/{id}", dataspaceHandlerRBAC.GetDataspace).Methods("GET")
-	apiRouter.HandleFunc("/dataspaces/{id}", dataspaceHandlerRBAC.UpdateDataspace).Methods("PUT")
-	apiRouter.HandleFunc("/dataspaces/{id}", dataspaceHandlerRBAC.DeleteDataspace).Methods("DELETE")
+	// Dataset CRUD operations
+	apiRouter.HandleFunc("/datasets", datasetHandlerRBAC.ListDatasets).Methods("GET")
+	apiRouter.HandleFunc("/datasets", datasetHandlerRBAC.CreateDataset).Methods("POST")
+	apiRouter.HandleFunc("/datasets/{id}", datasetHandlerRBAC.GetDataset).Methods("GET")
+	apiRouter.HandleFunc("/datasets/{id}", datasetHandlerRBAC.UpdateDataset).Methods("PUT")
+	apiRouter.HandleFunc("/datasets/{id}", datasetHandlerRBAC.DeleteDataset).Methods("DELETE")
 	
-	// Dataspace management operations - removed grant/revoke until implemented
+	// Dataset management operations - removed grant/revoke until implemented
 	
-	// Dataspace-scoped entity operations with RBAC
-	dataspaceEntityHandlerRBAC := api.NewDataspaceEntityHandlerRBAC(server.entityHandler, server.entityRepo, server.sessionManager)
+	// Dataset-scoped entity operations with RBAC
+	datasetEntityHandlerRBAC := api.NewDatasetEntityHandlerRBAC(server.entityHandler, server.entityRepo, server.sessionManager)
 	
-	// Basic dataspace entity operations  
-	apiRouter.HandleFunc("/dataspaces/{dataspace}/entities/create", dataspaceEntityHandlerRBAC.CreateDataspaceEntity()).Methods("POST")
-	apiRouter.HandleFunc("/dataspaces/{dataspace}/entities/query", dataspaceEntityHandlerRBAC.QueryDataspaceEntities()).Methods("GET")
+	// Basic dataset entity operations  
+	apiRouter.HandleFunc("/datasets/{dataset}/entities/create", datasetEntityHandlerRBAC.CreateDatasetEntity()).Methods("POST")
+	apiRouter.HandleFunc("/datasets/{dataset}/entities/query", datasetEntityHandlerRBAC.QueryDatasetEntities()).Methods("GET")
 	
-	// Dataspace relationship operations - removed until implemented
+	// Dataset relationship operations - removed until implemented
 	
 	// Swagger UI route
 	router.PathPrefix("/swagger/").Handler(httpSwagger.Handler(

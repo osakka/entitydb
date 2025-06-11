@@ -6,8 +6,8 @@ import (
 	"entitydb/logger"
 )
 
-// ListEntitiesDataspaceAware handles listing entities with dataspace support
-func (h *EntityHandler) ListEntitiesDataspaceAware(w http.ResponseWriter, r *http.Request) {
+// ListEntitiesDatasetAware handles listing entities with dataset support
+func (h *EntityHandler) ListEntitiesDatasetAware(w http.ResponseWriter, r *http.Request) {
 	// Check if timestamps should be included in response
 	includeTimestamps := r.URL.Query().Get("include_timestamps") == "true"
 	
@@ -27,7 +27,7 @@ func (h *EntityHandler) ListEntitiesDataspaceAware(w http.ResponseWriter, r *htt
 		tags[i] = strings.TrimSpace(tags[i])
 	}
 	
-	// Use ListByTags which supports dataspace queries
+	// Use ListByTags which supports dataset queries
 	entities, err := h.repo.ListByTags(tags, matchAll)
 	if err != nil {
 		logger.Error("Failed to list entities by tags: %v", err)

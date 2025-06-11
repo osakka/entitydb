@@ -1,9 +1,9 @@
 #!/bin/bash
-# Test dataspace query performance
+# Test dataset query performance
 
 cd "$(dirname "$0")/../.."
 
-echo "=== Dataspace Performance Test ==="
+echo "=== Dataset Performance Test ==="
 echo
 
 # Clean start
@@ -12,7 +12,7 @@ sleep 1
 rm -rf var/test_perf
 mkdir -p var/test_perf
 
-# Start server with dataspace mode
+# Start server with dataset mode
 export ENTITYDB_DATA_PATH=var/test_perf
 export ENTITYDB_DATASPACE=true
 
@@ -29,10 +29,10 @@ TOKEN=$(curl -s -X POST http://localhost:8085/api/v1/auth/login \
      -H "Content-Type: application/json" \
      -d '{"username":"admin","password":"admin"}' | jq -r '.token')
 
-echo "Creating entities across multiple dataspaces..."
+echo "Creating entities across multiple datasets..."
 echo
 
-# Create many entities in different dataspaces
+# Create many entities in different datasets
 echo -n "Creating worca entities: "
 for i in $(seq 1 100); do
     curl -s -X POST http://localhost:8085/api/v1/entities/create \
@@ -40,7 +40,7 @@ for i in $(seq 1 100); do
          -H "Content-Type: application/json" \
          -d "{
            \"id\": \"worca-task-$i\",
-           \"tags\": [\"dataspace:worca\", \"type:task\", \"project:p$((i % 10))\"],
+           \"tags\": [\"dataset:worca\", \"type:task\", \"project:p$((i % 10))\"],
            \"content\": \"Task $i in worca\"
          }" > /dev/null
     [ $((i % 10)) -eq 0 ] && echo -n "."
@@ -54,7 +54,7 @@ for i in $(seq 1 200); do
          -H "Content-Type: application/json" \
          -d "{
            \"id\": \"metric-$i\",
-           \"tags\": [\"dataspace:metrics\", \"type:metric\", \"host:server$((i % 20))\"],
+           \"tags\": [\"dataset:metrics\", \"type:metric\", \"host:server$((i % 20))\"],
            \"content\": \"Metric $i\"
          }" > /dev/null
     [ $((i % 20)) -eq 0 ] && echo -n "."
@@ -83,26 +83,26 @@ echo
 echo "Testing query performance..."
 echo
 
-# Test 1: Query specific dataspace
-echo "1. Querying worca dataspace (100 entities):"
+# Test 1: Query specific dataset
+echo "1. Querying worca dataset (100 entities):"
 START=$(date +%s.%N)
-RESULT=$(curl -s -X GET "http://localhost:8085/api/v1/entities/list?tags=dataspace:worca" \
+RESULT=$(curl -s -X GET "http://localhost:8085/api/v1/entities/list?tags=dataset:worca" \
      -H "Authorization: Bearer $TOKEN" | jq -r 'length')
 END=$(date +%s.%N)
 TIME=$(echo "$END - $START" | bc)
 echo "   Found: $RESULT entities in ${TIME}s"
 
-# Test 2: Query larger dataspace
+# Test 2: Query larger dataset
 echo
-echo "2. Querying metrics dataspace (200 entities):"
+echo "2. Querying metrics dataset (200 entities):"
 START=$(date +%s.%N)
-RESULT=$(curl -s -X GET "http://localhost:8085/api/v1/entities/list?tags=dataspace:metrics" \
+RESULT=$(curl -s -X GET "http://localhost:8085/api/v1/entities/list?tags=dataset:metrics" \
      -H "Authorization: Bearer $TOKEN" | jq -r 'length')
 END=$(date +%s.%N)
 TIME=$(echo "$END - $START" | bc)
 echo "   Found: $RESULT entities in ${TIME}s"
 
-# Test 3: Global query (no dataspace)
+# Test 3: Global query (no dataset)
 echo
 echo "3. Global query (all 351 entities):"
 START=$(date +%s.%N)
@@ -112,11 +112,11 @@ END=$(date +%s.%N)
 TIME=$(echo "$END - $START" | bc)
 echo "   Found: $RESULT entities in ${TIME}s"
 
-# Test 4: Complex filter within dataspace
+# Test 4: Complex filter within dataset
 echo
 echo "4. Filtered query in worca (project:p5):"
 START=$(date +%s.%N)
-RESULT=$(curl -s -X GET "http://localhost:8085/api/v1/entities/list?tags=dataspace:worca,project:p5&matchAll=true" \
+RESULT=$(curl -s -X GET "http://localhost:8085/api/v1/entities/list?tags=dataset:worca,project:p5&matchAll=true" \
      -H "Authorization: Bearer $TOKEN" | jq -r 'length')
 END=$(date +%s.%N)
 TIME=$(echo "$END - $START" | bc)
@@ -124,14 +124,14 @@ echo "   Found: $RESULT entities in ${TIME}s"
 
 echo
 echo "Index files created:"
-ls -lh var/test_perf/dataspaces/
+ls -lh var/test_perf/datasets/
 
 echo
 echo "Performance Summary:"
 echo "==================="
-echo "✅ Dataspace queries only search within their isolated index"
-echo "✅ Each dataspace maintains its own .idx file"
-echo "✅ Query performance scales with dataspace size, not total DB size"
+echo "✅ Dataset queries only search within their isolated index"
+echo "✅ Each dataset maintains its own .idx file"
+echo "✅ Query performance scales with dataset size, not total DB size"
 
 # Cleanup
 kill $SERVER_PID 2>/dev/null

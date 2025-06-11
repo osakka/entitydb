@@ -12,7 +12,7 @@ This directory contains detailed implementation documentation for EntityDB featu
 
 ### Storage & Performance
 - [Tag Indexing](impl-tag-indexing.md) - Advanced indexing system
-- [Dataspace Architecture](impl-dataspace.md) - Multi-tenant design
+- [Dataset Architecture](impl-dataset.md) - Multi-tenant design
 - [Performance Optimizations](impl-performance.md) - Speed and memory improvements
 - [WAL Management](impl-wal.md) - Write-ahead logging system
 
