@@ -22,6 +22,13 @@
     
     <!-- Remove chart.js adapter since we're using ApexCharts -->
     
+    <!-- Load foundation components first -->
+    <script src="/js/logger.js"></script>
+    <script src="/js/api-client.js"></script>
+    <script src="/js/notification-system.js"></script>
+    <script src="/js/loading-states.js"></script>
+    <script src="/js/base-component.js"></script>
+    
     <!-- Load custom components -->
     <script src="/js/entitydb-widgets.js"></script>
     <script src="/js/entity-browser.js"></script>
@@ -659,6 +666,9 @@
                 </div>
                 <div class="header-right" style="display: flex; align-items: center; gap: 16px;">
                     <template v-if="isAuthenticated">
+                        <button @click="showDebugPanel = !showDebugPanel" class="dark-mode-toggle" title="Debug Panel" v-if="api && api.debug">
+                            <i class="fas fa-bug"></i>
+                        </button>
                         <button @click="toggleDarkMode" class="dark-mode-toggle" :title="isDarkMode ? 'Light Mode' : 'Dark Mode'">
                             <i :class="isDarkMode ? 'fas fa-sun' : 'fas fa-moon'"></i>
                         </button>
@@ -712,8 +722,10 @@
                                     required
                                 >
                             </div>
-                            <button type="submit" class="btn btn-primary" style="width: 100%;">
-                                <i class="fas fa-sign-in-alt"></i> Login
+                            <button type="submit" class="btn btn-primary" style="width: 100%;" :disabled="loading">
+                                <loading-spinner v-if="loading" size="small" />
+                                <i v-else class="fas fa-sign-in-alt"></i> 
+                                {{ loading ? 'Logging in...' : 'Login' }}
                             </button>
                         </form>
                     </div>
@@ -752,9 +764,12 @@
                         </div>
                     </div>
 
+                    <!-- Loading Overlay -->
+                    <loading-overlay v-if="loading" :message="loadingMessage" />
+                    
                     <!-- Widget Grid -->
                     <grid-layout
-                        v-if="gridLayout.length > 0"
+                        v-if="!loading && gridLayout.length > 0"
                         v-model:layout="gridLayout"
                         :col-num="12"
                         :row-height="30"
@@ -785,7 +800,7 @@
                     </grid-layout>
 
                     <!-- Empty State -->
-                    <div v-if="widgets.length === 0" style="text-align: center; padding: 60px; color: #6c757d;">
+                    <div v-if="!loading && widgets.length === 0" style="text-align: center; padding: 60px; color: #6c757d;">
                         <i class="fas fa-th-large" style="font-size: 48px; margin-bottom: 16px; opacity: 0.3;"></i>
                         <p style="font-size: 18px; margin-bottom: 24px;">No widgets added yet</p>
                         <button @click="showAddWidget = true" class="btn btn-primary">
@@ -866,6 +881,50 @@
                         <div style="font-weight: 600; font-size: 12px;">{{ widgetType.name }}</div>
                         <div style="font-size: 10px; color: #6c757d; margin-top: 4px;">
                             {{ widgetType.description }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Debug Panel Modal -->
+        <div v-if="showDebugPanel" class="modal-backdrop" @click.self="showDebugPanel = false">
+            <div class="modal" style="max-width: 800px;">
+                <div class="modal-header">
+                    <h3 style="margin: 0;">Debug Panel</h3>
+                    <button @click="showDebugPanel = false" class="widget-action">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div style="padding: 0 24px 24px;">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+                        <div>
+                            <h4>Debug Controls</h4>
+                            <button @click="toggleDebugMode" class="btn btn-secondary" style="margin-right: 10px;">
+                                {{ (api && api.debug) ? 'Disable' : 'Enable' }} Debug Mode
+                            </button>
+                            <button @click="exportLogs" class="btn btn-secondary">
+                                Export Logs
+                            </button>
+                        </div>
+                        <div>
+                            <h4>Performance</h4>
+                            <p><strong>Session ID:</strong> {{ logger ? logger.sessionId : 'N/A' }}</p>
+                            <p><strong>API Requests:</strong> {{ apiRequestCount || 0 }}</p>
+                            <p><strong>Last Error:</strong> {{ lastError ? lastError.message : 'None' }}</p>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <h4>Recent Errors</h4>
+                        <div style="max-height: 200px; overflow-y: auto; background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 12px;">
+                            <div v-for="error in recentErrors.slice(-10)" :key="error.timestamp">
+                                <strong>{{ new Date(error.timestamp).toLocaleTimeString() }}</strong> 
+                                [{{ error.component }}] {{ error.message }}
+                            </div>
+                            <div v-if="recentErrors.length === 0" style="color: #6c757d;">
+                                No recent errors
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1169,7 +1228,9 @@
                 'apexchart': window.VueApexCharts || {},
                 'entity-browser': window.EntityBrowser || {},
                 'rbac-manager': window.RBACManager || {},
-                'dataset-manager': window.DatasetManager || {}
+                'dataset-manager': window.DatasetManager || {},
+                // Loading components
+                ...LoadingStates.components
             },
             data() {
                 return {
@@ -1353,19 +1414,42 @@
                     
                     // UI state
                     notification: null,
-                    layoutSaveTimeout: null
+                    layoutSaveTimeout: null,
+                    
+                    // Infrastructure
+                    logger: null,
+                    api: null,
+                    
+                    // Loading states
+                    loading: false,
+                    loadingMessage: '',
+                    
+                    // Debug panel
+                    showDebugPanel: false,
+                    apiRequestCount: 0,
+                    lastError: null
                 };
             },
             
+            created() {
+                // Initialize logger and API client
+                this.logger = new Logger('Dashboard');
+                this.api = new EntityDBClient();
+                this.logger.info('EntityDB Dashboard created');
+            },
+            
             mounted() {
-                console.log('EntityDB Dashboard mounted');
-                console.log('Components available:', {
+                this.logger.info('EntityDB Dashboard mounted');
+                this.logger.debug('Components available:', {
                     GridLayout: !!window.SimpleGridLayout,
                     GridItem: !!window.SimpleGridItem,
                     EntityBrowser: !!window.EntityBrowser,
                     RBACManager: !!window.RBACManager,
                     DatasetManager: !!window.DatasetManager,
-                    EntityDBWidgets: !!window.EntityDBWidgets
+                    EntityDBWidgets: !!window.EntityDBWidgets,
+                    Logger: !!window.Logger,
+                    EntityDBClient: !!window.EntityDBClient,
+                    NotificationSystem: !!window.notificationSystem
                 });
                 
                 // First check server connectivity
@@ -1404,6 +1488,13 @@
                         this.loadSystemStats();
                     }
                 }, 30000);
+                
+                // Add keyboard shortcuts
+                document.addEventListener('keydown', this.handleKeyboardShortcuts);
+            },
+            
+            beforeUnmount() {
+                document.removeEventListener('keydown', this.handleKeyboardShortcuts);
             },
             
             methods: {
@@ -1444,54 +1535,51 @@
                 
                 // Authentication
                 async login() {
-                    console.log('Attempting login for:', this.loginForm.username);
+                    this.loading = true;
+                    this.loadingMessage = 'Authenticating...';
+                    this.logger.info('Attempting login', { username: this.loginForm.username });
                     try {
-                        const response = await fetch('/api/v1/auth/login', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(this.loginForm)
-                        });
+                        const data = await this.api.login(this.loginForm.username, this.loginForm.password);
                         
-                        console.log('Login response status:', response.status);
+                        this.logger.info('Login successful', { user: data.user });
                         
-                        if (response.ok) {
-                            const data = await response.json();
-                            console.log('Login successful, user:', data.user);
-                            
-                            this.sessionToken = data.token;
-                            this.currentUser = data.user;
-                            this.isAuthenticated = true;
-                            
-                            // Save to localStorage
-                            localStorage.setItem('entitydb-admin-token', data.token);
-                            localStorage.setItem('entitydb-admin-user', JSON.stringify(data.user));
-                            
-                            this.showNotification('Login successful!', 'success');
-                            
-                            // Log current state
-                            console.log('After login - isAuthenticated:', this.isAuthenticated);
-                            console.log('After login - activeTab:', this.activeTab);
-                            
-                            this.loadDashboard();
-                            this.loadSystemStats();
-                        } else {
-                            const error = await response.json();
-                            console.error('Login failed:', error);
-                            this.showNotification(error.error || 'Login failed', 'error');
-                        }
+                        this.sessionToken = data.token;
+                        this.currentUser = data.user;
+                        this.isAuthenticated = true;
+                        
+                        // Update API client token
+                        this.api.setToken(data.token);
+                        
+                        // Save to localStorage
+                        localStorage.setItem('entitydb-admin-token', data.token);
+                        localStorage.setItem('entitydb-admin-user', JSON.stringify(data.user));
+                        
+                        this.notify('Login successful!', 'success');
+                        
+                        this.loadDashboard();
+                        this.loadSystemStats();
                     } catch (error) {
-                        console.error('Login error:', error);
-                        this.showNotification('Login error: ' + error.message, 'error');
+                        this.logger.error('Login failed', error);
+                        if (error instanceof APIError) {
+                            this.notify(error.message, 'error');
+                        } else {
+                            this.notify('Login error: ' + error.message, 'error');
+                        }
+                    } finally {
+                        this.loading = false;
+                        this.loadingMessage = '';
                     }
                 },
                 
                 logout() {
+                    this.logger.info('User logout');
                     this.isAuthenticated = false;
                     this.sessionToken = null;
                     this.currentUser = null;
+                    this.api.setToken(null);
                     localStorage.removeItem('entitydb-admin-token');
                     localStorage.removeItem('entitydb-admin-user');
-                    this.showNotification('Logged out', 'info');
+                    this.notify('Logged out', 'info');
                 },
                 
                 // Tab switching
@@ -1516,11 +1604,58 @@
                     });
                 },
                 
+                // Keyboard shortcuts
+                handleKeyboardShortcuts(event) {
+                    if (!this.isAuthenticated) return;
+                    
+                    // Ctrl + 1-6 for tab switching
+                    if (event.ctrlKey && event.key >= '1' && event.key <= '6') {
+                        event.preventDefault();
+                        const tabIndex = parseInt(event.key) - 1;
+                        if (this.tabs[tabIndex]) {
+                            this.switchTab(this.tabs[tabIndex].id);
+                        }
+                    }
+                    
+                    // Ctrl + D for toggle dark mode
+                    if (event.ctrlKey && event.key === 'd') {
+                        event.preventDefault();
+                        this.toggleDarkMode();
+                    }
+                    
+                    // Ctrl + R for refresh current view
+                    if (event.ctrlKey && event.key === 'r') {
+                        event.preventDefault();
+                        this.refreshCurrentView();
+                    }
+                    
+                    // Escape to close modals
+                    if (event.key === 'Escape') {
+                        this.showAddWidget = false;
+                    }
+                },
+                
+                // Refresh current view
+                refreshCurrentView() {
+                    this.logger.info('Refreshing current view', { tab: this.activeTab });
+                    switch (this.activeTab) {
+                        case 'dashboard':
+                            this.loadDashboard();
+                            this.loadSystemStats();
+                            break;
+                        default:
+                            // For other tabs, we'll emit a refresh event
+                            this.$emit('refresh-tab', this.activeTab);
+                    }
+                    this.notify('View refreshed', 'info');
+                },
+                
                 // Dark mode
                 toggleDarkMode() {
                     this.isDarkMode = !this.isDarkMode;
                     document.body.classList.toggle('dark-mode');
                     localStorage.setItem('entitydb-dark-mode', this.isDarkMode);
+                    this.logger.debug('Dark mode toggled', { darkMode: this.isDarkMode });
                 },
                 
                 // Dataset
@@ -1534,69 +1669,47 @@
                 // Dashboard methods
                 async loadDashboard() {
                     try {
-                        console.log('Loading dashboard...');
-                        console.log('- Token:', this.sessionToken ? `${this.sessionToken.substring(0, 20)}...` : 'No token');
-                        console.log('- User:', this.currentUser ? this.currentUser.username : 'No user');
-                        console.log('- API URL:', `${window.location.origin}/api/v1/entities/list?tags=type:dashboard_layout`);
-                        
-                        const response = await fetch(`/api/v1/entities/list?tags=type:dashboard_layout`, {
-                            headers: { 'Authorization': `Bearer ${this.sessionToken}` }
+                        this.logger.info('Loading dashboard', { 
+                            user: this.currentUser ? this.currentUser.username : 'No user'
                         });
                         
-                        console.log('Response status:', response.status);
-                        console.log('Response headers:', response.headers);
+                        const entities = await this.api.listEntities({ tags: 'type:dashboard_layout' });
+                        this.logger.debug('Loaded dashboard entities', { count: entities.length });
                         
-                        if (response.ok) {
-                            const entities = await response.json();
-                            console.log('Loaded entities:', entities.length);
+                        const userLayout = entities.find(e => 
+                            e.tags && e.tags.some(t => t === `user:${this.currentUser.username}`)
+                        );
+                        
+                        if (userLayout && userLayout.content) {
+                            const content = this.isBase64(userLayout.content) 
+                                ? atob(userLayout.content) 
+                                : userLayout.content;
+                            const layout = JSON.parse(content);
+                            this.widgets = layout.widgets || [];
+                            this.gridLayout = layout.gridLayout || [];
+                            this.logger.info('Loaded dashboard layout', { widgets: this.widgets.length });
                             
-                            const userLayout = entities.find(e => 
-                                e.tags && e.tags.some(t => t === `user:${this.currentUser.username}`)
-                            );
-                            
-                            if (userLayout && userLayout.content) {
-                                const content = this.isBase64(userLayout.content) 
-                                    ? atob(userLayout.content) 
-                                    : userLayout.content;
-                                const layout = JSON.parse(content);
-                                this.widgets = layout.widgets || [];
-                                this.gridLayout = layout.gridLayout || [];
-                                console.log('Loaded widgets:', this.widgets.length);
-                                
-                                // If we have widgets but no grid layout, generate it
-                                if (this.widgets.length > 0 && this.gridLayout.length === 0) {
-                                    this.updateGridLayout();
-                                }
-                            } else {
-                                // No saved dashboard - that's OK, show empty state
-                                console.log('No saved dashboard found for user:', this.currentUser.username);
+                            // If we have widgets but no grid layout, generate it
+                            if (this.widgets.length > 0 && this.gridLayout.length === 0) {
+                                this.updateGridLayout();
                             }
                         } else {
-                            console.error('Failed to load dashboard:', response.status, response.statusText);
-                            const errorText = await response.text();
-                            console.error('Error response:', errorText);
-                            
-                            if (response.status === 401) {
-                                console.log('Authentication failed - token may be expired');
-                                // Clear invalid session
-                                this.logout();
-                            }
+                            // No saved dashboard - that's OK, show empty state
+                            this.logger.debug('No saved dashboard found', { user: this.currentUser.username });
                         }
                     } catch (error) {
-                        console.error('Error loading dashboard:', error);
-                        console.error('Error details:', {
-                            name: error.name,
-                            message: error.message,
-                            stack: error.stack
-                        });
+                        this.logger.error('Error loading dashboard', error);
+                        
+                        if (error instanceof APIError && error.status === 401) {
+                            this.logger.warn('Authentication failed - token may be expired');
+                            this.logout();
+                            return;
+                        }
                         
                         // Check if it's a network error
                         if (error.name === 'TypeError' && error.message.includes('NetworkError')) {
-                            console.error('Network error - Server may not be running or SSL certificate issue');
-                            console.error('Expected URL:', `${window.location.origin}/api/v1/entities/list`);
-                            
-                            // Try to provide more helpful error info
-                            this.showNotification('Unable to connect to server. Redirecting to connection help...', 'error');
+                            this.logger.error('Network error - Server may not be running or SSL certificate issue');
+                            this.notify('Unable to connect to server. Redirecting to connection help...', 'error');
                             
                             // If we're having repeated connection issues, redirect to help page
                             setTimeout(() => {
@@ -1604,6 +1717,8 @@
                                     window.location.href = '/connection-help.html';
                                 }
                             }, 2000);
+                        } else {
+                            this.notify('Failed to load dashboard', 'error');
                         }
                     }
                 },
@@ -1793,11 +1908,15 @@
                 },
                 
                 // UI helpers
-                showNotification(message, type = 'info') {
-                    this.notification = { message, type };
-                    setTimeout(() => {
-                        this.notification = null;
-                    }, 3000);
+                // Notification methods
+                showNotification(message, type = 'info', options = {}) {
+                    // Backwards compatibility
+                    return this.notify(message, type, options);
+                },
+                
+                notify(message, type = 'info', options = {}) {
+                    this.logger.debug('Showing notification', { message, type });
+                    return window.notificationSystem.show(message, type, options);
                 },
                 
                 handleError(error) {
@@ -1826,6 +1945,24 @@
                     this.showNotification(`Viewing relationships for ${entity.id}`, 'info');
                 },
                 
+                // Debug methods
+                toggleDebugMode() {
+                    const newDebugMode = !(this.api && this.api.debug);
+                    if (this.api) {
+                        this.api.setDebug(newDebugMode);
+                    }
+                    if (this.logger) {
+                        this.logger.enabled = newDebugMode;
+                    }
+                    window.entitydbLogger.setDebugMode(newDebugMode);
+                    this.notify(`Debug mode ${newDebugMode ? 'enabled' : 'disabled'}`, 'info');
+                },
+                
+                exportLogs() {
+                    window.entitydbLogger.exportErrors();
+                    this.notify('Logs exported', 'success');
+                },
+                
                 // Utilities
                 isBase64(str) {
                     try {
@@ -1852,6 +1989,12 @@
                         return `${match[1]}h ${match[2]}m`;
                     }
                     return uptime;
+                }
+            },
+            
+            computed: {
+                recentErrors() {
+                    return window.entitydbLogger.getStoredErrors();
                 }
             }
         }).mount('#app');
