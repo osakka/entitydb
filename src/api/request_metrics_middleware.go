@@ -13,12 +13,18 @@ import (
 
 // RequestMetricsMiddleware tracks HTTP request metrics
 type RequestMetricsMiddleware struct {
-	repo models.EntityRepository
+	repo       models.EntityRepository
+	workerPool *MetricsWorkerPool
 }
 
 // NewRequestMetricsMiddleware creates a new request metrics middleware
 func NewRequestMetricsMiddleware(repo models.EntityRepository) *RequestMetricsMiddleware {
-	return &RequestMetricsMiddleware{repo: repo}
+	// Create worker pool with 10 workers and queue size of 1000
+	workerPool := NewMetricsWorkerPool(10, 1000)
+	return &RequestMetricsMiddleware{
+		repo:       repo,
+		workerPool: workerPool,
+	}
 }
 
 // responseWriter wraps http.ResponseWriter to capture status code and size
@@ -85,8 +91,18 @@ func (m *RequestMetricsMiddleware) Middleware(next http.Handler) http.Handler {
 			return
 		}
 		
-		// Store metrics asynchronously to avoid blocking
-		go m.storeRequestMetrics(r.Method, path, wrapped.statusCode, duration, requestSize, int64(wrapped.size))
+		// Submit metrics task to worker pool
+		method := r.Method
+		statusCode := wrapped.statusCode
+		respSize := int64(wrapped.size)
+		
+		submitted := m.workerPool.Submit(func() {
+			m.storeRequestMetrics(method, path, statusCode, duration, requestSize, respSize)
+		})
+		
+		if !submitted {
+			logger.Warn("Failed to submit metrics task for %s %s (queue full)", method, path)
+		}
 	})
 }
 
@@ -282,5 +298,12 @@ func (m *RequestMetricsMiddleware) storeMetric(name string, value float64, unit 
 	valueTag := "value:" + strconv.FormatFloat(value, 'f', 2, 64)
 	if err := m.repo.AddTag(metricID, valueTag); err != nil {
 		logger.Error("Failed to update request metric %s: %v", metricID, err)
+	}
+}
+// Shutdown gracefully stops the metrics worker pool
+func (m *RequestMetricsMiddleware) Shutdown() {
+	if m.workerPool != nil {
+		logger.Info("Shutting down metrics worker pool...")
+		m.workerPool.Shutdown()
 	}
 }
