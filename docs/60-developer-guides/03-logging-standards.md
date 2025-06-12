@@ -1,8 +1,7 @@
 # EntityDB Logging Standards
 
-> **Version**: 2.0  
-> **Status**: Implemented in v2.27.0  
-> **Component**: Professional logging system
+> **Version**: v2.30.0 | **Last Updated**: 2025-06-12 | **Status**: AUTHORITATIVE  
+> **Component**: Professional logging system with runtime control
 
 ## Overview
 
@@ -192,6 +191,158 @@ logger.Debug("User credentials: %+v", credentials)  // DANGEROUS
 **✅ Log operation results**:
 ```go
 logger.Info("Authentication completed for user %s", username)
+```
+
+## Runtime Control
+
+EntityDB provides comprehensive runtime control of logging levels and trace subsystems through multiple interfaces.
+
+### API-Based Control
+
+**Set Log Level:**
+```bash
+curl -k -X POST https://localhost:8085/api/v1/admin/log-level \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"level": "DEBUG"}'
+```
+
+**Get Current Level:**
+```bash
+curl -k -X GET https://localhost:8085/api/v1/admin/log-level \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+**Enable Trace Subsystems:**
+```bash
+curl -k -X POST https://localhost:8085/api/v1/admin/trace-subsystems \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"enable": ["auth", "storage", "locks"]}'
+```
+
+**Disable Trace Subsystems:**
+```bash
+curl -k -X POST https://localhost:8085/api/v1/admin/trace-subsystems \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"disable": ["locks"]}'
+```
+
+**Clear All Trace Subsystems:**
+```bash
+curl -k -X POST https://localhost:8085/api/v1/admin/trace-subsystems \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"clear": true}'
+```
+
+### Environment Variable Control
+
+**Set Log Level:**
+```bash
+export ENTITYDB_LOG_LEVEL=DEBUG
+export ENTITYDB_LOG_LEVEL=TRACE
+export ENTITYDB_LOG_LEVEL=INFO  # Production default
+export ENTITYDB_LOG_LEVEL=WARN  # Minimal logging
+```
+
+**Enable Trace Subsystems:**
+```bash
+export ENTITYDB_TRACE_SUBSYSTEMS="auth,storage,metrics"
+```
+
+### Command Line Flag Control
+
+**Set Log Level:**
+```bash
+./bin/entitydb --entitydb-log-level=DEBUG
+./bin/entitydb --entitydb-log-level=TRACE
+```
+
+**Enable Trace Subsystems:**
+```bash
+./bin/entitydb --entitydb-trace-subsystems="auth,locks,storage"
+```
+
+### Configuration File Control
+
+**In `/opt/entitydb/share/config/entitydb.env`:**
+```bash
+# Default log level (TRACE, DEBUG, INFO, WARN, ERROR)
+ENTITYDB_LOG_LEVEL=INFO
+
+# Comma-separated list of trace subsystems to enable
+ENTITYDB_TRACE_SUBSYSTEMS=auth,storage
+```
+
+## Trace Subsystems
+
+### Available Subsystems
+
+- **auth**: Authentication and authorization operations
+- **storage**: Binary storage operations (read, write, index)
+- **locks**: Locking and concurrency control
+- **metrics**: Metrics collection and aggregation
+- **requests**: HTTP request processing
+- **session**: Session management operations
+- **config**: Configuration loading and updates
+
+### Usage Examples
+
+**Enable Specific Subsystem for Debugging:**
+```bash
+# Enable auth tracing for authentication issues
+export ENTITYDB_TRACE_SUBSYSTEMS=auth
+./bin/entitydb --entitydb-log-level=TRACE
+```
+
+**Multi-Subsystem Debugging:**
+```bash
+# Enable multiple subsystems for complex debugging
+export ENTITYDB_TRACE_SUBSYSTEMS=auth,storage,locks
+./bin/entitydbd.sh restart
+```
+
+**Production Troubleshooting:**
+```bash
+# Runtime enable auth tracing without restart
+curl -k -X POST https://localhost:8085/api/v1/admin/trace-subsystems \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"enable": ["auth"]}'
+
+# Disable when troubleshooting complete
+curl -k -X POST https://localhost:8085/api/v1/admin/trace-subsystems \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"clear": true}'
+```
+
+## Configuration Hierarchy
+
+The logging configuration follows this hierarchy (highest to lowest priority):
+
+1. **Runtime API Changes** (immediate, no restart required)
+2. **Command Line Flags** (requires restart)  
+3. **Environment Variables** (requires restart)
+4. **Configuration Files** (requires restart)
+
+## Zero-Overhead Design
+
+**Disabled Log Levels:**
+- Log level checking uses atomic operations
+- Disabled levels incur virtually zero CPU overhead
+- Trace subsystem checking uses efficient read locks
+- String formatting only occurs for enabled levels
+
+**Performance Verification:**
+```go
+// This incurs no overhead when DEBUG is disabled
+logger.Debug("expensive operation: %s", expensiveStringOperation())
+
+// But this still processes the string - avoid!
+if logger.IsDebugEnabled() {
+    logger.Debug("expensive operation: %s", expensiveStringOperation())
+}
 ```
 
 ## Configuration

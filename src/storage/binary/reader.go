@@ -72,7 +72,7 @@ type Reader struct {
 // Thread Safety:
 //   The returned Reader is safe for concurrent use.
 func NewReader(filename string) (*Reader, error) {
-	logger.Trace("Opening reader for file: %s", filename)
+	logger.TraceIf("storage", "Opening reader for file: %s", filename)
 	
 	file, err := os.Open(filename)
 	if err != nil {
@@ -87,7 +87,7 @@ func NewReader(filename string) (*Reader, error) {
 		file.Close()
 		return nil, err
 	}
-	logger.Trace("File size: %d bytes", stat.Size())
+	logger.TraceIf("storage", "File size: %d bytes", stat.Size())
 	
 	r := &Reader{
 		file:    file,
@@ -97,20 +97,20 @@ func NewReader(filename string) (*Reader, error) {
 	}
 	
 	// Read header
-	logger.Trace("Reading header")
+	logger.TraceIf("storage", "Reading header")
 	if err := r.header.Read(file); err != nil {
 		logger.Error("Failed to read header: %v", err)
 		return nil, err
 	}
 	
-	logger.Trace("Header read successfully: Magic=%x, Version=%d, EntityCount=%d, FileSize=%d",
+	logger.TraceIf("storage", "Header read successfully: Magic=%x, Version=%d, EntityCount=%d, FileSize=%d",
 		r.header.Magic, r.header.Version, r.header.EntityCount, r.header.FileSize)
-	logger.Trace("TagDictOffset=%d, TagDictSize=%d", r.header.TagDictOffset, r.header.TagDictSize)
-	logger.Trace("EntityIndexOffset=%d, EntityIndexSize=%d", r.header.EntityIndexOffset, r.header.EntityIndexSize)
+	logger.TraceIf("storage", "TagDictOffset=%d, TagDictSize=%d", r.header.TagDictOffset, r.header.TagDictSize)
+	logger.TraceIf("storage", "EntityIndexOffset=%d, EntityIndexSize=%d", r.header.EntityIndexOffset, r.header.EntityIndexSize)
 	
 	// Skip dictionary and index if no entities
 	if r.header.EntityCount == 0 {
-		logger.Trace("No entities in file, skipping dictionary and index")
+		logger.TraceIf("storage", "No entities in file, skipping dictionary and index")
 		return r, nil
 	}
 	

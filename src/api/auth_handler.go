@@ -141,7 +141,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Authenticate user using relationship-based security
-	logger.Debug("authenticating user %s", loginReq.Username)
+	logger.Info("authentication attempt for user %s", loginReq.Username)
 	logger.TraceIf("auth", "calling AuthenticateUser")
 	userEntity, err := h.securityManager.AuthenticateUser(loginReq.Username, loginReq.Password)
 	logger.TraceIf("auth", "AuthenticateUser returned")
@@ -171,7 +171,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(AuthErrorResponse{Error: "Invalid credentials"})
 		return
 	}
-	logger.Debug("user %s authenticated successfully", loginReq.Username)
+	logger.Info("user %s authenticated successfully", loginReq.Username)
 
 	// Extract user roles from entity tags
 	// Roles are stored as tags with the format "rbac:role:rolename"
@@ -186,7 +186,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	// Create session in database (this is what security middleware uses)
 	ipAddress := r.RemoteAddr
 	userAgent := r.Header.Get("User-Agent")
-	logger.Debug("Creating database session for user %s", userEntity.ID)
+	logger.TraceIf("auth", "creating database session for user %s", userEntity.ID)
 	dbSession, err := h.securityManager.CreateSession(userEntity, ipAddress, userAgent)
 	if err != nil {
 		logger.Error("failed to create database session for user %s: %v", userEntity.ID, err)
@@ -195,7 +195,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(AuthErrorResponse{Error: "Failed to create session"})
 		return
 	}
-	logger.Debug("Created database session with token: %s", dbSession.Token)
+	logger.TraceIf("auth", "created database session for user %s", userEntity.ID)
 
 	// Create response with session token
 	response := AuthLoginResponse{
@@ -226,7 +226,6 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	// 	logger.Error("Failed to track auth event: %v", err)
 	// }
 
-	logger.Debug("user %s authenticated, session created", loginReq.Username)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
 }

@@ -187,7 +187,7 @@ func (w *Writer) WriteEntity(entity *models.Entity) error {
 	defer w.mu.Unlock()
 	
 	// Log write intent
-	logger.Trace("Starting write for entity %s (tags=%d, content=%d bytes)", 
+	logger.TraceIf("storage", "Starting write for entity %s (tags=%d, content=%d bytes)", 
 		entity.ID, len(entity.Tags), len(entity.Content))
 	
 	// Validate entity
@@ -204,7 +204,7 @@ func (w *Writer) WriteEntity(entity *models.Entity) error {
 	contentChecksum := sha256.Sum256(entity.Content)
 	op.SetMetadata("content_checksum", hex.EncodeToString(contentChecksum[:]))
 	
-	logger.Trace("Entity %s content checksum: %x", entity.ID, contentChecksum)
+	logger.TraceIf("storage", "Entity %s content checksum: %x", entity.ID, contentChecksum)
 	
 	// Acquire buffer from memory pool to reduce GC pressure
 	// Large buffers (>64KB) are reused across write operations
@@ -231,14 +231,14 @@ func (w *Writer) WriteEntity(entity *models.Entity) error {
 	if !hasChecksum {
 		tags = append([]string{}, entity.Tags...)
 		tags = append(tags, checksumTag)
-		logger.Trace("Added checksum tag for entity %s: %s", entity.ID, checksumTag)
+		logger.TraceIf("storage", "Added checksum tag for entity %s: %s", entity.ID, checksumTag)
 	}
 	
 	// Convert tags to IDs
 	tagIDs := make([]uint32, len(tags))
 	for i, tag := range tags {
 		tagIDs[i] = w.tagDict.GetOrCreateID(tag)
-		logger.Trace("Tag '%s' assigned ID %d", tag, tagIDs[i])
+		logger.TraceIf("storage", "Tag '%s' assigned ID %d", tag, tagIDs[i])
 	}
 	
 	// Write entity header
@@ -248,7 +248,7 @@ func (w *Writer) WriteEntity(entity *models.Entity) error {
 		ContentCount: 1, // Now we store content as a single item
 	}
 	
-	logger.Trace("Writing entity header: Modified=%d, TagCount=%d, ContentCount=%d", 
+	logger.TraceIf("storage", "Writing entity header: Modified=%d, TagCount=%d, ContentCount=%d", 
 		header.Modified, header.TagCount, header.ContentCount)
 	
 	binary.Write(buffer, binary.LittleEndian, header)
@@ -268,13 +268,13 @@ func (w *Writer) WriteEntity(entity *models.Entity) error {
 		// 3. Default to application/octet-stream if not specified
 		// This ensures proper content handling when reading back
 		contentType := "application/octet-stream" // Default
-		logger.Trace("Entity %s has %d tags, checking for content type", entity.ID, len(entity.Tags))
+		logger.TraceIf("storage", "Entity %s has %d tags, checking for content type", entity.ID, len(entity.Tags))
 		for _, tag := range entity.Tags {
-			logger.Trace("Checking tag: %s", tag)
+			logger.TraceIf("storage", "Checking tag: %s", tag)
 			if strings.HasPrefix(tag, "content:type:") {
 				// Direct match (non-timestamped)
 				contentType = strings.TrimPrefix(tag, "content:type:")
-				logger.Trace("Found direct content type: %s", contentType)
+				logger.TraceIf("storage", "Found direct content type: %s", contentType)
 				break
 			} else if strings.Contains(tag, "|content:type:") {
 				// Timestamped tag format: "timestamp|content:type:value"
@@ -283,13 +283,13 @@ func (w *Writer) WriteEntity(entity *models.Entity) error {
 					tagPart := parts[1] // Use the part after timestamp
 					if strings.HasPrefix(tagPart, "content:type:") {
 						contentType = strings.TrimPrefix(tagPart, "content:type:")
-						logger.Trace("Found timestamped content type: %s", contentType)
+						logger.TraceIf("storage", "Found timestamped content type: %s", contentType)
 						break
 					}
 				}
 			}
 		}
-		logger.Trace("Final content type for entity %s: %s", entity.ID, contentType)
+		logger.TraceIf("storage", "Final content type for entity %s: %s", entity.ID, contentType)
 		
 		// Compression Strategy:
 		// - Content > 1KB is compressed using gzip
@@ -354,7 +354,7 @@ func (w *Writer) WriteEntity(entity *models.Entity) error {
 	op.SetMetadata("write_offset", offset)
 	op.SetMetadata("buffer_size", buffer.Len())
 	
-	logger.Trace("Writing entity %s: %d bytes at offset %d", entity.ID, buffer.Len(), offset)
+	logger.TraceIf("storage", "Writing entity %s: %d bytes at offset %d", entity.ID, buffer.Len(), offset)
 	
 	// Write to file
 	n, err := w.file.Write(buffer.Bytes())
@@ -372,7 +372,7 @@ func (w *Writer) WriteEntity(entity *models.Entity) error {
 	}
 	
 	op.SetMetadata("bytes_written", n)
-	logger.Trace("Successfully wrote %d bytes for entity %s", n, entity.ID)
+	logger.TraceIf("storage", "Successfully wrote %d bytes for entity %s", n, entity.ID)
 	
 	// Update index
 	entry := &IndexEntry{
@@ -394,7 +394,7 @@ func (w *Writer) WriteEntity(entity *models.Entity) error {
 	_, isUpdate := w.index[entity.ID]
 	w.index[entity.ID] = entry
 	
-	logger.Trace("Added index entry for %s: offset=%d, size=%d, isUpdate=%v", entity.ID, entry.Offset, entry.Size, isUpdate)
+	logger.TraceIf("storage", "Added index entry for %s: offset=%d, size=%d, isUpdate=%v", entity.ID, entry.Offset, entry.Size, isUpdate)
 	op.SetMetadata("index_offset", entry.Offset)
 	op.SetMetadata("index_size", entry.Size)
 	op.SetMetadata("is_update", isUpdate)
@@ -416,14 +416,14 @@ func (w *Writer) WriteEntity(entity *models.Entity) error {
 	// Update header - only increment count for new entities
 	if !isUpdate {
 		w.header.EntityCount++
-		logger.Trace("Incremented EntityCount to %d for new entity %s", w.header.EntityCount, entity.ID)
+		logger.TraceIf("storage", "Incremented EntityCount to %d for new entity %s", w.header.EntityCount, entity.ID)
 	} else {
-		logger.Trace("Updated existing entity %s, EntityCount remains %d", entity.ID, w.header.EntityCount)
+		logger.TraceIf("storage", "Updated existing entity %s, EntityCount remains %d", entity.ID, w.header.EntityCount)
 	}
 	w.header.FileSize = uint64(offset) + uint64(n)
 	w.header.LastModified = time.Now().Unix()
 	
-	logger.Trace("Updated header: EntityCount=%d, FileSize=%d", w.header.EntityCount, w.header.FileSize)
+	logger.TraceIf("storage", "Updated header: EntityCount=%d, FileSize=%d", w.header.EntityCount, w.header.FileSize)
 	op.SetMetadata("final_entity_count", w.header.EntityCount)
 	op.SetMetadata("final_file_size", w.header.FileSize)
 	
@@ -564,7 +564,7 @@ func (w *Writer) Close() error {
 		}
 		writtenCount++
 	}
-	logger.Trace("Wrote %d index entries (header claims %d)", writtenCount, w.header.EntityCount)
+	logger.TraceIf("storage", "Wrote %d index entries (header claims %d)", writtenCount, w.header.EntityCount)
 	
 	// Verify index count matches header
 	if writtenCount != int(w.header.EntityCount) {

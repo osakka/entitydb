@@ -33,7 +33,7 @@ func NewMetricsHandler(entityRepo models.EntityRepository) *MetricsHandler {
 // @Success 200 {string} string "Prometheus metrics"
 // @Router /metrics [get]
 func (h *MetricsHandler) PrometheusMetrics(w http.ResponseWriter, r *http.Request) {
-	logger.Debug("Handling Prometheus metrics request")
+	logger.TraceIf("metrics", "Handling Prometheus metrics request")
 	
 	w.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
 	

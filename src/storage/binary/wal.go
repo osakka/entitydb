@@ -93,7 +93,7 @@ type WAL struct {
 //   defer wal.Close()
 func NewWAL(dataPath string) (*WAL, error) {
 	walPath := filepath.Join(dataPath, "entitydb.wal")
-	logger.Debug("Creating WAL with dataPath: %s, resulting walPath: %s", dataPath, walPath)
+	logger.TraceIf("storage", "Creating WAL with dataPath: %s, resulting walPath: %s", dataPath, walPath)
 	
 	file, err := os.OpenFile(walPath, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0644)
 	if err != nil {
@@ -139,7 +139,7 @@ func (w *WAL) LogCreate(entity *models.Entity) error {
 	})
 	defer op.Complete()
 	
-	logger.Trace("Logging CREATE operation for entity %s", entity.ID)
+	logger.TraceIf("wal", "Logging CREATE operation for entity %s", entity.ID)
 	
 	err := w.logEntry(WALEntry{
 		OpType:    WALOpCreate,
@@ -155,7 +155,7 @@ func (w *WAL) LogCreate(entity *models.Entity) error {
 	}
 	
 	op.SetMetadata("sequence", w.sequence)
-	logger.Debug("Successfully logged CREATE for entity %s at sequence %d", entity.ID, w.sequence)
+	logger.TraceIf("wal", "Successfully logged CREATE for entity %s at sequence %d", entity.ID, w.sequence)
 	return nil
 }
 
@@ -168,7 +168,7 @@ func (w *WAL) LogUpdate(entity *models.Entity) error {
 	})
 	defer op.Complete()
 	
-	logger.Trace("Logging UPDATE operation for entity %s", entity.ID)
+	logger.TraceIf("wal", "Logging UPDATE operation for entity %s", entity.ID)
 	
 	err := w.logEntry(WALEntry{
 		OpType:    WALOpUpdate,
@@ -184,7 +184,7 @@ func (w *WAL) LogUpdate(entity *models.Entity) error {
 	}
 	
 	op.SetMetadata("sequence", w.sequence)
-	logger.Debug("Successfully logged UPDATE for entity %s at sequence %d", entity.ID, w.sequence)
+	logger.TraceIf("wal", "Successfully logged UPDATE for entity %s at sequence %d", entity.ID, w.sequence)
 	return nil
 }
 
@@ -195,7 +195,7 @@ func (w *WAL) LogDelete(entityID string) error {
 	})
 	defer op.Complete()
 	
-	logger.Trace("Logging DELETE operation for entity %s", entityID)
+	logger.TraceIf("wal", "Logging DELETE operation for entity %s", entityID)
 	
 	err := w.logEntry(WALEntry{
 		OpType:    WALOpDelete,
@@ -210,7 +210,7 @@ func (w *WAL) LogDelete(entityID string) error {
 	}
 	
 	op.SetMetadata("sequence", w.sequence)
-	logger.Debug("Successfully logged DELETE for entity %s at sequence %d", entityID, w.sequence)
+	logger.TraceIf("wal", "Successfully logged DELETE for entity %s at sequence %d", entityID, w.sequence)
 	return nil
 }
 
