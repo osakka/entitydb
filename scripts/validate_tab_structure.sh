@@ -21,15 +21,15 @@ else
     echo "✅ PASS"
 fi
 
-# Check for x-if templates
-echo -n "Checking for proper x-if templates... "
-XIF_COUNT=$(grep -c 'x-if="activeTab' "$HTML_FILE" 2>/dev/null || echo 0)
-if [ "$XIF_COUNT" -eq 0 ]; then
+# Check for Vue conditional classes
+echo -n "Checking for proper Vue conditional templates... "
+VUE_COUNT=$(grep -c ':class=.*active.*activeTab' "$HTML_FILE" 2>/dev/null || echo 0)
+if [ "$VUE_COUNT" -eq 0 ]; then
     echo "❌ FAIL"
-    echo "  No x-if templates found for tabs!"
+    echo "  No Vue conditional classes found for tabs!"
     ERRORS=$((ERRORS + 1))
 else
-    echo "✅ PASS ($XIF_COUNT tab templates found)"
+    echo "✅ PASS ($VUE_COUNT tab templates found)"
 fi
 
 # Check for nested tab-content

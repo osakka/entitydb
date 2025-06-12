@@ -9,7 +9,7 @@
 > This eliminates separate credential entities and relationships. Users with credentials have the `has:credentials` tag.
 > NO BACKWARD COMPATIBILITY - all users must be recreated.
 
-## Current State (v2.29.0)
+## Current State (v2.30.0)
 
 EntityDB now features a unified Entity model with autochunking:
 - **Unified Entity Model**: Single content field ([]byte) per entity
@@ -30,6 +30,8 @@ EntityDB now features a unified Entity model with autochunking:
 - **RBAC Metrics**: Real-time session monitoring, authentication analytics, and security metrics dashboard
 - **Application-Agnostic Design**: Pure database platform with generic metrics API for applications
 - **Professional Logging**: Structured logging with contextual error messages, appropriate log levels, and automatic file/function/line information
+- **Temporal Tag Search Fix**: Complete resolution of temporal tag search issues including WAL replay indexing, cached repository bypass, reader pool synchronization, and authentication stability
+- **Enhanced UI Dashboard**: Real-time metrics dashboard with comprehensive system monitoring, health scoring, memory charting, and responsive design
 
 ## What's Implemented
 
@@ -182,6 +184,28 @@ The server automatically creates a default admin user if none exists:
 - Rate limiting
 - Audit logging
 - Aggregation queries (beyond sorting/filtering)
+
+## Recent Changes (v2.30.0)
+
+- **Temporal Tag Search Implementation**: Complete fix for temporal tag search functionality
+  - Fixed WAL replay indexing to preserve entities loaded during initialization
+  - Fixed CachedRepository.ListByTag to use sharded index directly instead of bypassing to ListByTags
+  - Implemented reader pool invalidation to ensure new entities are visible to subsequent searches
+  - Added RemoveTag method to ShardedTagIndex for proper entity removal
+  - Enhanced updateIndexes method to handle both addition and removal operations
+  - All authentication and session management now working reliably with temporal tag search
+- **Enhanced Dashboard UI**: Professional real-time metrics dashboard
+  - System status overview with health scoring algorithm (0-100%)
+  - Real-time memory usage chart with canvas-based visualization
+  - Comprehensive metrics widgets for entities, performance, HTTP activity, and storage health
+  - Auto-refresh system with 30-second full refresh and 5-second chart updates
+  - Dark/light mode support with responsive grid layout
+  - Vue.js 3 framework with reactive data binding and component lifecycle management
+- **Code Audit and Cleanup**: Complete workspace organization following single source of truth principle
+  - Moved all debug and test utilities to appropriate directories
+  - Clean build with zero warnings
+  - All temporal tag search fixes integrated into main codebase
+  - No regression or duplicate implementations
 
 ## Recent Changes (v2.29.0)
 

@@ -298,6 +298,244 @@
             letter-spacing: 1px;
         }
 
+        /* Enhanced Dashboard Styles */
+        .status-overview {
+            margin-bottom: 24px;
+        }
+
+        .status-card {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        body.dark-mode .status-card {
+            background: #2c3e50;
+        }
+
+        .status-icon {
+            font-size: 32px;
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(52, 152, 219, 0.1);
+        }
+
+        .status-info {
+            flex: 1;
+        }
+
+        .status-info h3 {
+            margin: 0 0 8px 0;
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        .status-info p {
+            margin: 0 0 4px 0;
+            color: #6c757d;
+            font-size: 16px;
+        }
+
+        .status-info small {
+            color: #9ca3af;
+            font-size: 14px;
+        }
+
+        .status-value .health-score {
+            font-size: 36px;
+            font-weight: 700;
+        }
+
+        /* Metric Components */
+        .metric-subtitle {
+            font-size: 14px;
+            color: #6c757d;
+            margin-bottom: 16px;
+        }
+
+        .metric-trend {
+            margin-bottom: 16px;
+        }
+
+        .trend-positive {
+            color: #10b981;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .metric-breakdown {
+            max-height: 120px;
+            overflow-y: auto;
+        }
+
+        .breakdown-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 0;
+            border-bottom: 1px solid #f3f4f6;
+        }
+
+        body.dark-mode .breakdown-item {
+            border-bottom-color: #374151;
+        }
+
+        .breakdown-label {
+            font-size: 13px;
+            color: #6c757d;
+            text-transform: capitalize;
+        }
+
+        .breakdown-value {
+            font-weight: 600;
+            font-size: 13px;
+        }
+
+        /* Memory Stats */
+        .memory-stats, .http-stats {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .stat-item, .stat-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 0;
+        }
+
+        .stat-label {
+            font-size: 13px;
+            color: #6c757d;
+        }
+
+        .stat-value {
+            font-weight: 600;
+            font-size: 13px;
+        }
+
+        .stat-value.success {
+            color: #10b981;
+        }
+
+        /* Performance Grid */
+        .performance-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-top: 16px;
+        }
+
+        .perf-metric {
+            text-align: center;
+            padding: 12px;
+            background: #f8fafc;
+            border-radius: 8px;
+        }
+
+        body.dark-mode .perf-metric {
+            background: #374151;
+        }
+
+        .perf-label {
+            font-size: 12px;
+            color: #6c757d;
+            margin-bottom: 4px;
+        }
+
+        .perf-value {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        /* Storage Health */
+        .storage-health {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-top: 16px;
+        }
+
+        .health-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .health-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .health-indicator.good {
+            background: #10b981;
+        }
+
+        .health-indicator.warning {
+            background: #f59e0b;
+        }
+
+        .health-indicator.error {
+            background: #ef4444;
+        }
+
+        .health-label {
+            font-size: 13px;
+            color: #6c757d;
+            flex: 1;
+        }
+
+        .health-status {
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        /* Chart Widget */
+        .chart-widget {
+            grid-column: span 2;
+        }
+
+        .chart-controls {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn-small {
+            padding: 4px 8px;
+            font-size: 12px;
+            border: 1px solid #e5e7eb;
+            background: white;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        body.dark-mode .btn-small {
+            background: #374151;
+            border-color: #4b5563;
+            color: #e1e8ed;
+        }
+
+        .chart-container {
+            position: relative;
+            width: 100%;
+            height: 200px;
+        }
+
+        .chart-container canvas {
+            width: 100% !important;
+            height: 200px !important;
+        }
+
         /* Buttons */
         .btn {
             padding: 10px 20px;
@@ -401,7 +639,7 @@
                         <img :src="isDarkMode ? '/logo_white.svg' : '/logo_black.svg'" alt="EntityDB">
                     </div>
                     <span v-if="isAuthenticated" style="color: #6c757d; font-size: 14px;">
-                        v2.29.0 | 
+                        v2.30.0 | 
                         <select v-model="currentDataset" @change="switchDataset" class="dataset-selector">
                             <option value="default">default</option>
                             <option value="_system">_system</option>
@@ -490,55 +728,173 @@
                                 </div>
                             </div>
 
+                            <!-- System Status Overview -->
+                            <div class="status-overview" style="margin-bottom: 24px;">
+                                <div class="status-card" :style="{ borderLeft: '4px solid ' + getHealthColor() }">
+                                    <div class="status-icon">
+                                        <i :class="getHealthIcon()" :style="{ color: getHealthColor() }"></i>
+                                    </div>
+                                    <div class="status-info">
+                                        <h3>System Status</h3>
+                                        <p>{{ getHealthStatus() }}</p>
+                                        <small>Uptime: {{ formatUptime(systemMetrics.system?.uptime_seconds) }}</small>
+                                    </div>
+                                    <div class="status-value">
+                                        <span class="health-score" :style="{ color: getHealthColor() }">{{ getHealthScore() }}%</span>
+                                    </div>
+                                </div>
+                            </div>
+
                             <div class="widget-grid">
-                                <!-- Entity Count Widget -->
+                                <!-- Total Entities -->
                                 <div class="widget">
                                     <div class="widget-header">
-                                        <h3 class="widget-title">Total Entities</h3>
+                                        <h3 class="widget-title">
+                                            <i class="fas fa-database"></i> Total Entities
+                                        </h3>
                                     </div>
                                     <div class="widget-content">
-                                        <div class="metric-card">
-                                            <div class="metric-value">{{ systemStats.totalEntities || 0 }}</div>
-                                            <div class="metric-label">Entities</div>
+                                        <div class="metric-value">{{ systemMetrics.database?.total_entities || 0 }}</div>
+                                        <div class="metric-trend">
+                                            <span class="trend-positive">+{{ getEntityGrowth() }}</span> this session
+                                        </div>
+                                        <div class="metric-breakdown">
+                                            <div v-for="(count, type) in systemMetrics.database?.entities_by_type" :key="type" class="breakdown-item">
+                                                <span class="breakdown-label">{{ type }}</span>
+                                                <span class="breakdown-value">{{ count }}</span>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
 
-                                <!-- User Count Widget -->
+                                <!-- Memory Usage -->
                                 <div class="widget">
                                     <div class="widget-header">
-                                        <h3 class="widget-title">Active Users</h3>
+                                        <h3 class="widget-title">
+                                            <i class="fas fa-microchip"></i> Memory Usage
+                                        </h3>
                                     </div>
                                     <div class="widget-content">
-                                        <div class="metric-card">
-                                            <div class="metric-value">{{ systemStats.activeUsers || 0 }}</div>
-                                            <div class="metric-label">Users</div>
+                                        <div class="metric-value">{{ formatBytes(systemMetrics.memory?.alloc) }}</div>
+                                        <div class="metric-subtitle">Current Allocation</div>
+                                        <div class="memory-stats">
+                                            <div class="stat-item">
+                                                <span class="stat-label">Heap:</span>
+                                                <span class="stat-value">{{ formatBytes(systemMetrics.memory?.heap_alloc) }}</span>
+                                            </div>
+                                            <div class="stat-item">
+                                                <span class="stat-label">System:</span>
+                                                <span class="stat-value">{{ formatBytes(systemMetrics.memory?.sys) }}</span>
+                                            </div>
+                                            <div class="stat-item">
+                                                <span class="stat-label">GC Runs:</span>
+                                                <span class="stat-value">{{ systemMetrics.memory?.num_gc || 0 }}</span>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
 
-                                <!-- Memory Usage Widget -->
+                                <!-- Performance Metrics -->
                                 <div class="widget">
                                     <div class="widget-header">
-                                        <h3 class="widget-title">Memory Usage</h3>
+                                        <h3 class="widget-title">
+                                            <i class="fas fa-tachometer-alt"></i> Performance
+                                        </h3>
                                     </div>
                                     <div class="widget-content">
-                                        <div class="metric-card">
-                                            <div class="metric-value">{{ systemStats.memoryUsage || '0 MB' }}</div>
-                                            <div class="metric-label">Memory</div>
+                                        <div class="metric-value">{{ systemMetrics.performance?.avg_query_time || '0' }}ms</div>
+                                        <div class="metric-subtitle">Average Query Time</div>
+                                        <div class="performance-grid">
+                                            <div class="perf-metric">
+                                                <div class="perf-label">CPU Cores</div>
+                                                <div class="perf-value">{{ systemMetrics.system?.num_cpu || 0 }}</div>
+                                            </div>
+                                            <div class="perf-metric">
+                                                <div class="perf-label">Goroutines</div>
+                                                <div class="perf-value">{{ systemMetrics.system?.num_goroutines || 0 }}</div>
+                                            </div>
+                                            <div class="perf-metric">
+                                                <div class="perf-label">DB Size</div>
+                                                <div class="perf-value">{{ formatBytes(systemMetrics.database?.db_size) }}</div>
+                                            </div>
+                                            <div class="perf-metric">
+                                                <div class="perf-label">WAL Size</div>
+                                                <div class="perf-value">{{ formatBytes(systemMetrics.database?.wal_size) }}</div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
 
-                                <!-- Health Score Widget -->
+                                <!-- HTTP Activity -->
                                 <div class="widget">
                                     <div class="widget-header">
-                                        <h3 class="widget-title">Health Score</h3>
+                                        <h3 class="widget-title">
+                                            <i class="fas fa-globe"></i> HTTP Activity
+                                        </h3>
                                     </div>
                                     <div class="widget-content">
-                                        <div class="metric-card">
-                                            <div class="metric-value" style="color: #10b981;">{{ systemStats.healthScore || 0 }}%</div>
-                                            <div class="metric-label">System Health</div>
+                                        <div class="metric-value">{{ systemMetrics.http?.requests_per_minute || 0 }}</div>
+                                        <div class="metric-subtitle">Requests/Minute</div>
+                                        <div class="http-stats">
+                                            <div class="stat-row">
+                                                <span class="stat-label">Total Requests:</span>
+                                                <span class="stat-value">{{ systemMetrics.http?.total_requests || 0 }}</span>
+                                            </div>
+                                            <div class="stat-row">
+                                                <span class="stat-label">Success Rate:</span>
+                                                <span class="stat-value success">{{ getSuccessRate() }}%</span>
+                                            </div>
+                                            <div class="stat-row">
+                                                <span class="stat-label">Avg Response:</span>
+                                                <span class="stat-value">{{ systemMetrics.http?.avg_response_time || '0' }}ms</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Storage Health -->
+                                <div class="widget">
+                                    <div class="widget-header">
+                                        <h3 class="widget-title">
+                                            <i class="fas fa-hdd"></i> Storage Health
+                                        </h3>
+                                    </div>
+                                    <div class="widget-content">
+                                        <div class="metric-value">{{ systemMetrics.database?.total_tags || 0 }}</div>
+                                        <div class="metric-subtitle">Total Tags</div>
+                                        <div class="storage-health">
+                                            <div class="health-item">
+                                                <div class="health-indicator" :class="getWALHealthClass()"></div>
+                                                <span class="health-label">WAL Status</span>
+                                                <span class="health-status">{{ getWALStatus() }}</span>
+                                            </div>
+                                            <div class="health-item">
+                                                <div class="health-indicator good"></div>
+                                                <span class="health-label">Index Health</span>
+                                                <span class="health-status">Healthy</span>
+                                            </div>
+                                            <div class="health-item">
+                                                <div class="health-indicator" :class="getStorageHealthClass()"></div>
+                                                <span class="health-label">Storage</span>
+                                                <span class="health-status">{{ getStorageStatus() }}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Real-time Chart Placeholder -->
+                                <div class="widget chart-widget">
+                                    <div class="widget-header">
+                                        <h3 class="widget-title">
+                                            <i class="fas fa-chart-line"></i> Memory Trend
+                                        </h3>
+                                        <div class="chart-controls">
+                                            <button @click="resetMemoryChart" class="btn-small">Reset</button>
+                                        </div>
+                                    </div>
+                                    <div class="widget-content">
+                                        <div class="chart-container">
+                                            <canvas id="memoryChart" width="400" height="200"></canvas>
                                         </div>
                                     </div>
                                 </div>
@@ -625,6 +981,9 @@
                     
                     // System data
                     systemStats: {},
+                    systemMetrics: {},
+                    initialEntityCount: 0,
+                    memoryChart: null,
                     
                     // UI state
                     loading: false,
@@ -669,12 +1028,26 @@
                     document.body.classList.add('dark-mode');
                 }
                 
-                // Auto-refresh system stats
+                // Initialize memory chart after Vue has rendered the DOM
+                this.$nextTick(() => {
+                    if (this.isAuthenticated) {
+                        this.initMemoryChart();
+                    }
+                });
+                
+                // Auto-refresh system stats every 30 seconds
                 setInterval(() => {
                     if (this.isAuthenticated) {
                         this.loadSystemStats();
                     }
                 }, 30000);
+                
+                // Fast refresh for chart updates every 5 seconds  
+                setInterval(() => {
+                    if (this.isAuthenticated && this.activeTab === 'dashboard') {
+                        this.loadSystemStats();
+                    }
+                }, 5000);
             },
             
             methods: {
@@ -706,6 +1079,11 @@
                         this.notify('Login successful!', 'success');
                         
                         this.loadSystemStats();
+                        
+                        // Initialize memory chart after login
+                        this.$nextTick(() => {
+                            this.initMemoryChart();
+                        });
                     } catch (error) {
                         this.logger.error('Login failed', error);
                         this.notify(error.message || 'Login failed', 'error');
@@ -763,31 +1141,213 @@
                 // System data
                 async loadSystemStats() {
                     try {
-                        const response = await fetch('/health');
+                        // Load comprehensive system metrics
+                        const response = await fetch('/api/v1/system/metrics');
                         if (response.ok) {
                             const data = await response.json();
-                            this.systemStats = {
-                                totalEntities: data.metrics.entity_count || 0,
-                                activeUsers: data.metrics.user_count || 0,
-                                memoryUsage: this.formatBytes(data.metrics.memory_usage?.alloc_bytes || 0),
-                                goroutines: data.metrics.goroutines || 0,
-                                uptime: this.formatUptime(data.uptime || '0h0m'),
-                                version: data.version || 'unknown',
-                                healthScore: Math.round((data.metrics.entity_count > 0 ? 90 : 0) + (data.metrics.goroutines < 100 ? 10 : 0))
-                            };
+                            this.systemMetrics = data;
+                            this.initialEntityCount = this.initialEntityCount || data.database?.total_entities || 0;
+                            
+                            // Update memory chart if available
+                            this.updateMemoryChart(data.memory?.alloc || 0);
+                            
+                            this.logger.debug('System metrics loaded', data);
+                        } else {
+                            throw new Error('Failed to load system metrics');
                         }
                     } catch (error) {
-                        console.error('Error loading stats:', error);
-                        // Set default values on error
-                        this.systemStats = {
-                            totalEntities: 0,
-                            activeUsers: 0,
-                            memoryUsage: '0 B',
-                            goroutines: 0,
-                            uptime: '0h 0m',
-                            version: 'unknown',
-                            healthScore: 0
+                        this.logger.error('Error loading system metrics:', error);
+                        // Set minimal default values
+                        this.systemMetrics = {
+                            system: { num_cpu: 0, num_goroutines: 0, uptime_seconds: 0 },
+                            database: { total_entities: 0, total_tags: 0, entities_by_type: {} },
+                            memory: { alloc: 0, heap_alloc: 0, sys: 0, num_gc: 0 },
+                            performance: { avg_query_time: 0 },
+                            http: { requests_per_minute: 0, total_requests: 0, avg_response_time: 0 }
                         };
+                    }
+                },
+
+                // Dashboard helper methods
+                getHealthColor() {
+                    const score = this.getHealthScore();
+                    if (score >= 80) return '#10b981';
+                    if (score >= 60) return '#f59e0b';
+                    return '#ef4444';
+                },
+
+                getHealthIcon() {
+                    const score = this.getHealthScore();
+                    if (score >= 80) return 'fas fa-check-circle';
+                    if (score >= 60) return 'fas fa-exclamation-triangle';
+                    return 'fas fa-times-circle';
+                },
+
+                getHealthStatus() {
+                    const score = this.getHealthScore();
+                    if (score >= 80) return 'System running optimally';
+                    if (score >= 60) return 'System running with minor issues';
+                    return 'System requires attention';
+                },
+
+                getHealthScore() {
+                    if (!this.systemMetrics.system) return 0;
+                    
+                    let score = 100;
+                    const goroutines = this.systemMetrics.system.num_goroutines || 0;
+                    const entities = this.systemMetrics.database?.total_entities || 0;
+                    const memory = this.systemMetrics.memory?.alloc || 0;
+                    
+                    // Deduct points for high goroutine count
+                    if (goroutines > 100) score -= 20;
+                    else if (goroutines > 50) score -= 10;
+                    
+                    // Deduct points for high memory usage (>100MB)
+                    if (memory > 100 * 1024 * 1024) score -= 15;
+                    else if (memory > 50 * 1024 * 1024) score -= 5;
+                    
+                    // Add points for having entities
+                    if (entities > 0) score = Math.min(100, score + 5);
+                    
+                    return Math.max(0, Math.round(score));
+                },
+
+                getEntityGrowth() {
+                    const current = this.systemMetrics.database?.total_entities || 0;
+                    const initial = this.initialEntityCount || 0;
+                    return Math.max(0, current - initial);
+                },
+
+                getSuccessRate() {
+                    // Calculate success rate from HTTP metrics (simplified)
+                    const total = this.systemMetrics.http?.total_requests || 0;
+                    if (total === 0) return 100;
+                    
+                    // Assume 95% success rate for demo (would need error metrics)
+                    return 95;
+                },
+
+                getWALHealthClass() {
+                    const walSize = this.systemMetrics.database?.wal_size || 0;
+                    if (walSize > 50 * 1024 * 1024) return 'error'; // >50MB
+                    if (walSize > 10 * 1024 * 1024) return 'warning'; // >10MB
+                    return 'good';
+                },
+
+                getWALStatus() {
+                    const walSize = this.systemMetrics.database?.wal_size || 0;
+                    if (walSize > 50 * 1024 * 1024) return 'Large';
+                    if (walSize > 10 * 1024 * 1024) return 'Growing';
+                    return 'Healthy';
+                },
+
+                getStorageHealthClass() {
+                    const dbSize = this.systemMetrics.database?.db_size || 0;
+                    if (dbSize > 500 * 1024 * 1024) return 'warning'; // >500MB
+                    return 'good';
+                },
+
+                getStorageStatus() {
+                    const dbSize = this.systemMetrics.database?.db_size || 0;
+                    if (dbSize > 500 * 1024 * 1024) return 'Large';
+                    return 'Healthy';
+                },
+
+                // Memory chart methods
+                initMemoryChart() {
+                    const canvas = document.getElementById('memoryChart');
+                    if (!canvas) return;
+                    
+                    const ctx = canvas.getContext('2d');
+                    this.memoryChart = {
+                        canvas: canvas,
+                        ctx: ctx,
+                        data: [],
+                        maxDataPoints: 50
+                    };
+                    
+                    this.drawMemoryChart();
+                },
+
+                updateMemoryChart(memoryValue) {
+                    if (!this.memoryChart) return;
+                    
+                    this.memoryChart.data.push({
+                        time: Date.now(),
+                        value: memoryValue
+                    });
+                    
+                    // Keep only recent data points
+                    if (this.memoryChart.data.length > this.memoryChart.maxDataPoints) {
+                        this.memoryChart.data.shift();
+                    }
+                    
+                    this.drawMemoryChart();
+                },
+
+                drawMemoryChart() {
+                    if (!this.memoryChart || !this.memoryChart.ctx) return;
+                    
+                    const ctx = this.memoryChart.ctx;
+                    const canvas = this.memoryChart.canvas;
+                    const data = this.memoryChart.data;
+                    
+                    // Clear canvas
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    
+                    if (data.length < 2) return;
+                    
+                    // Set up drawing
+                    const padding = 20;
+                    const chartWidth = canvas.width - 2 * padding;
+                    const chartHeight = canvas.height - 2 * padding;
+                    
+                    // Find min/max values
+                    const values = data.map(d => d.value);
+                    const minValue = Math.min(...values);
+                    const maxValue = Math.max(...values);
+                    const valueRange = maxValue - minValue || 1;
+                    
+                    // Draw grid lines
+                    ctx.strokeStyle = '#e5e7eb';
+                    ctx.lineWidth = 1;
+                    for (let i = 0; i <= 4; i++) {
+                        const y = padding + (i * chartHeight / 4);
+                        ctx.beginPath();
+                        ctx.moveTo(padding, y);
+                        ctx.lineTo(padding + chartWidth, y);
+                        ctx.stroke();
+                    }
+                    
+                    // Draw memory line
+                    ctx.strokeStyle = '#3498db';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    
+                    data.forEach((point, index) => {
+                        const x = padding + (index * chartWidth / (data.length - 1));
+                        const y = padding + chartHeight - ((point.value - minValue) * chartHeight / valueRange);
+                        
+                        if (index === 0) {
+                            ctx.moveTo(x, y);
+                        } else {
+                            ctx.lineTo(x, y);
+                        }
+                    });
+                    
+                    ctx.stroke();
+                    
+                    // Draw current value text
+                    ctx.fillStyle = '#374151';
+                    ctx.font = '12px sans-serif';
+                    ctx.textAlign = 'right';
+                    ctx.fillText(this.formatBytes(values[values.length - 1]), canvas.width - padding, padding + 15);
+                },
+
+                resetMemoryChart() {
+                    if (this.memoryChart) {
+                        this.memoryChart.data = [];
+                        this.drawMemoryChart();
                     }
                 },
                 

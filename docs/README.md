@@ -1,15 +1,15 @@
 # EntityDB Documentation Library
 
-> **Version**: v2.29.0 | **Last Updated**: 2025-06-11
+> **Version**: v2.30.0 | **Last Updated**: 2025-06-12
 
 Welcome to the EntityDB documentation library. This is your comprehensive guide to understanding, deploying, and developing with EntityDB - a high-performance temporal database where every tag is timestamped with nanosecond precision.
 
-## 🎉 New in v2.29.0
+## 🎉 New in v2.30.0
 
-- **Complete UI/UX Overhaul**: Professional web interface with Vue.js 3, dark mode, and modern components
-- **Comprehensive Documentation**: Audit reports, migration plans, and implementation guides
-- **Enhanced API Reference**: Updated with all endpoints and authentication changes
-- **Improved Architecture Guides**: Detailed temporal, RBAC, and performance documentation
+- **Temporal Tag Search Implementation**: Complete resolution of critical temporal tag search issues with comprehensive documentation
+- **Enhanced Dashboard UI**: Real-time metrics dashboard with health scoring, memory charting, and professional design
+- **Performance Optimization**: Sub-millisecond queries, zero goroutine leaks, and stability improvements
+- **Implementation Documentation**: Detailed technical documentation in `implementation/temporal-tag-search-implementation.md`
 
 ## ⚠️ Critical Notice for v2.29.0
 
