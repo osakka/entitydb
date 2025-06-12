@@ -24,133 +24,308 @@ import (
 // EntityRepository defines the contract for entity storage implementations.
 // All storage backends must implement this interface to provide entity
 // persistence with temporal support.
+//
+// Implementations include:
+//   - BinaryEntityRepository: High-performance binary format storage
+//   - CachedRepository: In-memory caching layer
+//   - TemporalRepository: Temporal query optimizations
+//   - WALOnlyRepository: Write-ahead log mode for extreme performance
 type EntityRepository interface {
-	// Core CRUD operations
+	// Core CRUD Operations
+	
+	// Create stores a new entity with auto-generated ID if not provided.
+	// Returns an error if the entity already exists.
 	Create(entity *Entity) error
+	
+	// GetByID retrieves an entity by its unique identifier.
+	// Returns nil, nil if the entity doesn't exist.
 	GetByID(id string) (*Entity, error)
+	
+	// Update modifies an existing entity, preserving temporal history.
+	// Returns an error if the entity doesn't exist.
 	Update(entity *Entity) error
+	
+	// Delete removes an entity from storage.
+	// Note: This is a hard delete, not a soft delete with tags.
 	Delete(id string) error
+	
+	// List returns all entities in the repository.
+	// Warning: Can be memory-intensive for large datasets.
 	List() ([]*Entity, error)
 	
-	// Tag-based queries
+	// Tag-Based Queries
+	
+	// ListByTag returns entities with the specified tag.
+	// Handles temporal tags transparently (strips timestamps).
 	ListByTag(tag string) ([]*Entity, error)
+	
+	// ListByTags returns entities matching multiple tags.
+	// If matchAll is true, entities must have ALL tags; otherwise ANY tag.
 	ListByTags(tags []string, matchAll bool) ([]*Entity, error)
+	
+	// ListByTagSQL returns entities using SQL-like tag patterns.
+	// Supports % wildcard for pattern matching.
 	ListByTagSQL(tag string) ([]*Entity, error)
+	
+	// ListByTagWildcard returns entities matching a glob pattern.
+	// Supports * and ? wildcards (e.g., "status:*", "user:?123").
 	ListByTagWildcard(pattern string) ([]*Entity, error)
+	
+	// ListByNamespace returns entities with tags in the specified namespace.
+	// Example: namespace "status" matches "status:active", "status:draft", etc.
 	ListByNamespace(namespace string) ([]*Entity, error)
 	
-	// Content queries
+	// Content Queries
+	
+	// SearchContent performs full-text search on entity content.
+	// Returns entities where content contains the query string.
 	SearchContent(query string) ([]*Entity, error)
+	
+	// SearchContentByType returns entities with specific content type.
+	// Deprecated: Content type is no longer tracked separately.
 	SearchContentByType(contentType string) ([]*Entity, error)
 	
-	// Advanced query
+	// Advanced Query
+	
+	// QueryAdvanced executes complex queries with multiple criteria.
+	// Supported parameters: tags, namespace, content, limit, offset, sort.
 	QueryAdvanced(params map[string]interface{}) ([]*Entity, error)
 	
-	// Transaction support
+	// Transaction Support
+	
+	// Transaction executes a function within a database transaction.
+	// Automatically rolls back on error, commits on success.
 	Transaction(fn func(tx interface{}) error) error
+	
+	// Commit explicitly commits a transaction.
+	// Usually not needed when using Transaction().
 	Commit(tx interface{}) error
+	
+	// Rollback explicitly rolls back a transaction.
+	// Usually not needed when using Transaction().
 	Rollback(tx interface{}) error
 	
-	// Tag operations
+	// Tag Operations
+	
+	// AddTag appends a new tag to an entity.
+	// The tag is automatically timestamped by the storage layer.
 	AddTag(id string, tag string) error
+	
+	// RemoveTag removes all instances of a tag from an entity.
+	// Handles temporal tags by matching the tag content.
 	RemoveTag(id string, tag string) error
 	
-	// Temporal operations
+	// Temporal Operations
+	
+	// GetEntityAsOf returns the entity state at a specific point in time.
+	// Reconstructs the entity by selecting appropriate temporal tag values.
 	GetEntityAsOf(id string, timestamp time.Time) (*Entity, error)
+	
+	// GetEntityHistory returns the change history for an entity.
+	// Limited to the specified number of most recent changes.
 	GetEntityHistory(id string, limit int) ([]*EntityChange, error)
+	
+	// GetRecentChanges returns recent changes across all entities.
+	// Useful for activity feeds and audit logs.
 	GetRecentChanges(limit int) ([]*EntityChange, error)
+	
+	// GetEntityDiff compares entity states between two timestamps.
+	// Returns (before, after) snapshots for the specified time range.
 	GetEntityDiff(id string, startTime, endTime time.Time) (*Entity, *Entity, error)
 	
-	// Relationship operations
+	// Relationship Operations
+	
+	// CreateRelationship creates a new relationship between entities.
+	// The relationship is stored as a special entity with relationship tags.
 	CreateRelationship(rel interface{}) error
+	
+	// GetRelationshipByID retrieves a relationship by its ID.
 	GetRelationshipByID(id string) (interface{}, error)
+	
+	// GetRelationshipsBySource returns all relationships from a source entity.
 	GetRelationshipsBySource(sourceID string) ([]interface{}, error)
+	
+	// GetRelationshipsByTarget returns all relationships to a target entity.
 	GetRelationshipsByTarget(targetID string) ([]interface{}, error)
+	
+	// DeleteRelationship removes a relationship.
 	DeleteRelationship(id string) error
 	
-	// Query builder
+	// Query Builder
+	
+	// Query returns a new query builder for fluent query construction.
+	// Example: repo.Query().WithTag("status:active").Limit(10).Execute()
 	Query() *EntityQuery
 	
-	// Maintenance operations
+	// Maintenance Operations
+	
+	// ReindexTags rebuilds the tag index from entity data.
+	// Use after corruption or to optimize performance.
 	ReindexTags() error
+	
+	// VerifyIndexHealth checks index integrity and consistency.
+	// Returns an error if corruption is detected.
 	VerifyIndexHealth() error
 }
 
-// Entity - The ONE entity type we need
+// Entity represents the universal data structure in EntityDB.
+// Everything is an entity - users, documents, configurations, relationships.
+//
+// Entities consist of:
+//   - A unique identifier (UUID)
+//   - A collection of temporal tags with nanosecond timestamps
+//   - Binary content (optional)
+//   - Creation and update timestamps
+//
+// Example:
+//
+//	entity := &Entity{
+//	    ID: "user-123",
+//	    Tags: []string{
+//	        "2024-01-15T10:30:45.123456789.type:user",
+//	        "2024-01-15T10:30:45.123456789.status:active",
+//	        "2024-01-15T10:30:45.123456789.rbac:role:admin",
+//	    },
+//	    Content: []byte("user profile data"),
+//	}
 type Entity struct {
+	// ID is the unique identifier for the entity (typically a UUID)
 	ID      string   `json:"id"`
+	
+	// Tags are temporal tags with nanosecond timestamps
+	// Format: "TIMESTAMP|tag" or "TIMESTAMP.tag"
 	Tags    []string `json:"tags"`
+	
+	// Content stores binary data (files, JSON, credentials, etc.)
+	// Supports autochunking for large files
 	Content []byte   `json:"content,omitempty"`
 	
-	// Timestamps as nanosecond epoch for efficiency
+	// CreatedAt is the creation timestamp in nanoseconds since Unix epoch
 	CreatedAt int64 `json:"created_at,omitempty"`
+	
+	// UpdatedAt is the last modification timestamp in nanoseconds since Unix epoch
 	UpdatedAt int64 `json:"updated_at,omitempty"`
 }
 
-// ContentItem for backward compatibility - will be removed
-// Deprecated: Use Content []byte directly
+// ContentItem represents legacy content storage format.
+// Deprecated: Use Entity.Content []byte directly.
+// This type is maintained only for backward compatibility during migration.
 type ContentItem struct {
-	Timestamp int64  `json:"timestamp"` // Now using nanosecond epoch
-	Type      string `json:"type"`
-	Value     string `json:"value"`
+	Timestamp int64  `json:"timestamp"` // Nanosecond epoch
+	Type      string `json:"type"`      // Content MIME type
+	Value     string `json:"value"`     // Base64-encoded content
 }
 
-// EntityChange represents a change to an entity
+// EntityChange represents a single change event in an entity's history.
+// Used for audit trails, history queries, and change tracking.
 type EntityChange struct {
+	// Type of change: "added", "modified", "removed"
 	Type      string `json:"type"`
-	Timestamp int64  `json:"timestamp"` // Nanosecond epoch for consistency
+	
+	// Timestamp when the change occurred (nanosecond epoch)
+	Timestamp int64  `json:"timestamp"`
+	
+	// OldValue contains the previous value (for modifications and removals)
 	OldValue  string `json:"old_value,omitempty"`
+	
+	// NewValue contains the new value (for additions and modifications)
 	NewValue  string `json:"new_value,omitempty"`
-	EntityID  string `json:"entity_id,omitempty"`  // Reference to the entity this change belongs to
+	
+	// EntityID references the entity this change belongs to
+	EntityID  string `json:"entity_id,omitempty"`
 }
 
-// ChunkConfig configures autochunking behavior
+// ChunkConfig configures the autochunking behavior for large content.
+// When content exceeds the threshold, it's automatically split into chunks
+// for efficient storage and retrieval.
 type ChunkConfig struct {
-	DefaultChunkSize   int64 `json:"default_chunk_size"`   // Default: 4MB
-	AutoChunkThreshold int64 `json:"auto_chunk_threshold"` // Files > this get chunked
+	// DefaultChunkSize is the size of each chunk in bytes (default: 4MB)
+	DefaultChunkSize   int64 `json:"default_chunk_size"`
+	
+	// AutoChunkThreshold is the minimum file size to trigger chunking (default: 4MB)
+	AutoChunkThreshold int64 `json:"auto_chunk_threshold"`
 }
 
-// DefaultChunkConfig returns sensible defaults
+// DefaultChunkConfig returns the default chunking configuration.
+// Default values are optimized for typical file storage scenarios.
 func DefaultChunkConfig() ChunkConfig {
 	return ChunkConfig{
-		DefaultChunkSize:   4 * 1024 * 1024, // 4MB
-		AutoChunkThreshold: 4 * 1024 * 1024, // Auto-chunk files > 4MB
+		DefaultChunkSize:   4 * 1024 * 1024, // 4MB chunks
+		AutoChunkThreshold: 4 * 1024 * 1024, // Chunk files > 4MB
 	}
 }
 
-// NewEntity creates a new entity with auto-generated UUID
+// NewEntity creates a new entity with an auto-generated UUID and initialized timestamps.
+// The entity is ready for immediate use with pre-allocated tag storage.
+//
+// Example:
+//
+//	entity := NewEntity()
+//	entity.AddTag("type:document")
+//	entity.Content = []byte("Hello, World!")
 func NewEntity() *Entity {
 	timestamp := Now()
 	return &Entity{
 		ID:        GenerateUUID(),
-		Tags:      make([]string, 0, 8), // Pre-allocate common size
+		Tags:      make([]string, 0, 8), // Pre-allocate for ~8 tags
 		CreatedAt: timestamp,
 		UpdatedAt: timestamp,
 	}
 }
 
-// GenerateUUID generates a unique identifier for entities
+// GenerateUUID generates a unique identifier for entities.
+// Uses SHA256 hash of current nanosecond timestamp for uniqueness.
+//
+// Note: For production use, consider using a proper UUID library
+// like github.com/google/uuid for guaranteed uniqueness.
 func GenerateUUID() string {
-	// Simple implementation - in production use crypto/rand
 	timestamp := fmt.Sprintf("%d", Now())
 	hash := sha256.Sum256([]byte(timestamp))
 	return hex.EncodeToString(hash[:16])
 }
 
-// AddTag adds a tag with automatic timestamping and interning
+// AddTag appends a tag to the entity with automatic timestamping.
+// The tag is formatted as a temporal tag and interned for memory efficiency.
+//
+// Example:
+//
+//	entity.AddTag("status:active")
+//	// Stored as: "2024-01-15T10:30:45.123456789|status:active"
 func (e *Entity) AddTag(tag string) {
-	// Use our centralized temporal tag formatting and intern the result
+	// Format as temporal tag and intern for memory efficiency
 	temporalTag := FormatTemporalTag(tag)
 	e.Tags = append(e.Tags, Intern(temporalTag))
 }
 
-// AddTagWithValue adds a key:value tag with automatic timestamping  
+// AddTagWithValue is a convenience method for adding namespace:value tags.
+// Equivalent to AddTag(fmt.Sprintf("%s:%s", key, value)).
+//
+// Example:
+//
+//	entity.AddTagWithValue("status", "active")
+//	// Same as: entity.AddTag("status:active")
 func (e *Entity) AddTagWithValue(key, value string) {
 	tag := fmt.Sprintf("%s:%s", key, value)
 	e.AddTag(tag)
 }
 
-// GetTagsWithoutTimestamp returns tags without their timestamp prefix
+// GetTagsWithoutTimestamp returns all tags with their timestamps stripped.
+// This is useful for tag comparison and display purposes.
+//
+// Handles multiple timestamp formats:
+//   - "ISO|tag" (standard format)
+//   - "ISO|NANO|tag" (double timestamp format)
+//   - "NANO|tag" (numeric only format)
+//   - "ISO.tag" (dot separator format)
+//
+// Example:
+//
+//	entity.Tags = []string{
+//	    "2024-01-15T10:30:45.123456789|status:active",
+//	    "2024-01-15T10:30:45.123456789|type:user",
+//	}
+//	cleanTags := entity.GetTagsWithoutTimestamp()
+//	// cleanTags = ["status:active", "type:user"]
 func (e *Entity) GetTagsWithoutTimestamp() []string {
 	result := []string{}
 	for _, tag := range e.Tags {
@@ -172,7 +347,14 @@ func (e *Entity) GetTagsWithoutTimestamp() []string {
 	return result
 }
 
-// HasTag checks if entity has a tag (checks without timestamp)
+// HasTag checks if the entity has a specific tag, ignoring timestamps.
+// This method strips timestamps before comparison.
+//
+// Example:
+//
+//	if entity.HasTag("status:active") {
+//	    // Entity is active
+//	}
 func (e *Entity) HasTag(tag string) bool {
 	cleanTags := e.GetTagsWithoutTimestamp()
 	for _, cleanTag := range cleanTags {
@@ -183,7 +365,19 @@ func (e *Entity) HasTag(tag string) bool {
 	return false
 }
 
-// GetTagValue returns the most recent value for a tag key (gets latest value with timestamp)
+// GetTagValue returns the most recent value for a given tag namespace.
+// This method handles temporal tags and returns the latest value.
+//
+// For tags without values (e.g., "archived"), returns empty string.
+// For non-existent tags, returns empty string.
+//
+// Example:
+//
+//	// Given tags with timestamps:
+//	// "2024-01-01T10:00:00.000000000|status:draft"
+//	// "2024-01-05T14:30:00.000000000|status:published"
+//	value := entity.GetTagValue("status")
+//	// value = "published" (most recent)
 func (e *Entity) GetTagValue(key string) string {
 	// Look for the most recent tag with the given key prefix
 	var latestValue string

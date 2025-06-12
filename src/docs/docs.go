@@ -2470,25 +2470,29 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "content": {
+                    "description": "Content stores binary data (files, JSON, credentials, etc.)\nSupports autochunking for large files",
                     "type": "array",
                     "items": {
                         "type": "integer"
                     }
                 },
                 "created_at": {
-                    "description": "Timestamps as nanosecond epoch for efficiency",
+                    "description": "CreatedAt is the creation timestamp in nanoseconds since Unix epoch",
                     "type": "integer"
                 },
                 "id": {
+                    "description": "ID is the unique identifier for the entity (typically a UUID)",
                     "type": "string"
                 },
                 "tags": {
+                    "description": "Tags are temporal tags with nanosecond timestamps\nFormat: \"TIMESTAMP|tag\" or \"TIMESTAMP.tag\"",
                     "type": "array",
                     "items": {
                         "type": "string"
                     }
                 },
                 "updated_at": {
+                    "description": "UpdatedAt is the last modification timestamp in nanoseconds since Unix epoch",
                     "type": "integer"
                 }
             }

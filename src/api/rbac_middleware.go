@@ -1,3 +1,5 @@
+// Package api provides HTTP handlers for the EntityDB REST API.
+// This file implements RBAC (Role-Based Access Control) middleware.
 package api
 
 import (
@@ -11,23 +13,54 @@ import (
 	"entitydb/models"
 )
 
-// RBACPermission represents a required permission for an operation
+// RBACPermission represents a required permission for an operation.
+// Permissions follow the pattern "resource:action" where:
+//   - Resource: The entity type being accessed (entity, user, system, etc.)
+//   - Action: The operation being performed (view, create, update, delete)
+//
+// Special permissions:
+//   - "*": Grants all permissions (admin only)
+//   - "resource:*": Grants all actions on a resource
 type RBACPermission struct {
 	Resource string // e.g., "entity", "issue", "user", "system"
 	Action   string // e.g., "view", "create", "update", "delete"
 }
 
-// RBACContext stores user permissions in the request context
+// RBACContext stores user permissions in the request context.
+// This is added to the request context by the RBAC middleware and can be
+// accessed by handlers to make authorization decisions.
 type RBACContext struct {
-	User        *models.Entity
-	Permissions []string
-	IsAdmin     bool
+	User        *models.Entity  // The authenticated user entity
+	Permissions []string        // List of permissions extracted from user tags
+	IsAdmin     bool           // True if user has admin role
 }
 
 // Context key for RBAC data
 type rbacContextKey struct{}
 
-// RBACMiddleware creates middleware that enforces permissions
+// RBACMiddleware creates middleware that enforces permissions.
+//
+// This middleware:
+//   1. Extracts the Bearer token from the Authorization header
+//   2. Validates the session token with the session manager
+//   3. Loads the user entity from the database
+//   4. Extracts RBAC permissions from user tags
+//   5. Checks if the user has the required permission
+//   6. Tracks permission events for auditing
+//   7. Adds user context to the request for handlers
+//
+// Permission Format:
+//   Tags use the format "rbac:perm:resource:action"
+//   Example: "rbac:perm:entity:create" grants entity creation
+//
+// Admin Override:
+//   Users with "rbac:role:admin" or "rbac:perm:*" bypass all checks
+//
+// Usage:
+//   handler := RBACMiddleware(repo, sessions, RBACPermission{
+//       Resource: "entity",
+//       Action: "create",
+//   })(actualHandler)
 func RBACMiddleware(entityRepo models.EntityRepository, sessionManager *models.SessionManager, requiredPerm RBACPermission) MiddlewareFunc {
 	return func(next http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
@@ -127,18 +160,26 @@ func RBACMiddleware(entityRepo models.EntityRepository, sessionManager *models.S
 	}
 }
 
-// GetRBACContext retrieves the RBAC context from the request
+// GetRBACContext retrieves the RBAC context from the request.
+// Returns the context and true if found, or nil and false if not found.
+// This should be called by handlers that need to access user permissions
+// after the RBAC middleware has run.
 func GetRBACContext(r *http.Request) (*RBACContext, bool) {
 	ctx, ok := r.Context().Value(rbacContextKey{}).(*RBACContext)
 	return ctx, ok
 }
 
-// formatPermissionTag formats a permission into a tag
+// formatPermissionTag formats a permission into a tag string.
+// Converts RBACPermission{Resource: "entity", Action: "create"}
+// into "rbac:perm:entity:create" for tag-based permission checking.
 func formatPermissionTag(perm RBACPermission) string {
 	return fmt.Sprintf("rbac:perm:%s:%s", perm.Resource, perm.Action)
 }
 
-// hasAdminRole checks if user has admin role
+// hasAdminRole checks if user has admin role privileges.
+// Returns true if the user has either:
+//   - rbac:role:admin - explicit admin role
+//   - rbac:perm:* - wildcard permission (grants all permissions)
 func hasAdminRole(permissions []string) bool {
 	for _, perm := range permissions {
 		if perm == "rbac:role:admin" || perm == "rbac:perm:*" {
@@ -148,31 +189,48 @@ func hasAdminRole(permissions []string) bool {
 	return false
 }
 
-// Common permission definitions
+// Common permission definitions for use throughout the API.
+// These constants define the standard permissions used by EntityDB.
+// Each permission follows the pattern: Resource + Action
 var (
+	// Entity permissions - for general entity CRUD operations
 	PermEntityView   = RBACPermission{Resource: "entity", Action: "view"}
 	PermEntityCreate = RBACPermission{Resource: "entity", Action: "create"}
 	PermEntityUpdate = RBACPermission{Resource: "entity", Action: "update"}
 	PermEntityDelete = RBACPermission{Resource: "entity", Action: "delete"}
 	
+	// Relationship permissions - for entity relationship management
 	PermRelationView   = RBACPermission{Resource: "relation", Action: "view"}
 	PermRelationCreate = RBACPermission{Resource: "relation", Action: "create"}
 	PermRelationUpdate = RBACPermission{Resource: "relation", Action: "update"}
 	PermRelationDelete = RBACPermission{Resource: "relation", Action: "delete"}
 	
+	// User permissions - for user management (admin only)
 	PermUserView   = RBACPermission{Resource: "user", Action: "view"}
 	PermUserCreate = RBACPermission{Resource: "user", Action: "create"}
 	PermUserUpdate = RBACPermission{Resource: "user", Action: "update"}
 	PermUserDelete = RBACPermission{Resource: "user", Action: "delete"}
 	
+	// System permissions - for system monitoring and configuration
 	PermSystemView   = RBACPermission{Resource: "system", Action: "view"}
 	PermSystemUpdate = RBACPermission{Resource: "system", Action: "update"}
 	
+	// Configuration permissions - for feature flags and settings
 	PermConfigView   = RBACPermission{Resource: "config", Action: "view"}
 	PermConfigUpdate = RBACPermission{Resource: "config", Action: "update"}
 )
 
-// CheckEntityPermission checks if user has permission for a specific entity
+// CheckEntityPermission checks if user has permission for a specific entity.
+// This function considers the entity's type tag to determine the required permission.
+// For example, an entity with "type:document" requires "document:view" permission.
+//
+// Parameters:
+//   - rbacCtx: The RBAC context containing user permissions
+//   - entity: The entity to check permissions for
+//   - action: The action to perform (view, create, update, delete)
+//
+// Returns true if the user has permission, false otherwise.
+// Admin users always return true.
 func CheckEntityPermission(rbacCtx *RBACContext, entity *models.Entity, action string) bool {
 	// Admins have all permissions
 	if rbacCtx.IsAdmin {
@@ -186,7 +244,13 @@ func CheckEntityPermission(rbacCtx *RBACContext, entity *models.Entity, action s
 	return models.HasPermission(rbacCtx.Permissions, requiredPerm)
 }
 
-// getEntityType extracts the entity type from tags
+// getEntityType extracts the entity type from tags.
+// Looks for tags with the "type:" prefix and returns the type value.
+// If no type tag is found, returns "entity" as the default type.
+//
+// Examples:
+//   - Tags ["type:user", "status:active"] returns "user"
+//   - Tags ["status:active"] returns "entity"
 func getEntityType(entity *models.Entity) string {
 	for _, tag := range entity.Tags {
 		if strings.HasPrefix(tag, "type:") {

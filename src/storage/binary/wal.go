@@ -1,3 +1,6 @@
+// Package binary provides Write-Ahead Logging (WAL) functionality for the EntityDB
+// Binary Format storage layer. The WAL ensures durability and crash recovery by
+// logging all write operations before they are applied to the main data file.
 package binary
 
 import (
@@ -14,7 +17,16 @@ import (
 	"time"
 )
 
-// WALEntry represents a single entry in the write-ahead log
+// WALEntry represents a single entry in the write-ahead log.
+// Each entry contains the complete information needed to replay
+// an operation during recovery.
+//
+// Fields:
+//   - OpType: The type of operation (create, update, delete, checkpoint)
+//   - EntityID: Unique identifier of the affected entity
+//   - Entity: Complete entity data (nil for delete operations)
+//   - Timestamp: When the operation was logged
+//   - Checksum: SHA256 hash of the serialized entry for integrity
 type WALEntry struct {
 	OpType    WALOpType
 	EntityID  string
@@ -23,25 +35,62 @@ type WALEntry struct {
 	Checksum  string // SHA256 hex string
 }
 
-// WALOpType defines the type of operation in the WAL
+// WALOpType defines the type of operation in the WAL.
+// Operations are ordered by their typical frequency of use.
 type WALOpType uint8
 
 const (
-	WALOpCreate WALOpType = iota
-	WALOpUpdate
-	WALOpDelete
-	WALOpCheckpoint
+	WALOpCreate     WALOpType = iota // New entity creation
+	WALOpUpdate                      // Entity modification
+	WALOpDelete                      // Entity removal
+	WALOpCheckpoint                  // Checkpoint marker for truncation
 )
 
-// WAL represents a write-ahead log for crash recovery
+// WAL implements a write-ahead log for ensuring durability and crash recovery.
+// All write operations are first logged to the WAL before being applied to
+// the main data file. This ensures that no data is lost even if the system
+// crashes during a write operation.
+//
+// Key features:
+//   - Append-only for optimal write performance
+//   - Automatic checkpointing to prevent unbounded growth
+//   - SHA256 checksums for corruption detection
+//   - Thread-safe through mutex synchronization
+//   - Sequence numbers for operation ordering
+//
+// Recovery process:
+//   1. Read all entries since last checkpoint
+//   2. Verify checksums for integrity
+//   3. Replay operations in sequence order
+//   4. Create new checkpoint after recovery
 type WAL struct {
-	mu       sync.Mutex
-	file     *os.File
-	path     string
-	sequence uint64
+	mu       sync.Mutex // Protects concurrent access
+	file     *os.File   // WAL file handle
+	path     string     // Full path to WAL file
+	sequence uint64     // Monotonic operation counter
 }
 
-// NewWAL creates a new write-ahead log
+// NewWAL creates a new write-ahead log instance for the given data directory.
+// The WAL file is created as "entitydb.wal" in the specified directory.
+//
+// Initialization process:
+//   1. Opens or creates the WAL file with append mode
+//   2. Reads the last sequence number for continuity
+//   3. Positions file pointer at end for new writes
+//
+// Parameters:
+//   - dataPath: Directory where the WAL file will be stored
+//
+// Returns:
+//   - *WAL: Initialized WAL ready for logging operations
+//   - error: File creation or initialization errors
+//
+// Example:
+//   wal, err := NewWAL("/var/lib/entitydb")
+//   if err != nil {
+//       log.Fatal(err)
+//   }
+//   defer wal.Close()
 func NewWAL(dataPath string) (*WAL, error) {
 	walPath := filepath.Join(dataPath, "entitydb.wal")
 	logger.Debug("Creating WAL with dataPath: %s, resulting walPath: %s", dataPath, walPath)
@@ -64,7 +113,24 @@ func NewWAL(dataPath string) (*WAL, error) {
 	return wal, nil
 }
 
-// LogCreate logs an entity creation
+// LogCreate logs an entity creation operation to the WAL.
+// This must be called before the entity is written to the main data file
+// to ensure durability in case of crashes.
+//
+// The method:
+//   1. Creates a WAL entry with the complete entity data
+//   2. Calculates checksum for integrity verification
+//   3. Appends entry to the WAL file
+//   4. Syncs to disk for immediate durability
+//
+// Parameters:
+//   - entity: The entity being created (must have valid ID)
+//
+// Returns:
+//   - error: I/O errors or serialization failures
+//
+// Thread Safety:
+//   Safe for concurrent use; operations are serialized via mutex.
 func (w *WAL) LogCreate(entity *models.Entity) error {
 	op := models.StartOperation(models.OpTypeWAL, entity.ID, map[string]interface{}{
 		"wal_operation": "create",
@@ -148,7 +214,21 @@ func (w *WAL) LogDelete(entityID string) error {
 	return nil
 }
 
-// LogCheckpoint logs a checkpoint
+// LogCheckpoint logs a checkpoint marker to the WAL.
+// Checkpoints indicate that all previous operations have been
+// successfully written to the main data file and the WAL can
+// be truncated up to this point during recovery.
+//
+// Checkpoint strategy:
+//   - Called after successful flush of main data file
+//   - Enables WAL truncation to prevent unbounded growth
+//   - Does not contain entity data, only timestamp
+//
+// Returns:
+//   - error: I/O errors during checkpoint write
+//
+// Thread Safety:
+//   Safe for concurrent use via internal locking.
 func (w *WAL) LogCheckpoint() error {
 	return w.logEntry(WALEntry{
 		OpType:    WALOpCheckpoint,
@@ -156,7 +236,29 @@ func (w *WAL) LogCheckpoint() error {
 	})
 }
 
-// logEntry writes an entry to the WAL
+// logEntry writes an entry to the WAL file atomically.
+// This is the core method that ensures all operations are durably stored.
+//
+// Write process:
+//   1. Serialize the entry to binary format
+//   2. Write 4-byte length prefix for framing
+//   3. Write serialized entry data
+//   4. Sync file to ensure durability
+//   5. Increment sequence number
+//
+// Format: [Length:4][SerializedEntry:Length]
+//
+// The length prefix allows for efficient scanning during recovery
+// and detection of incomplete writes.
+//
+// Parameters:
+//   - entry: The WAL entry to write
+//
+// Returns:
+//   - error: Serialization or I/O errors
+//
+// Note: This method must hold the mutex for the entire operation
+// to ensure write atomicity and sequence number consistency.
 func (w *WAL) logEntry(entry WALEntry) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -269,7 +371,40 @@ func (w *WAL) serializeEntry(entry WALEntry) ([]byte, error) {
 	return buf, nil
 }
 
-// Replay replays the WAL entries
+// Replay reads all entries from the WAL and executes the callback for each.
+// This is the primary mechanism for crash recovery and restoring system state.
+//
+// Recovery process:
+//   1. Seeks to beginning of WAL file
+//   2. Reads entries sequentially using length-prefix framing
+//   3. Deserializes each entry and verifies integrity
+//   4. Calls callback for each valid entry
+//   5. Skips corrupted entries with logging
+//   6. Stops at EOF or unreadable data
+//
+// The callback should:
+//   - Apply the operation to the main data store
+//   - Return error only for fatal conditions
+//   - Handle idempotency for repeated operations
+//
+// Parameters:
+//   - callback: Function to process each WAL entry
+//
+// Returns:
+//   - error: Fatal errors that prevent recovery
+//
+// Example:
+//   err := wal.Replay(func(entry WALEntry) error {
+//       switch entry.OpType {
+//       case WALOpCreate:
+//           return writer.WriteEntity(entry.Entity)
+//       case WALOpUpdate:
+//           return writer.UpdateEntity(entry.Entity)
+//       case WALOpDelete:
+//           return writer.DeleteEntity(entry.EntityID)
+//       }
+//       return nil
+//   })
 func (w *WAL) Replay(callback func(entry WALEntry) error) error {
 	op := models.StartOperation(models.OpTypeWAL, "replay", map[string]interface{}{
 		"wal_operation": "replay",
@@ -438,7 +573,29 @@ func (w *WAL) deserializeEntry(data []byte) (*WALEntry, error) {
 	return entry, nil
 }
 
-// Truncate truncates the WAL after a successful checkpoint
+// Truncate removes all entries from the WAL file after a successful checkpoint.
+// This should only be called after all WAL entries have been durably written
+// to the main data file.
+//
+// Truncation process:
+//   1. Closes the current WAL file
+//   2. Deletes the old WAL file from disk
+//   3. Creates a new empty WAL file
+//   4. Resets sequence counter to zero
+//
+// Safety considerations:
+//   - Only call after successful checkpoint
+//   - Ensure main data file is synced first
+//   - Operation is not atomic (brief window of no WAL)
+//
+// Returns:
+//   - error: File operation failures
+//
+// Thread Safety:
+//   Method is synchronized; safe for concurrent use.
+//
+// Note: In production systems, consider using rename operations
+// for atomic truncation to avoid the window where no WAL exists.
 func (w *WAL) Truncate() error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -465,7 +622,19 @@ func (w *WAL) Truncate() error {
 	return nil
 }
 
-// Close closes the WAL
+// Close gracefully shuts down the WAL, ensuring all pending operations complete.
+// After Close, the WAL instance cannot be used for further operations.
+//
+// This method:
+//   - Ensures any buffered data is written
+//   - Closes the underlying file handle
+//   - Releases file locks and resources
+//
+// Returns:
+//   - error: File closing errors
+//
+// Thread Safety:
+//   Safe to call concurrently; only the first call takes effect.
 func (w *WAL) Close() error {
 	w.mu.Lock()
 	defer w.mu.Unlock()

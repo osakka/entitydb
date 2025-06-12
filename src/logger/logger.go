@@ -23,36 +23,118 @@ import (
 	"time"
 )
 
-// LogLevel represents the severity of a log message.
-// Higher values indicate more severe messages.
+// LogLevel represents the severity level of log messages.
+//
+// Log levels follow a hierarchical system where higher numeric values indicate
+// more severe messages. When a log level is set, only messages at that level
+// or higher will be output, providing efficient filtering of debug information
+// in production environments.
+//
+// Performance:
+//   Log level checking uses atomic operations for minimal overhead when
+//   logging is disabled for a particular level.
 type LogLevel int32
 
+// Log level constants defining the severity hierarchy.
+//
+// Level Usage Guidelines:
+//
+// TRACE: Extremely detailed information for debugging specific subsystems.
+//   - Function entry/exit with parameters
+//   - Loop iterations and state changes  
+//   - Lock acquisition and release operations
+//   - Memory allocation details
+//   - Should be used with subsystem filtering to avoid overwhelming output
+//   - Performance impact: Negligible when disabled via atomic check
+//
+// DEBUG: Detailed information useful for diagnosing problems.
+//   - SQL queries and their results
+//   - Cache hits/misses
+//   - Configuration loading steps
+//   - Request/response content (sanitized)
+//   - Algorithm decision points
+//   - Recommended for development environments
+//
+// INFO: General information about program execution.
+//   - Server startup/shutdown events
+//   - Configuration changes
+//   - Successful completion of major operations
+//   - Performance metrics and statistics
+//   - User authentication events
+//   - Default level for production environments
+//
+// WARN: Potentially harmful situations that don't prevent operation.
+//   - Deprecated API usage
+//   - Configuration fallbacks to defaults
+//   - Retry attempts for failed operations  
+//   - Resource usage approaching limits
+//   - Non-critical errors that were handled
+//
+// ERROR: Error events that might allow the application to continue.
+//   - Database connection failures
+//   - Authentication failures
+//   - Invalid user input that was rejected
+//   - External service errors
+//   - Critical errors that require immediate attention
 const (
-	TRACE LogLevel = iota
-	DEBUG
-	INFO
-	WARN
-	ERROR
+	TRACE LogLevel = iota // Most verbose: subsystem-level debugging
+	DEBUG                 // Detailed: diagnostic information for troubleshooting
+	INFO                  // General: normal operation events and status
+	WARN                  // Warning: potential issues that don't stop operation  
+	ERROR                 // Critical: error conditions requiring attention
 )
 
+// Global logger state and configuration
 var (
+	// currentLevel holds the current minimum log level using atomic operations.
+	// This allows lock-free, high-performance level checking from multiple goroutines.
+	// Value is stored as int32 for atomic compatibility.
 	currentLevel atomic.Int32
+	
+	// levelNames provides string representations of log levels for output formatting.
+	// Used in log message formatting to display human-readable level names.
 	levelNames = map[LogLevel]string{
-		TRACE: "TRACE",
-		DEBUG: "DEBUG",
-		INFO:  "INFO",
-		WARN:  "WARN",
-		ERROR: "ERROR",
+		TRACE: "TRACE", // Most verbose debugging output
+		DEBUG: "DEBUG", // Detailed diagnostic information
+		INFO:  "INFO",  // General operational information  
+		WARN:  "WARN",  // Warning conditions
+		ERROR: "ERROR", // Error conditions
 	}
 	
-	// Trace subsystems that are enabled
-	traceSubsystems = make(map[string]bool)
-	traceMutex      sync.RWMutex
+	// Trace Subsystem Management
+	// =========================
 	
-	// Process and thread IDs
+	// traceSubsystems tracks which debugging subsystems are currently enabled.
+	// Subsystems allow fine-grained control over trace output, enabling developers
+	// to focus on specific components without overwhelming log output.
+	//
+	// Common subsystems include:
+	//   - "locks"     - Lock acquisition and release operations
+	//   - "storage"   - Database and file operations  
+	//   - "auth"      - Authentication and authorization
+	//   - "requests"  - HTTP request processing
+	//   - "metrics"   - Metrics collection and aggregation
+	traceSubsystems = make(map[string]bool)
+	
+	// traceMutex protects the traceSubsystems map from concurrent access.
+	// Uses RWMutex to allow multiple concurrent readers when checking if
+	// a subsystem is enabled.
+	traceMutex sync.RWMutex
+	
+	// Process and Thread Identification
+	// =================================
+	
+	// processID is the current process ID, captured at startup.
+	// Included in all log messages to help correlate logs in multi-process
+	// deployments and distinguish between server instances.
 	processID = os.Getpid()
 	
-	// Logger instance
+	// Logger Infrastructure
+	// ====================
+	
+	// logger is the underlying Go standard library logger instance.
+	// Configured with no prefix since we format all output ourselves
+	// to maintain consistent formatting across all log levels.
 	logger *log.Logger
 )
 

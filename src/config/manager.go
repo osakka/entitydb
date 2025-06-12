@@ -13,21 +13,71 @@ import (
 	"time"
 )
 
-// ConfigManager manages the three-tier configuration hierarchy:
-// 1. Database configuration entities (highest priority)
-// 2. Command-line flags
-// 3. Environment variables (lowest priority)
+// ConfigManager manages EntityDB's three-tier configuration hierarchy system.
+//
+// The configuration system provides flexible, runtime-configurable settings
+// through a priority-based hierarchy:
+//   1. Database configuration entities (highest priority)
+//   2. Command-line flags (medium priority)  
+//   3. Environment variables (lowest priority)
+//
+// Database Configuration:
+//   Configuration stored as entities with type:config tags enables runtime
+//   configuration changes without server restarts. Values are cached for
+//   performance and refreshed every 5 minutes or on explicit refresh.
+//
+// Flag Processing:
+//   Command-line flags use long names (--entitydb-*) to avoid conflicts.
+//   Only explicitly set flags override environment values.
+//
+// Performance:
+//   Database configuration is cached with configurable TTL to minimize
+//   repository queries while maintaining reasonable update responsiveness.
+//
+// Thread Safety:
+//   All operations are protected by read-write mutexes for safe concurrent
+//   access from multiple goroutines.
 type ConfigManager struct {
-	mu              sync.RWMutex
-	config          *Config
-	entityRepo      models.EntityRepository
-	flagValues      map[string]interface{}
-	dbCache         map[string]string
-	cacheExpiry     time.Time
-	cacheDuration   time.Duration
+	// mu protects all ConfigManager fields from concurrent access
+	mu sync.RWMutex
+	
+	// config holds the current active configuration after applying all hierarchy tiers
+	config *Config
+	
+	// entityRepo provides access to configuration entities in the database
+	entityRepo models.EntityRepository
+	
+	// flagValues stores parsed command-line flag values for priority checking
+	flagValues map[string]interface{}
+	
+	// dbCache holds cached database configuration values to reduce repository queries
+	dbCache map[string]string
+	
+	// cacheExpiry tracks when the database configuration cache should be refreshed
+	cacheExpiry time.Time
+	
+	// cacheDuration defines how long database configuration values are cached
+	// Default: 5 minutes (good balance between performance and responsiveness)
+	cacheDuration time.Duration
 }
 
-// NewConfigManager creates a new configuration manager
+// NewConfigManager creates a new configuration manager instance.
+//
+// The manager is initialized with empty caches and a default cache duration
+// of 5 minutes for database configuration values. The entity repository
+// can be nil initially and set later when the storage layer is available.
+//
+// Parameters:
+//   entityRepo - Repository for accessing configuration entities (can be nil)
+//
+// Returns:
+//   A new ConfigManager ready for initialization and flag registration
+//
+// Cache Duration:
+//   The 5-minute cache duration provides a good balance between:
+//   - Performance: Reduces database queries for configuration reads
+//   - Responsiveness: Configuration changes take effect within reasonable time
+//   - Consistency: Prevents stale configuration in long-running operations
 func NewConfigManager(entityRepo models.EntityRepository) *ConfigManager {
 	return &ConfigManager{
 		entityRepo:    entityRepo,
@@ -37,7 +87,29 @@ func NewConfigManager(entityRepo models.EntityRepository) *ConfigManager {
 	}
 }
 
-// Initialize sets up the configuration with proper priority hierarchy
+// Initialize builds the final configuration by applying the three-tier hierarchy.
+//
+// This method must be called after RegisterFlags() and flag.Parse() to properly
+// apply command-line flag overrides. The initialization process follows this sequence:
+//
+//   1. Load base configuration from environment variables
+//   2. Apply command-line flag overrides (only explicitly set flags)
+//   3. Apply database configuration overrides (highest priority)
+//
+// The method is thread-safe and can be called multiple times, though subsequent
+// calls will rebuild the entire configuration from scratch.
+//
+// Database Configuration Handling:
+//   If the entity repository is not available or database configuration loading
+//   fails, the method logs a warning and continues with environment and flag values.
+//   This ensures the server can start even if the database is temporarily unavailable.
+//
+// Returns:
+//   - *Config: The final configuration with all hierarchy tiers applied
+//   - error: Only returned for critical errors (database errors are logged as warnings)
+//
+// Thread Safety:
+//   This method acquires a write lock for the duration of configuration building.
 func (cm *ConfigManager) Initialize() (*Config, error) {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()

@@ -1,3 +1,6 @@
+// Package binary provides high-performance concurrent data structures for the
+// EntityDB storage layer. The sharded lock implementation distributes lock
+// contention across multiple shards to improve scalability under high concurrency.
 package binary
 
 import (
@@ -8,34 +11,64 @@ import (
 )
 
 const (
-	// NumShards is the number of lock shards (must be power of 2)
+	// NumShards is the number of lock shards (must be power of 2).
+	// Higher values reduce contention but increase memory usage.
+	// 256 shards provides good balance for most workloads.
 	NumShards = 256
-	// MaxReadersBatch is the number of readers before a writer gets priority
+	
+	// MaxReadersBatch controls reader/writer fairness.
+	// After this many readers, a waiting writer gets priority.
+	// Prevents writer starvation under heavy read loads.
 	MaxReadersBatch = 10
-	// NumLockShards for ShardedLock
+	
+	// NumLockShards for general-purpose ShardedLock.
+	// Smaller than tag index shards as it's used for coarser locking.
 	NumLockShards = 64
 )
 
-// ShardedTagIndex implements a sharded tag index with fair locking
+// ShardedTagIndex implements a high-performance tag index using sharding
+// to distribute lock contention. Tags are distributed across shards using
+// consistent hashing, allowing concurrent operations on different tags.
+//
+// Performance characteristics:
+//   - O(1) tag lookups within a shard
+//   - Concurrent operations on different shards
+//   - Fair reader/writer scheduling prevents starvation
+//   - Memory usage: O(unique_tags * avg_entities_per_tag)
+//
+// Example usage:
+//   index := NewShardedTagIndex()
+//   index.AddTag("type:user", "user-123")
+//   entities := index.GetEntitiesForTag("type:user")
 type ShardedTagIndex struct {
 	shards [NumShards]*TagIndexShard
 }
 
-// TagIndexShard represents a single shard of the tag index
+// TagIndexShard represents a single shard of the tag index.
+// Each shard maintains its own lock and tag mappings, allowing
+// concurrent access to different shards.
 type TagIndexShard struct {
-	mu       sync.RWMutex
-	tags     map[string][]string // tag -> entity IDs
-	queue    *FairQueue
+	mu       sync.RWMutex        // Protects tag map access
+	tags     map[string][]string // tag -> entity IDs mapping
+	queue    *FairQueue          // Ensures fair reader/writer access
 }
 
-// FairQueue implements fair queuing for readers and writers
+// FairQueue implements fair scheduling between readers and writers
+// to prevent starvation. It ensures writers eventually get access
+// even under heavy read load.
+//
+// Algorithm:
+//   1. Readers can proceed if no writer is waiting
+//   2. After MaxReadersBatch reads, writers get priority
+//   3. Writers process one at a time
+//   4. Queued operations maintain FIFO order
 type FairQueue struct {
-	mu            sync.Mutex
-	readerQueue   []chan struct{}
-	writerQueue   []chan struct{}
-	activeReaders int32
-	readerCount   int32 // Count of reads since last write
-	writerWaiting bool
+	mu            sync.Mutex      // Protects queue state
+	readerQueue   []chan struct{} // Blocked readers
+	writerQueue   []chan struct{} // Blocked writers
+	activeReaders int32           // Current active reader count
+	readerCount   int32           // Reads since last write
+	writerWaiting bool            // Writer is waiting for access
 }
 
 // NewShardedTagIndex creates a new sharded tag index
@@ -58,7 +91,15 @@ func NewFairQueue() *FairQueue {
 	}
 }
 
-// getShard returns the shard for a given tag
+// getShard determines which shard owns a given tag using consistent hashing.
+// The FNV-1a hash provides good distribution across shards with low collision rate.
+//
+// Shard selection algorithm:
+//   1. Hash the tag string using FNV-1a (fast, non-cryptographic)
+//   2. Use bitwise AND with (NumShards-1) for modulo operation
+//   3. This works because NumShards is power of 2
+//
+// Performance: O(len(tag)) for hash calculation
 func (s *ShardedTagIndex) getShard(tag string) *TagIndexShard {
 	h := fnv.New32a()
 	h.Write([]byte(tag))
@@ -66,7 +107,21 @@ func (s *ShardedTagIndex) getShard(tag string) *TagIndexShard {
 	return s.shards[shardIdx]
 }
 
-// AddTag adds an entity ID to a tag's index
+// AddTag associates an entity ID with a tag in the index.
+// If the entity is already associated with the tag, this is a no-op.
+//
+// Concurrency behavior:
+//   - Acquires write lock on the tag's shard only
+//   - Other shards remain accessible for concurrent operations
+//   - Uses fair queuing to prevent writer starvation
+//
+// Parameters:
+//   - tag: The tag to index (e.g., "type:user")
+//   - entityID: The entity to associate with the tag
+//
+// Thread Safety:
+//   Safe for concurrent use. Multiple AddTag calls for different
+//   shards can proceed in parallel.
 func (s *ShardedTagIndex) AddTag(tag string, entityID string) {
 	shard := s.getShard(tag)
 	
@@ -140,7 +195,21 @@ func (s *ShardedTagIndex) GetAllTags() map[string][]string {
 	return result
 }
 
-// AcquireRead acquires a read lock with fair queuing
+// AcquireRead acquires a read lock using fair scheduling to prevent writer starvation.
+// Readers can proceed concurrently unless a writer is waiting and the reader
+// batch limit has been reached.
+//
+// Fair scheduling algorithm:
+//   1. Check if writer is waiting AND reader batch limit reached
+//   2. If so, queue this reader and block until signaled
+//   3. Otherwise, increment active reader count and proceed
+//   4. Track total reads since last write for fairness
+//
+// This ensures writers eventually get access even under heavy read load,
+// preventing writer starvation while still allowing read concurrency.
+//
+// Thread Safety:
+//   Safe for concurrent use. Multiple readers can call simultaneously.
 func (q *FairQueue) AcquireRead() {
 	q.mu.Lock()
 	
@@ -149,7 +218,7 @@ func (q *FairQueue) AcquireRead() {
 		ch := make(chan struct{})
 		q.readerQueue = append(q.readerQueue, ch)
 		q.mu.Unlock()
-		<-ch
+		<-ch // Block until writer completes
 		q.mu.Lock()
 	}
 	
@@ -158,7 +227,16 @@ func (q *FairQueue) AcquireRead() {
 	q.mu.Unlock()
 }
 
-// ReleaseRead releases a read lock
+// ReleaseRead releases a read lock and potentially unblocks waiting writers.
+// Must be called exactly once for each successful AcquireRead.
+//
+// Cleanup process:
+//   1. Decrement active reader count
+//   2. If no readers remain AND writer is queued, signal it
+//   3. Reset reader count when writer proceeds (fairness reset)
+//
+// Thread Safety:
+//   Safe for concurrent use. Matches with AcquireRead calls.
 func (q *FairQueue) ReleaseRead() {
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -339,14 +417,43 @@ func (idx *ShardedTagIndex) ToMap() map[string][]string {
 	return result
 }
 
-// ShardedLock provides fine-grained locking with multiple shards
-// This is used by TemporalRepository for entity and bucket locks
+// ShardedLock provides fine-grained locking by distributing locks across
+// multiple shards. This reduces contention when locking different keys,
+// as operations on different shards can proceed concurrently.
+//
+// Used extensively in TemporalRepository for:
+//   - Entity-level locking (prevent concurrent modifications)
+//   - Timeline bucket locking (temporal index updates)
+//   - Tag index locking (consistent tag operations)
+//
+// Performance characteristics:
+//   - O(1) lock acquisition
+//   - Concurrent operations on ~1/numShards of keyspace
+//   - Memory usage: O(numShards) - typically small
+//
+// Example usage:
+//   lock := NewShardedLock(64)
+//   lock.Lock("entity-123")
+//   defer lock.Unlock("entity-123")
+//   // ... critical section ...
 type ShardedLock struct {
-	locks    []*sync.RWMutex
-	numShards int
+	locks     []*sync.RWMutex // Array of locks, one per shard
+	numShards int             // Number of shards (not required to be power of 2)
 }
 
-// NewShardedLock creates a new sharded lock with the specified number of shards
+// NewShardedLock creates a new sharded lock with the specified number of shards.
+// More shards reduce contention but increase memory usage.
+//
+// Recommended shard counts:
+//   - 16-32: Low concurrency applications
+//   - 64-128: Medium concurrency
+//   - 256+: High concurrency with many unique keys
+//
+// Parameters:
+//   - numShards: Number of lock shards to create
+//
+// Returns:
+//   - *ShardedLock: Initialized lock manager
 func NewShardedLock(numShards int) *ShardedLock {
 	sl := &ShardedLock{
 		locks:     make([]*sync.RWMutex, numShards),
@@ -389,14 +496,42 @@ func (sl *ShardedLock) getShard(key string) int {
 	return int(h.Sum32() % uint32(sl.numShards))
 }
 
-// WithLock executes a function while holding a write lock for the given key
+// WithLock executes a function while holding a write lock for the given key.
+// This is a convenience method that ensures proper lock release via defer.
+//
+// Deadlock Prevention:
+//   When locking multiple keys, always acquire locks in a consistent order
+//   (e.g., alphabetical) to prevent circular wait conditions.
+//
+// Parameters:
+//   - key: The key to lock (hashed to determine shard)
+//   - fn: Function to execute while holding the lock
+//
+// Example:
+//   sl.WithLock("user-123", func() {
+//       // Critical section - exclusive access to "user-123"
+//       updateUser(...)
+//   })
 func (sl *ShardedLock) WithLock(key string, fn func()) {
 	sl.Lock(key)
 	defer sl.Unlock(key)
 	fn()
 }
 
-// WithRLock executes a function while holding a read lock for the given key
+// WithRLock executes a function while holding a read lock for the given key.
+// Multiple readers can hold the lock simultaneously for the same key.
+//
+// Use for read-only operations that must not see partial updates.
+//
+// Parameters:
+//   - key: The key to lock (hashed to determine shard)
+//   - fn: Function to execute while holding the read lock
+//
+// Example:
+//   var user User
+//   sl.WithRLock("user-123", func() {
+//       user = getUser("user-123")
+//   })
 func (sl *ShardedLock) WithRLock(key string, fn func()) {
 	sl.RLock(key)
 	defer sl.RUnlock(key)

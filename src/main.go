@@ -59,19 +59,67 @@ import (
 // Global Variables and Configuration
 // =============================================================================
 
-// Version information (can be overridden at build time via ldflags)
+// Build-time version information that can be overridden during compilation.
+//
+// These variables are designed to be set at build time using Go's -ldflags
+// to embed version and build information directly into the binary. This
+// provides accurate version reporting regardless of deployment environment.
+//
+// Usage with go build:
+//   go build -ldflags "-X main.Version=2.29.0 -X main.BuildDate=$(date +%Y-%m-%d)"
+//
+// Usage with Makefile:
+//   VERSION := $(shell git describe --tags --always)
+//   BUILD_DATE := $(shell date +%Y-%m-%d)
+//   LDFLAGS := -X main.Version=$(VERSION) -X main.BuildDate=$(BUILD_DATE)
+//
+// These values are displayed by the --version flag and included in API responses
+// to help with deployment tracking and support diagnostics.
 var (
-	Version    = "2.28.0"  // Build-time version, set via -ldflags "-X main.Version=x.y.z"
-	BuildDate  = "unknown" // Build-time date, set via -ldflags "-X main.BuildDate=YYYY-MM-DD"
+	// Version is the EntityDB version string, typically in semantic versioning format.
+	// Default: "2.28.0" (current development version)
+	// Build override: -ldflags "-X main.Version=x.y.z"
+	// Used in: version command output, API responses, swagger documentation
+	Version = "2.28.0"
+	
+	// BuildDate is the date when the binary was compiled.
+	// Default: "unknown" (for development builds)
+	// Build override: -ldflags "-X main.BuildDate=YYYY-MM-DD" 
+	// Format: YYYY-MM-DD (ISO 8601 date format)
+	// Used in: version command output, diagnostics, support information
+	BuildDate = "unknown"
 )
 
-// Global configuration manager
-var configManager *config.ConfigManager
-
-// Essential short flags only
+// Global application state and configuration
 var (
+	// configManager handles the three-tier configuration hierarchy system.
+	// Initialized during application startup and used throughout the server
+	// lifecycle to provide centralized configuration management.
+	// See config.ConfigManager for detailed documentation.
+	configManager *config.ConfigManager
+)
+
+// Command-line flag variables for essential functions.
+//
+// EntityDB follows a strict policy of using long-form flags (--entitydb-*)
+// for configuration and reserving short flags only for essential functions
+// like help and version display. This prevents conflicts with other tools
+// and provides clear, unambiguous flag names.
+//
+// Flag Processing:
+//   These flags are processed before full configuration initialization
+//   to allow immediate exit for help/version requests without requiring
+//   full server initialization.
+var (
+	// showVersion indicates whether to display version information and exit.
+	// Triggered by: -v, --version
+	// Action: Print version and build date, then exit with code 0
 	showVersion bool
-	showHelp    bool
+	
+	// showHelp indicates whether to display help information and exit.
+	// Triggered by: -h, --help
+	// Action: Print usage information and flag descriptions, then exit with code 0
+	showHelp bool
 )
 
 // =============================================================================

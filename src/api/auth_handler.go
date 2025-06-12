@@ -1,3 +1,5 @@
+// Package api provides HTTP handlers for the EntityDB REST API.
+// This file implements authentication endpoints.
 package api
 
 import (
@@ -11,13 +13,27 @@ import (
 	"entitydb/models"
 )
 
-// AuthHandler handles authentication using the new relationship-based security system
+// AuthHandler handles authentication endpoints for EntityDB.
+// It manages user login, logout, and session validation using the embedded credential system.
+//
+// As of v2.29.0, user credentials are stored directly in the user entity's content field
+// in the format "salt|bcrypt_hash". This eliminates the need for separate credential
+// entities and relationships.
+//
+// Key responsibilities:
+//   - User authentication via username/password
+//   - Session token generation and management
+//   - Session refresh and logout functionality
+//   - Integration with RBAC for permission checking
 type AuthHandler struct {
 	securityManager *models.SecurityManager
 	sessionManager  *models.SessionManager
 }
 
-// NewAuthHandler creates a new authentication handler
+// NewAuthHandler creates a new authentication handler.
+// Parameters:
+//   - securityManager: Handles password verification and user authentication
+//   - sessionManager: Manages session tokens and expiration
 func NewAuthHandler(securityManager *models.SecurityManager, sessionManager *models.SessionManager) *AuthHandler {
 	return &AuthHandler{
 		securityManager: securityManager,
@@ -52,7 +68,50 @@ type AuthErrorResponse struct {
 	Error string `json:"error"`
 }
 
-// Login handles user authentication using relationship-based security
+// Login handles user authentication using the embedded credential system.
+//
+// HTTP Method: POST
+// Endpoint: /api/v1/auth/login
+// Required Permission: None (public endpoint)
+//
+// Request Body:
+//   {
+//     "username": "admin",
+//     "password": "admin"
+//   }
+//
+// Response:
+//   200 OK: Authentication successful
+//   {
+//     "token": "generated-session-token",
+//     "expires_at": "2024-01-01T12:00:00Z",
+//     "user_id": "user-entity-id",
+//     "user": {
+//       "id": "user-entity-id",
+//       "username": "admin",
+//       "email": "admin@example.com",
+//       "roles": ["admin", "user"]
+//     }
+//   }
+//
+// Error Responses:
+//   - 400 Bad Request: Invalid request body or missing credentials
+//   - 401 Unauthorized: Invalid username or password
+//   - 500 Internal Server Error: Failed to create session
+//
+// Authentication Flow:
+//   1. Validates username and password are provided
+//   2. Looks up user entity by username tag
+//   3. Verifies password against embedded bcrypt hash in entity content
+//   4. Creates a new session with TTL (default 1 hour)
+//   5. Returns session token and user information
+//
+// Security Notes:
+//   - Passwords are hashed using bcrypt with cost 10
+//   - Session tokens are generated using crypto/rand
+//   - Failed login attempts are tracked (currently disabled due to deadlock)
+//   - Sessions expire after TTL and are automatically cleaned up
+//
 // @Summary Authenticate user
 // @Description Authenticate user with username and password using relationship-based security
 // @Tags authentication
@@ -173,7 +232,31 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
-// Logout handles user logout by invalidating the session
+// Logout handles user logout by invalidating the session.
+//
+// HTTP Method: POST
+// Endpoint: /api/v1/auth/logout
+// Required Permission: None (but requires valid session token)
+//
+// Headers:
+//   Authorization: Bearer <session-token>
+//
+// Response:
+//   200 OK: Successfully logged out
+//   {
+//     "message": "Logged out successfully"
+//   }
+//
+// Error Responses:
+//   - 401 Unauthorized: No token provided or invalid token format
+//   - 500 Internal Server Error: Failed to invalidate session
+//
+// Logout Flow:
+//   1. Extracts session token from Authorization header
+//   2. Validates token format (Bearer scheme)
+//   3. Invalidates the session in session manager
+//   4. Returns success message
+//
 // @Summary Logout user
 // @Description Logout user by invalidating the current session
 // @Tags authentication

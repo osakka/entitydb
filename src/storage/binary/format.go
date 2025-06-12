@@ -1,3 +1,47 @@
+// Package binary implements the EntityDB Binary Format (EBF), a custom binary storage
+// format optimized for temporal data with high-performance concurrent access.
+//
+// # Format Overview
+//
+// The EBF format consists of:
+//   - Fixed-size header (64 bytes) containing metadata and offsets
+//   - Tag dictionary for string compression and interning
+//   - Entity index for O(1) lookups by ID
+//   - Entity data blocks containing tags and content
+//
+// # File Structure
+//
+//	+----------------+ 0x00
+//	|     Header     | 64 bytes
+//	+----------------+ 0x40
+//	| Tag Dictionary | Variable size
+//	+----------------+
+//	|  Entity Index  | EntityCount * 112 bytes
+//	+----------------+
+//	|  Entity Data   | Variable size blocks
+//	+----------------+
+//
+// # Design Principles
+//
+//   - Memory-mapped file support for zero-copy reads
+//   - String interning to reduce memory usage
+//   - Fixed-size index entries for predictable performance
+//   - Write-Ahead Logging (WAL) for durability
+//   - Lock-free reads with sharded write locks
+//
+// # Example
+//
+//	// Reading an EBF file
+//	reader, err := NewReader("entities.ebf")
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+//	defer reader.Close()
+//
+//	entity, err := reader.GetByID("user-123")
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
 package binary
 
 import (
@@ -10,41 +54,66 @@ import (
 )
 
 const (
-	// Magic number "EBDF" (EntityDB Format)
+	// MagicNumber identifies valid EBF files.
+	// Value: 0x45424446 ("EBDF" - EntityDB Format)
 	MagicNumber uint32 = 0x45424446
 	
-	// Current format version
+	// FormatVersion indicates the binary format version.
+	// Version 1: Initial format with temporal tags and compression support
 	FormatVersion uint32 = 1
 	
-	// Header size in bytes
+	// HeaderSize is the fixed size of the file header in bytes.
+	// The header contains file metadata and section offsets.
 	HeaderSize = 64
 	
-	// Index entry size (96-byte ID + 8-byte offset + 4-byte size + 4-byte flags)
+	// IndexEntrySize is the size of each entity index entry.
+	// Structure: EntityID (96 bytes) + Offset (8 bytes) + Size (4 bytes) + Flags (4 bytes)
 	IndexEntrySize = 112
 )
 
 var (
+	// ErrInvalidFormat is returned when the file magic number doesn't match
 	ErrInvalidFormat = errors.New("invalid file format")
+	
+	// ErrVersionMismatch is returned when the format version is unsupported
 	ErrVersionMismatch = errors.New("unsupported format version")
 )
 
-// Header represents the file header
+// Header represents the EBF file header containing metadata and section offsets.
+// The header is always 64 bytes and located at the beginning of the file.
+//
+// # Binary Layout (Little Endian)
+//
+//	Offset  Size  Field
+//	0x00    4     Magic (0x45424446)
+//	0x04    4     Version
+//	0x08    8     FileSize
+//	0x10    8     TagDictOffset
+//	0x18    8     TagDictSize
+//	0x20    8     EntityIndexOffset
+//	0x28    8     EntityIndexSize
+//	0x30    8     EntityCount
+//	0x38    8     LastModified (Unix timestamp)
 type Header struct {
-	Magic            uint32
-	Version          uint32
-	FileSize         uint64
-	TagDictOffset    uint64
-	TagDictSize      uint64
-	EntityIndexOffset uint64
-	EntityIndexSize  uint64
-	EntityCount      uint64
-	LastModified     int64
+	Magic            uint32  // File format identifier (must be MagicNumber)
+	Version          uint32  // Format version (must be FormatVersion)
+	FileSize         uint64  // Total file size in bytes
+	TagDictOffset    uint64  // Offset to tag dictionary section
+	TagDictSize      uint64  // Size of tag dictionary in bytes
+	EntityIndexOffset uint64  // Offset to entity index section
+	EntityIndexSize  uint64  // Size of entity index in bytes
+	EntityCount      uint64  // Number of entities in the file
+	LastModified     int64   // Unix timestamp of last modification
 }
 
-// Write writes the header to writer
+// Write serializes the header to the provided writer.
+// The header is written as a fixed 64-byte block in little-endian format.
+//
+// Returns an error if the write operation fails.
 func (h *Header) Write(w io.Writer) error {
 	buf := make([]byte, HeaderSize)
 	
+	// Serialize all fields to the buffer in little-endian format
 	binary.LittleEndian.PutUint32(buf[0:4], h.Magic)
 	binary.LittleEndian.PutUint32(buf[4:8], h.Version)
 	binary.LittleEndian.PutUint64(buf[8:16], h.FileSize)
@@ -65,7 +134,16 @@ func (h *Header) Write(w io.Writer) error {
 	return nil
 }
 
-// Read reads the header from reader
+// Read deserializes the header from the provided reader.
+// The method reads exactly 64 bytes and validates the magic number and version.
+//
+// If the file is truncated but has a valid header start (magic + version),
+// it assumes an empty file and sets EntityCount to 0.
+//
+// Returns:
+//   - ErrInvalidFormat if the magic number doesn't match
+//   - ErrVersionMismatch if the version is unsupported
+//   - io.ErrUnexpectedEOF if the header is incomplete
 func (h *Header) Read(r io.Reader) error {
 	buf := make([]byte, HeaderSize)
 	n, err := io.ReadFull(r, buf)
@@ -106,31 +184,57 @@ func (h *Header) Read(r io.Reader) error {
 	return nil
 }
 
-// IndexEntry represents an entry in the entity index
+// IndexEntry represents an entry in the entity index section.
+// Each entry maps an entity ID to its location in the file.
+//
+// # Binary Layout (112 bytes)
+//
+//	Offset  Size  Field
+//	0x00    96    EntityID (UUID with optional prefix, null-terminated)
+//	0x60    8     Offset (file position of entity data)
+//	0x68    4     Size (size of entity data in bytes)
+//	0x6C    4     Flags (reserved for future use)
 type IndexEntry struct {
-	EntityID [96]byte  // UUID with prefix (up to 96 bytes)
-	Offset   uint64
-	Size     uint32
-	Flags    uint32
+	EntityID [96]byte  // UUID with optional prefix (e.g., "dataset:uuid")
+	Offset   uint64    // File offset to entity data
+	Size     uint32    // Size of entity data block
+	Flags    uint32    // Reserved flags (0 = normal, 1 = compressed)
 }
 
-// EntityHeader represents the header of an entity data block
+// EntityHeader represents the header of an entity data block.
+// This header precedes the tag and content data for each entity.
+//
+// # Binary Layout (16 bytes)
+//
+//	Offset  Size  Field
+//	0x00    8     Modified (Unix timestamp in nanoseconds)
+//	0x08    2     TagCount (number of tags)
+//	0x0A    2     ContentCount (number of content chunks)
+//	0x0C    4     Reserved (must be 0)
 type EntityHeader struct {
-	Modified     int64
-	TagCount     uint16
-	ContentCount uint16
-	Reserved     uint32
+	Modified     int64   // Last modification timestamp (Unix nanoseconds)
+	TagCount     uint16  // Number of tags in this entity
+	ContentCount uint16  // Number of content chunks (for autochunking)
+	Reserved     uint32  // Reserved for future use (must be 0)
 }
 
-// TagDictionary manages tag string compression with interning
+// TagDictionary manages tag string compression using dictionary encoding.
+// It maps tag strings to numeric IDs to reduce storage space and improve performance.
+//
+// The dictionary uses string interning to ensure each unique tag string
+// is stored only once in memory, significantly reducing memory usage for
+// systems with many repeated tags.
+//
+// Thread-safe for concurrent access.
 type TagDictionary struct {
-	idToTag map[uint32]string
-	tagToID map[string]uint32
-	nextID  uint32
-	mu      sync.RWMutex // Add mutex for thread safety
+	idToTag map[uint32]string   // Maps numeric IDs to tag strings
+	tagToID map[string]uint32   // Maps tag strings to numeric IDs
+	nextID  uint32              // Next available ID
+	mu      sync.RWMutex        // Protects concurrent access
 }
 
-// NewTagDictionary creates a new tag dictionary
+// NewTagDictionary creates a new empty tag dictionary.
+// IDs start at 1 (0 is reserved for "no tag").
 func NewTagDictionary() *TagDictionary {
 	return &TagDictionary{
 		idToTag: make(map[uint32]string),
@@ -139,7 +243,11 @@ func NewTagDictionary() *TagDictionary {
 	}
 }
 
-// GetOrCreateID returns the ID for a tag, creating if necessary
+// GetOrCreateID returns the numeric ID for a tag string.
+// If the tag doesn't exist in the dictionary, it's added with a new ID.
+// The tag string is interned to reduce memory usage.
+//
+// Thread-safe for concurrent access.
 func (d *TagDictionary) GetOrCreateID(tag string) uint32 {
 	// Intern the string first
 	tag = models.Intern(tag)
@@ -171,24 +279,37 @@ func (d *TagDictionary) GetOrCreateID(tag string) uint32 {
 	return id
 }
 
-// GetTag returns the tag string for an ID
+// GetTag returns the tag string for a given numeric ID.
+// Returns empty string if the ID doesn't exist.
+//
+// Thread-safe for concurrent access.
 func (d *TagDictionary) GetTag(id uint32) string {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 	return d.idToTag[id]
 }
 
-// Write writes the dictionary to writer
+// Write serializes the tag dictionary to the provided writer.
+//
+// # Binary Format
+//
+//	4 bytes: Count (number of entries)
+//	For each entry:
+//	  4 bytes: ID
+//	  2 bytes: Tag length
+//	  N bytes: Tag string
+//
+// Returns an error if the write operation fails.
 func (d *TagDictionary) Write(w io.Writer) error {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 	
-	// Write count
+	// Write entry count
 	if err := binary.Write(w, binary.LittleEndian, uint32(len(d.idToTag))); err != nil {
 		return err
 	}
 	
-	// Write entries
+	// Write each dictionary entry
 	for id, tag := range d.idToTag {
 		if err := binary.Write(w, binary.LittleEndian, id); err != nil {
 			return err
@@ -204,36 +325,48 @@ func (d *TagDictionary) Write(w io.Writer) error {
 	return nil
 }
 
-// Read reads the dictionary from reader
+// Read deserializes the tag dictionary from the provided reader.
+// Existing dictionary contents are preserved - new entries are merged.
+//
+// The method updates nextID to ensure new tags get unique IDs.
+//
+// Returns an error if the read operation fails or data is corrupted.
 func (d *TagDictionary) Read(r io.Reader) error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	
+	// Read entry count
 	var count uint32
 	if err := binary.Read(r, binary.LittleEndian, &count); err != nil {
 		return err
 	}
 	
+	// Read each dictionary entry
 	for i := uint32(0); i < count; i++ {
 		var id uint32
 		var length uint16
 		
+		// Read ID
 		if err := binary.Read(r, binary.LittleEndian, &id); err != nil {
 			return err
 		}
+		// Read tag length
 		if err := binary.Read(r, binary.LittleEndian, &length); err != nil {
 			return err
 		}
 		
+		// Read tag string
 		tag := make([]byte, length)
 		if _, err := io.ReadFull(r, tag); err != nil {
 			return err
 		}
 		
-		// Intern the tag string
+		// Intern the tag string to save memory
 		tagStr := models.Intern(string(tag))
 		d.idToTag[id] = tagStr
 		d.tagToID[tagStr] = id
+		
+		// Update nextID to avoid collisions
 		if id >= d.nextID {
 			d.nextID = id + 1
 		}

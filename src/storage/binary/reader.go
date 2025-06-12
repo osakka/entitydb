@@ -14,18 +14,63 @@ import (
 )
 
 var (
+	// ErrNotFound is returned when an entity cannot be found in the binary file
 	ErrNotFound = errors.New("entity not found")
 )
 
-// Reader handles reading entities from binary format
+// Reader provides read-only access to entities stored in the EntityDB Binary Format.
+// It loads the file's index and tag dictionary into memory for fast lookups,
+// while reading entity data on-demand to minimize memory usage.
+//
+// The Reader is designed for concurrent use - multiple goroutines can safely
+// call ReadEntity simultaneously. The underlying file is opened in read-only
+// mode to prevent accidental modifications.
+//
+// Performance characteristics:
+//   - O(1) entity lookups via in-memory index
+//   - Minimal memory footprint (only index and dictionary in RAM)
+//   - Automatic decompression of compressed content
+//   - Efficient tag resolution through dictionary
+//
+// Example usage:
+//   reader, err := NewReader("/var/lib/entitydb/entities.ebf")
+//   if err != nil {
+//       log.Fatal(err)
+//   }
+//   defer reader.Close()
+//
+//   entity, err := reader.ReadEntity("user-123")
+//   if err != nil {
+//       log.Printf("Entity not found: %v", err)
+//   }
 type Reader struct {
-	file    *os.File
-	header  *Header
-	tagDict *TagDictionary
-	index   map[string]*IndexEntry
+	file    *os.File                // Read-only file handle
+	header  *Header                 // File header with metadata
+	tagDict *TagDictionary          // Tag ID to string mapping
+	index   map[string]*IndexEntry  // Entity ID to file location mapping
 }
 
-// NewReader creates a new reader for the given file
+// NewReader creates a new Reader instance for the specified binary file.
+// It performs the following initialization steps:
+//   1. Opens the file in read-only mode
+//   2. Reads and validates the file header
+//   3. Loads the tag dictionary for efficient tag resolution
+//   4. Loads the entity index for O(1) lookups
+//
+// The Reader gracefully handles partial or corrupted files:
+//   - Missing dictionary or index sections are logged but don't fail
+//   - Corrupted index entries are skipped
+//   - The Reader remains functional with available data
+//
+// Parameters:
+//   - filename: Path to the EBF file to read
+//
+// Returns:
+//   - *Reader: Initialized reader ready for entity queries
+//   - error: File access errors or invalid format
+//
+// Thread Safety:
+//   The returned Reader is safe for concurrent use.
 func NewReader(filename string) (*Reader, error) {
 	logger.Trace("Opening reader for file: %s", filename)
 	
@@ -177,9 +222,34 @@ func NewReader(filename string) (*Reader, error) {
 	return r, nil
 }
 
-// GetEntity reads an entity by ID
+// GetEntity reads a single entity by its ID from the binary file.
+// This is the primary method for retrieving entities.
+//
+// The method performs these operations:
+//   1. Looks up the entity's location in the index (O(1))
+//   2. Seeks to the entity's position in the file
+//   3. Reads the exact number of bytes for the entity
+//   4. Parses the binary data into an Entity struct
+//   5. Decompresses content if it was compressed
+//   6. Resolves tag IDs to their string values
+//
+// Performance optimizations:
+//   - Uses memory pools to avoid allocations
+//   - Reads exact bytes needed (no over-reading)
+//   - Decompression happens in-place when possible
+//
+// Parameters:
+//   - id: The unique identifier of the entity to read
+//
+// Returns:
+//   - *models.Entity: The parsed entity with all fields populated
+//   - error: ErrNotFound if entity doesn't exist, or I/O errors
+//
+// Thread Safety:
+//   Multiple goroutines can call this method concurrently.
+//   File reads use pread-style operations (seek + read).
 func (r *Reader) GetEntity(id string) (*models.Entity, error) {
-	// Start operation tracking
+	// Start operation tracking for observability
 	op := models.StartOperation(models.OpTypeRead, id, map[string]interface{}{
 		"index_size": len(r.index),
 	})
@@ -242,7 +312,26 @@ func (r *Reader) GetEntity(id string) (*models.Entity, error) {
 	return entity, nil
 }
 
-// GetAllEntities reads all entities
+// GetAllEntities reads all entities from the binary file.
+// This method is useful for bulk operations like backups or migrations.
+//
+// Performance considerations:
+//   - Loads all entities into memory simultaneously
+//   - Memory usage: O(n) where n is total size of all entities
+//   - Use with caution on large files (consider pagination instead)
+//
+// Error handling:
+//   - Corrupted entities are logged and skipped
+//   - Returns successfully read entities even if some fail
+//   - Empty result only if no entities can be read
+//
+// Returns:
+//   - []*models.Entity: Slice containing all readable entities
+//   - error: Currently always returns nil (errors are logged)
+//
+// Thread Safety:
+//   Safe for concurrent use, but may cause contention
+//   if called simultaneously from multiple goroutines.
 func (r *Reader) GetAllEntities() ([]*models.Entity, error) {
 	logger.Trace("GetAllEntities called, index has %d entries, header says %d entities", len(r.index), r.header.EntityCount)
 	entities := make([]*models.Entity, 0, r.header.EntityCount)
@@ -262,11 +351,26 @@ func (r *Reader) GetAllEntities() ([]*models.Entity, error) {
 	return entities, nil
 }
 
-// parseEntity parses entity data from bytes
+// parseEntity decodes binary entity data into a models.Entity struct.
+// It handles the complete binary format including header, tags, and content.
+//
+// Binary Format:
+//   [EntityHeader][TagIDs...][CompressionType][ContentType][Sizes][Data][Timestamp]
+//
+// The method handles both compressed and uncompressed content transparently,
+// and properly decodes JSON content that was stored without extra wrapping.
+//
+// Parameters:
+//   - data: Raw binary data read from file
+//   - id: Entity ID (passed separately as it's stored in the index)
+//
+// Returns:
+//   - *models.Entity: Fully populated entity
+//   - error: Parsing errors or corruption
 func (r *Reader) parseEntity(data []byte, id string) (*models.Entity, error) {
 	buf := bytes.NewReader(data)
 	
-	// Read entity header
+	// Read entity header containing metadata
 	var header EntityHeader
 	if err := binary.Read(buf, binary.LittleEndian, &header); err != nil {
 		return nil, err
@@ -275,10 +379,14 @@ func (r *Reader) parseEntity(data []byte, id string) (*models.Entity, error) {
 	entity := &models.Entity{
 		ID:   id,
 		Tags: make([]string, header.TagCount),
-		Content: []byte{}, // New model uses byte slice
+		Content: []byte{}, // Unified content model
 	}
 	
-	// Read tag IDs and convert to strings
+	// Tag Resolution Algorithm:
+	// 1. Read tag IDs (4 bytes each)
+	// 2. Look up each ID in the tag dictionary
+	// 3. Dictionary returns the original tag string
+	// This reduces storage size significantly for repeated tags
 	for i := uint16(0); i < header.TagCount; i++ {
 		var tagID uint32
 		if err := binary.Read(buf, binary.LittleEndian, &tagID); err != nil {
@@ -287,9 +395,12 @@ func (r *Reader) parseEntity(data []byte, id string) (*models.Entity, error) {
 		entity.Tags[i] = r.tagDict.GetTag(tagID)
 	}
 	
-	// Read content (new unified format)
+	// Content Decoding Algorithm:
+	// The binary format stores content with metadata for proper reconstruction
+	// Format: [CompressionType][ContentTypeLen][ContentType][OriginalSize][CompressedSize][Data][Timestamp]
 	if header.ContentCount > 0 {
-		// Check for compression type (new format)
+		// Read compression type (1 byte)
+		// 0 = no compression, 1 = gzip compression
 		var compressionType uint8
 		if err := binary.Read(buf, binary.LittleEndian, &compressionType); err != nil {
 			return nil, err
@@ -373,7 +484,20 @@ func (r *Reader) parseEntity(data []byte, id string) (*models.Entity, error) {
 	return entity, nil
 }
 
-// Close closes the reader
+// Close releases all resources associated with the Reader.
+// After calling Close, the Reader cannot be used for further operations.
+//
+// This method:
+//   - Closes the underlying file handle
+//   - Allows the OS to reclaim file descriptors
+//   - Does NOT clear the in-memory index or dictionary
+//
+// Returns:
+//   - error: File closing errors (rare)
+//
+// It's safe to call Close multiple times; subsequent calls
+// will return the error from os.File.Close() if the file
+// is already closed.
 func (r *Reader) Close() error {
 	return r.file.Close()
 }

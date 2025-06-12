@@ -9,6 +9,14 @@
 //
 // All handlers follow RESTful conventions and return JSON responses.
 // Authentication is required for most endpoints using JWT tokens.
+//
+// Handler Organization:
+//   - entity_handler.go: Core entity CRUD operations
+//   - entity_handler_rbac.go: RBAC-wrapped entity handlers
+//   - auth_handler.go: Authentication endpoints
+//   - user_handler.go: User management
+//   - metrics_handler.go: Prometheus metrics
+//   - health_handler.go: Health checks
 package api
 
 // Fixed double encoding issue in v2.12.0:
@@ -30,19 +38,31 @@ import (
 	"entitydb/logger"
 )
 
-// EntityHandler handles entity-related API endpoints
+// EntityHandler handles entity-related API endpoints.
+// It provides the core CRUD operations for entities including:
+//   - Create: Creates new entities with tags and content
+//   - Read: Retrieves entities by ID or lists all entities
+//   - Update: Updates entity tags and content
+//   - Delete: (Not implemented - entities are immutable)
+//   - Query: Advanced querying with filters and sorting
+//   - Temporal: Historical queries (as-of, history, changes, diff)
 type EntityHandler struct {
 	repo models.EntityRepository
 }
 
-// NewEntityHandler creates a new EntityHandler
+// NewEntityHandler creates a new EntityHandler with the given repository.
+// The repository must implement the EntityRepository interface which provides
+// the underlying storage operations.
 func NewEntityHandler(repo models.EntityRepository) *EntityHandler {
 	return &EntityHandler{
 		repo: repo,
 	}
 }
 
-// stripTimestampsFromEntity returns a copy of the entity with timestamps removed from tags
+// stripTimestampsFromEntity returns a copy of the entity with timestamps removed from tags.
+// EntityDB stores all tags with nanosecond timestamps in the format "TIMESTAMP|tag".
+// By default, the API strips these timestamps for backward compatibility.
+// Set includeTimestamps=true to see the raw temporal tags.
 func (h *EntityHandler) stripTimestampsFromEntity(entity *models.Entity, includeTimestamps bool) *models.Entity {
 	if includeTimestamps {
 		return entity
@@ -52,7 +72,9 @@ func (h *EntityHandler) stripTimestampsFromEntity(entity *models.Entity, include
 	return &result
 }
 
-// Utility function to convert repository to temporal repository
+// asTemporalRepository attempts to cast the repository to a TemporalRepository.
+// Returns an error if the repository doesn't support temporal features.
+// This is used by temporal query handlers (as-of, history, changes, diff).
 func asTemporalRepository(repo models.EntityRepository) (*binary.TemporalRepository, error) {
 	if temporalRepo, ok := repo.(*binary.TemporalRepository); ok {
 		return temporalRepo, nil
@@ -60,21 +82,62 @@ func asTemporalRepository(repo models.EntityRepository) (*binary.TemporalReposit
 	return nil, fmt.Errorf("repository does not support temporal features")
 }
 
-// Helper to parse integer safely
+// parseInt safely parses a string to an integer using fmt.Sscanf.
+// This is more strict than strconv.Atoi and ensures the entire string is a valid integer.
 func parseInt(s string) (int, error) {
 	var i int
 	_, err := fmt.Sscanf(s, "%d", &i)
 	return i, err
 }
 
-// CreateEntityRequest represents a request to create a new entity
+// CreateEntityRequest represents a request to create a new entity.
+// The request can include:
+//   - ID: Optional entity ID (auto-generated if not provided)
+//   - Tags: Array of tags to assign to the entity
+//   - Content: Entity content (string, JSON object/array, or base64-encoded bytes)
 type CreateEntityRequest struct {
 	ID      string   `json:"id,omitempty"`
 	Tags    []string `json:"tags,omitempty"`
 	Content interface{} `json:"content,omitempty"`  // Can be string, map, or byte array (base64 encoded)
 }
 
-// CreateEntity handles creating a new entity
+// CreateEntity handles creating a new entity.
+//
+// HTTP Method: POST
+// Endpoint: /api/v1/entities/create
+// Required Permission: entity:create
+//
+// Request Body:
+//   {
+//     "id": "optional-entity-id",
+//     "tags": ["type:document", "status:draft"],
+//     "content": "string content or JSON object"
+//   }
+//
+// Query Parameters:
+//   - include_timestamps: If true, returns tags with timestamps (default: false)
+//
+// Response:
+//   201 Created: Entity successfully created
+//   {
+//     "id": "generated-or-provided-id",
+//     "tags": ["type:document", "status:draft"],
+//     "content": "base64-encoded-content",
+//     "created_at": "2024-01-01T00:00:00Z",
+//     "updated_at": "2024-01-01T00:00:00Z"
+//   }
+//
+// Error Responses:
+//   - 400 Bad Request: Invalid request body or content type
+//   - 401 Unauthorized: Missing or invalid authentication
+//   - 403 Forbidden: User lacks entity:create permission
+//   - 500 Internal Server Error: Failed to create entity
+//
+// Features:
+//   - Auto-chunking: Large content (>4MB) is automatically split into chunks
+//   - Content Types: Supports text/plain, application/json, and binary content
+//   - Temporal Tags: All tags are stored with nanosecond timestamps
+//
 // @Summary Create a new entity
 // @Description Create a new entity with tags and content
 // @Tags entities
@@ -212,7 +275,39 @@ func (h *EntityHandler) CreateEntity(w http.ResponseWriter, r *http.Request) {
 	RespondJSON(w, http.StatusCreated, response)
 }
 
-// GetEntity handles retrieving an entity by ID
+// GetEntity handles retrieving an entity by ID.
+//
+// HTTP Method: GET
+// Endpoint: /api/v1/entities/get
+// Required Permission: entity:view
+//
+// Query Parameters:
+//   - id: Entity ID to retrieve (required)
+//   - include_timestamps: If true, returns tags with timestamps (default: false)
+//   - include_content: If true, includes entity content in response (default: true)
+//   - stream: If true and entity is chunked, streams content directly (default: false)
+//
+// Response:
+//   200 OK: Entity found and returned
+//   {
+//     "id": "entity-id",
+//     "tags": ["type:document", "status:published"],
+//     "content": "base64-encoded-content",
+//     "created_at": "2024-01-01T00:00:00Z",
+//     "updated_at": "2024-01-01T00:00:00Z"
+//   }
+//
+// Error Responses:
+//   - 400 Bad Request: Missing entity ID
+//   - 401 Unauthorized: Missing or invalid authentication
+//   - 403 Forbidden: User lacks entity:view permission
+//   - 404 Not Found: Entity with given ID not found
+//
+// Special Features:
+//   - Chunked Content: Automatically reassembles chunked entities
+//   - Streaming: Use stream=true for efficient large file delivery
+//   - Content Type: Detects and sets appropriate content type from tags
+//
 // @Summary Get entity by ID
 // @Description Retrieve a single entity by its ID
 // @Tags entities
@@ -409,7 +504,48 @@ func (h *EntityHandler) StreamEntity(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// ListEntities handles listing all entities
+// ListEntities handles listing all entities.
+//
+// HTTP Method: GET
+// Endpoint: /api/v1/entities/list
+// Required Permission: entity:view
+//
+// Query Parameters:
+//   - tag: Filter by exact tag match (e.g., "type:user")
+//   - wildcard: Filter by wildcard pattern (e.g., "status:*")
+//   - search: Search within entity content
+//   - contentType: Filter by content type when searching
+//   - namespace: Filter by tag namespace (e.g., "rbac")
+//   - include_timestamps: If true, returns tags with timestamps (default: false)
+//
+// Response:
+//   200 OK: List of entities matching criteria
+//   [
+//     {
+//       "id": "entity-1",
+//       "tags": ["type:user", "status:active"],
+//       "created_at": "2024-01-01T00:00:00Z",
+//       "updated_at": "2024-01-01T00:00:00Z"
+//     }
+//   ]
+//
+// Error Responses:
+//   - 401 Unauthorized: Missing or invalid authentication
+//   - 403 Forbidden: User lacks entity:view permission
+//   - 500 Internal Server Error: Failed to list entities
+//
+// Query Examples:
+//   - List all entities: /api/v1/entities/list
+//   - Filter by type: /api/v1/entities/list?tag=type:user
+//   - Wildcard search: /api/v1/entities/list?wildcard=status:*
+//   - Content search: /api/v1/entities/list?search=important&contentType=text/plain
+//   - Namespace filter: /api/v1/entities/list?namespace=rbac
+//
+// Performance Notes:
+//   - Results are not paginated by default
+//   - Large result sets may impact performance
+//   - Consider using QueryEntities for advanced filtering and pagination
+//
 // @Summary List entities
 // @Description List all entities or filter by various criteria
 // @Tags entities
@@ -972,7 +1108,50 @@ func removeTagsByPrefix(tags []string, prefix string) []string {
 	return result
 }
 
-// UpdateEntity handles updating an existing entity
+// UpdateEntity handles updating an existing entity.
+//
+// HTTP Method: PUT
+// Endpoint: /api/v1/entities/update
+// Required Permission: entity:update
+//
+// Request Body:
+//   {
+//     "id": "entity-id",      // Can also be provided as query parameter
+//     "tags": ["type:document", "status:updated"],  // Optional: new tags
+//     "content": "new content or JSON object"       // Optional: new content
+//   }
+//
+// Query Parameters:
+//   - id: Entity ID (alternative to body parameter)
+//
+// Response:
+//   200 OK: Entity successfully updated
+//   {
+//     "id": "entity-id",
+//     "tags": ["type:document", "status:updated"],
+//     "content": "base64-encoded-content",
+//     "created_at": "2024-01-01T00:00:00Z",
+//     "updated_at": "2024-01-02T00:00:00Z"
+//   }
+//
+// Error Responses:
+//   - 400 Bad Request: Missing entity ID or invalid request format
+//   - 401 Unauthorized: Missing or invalid authentication
+//   - 403 Forbidden: User lacks entity:update permission
+//   - 404 Not Found: Entity with given ID not found
+//   - 500 Internal Server Error: Failed to update entity
+//
+// Update Behavior:
+//   - Tags: If provided, completely replaces existing tags
+//   - Content: If provided, replaces existing content
+//   - Timestamps: UpdatedAt is automatically set to current time
+//   - Partial Updates: Omit fields to keep existing values
+//
+// Content Types:
+//   - String: Stored as UTF-8 text
+//   - JSON Object/Array: Automatically detected and stored as JSON
+//   - Base64 String: Decoded and stored as binary
+//
 // @Summary Update an entity
 // @Description Update an existing entity's tags and content
 // @Tags entities

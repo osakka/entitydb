@@ -1,3 +1,20 @@
+// Package binary implements the EntityDB Binary Format (EBF) storage layer.
+// It provides high-performance, concurrent-safe persistence for entities with
+// temporal tags, supporting compression, checksumming, and memory-mapped access.
+//
+// The binary format consists of:
+//   - Header: Magic number, version, entity count, and offset information
+//   - Entity data: Sequential entity records with tags and content
+//   - Tag dictionary: Compressed mapping of tag strings to IDs
+//   - Index: Offset and size information for rapid entity lookup
+//
+// Key features:
+//   - Temporal tag storage with nanosecond precision timestamps
+//   - Automatic content compression for entries > 1KB
+//   - SHA256 checksumming for data integrity
+//   - Memory pooling to reduce GC pressure
+//   - Concurrent access with sharded locking
+//   - Write-Ahead Logging (WAL) for durability
 package binary
 
 import (
@@ -15,16 +32,33 @@ import (
 	"entitydb/logger"
 )
 
-// Writer handles writing entities to binary format
+// Writer handles writing entities to the EntityDB Binary Format (EBF).
+// It manages the file structure, maintains indexes for fast lookups,
+// and ensures data integrity through checksums and atomic operations.
+//
+// The Writer is safe for concurrent use through internal mutex locking.
+// However, only one Writer instance should be active per file to prevent
+// corruption. Use WriterManager for safe concurrent access patterns.
+//
+// File Layout:
+//   [Header][Entity1][Entity2]...[EntityN][TagDictionary][Index]
+//
+// Performance characteristics:
+//   - O(1) append operations for new entities
+//   - O(1) index updates through in-memory map
+//   - Compression reduces I/O for large content
+//   - Memory pools minimize allocation overhead
 type Writer struct {
-	file     *os.File
-	header   *Header
-	tagDict  *TagDictionary
-	index    map[string]*IndexEntry
-	mu       sync.Mutex
+	file     *os.File                // Underlying file handle
+	header   *Header                 // File header with metadata
+	tagDict  *TagDictionary          // Tag string to ID mapping
+	index    map[string]*IndexEntry  // Entity ID to file location mapping
+	mu       sync.Mutex              // Protects concurrent access
 }
 
-// getFilePosition returns the current file position
+// getFilePosition returns the current file position for tracking write operations.
+// Returns -1 if the position cannot be determined (e.g., file closed or seek error).
+// This is primarily used for operation tracking and debugging.
 func (w *Writer) getFilePosition() int64 {
 	pos, err := w.file.Seek(0, os.SEEK_CUR)
 	if err != nil {
@@ -33,7 +67,26 @@ func (w *Writer) getFilePosition() int64 {
 	return pos
 }
 
-// NewWriter creates a new writer for the given file
+// NewWriter creates a new Writer instance for the specified file.
+// If the file exists and contains valid data, it loads the existing header,
+// tag dictionary, and index. For new files, it initializes the header structure.
+//
+// The Writer maintains exclusive access to the file while open. Use WriterManager
+// for safe concurrent access patterns in production environments.
+//
+// Parameters:
+//   - filename: Path to the EBF file to open or create
+//
+// Returns:
+//   - *Writer: Initialized writer ready for entity operations
+//   - error: File access errors, corruption, or invalid format
+//
+// Example:
+//   writer, err := NewWriter("/var/lib/entitydb/entities.ebf")
+//   if err != nil {
+//       log.Fatal(err)
+//   }
+//   defer writer.Close()
 func NewWriter(filename string) (*Writer, error) {
 	file, err := os.OpenFile(filename, os.O_CREATE|os.O_RDWR, 0644)
 	if err != nil {
@@ -76,9 +129,47 @@ func NewWriter(filename string) (*Writer, error) {
 	return w, nil
 }
 
-// WriteEntity writes an entity to the file
+// WriteEntity persists an entity to the binary file with automatic compression,
+// checksumming, and index updates. This is the primary method for storing entities.
+//
+// The method performs the following operations:
+//   1. Validates the entity ID (required, non-empty)
+//   2. Calculates content checksum for integrity verification
+//   3. Adds checksum tag if not already present
+//   4. Compresses content if size > 1KB and compression is beneficial
+//   5. Writes entity header, tags, and content to file
+//   6. Updates in-memory index for fast lookups
+//   7. Updates file header with new counts and offsets
+//   8. Syncs data to disk for durability
+//
+// Thread Safety:
+//   - Method is synchronized with internal mutex
+//   - Safe for concurrent calls from multiple goroutines
+//   - Index updates are atomic within the lock
+//
+// Performance Notes:
+//   - Uses memory pools to reduce allocations
+//   - Compression is skipped if it doesn't reduce size
+//   - File seeks are minimized through append-only writes
+//   - Header updates require seeking to file start
+//
+// Parameters:
+//   - entity: The entity to write (must have non-empty ID)
+//
+// Returns:
+//   - error: Validation errors, I/O failures, or sync errors
+//
+// Example:
+//   entity := &models.Entity{
+//       ID: "user-123",
+//       Tags: []string{"type:user", "status:active"},
+//       Content: []byte(`{"name":"John Doe"}`),
+//   }
+//   if err := writer.WriteEntity(entity); err != nil {
+//       return fmt.Errorf("failed to write entity: %w", err)
+//   }
 func (w *Writer) WriteEntity(entity *models.Entity) error {
-	// Start operation tracking
+	// Start operation tracking for observability
 	op := models.StartOperation(models.OpTypeWrite, entity.ID, map[string]interface{}{
 		"tags_count":    len(entity.Tags),
 		"content_size":  len(entity.Content),
@@ -91,6 +182,7 @@ func (w *Writer) WriteEntity(entity *models.Entity) error {
 		}
 	}()
 	
+	// Acquire exclusive lock for thread safety
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	
@@ -106,17 +198,24 @@ func (w *Writer) WriteEntity(entity *models.Entity) error {
 		return err
 	}
 	
-	// Calculate content checksum before write
+	// Calculate content checksum for data integrity verification
+	// SHA256 provides strong collision resistance and is used throughout
+	// the system for content addressing and verification
 	contentChecksum := sha256.Sum256(entity.Content)
 	op.SetMetadata("content_checksum", hex.EncodeToString(contentChecksum[:]))
 	
 	logger.Trace("Entity %s content checksum: %x", entity.ID, contentChecksum)
 	
-	// Get buffer from pool
+	// Acquire buffer from memory pool to reduce GC pressure
+	// Large buffers (>64KB) are reused across write operations
 	buffer := GetLargeSafeBuffer()
 	defer PutLargeSafeBuffer(buffer)
 	
-	// Add checksum tag if not already present
+	// Checksum Tag Algorithm:
+	// 1. Generate temporal checksum tag with nanosecond timestamp
+	// 2. Check if entity already has a checksum tag (temporal format)
+	// 3. Add new checksum tag only if missing
+	// This ensures content integrity can be verified later
 	checksumTag := fmt.Sprintf("%d|checksum:sha256:%s", time.Now().UnixNano(), hex.EncodeToString(contentChecksum[:]))
 	hasChecksum := false
 	for _, tag := range entity.Tags {
@@ -127,6 +226,7 @@ func (w *Writer) WriteEntity(entity *models.Entity) error {
 	}
 	
 	// Create a new tags slice with checksum if needed
+	// We don't modify the original slice to avoid side effects
 	tags := entity.Tags
 	if !hasChecksum {
 		tags = append([]string{}, entity.Tags...)
@@ -158,9 +258,15 @@ func (w *Writer) WriteEntity(entity *models.Entity) error {
 		binary.Write(buffer, binary.LittleEndian, id)
 	}
 	
-	// Write content as a single item
+	// Content Encoding Algorithm:
+	// The binary format stores content with metadata for proper decoding
+	// Format: [CompressionType][ContentTypeLen][ContentType][OriginalSize][CompressedSize][Data][Timestamp]
 	if len(entity.Content) > 0 {
-		// Determine content type from entity tags or default to application/octet-stream
+		// Content Type Detection:
+		// 1. Search for content:type: tag in entity tags
+		// 2. Handle both temporal (timestamp|tag) and direct formats
+		// 3. Default to application/octet-stream if not specified
+		// This ensures proper content handling when reading back
 		contentType := "application/octet-stream" // Default
 		logger.Trace("Entity %s has %d tags, checking for content type", entity.ID, len(entity.Tags))
 		for _, tag := range entity.Tags {
@@ -171,7 +277,7 @@ func (w *Writer) WriteEntity(entity *models.Entity) error {
 				logger.Trace("Found direct content type: %s", contentType)
 				break
 			} else if strings.Contains(tag, "|content:type:") {
-				// Timestamped tag
+				// Timestamped tag format: "timestamp|content:type:value"
 				parts := strings.SplitN(tag, "|", 2)
 				if len(parts) == 2 {
 					tagPart := parts[1] // Use the part after timestamp
@@ -185,7 +291,11 @@ func (w *Writer) WriteEntity(entity *models.Entity) error {
 		}
 		logger.Trace("Final content type for entity %s: %s", entity.ID, contentType)
 		
-		// Compress content if beneficial
+		// Compression Strategy:
+		// - Content > 1KB is compressed using gzip
+		// - Compression is skipped if it doesn't reduce size
+		// - Failed compression falls back to uncompressed storage
+		// - Uses memory pools to avoid allocation overhead
 		compressed, err := CompressWithPool(entity.Content)
 		if err != nil {
 			logger.Warn("Compression failed for entity %s: %v, storing uncompressed", entity.ID, err)
@@ -357,7 +467,33 @@ func (w *Writer) WriteEntity(entity *models.Entity) error {
 }
 
 
-// Close flushes and closes the writer
+// Close finalizes the binary file by writing the tag dictionary and index.
+// It must be called when all entity writes are complete to ensure the file
+// is properly structured and can be read by Reader instances.
+//
+// The method performs these critical operations:
+//   1. Writes the tag dictionary at the end of entity data
+//   2. Writes the complete entity index in sorted order
+//   3. Updates the header with final offsets and counts
+//   4. Syncs all data to disk for durability
+//
+// File Structure After Close:
+//   [Header][Entities...][TagDictionary][Index]
+//   ^                    ^              ^
+//   |                    |              +-- EntityIndexOffset
+//   |                    +-- TagDictOffset
+//   +-- Start of file (offset 0)
+//
+// Thread Safety:
+//   - Method is synchronized with internal mutex
+//   - Safe to call from any goroutine
+//   - Subsequent operations will fail after Close
+//
+// Returns:
+//   - error: I/O failures during finalization
+//
+// Note: The file handle is NOT closed to support singleton pattern.
+// Use WriterManager for proper lifecycle management.
 func (w *Writer) Close() error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -389,7 +525,11 @@ func (w *Writer) Close() error {
 	}
 	logger.Debug("Writing index at offset %d with %d entries", indexOffset, len(w.index))
 	
-	// Collect all entity IDs and sort them to ensure deterministic order
+	// Index Writing Algorithm:
+	// 1. Collect all entity IDs from the in-memory map
+	// 2. Sort IDs alphabetically for deterministic file layout
+	// 3. Write each index entry in sorted order
+	// This ensures consistent file structure across writes
 	entityIDs := make([]string, 0, len(w.index))
 	for id := range w.index {
 		entityIDs = append(entityIDs, id)
@@ -397,6 +537,11 @@ func (w *Writer) Close() error {
 	sort.Strings(entityIDs)
 	
 	// Write index entries in sorted order
+	// Each entry consists of:
+	//   - EntityID: 64-byte fixed array (padded with zeros)
+	//   - Offset: 8-byte position in file where entity data starts
+	//   - Size: 4-byte size of entity data
+	//   - Flags: 4-byte reserved for future use
 	writtenCount := 0
 	for _, id := range entityIDs {
 		entry := w.index[id]
@@ -465,6 +610,17 @@ func (w *Writer) Close() error {
 	return nil
 }
 
+// writeHeader writes the file header to the beginning of the file.
+// This is called during initialization and after each entity write to
+// keep the header synchronized with the actual file state.
+//
+// The header contains:
+//   - Magic number and version for format validation
+//   - Entity count and file size
+//   - Offsets to tag dictionary and index sections
+//
+// Returns:
+//   - error: Write failures or seek errors
 func (w *Writer) writeHeader() error {
 	logger.Debug("writeHeader called - EntityCount=%d, FileSize=%d", w.header.EntityCount, w.header.FileSize)
 	err := w.header.Write(w.file)
@@ -476,6 +632,19 @@ func (w *Writer) writeHeader() error {
 	return nil
 }
 
+// readExisting loads an existing binary file's metadata into memory.
+// This includes the header, tag dictionary, and entity index, allowing
+// the Writer to append new entities without corrupting existing data.
+//
+// The method performs validation to ensure:
+//   - The file has a valid magic number and compatible version
+//   - The tag dictionary can be loaded successfully
+//   - The index entries are valid and complete
+//
+// After loading, the file position is set to the end for appending.
+//
+// Returns:
+//   - error: Format errors, corruption, or I/O failures
 func (w *Writer) readExisting() error {
 	logger.Debug("readExisting called")
 	
