@@ -28,7 +28,7 @@ measure_time() {
 
 # 1. Basic Health Check
 echo -n "1. Health endpoint... "
-HEALTH_TIME=$(curl -s -o /dev/null -w "%{time_total}" "$HOST/health")
+HEALTH_TIME=$(curl -k -s -o /dev/null -w "%{time_total}" "$HOST/health")
 HEALTH_MS=$(echo "$HEALTH_TIME * 1000" | bc | cut -d. -f1)
 if [ $HEALTH_MS -lt 50 ]; then
     echo -e "${GREEN}✓ ${HEALTH_MS}ms${NC}"
@@ -38,7 +38,7 @@ fi
 
 # 2. Goroutine Count
 echo -n "2. Goroutine count... "
-GOROUTINES=$(curl -s "$HOST/health" | jq -r '.memory.goroutines // 0')
+GOROUTINES=$(curl -k -s "$HOST/health" | jq -r '.memory.goroutines // 0')
 if [ $GOROUTINES -lt 500 ]; then
     echo -e "${GREEN}✓ $GOROUTINES${NC}"
 else
@@ -47,7 +47,7 @@ fi
 
 # 3. Memory Usage
 echo -n "3. Memory usage... "
-MEMORY_MB=$(curl -s "$HOST/health" | jq -r '.memory.alloc_mb // 0')
+MEMORY_MB=$(curl -k -s "$HOST/health" | jq -r '.memory.alloc_mb // 0')
 if [ $(echo "$MEMORY_MB < 200" | bc) -eq 1 ]; then
     echo -e "${GREEN}✓ ${MEMORY_MB}MB${NC}"
 else
@@ -56,17 +56,17 @@ fi
 
 # 4. Database Size
 echo -n "4. Database size... "
-DB_SIZE=$(curl -s "$HOST/api/v1/system/metrics" | jq -r '.database.size_mb // 0')
-WAL_SIZE=$(curl -s "$HOST/api/v1/system/metrics" | jq -r '.database.wal_size_mb // 0')
+DB_SIZE=$(curl -k -s "$HOST/api/v1/system/metrics" | jq -r '.database.size_mb // 0')
+WAL_SIZE=$(curl -k -s "$HOST/api/v1/system/metrics" | jq -r '.database.wal_size_mb // 0')
 echo -e "${GREEN}DB: ${DB_SIZE}MB, WAL: ${WAL_SIZE}MB${NC}"
 
 # 5. Authentication Test
 echo -n "5. Authentication... "
-AUTH_TIME=$(curl -s -o /dev/null -w "%{time_total}" -X POST "$HOST/api/v1/auth/login" \
+AUTH_TIME=$(curl -k -s -o /dev/null -w "%{time_total}" -X POST "$HOST/api/v1/auth/login" \
     -H "Content-Type: application/json" \
     -d '{"username":"admin","password":"admin"}')
 AUTH_MS=$(echo "$AUTH_TIME * 1000" | bc | cut -d. -f1)
-TOKEN=$(curl -s -X POST "$HOST/api/v1/auth/login" \
+TOKEN=$(curl -k -s -X POST "$HOST/api/v1/auth/login" \
     -H "Content-Type: application/json" \
     -d '{"username":"admin","password":"admin"}' | jq -r '.token')
 
@@ -78,7 +78,7 @@ fi
 
 # 6. Entity Operations
 echo -n "6. Entity list... "
-LIST_TIME=$(curl -s -o /dev/null -w "%{time_total}" \
+LIST_TIME=$(curl -k -s -o /dev/null -w "%{time_total}" \
     -H "Authorization: Bearer $TOKEN" \
     "$HOST/api/v1/entities/list?limit=10")
 LIST_MS=$(echo "$LIST_TIME * 1000" | bc | cut -d. -f1)
@@ -92,7 +92,7 @@ fi
 echo -n "7. Concurrent requests (10)... "
 CONCURRENT_START=$(date +%s%N)
 for i in {1..10}; do
-    curl -s "$HOST/health" > /dev/null &
+    curl -k -s "$HOST/health" > /dev/null &
 done
 wait
 CONCURRENT_END=$(date +%s%N)
@@ -105,7 +105,7 @@ fi
 
 # 8. Metrics Endpoint
 echo -n "8. Metrics endpoint... "
-METRICS=$(curl -s "$HOST/metrics" | grep -c "entitydb_" || echo "0")
+METRICS=$(curl -k -s "$HOST/metrics" | grep -c "entitydb_" || echo "0")
 if [ $METRICS -gt 0 ]; then
     echo -e "${GREEN}✓ $METRICS metrics${NC}"
 else
@@ -114,7 +114,7 @@ fi
 
 # 9. Error Rate Check
 echo -n "9. Recent errors... "
-ERRORS=$(curl -s -H "Authorization: Bearer $TOKEN" \
+ERRORS=$(curl -k -s -H "Authorization: Bearer $TOKEN" \
     "$HOST/api/v1/system/metrics" | jq -r '.activity.errors_last_hour // 0')
 if [ $ERRORS -eq 0 ]; then
     echo -e "${GREEN}✓ No errors${NC}"
@@ -124,7 +124,7 @@ fi
 
 # 10. WAL Checkpoint Status
 echo -n "10. WAL status... "
-WAL_SIZE_MB=$(curl -s "$HOST/api/v1/system/metrics" | jq -r '.database.wal_size_mb // 0')
+WAL_SIZE_MB=$(curl -k -s "$HOST/api/v1/system/metrics" | jq -r '.database.wal_size_mb // 0')
 if [ $(echo "$WAL_SIZE_MB < 50" | bc) -eq 1 ]; then
     echo -e "${GREEN}✓ ${WAL_SIZE_MB}MB${NC}"
 else

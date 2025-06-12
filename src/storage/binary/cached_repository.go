@@ -188,7 +188,8 @@ func (r *CachedRepository) ListByTags(tags []string, matchAll bool) ([]*models.E
 
 // ListByTag with caching
 func (r *CachedRepository) ListByTag(tag string) ([]*models.Entity, error) {
-	return r.ListByTags([]string{tag}, false)
+	// Call the underlying repository's ListByTag directly to use sharded index
+	return r.EntityRepository.ListByTag(tag)
 }
 
 // List with caching

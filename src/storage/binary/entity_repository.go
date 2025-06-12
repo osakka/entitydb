@@ -200,11 +200,20 @@ func (r *EntityRepository) buildIndexes() error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	
-	// Clear existing indexes
-	r.tagIndex = make(map[string][]string)
-	r.contentIndex = make(map[string][]string)
-	r.temporalIndex = NewTemporalIndex()
-	r.namespaceIndex = NewNamespaceIndex()
+	// Check if entities are already loaded (e.g., from WAL replay)
+	entitiesAlreadyLoaded := len(r.entities) > 0
+	
+	// Only clear existing indexes if no entities are loaded
+	// This preserves indexes populated during WAL replay
+	if !entitiesAlreadyLoaded {
+		logger.Debug("Clearing indexes - no entities loaded yet")
+		r.tagIndex = make(map[string][]string)
+		r.contentIndex = make(map[string][]string)
+		r.temporalIndex = NewTemporalIndex()
+		r.namespaceIndex = NewNamespaceIndex()
+	} else {
+		logger.Debug("Preserving existing indexes - %d entities already loaded (likely from WAL replay)", len(r.entities))
+	}
 	
 	// Try to load persisted index first
 	indexFile := r.getDataFile() + ".idx"
@@ -232,38 +241,54 @@ func (r *EntityRepository) buildIndexes() error {
 		}
 	}
 	
-	// Always need to read entities from disk
-	logger.Debug("Building indexes from entities")
+	var entities []*models.Entity
 	
-	reader, err := NewReader(r.getDataFile())
-	if err != nil {
-		return err
+	if entitiesAlreadyLoaded {
+		// Use entities already loaded in memory (from WAL replay)
+		logger.Debug("Using entities already loaded in memory: %d entities", len(r.entities))
+		entities = make([]*models.Entity, 0, len(r.entities))
+		for _, entity := range r.entities {
+			entities = append(entities, entity)
+		}
+	} else {
+		// Read entities from disk
+		logger.Debug("Building indexes from entities on disk")
+		
+		reader, err := NewReader(r.getDataFile())
+		if err != nil {
+			return err
+		}
+		defer reader.Close()
+		
+		// Read all entities
+		diskEntities, err := reader.GetAllEntities()
+		if err != nil {
+			return err
+		}
+		entities = diskEntities
+		
+		// Load entities and optionally build indexes
+		logger.Debug("Loading entities from disk: %d found", len(entities))
 	}
-	defer reader.Close()
-	
-	// Read all entities
-	entities, err := reader.GetAllEntities()
-	if err != nil {
-		return err
-	}
-	
-	// Load entities and optionally build indexes
-	logger.Debug("Loading entities: %d found", len(entities))
 	for _, entity := range entities {
-		// Add to entity cache
-		r.entities[entity.ID] = entity
+		// Add to entity cache (only if not already loaded)
+		if !entitiesAlreadyLoaded {
+			r.entities[entity.ID] = entity
+		}
 		
 		// Log entity details for debugging
 		if strings.HasPrefix(entity.ID, "rel_") {
 			logger.Trace("Indexing relationship: %s", entity.ID)
 		}
 		
-		// Only update indexes if we didn't load from persistent index
-		if !r.persistentIndexLoaded {
+		// Only update indexes if we didn't load from persistent index AND entities weren't already loaded from WAL
+		if !r.persistentIndexLoaded && !entitiesAlreadyLoaded {
+			logger.Debug("Indexing entity %s - persistentIndexLoaded=false, useShardedIndex=%v", entity.ID, r.useShardedIndex)
 			// Update tag index
 			for _, tag := range entity.Tags {
 				if r.useShardedIndex {
 					// Add to sharded index
+					logger.Trace("Adding to sharded index: %s -> %s", tag, entity.ID)
 					r.shardedTagIndex.AddTag(tag, entity.ID)
 					
 					// Also index the non-timestamped version for temporal tags
@@ -309,6 +334,12 @@ func (r *EntityRepository) buildIndexes() error {
 				// Add to namespace index
 				r.namespaceIndex.AddTag(entity.ID, tag)
 			}
+		} else {
+			if r.persistentIndexLoaded {
+				logger.Debug("Skipping indexing for entity %s - persistentIndexLoaded=true", entity.ID)
+			} else if entitiesAlreadyLoaded {
+				logger.Debug("Skipping indexing for entity %s - already indexed from WAL replay", entity.ID)
+			}
 		}
 		
 		// Update content index - store content as string for searching
@@ -326,15 +357,17 @@ func (r *EntityRepository) buildIndexes() error {
 func (r *EntityRepository) updateIndexes(entity *models.Entity) {
 	logger.Trace("Updating indexes for entity %s (%d tags)", entity.ID, len(entity.Tags))
 	
-	// CRITICAL: First remove all existing index entries for this entity
-	// This prevents duplicate entries when updating
-	if existingEntity, exists := r.entities[entity.ID]; exists {
-		for _, tag := range existingEntity.Tags {
-			// Remove from tag index
+	// Helper function to remove entity ID from tag index
+	removeEntityFromTag := func(tag, entityID string) {
+		if r.useShardedIndex {
+			// Use sharded index for better concurrency
+			r.shardedTagIndex.RemoveTag(tag, entityID)
+		} else {
+			// Legacy path: manual removal from slice
 			if ids, ok := r.tagIndex[tag]; ok {
 				newIDs := make([]string, 0, len(ids))
 				for _, id := range ids {
-					if id != entity.ID {
+					if id != entityID {
 						newIDs = append(newIDs, id)
 					}
 				}
@@ -344,25 +377,22 @@ func (r *EntityRepository) updateIndexes(entity *models.Entity) {
 					delete(r.tagIndex, tag)
 				}
 			}
+		}
+	}
+
+	// CRITICAL: First remove all existing index entries for this entity
+	// This prevents duplicate entries when updating
+	if existingEntity, exists := r.entities[entity.ID]; exists {
+		for _, tag := range existingEntity.Tags {
+			// Remove from tag index
+			removeEntityFromTag(tag, entity.ID)
 			
 			// Also remove non-timestamped version
 			if strings.Contains(tag, "|") {
 				parts := strings.SplitN(tag, "|", 2)
 				if len(parts) == 2 {
 					actualTag := parts[1]
-					if ids, ok := r.tagIndex[actualTag]; ok {
-						newIDs := make([]string, 0, len(ids))
-						for _, id := range ids {
-							if id != entity.ID {
-								newIDs = append(newIDs, id)
-							}
-						}
-						if len(newIDs) > 0 {
-							r.tagIndex[actualTag] = newIDs
-						} else {
-							delete(r.tagIndex, actualTag)
-						}
-					}
+					removeEntityFromTag(actualTag, entity.ID)
 				}
 			}
 		}
@@ -370,14 +400,19 @@ func (r *EntityRepository) updateIndexes(entity *models.Entity) {
 	
 	// Helper function to add entity ID to tag if not already present
 	addEntityToTag := func(tag, entityID string) {
-		// Check if entity is already indexed for this tag
-		existing := r.tagIndex[tag]
-		for _, id := range existing {
-			if id == entityID {
-				return // Already indexed
+		if r.useShardedIndex {
+			// Use sharded index for better concurrency and performance
+			r.shardedTagIndex.AddTag(tag, entityID)
+		} else {
+			// Legacy path: check if entity is already indexed for this tag
+			existing := r.tagIndex[tag]
+			for _, id := range existing {
+				if id == entityID {
+					return // Already indexed
+				}
 			}
+			r.tagIndex[tag] = append(r.tagIndex[tag], entityID)
 		}
-		r.tagIndex[tag] = append(r.tagIndex[tag], entityID)
 	}
 	
 	// Update tag index
@@ -492,6 +527,18 @@ func (r *EntityRepository) Create(entity *models.Entity) error {
 	// Invalidate cache
 	r.cache.Clear()
 	
+	// Invalidate reader pool to force new readers to see the entity
+	r.readerPool = sync.Pool{
+		New: func() interface{} {
+			reader, err := NewReader(r.getDataFile())
+			if err != nil {
+				logger.Error("Failed to create reader: %v", err)
+				return nil
+			}
+			return reader
+		},
+	}
+	
 	// Explicitly sync to disk to ensure persistence
 	if err := r.writerManager.Flush(); err != nil {
 		logger.Error("Failed to flush writes to disk: %v", err)
@@ -502,6 +549,18 @@ func (r *EntityRepository) Create(entity *models.Entity) error {
 	if err := r.writerManager.Checkpoint(); err != nil {
 		logger.Error("Failed to checkpoint after create: %v", err)
 		// Don't fail the write, just log the error
+	}
+	
+	// After checkpoint, invalidate reader pool again to ensure readers see the updated index
+	r.readerPool = sync.Pool{
+		New: func() interface{} {
+			reader, err := NewReader(r.getDataFile())
+			if err != nil {
+				logger.Error("Failed to create reader: %v", err)
+				return nil
+			}
+			return reader
+		},
 	}
 	
 	logger.Debug("Created entity: %s", entity.ID)

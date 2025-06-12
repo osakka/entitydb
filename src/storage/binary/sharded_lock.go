@@ -168,6 +168,38 @@ func (s *ShardedTagIndex) GetEntitiesForTag(tag string) []string {
 	return result
 }
 
+// RemoveTag removes an entity from a tag in the sharded index
+func (s *ShardedTagIndex) RemoveTag(tag string, entityID string) {
+	shard := s.getShard(tag)
+	
+	// Use fair queue for write access
+	shard.queue.AcquireWrite()
+	defer shard.queue.ReleaseWrite()
+	
+	shard.mu.Lock()
+	defer shard.mu.Unlock()
+	
+	entities := shard.tags[tag]
+	if entities == nil {
+		return // Tag doesn't exist
+	}
+	
+	// Remove entityID from the slice
+	newEntities := make([]string, 0, len(entities))
+	for _, id := range entities {
+		if id != entityID {
+			newEntities = append(newEntities, id)
+		}
+	}
+	
+	if len(newEntities) > 0 {
+		shard.tags[tag] = newEntities
+	} else {
+		// Remove the tag entirely if no entities left
+		delete(shard.tags, tag)
+	}
+}
+
 // GetAllTags returns all tags in the index (for backward compatibility)
 // This should be avoided in hot paths as it locks all shards
 func (s *ShardedTagIndex) GetAllTags() map[string][]string {

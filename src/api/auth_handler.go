@@ -4,7 +4,6 @@ package api
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -27,17 +26,14 @@ import (
 //   - Integration with RBAC for permission checking
 type AuthHandler struct {
 	securityManager *models.SecurityManager
-	sessionManager  *models.SessionManager
 }
 
 // NewAuthHandler creates a new authentication handler.
 // Parameters:
-//   - securityManager: Handles password verification and user authentication
-//   - sessionManager: Manages session tokens and expiration
-func NewAuthHandler(securityManager *models.SecurityManager, sessionManager *models.SessionManager) *AuthHandler {
+//   - securityManager: Handles password verification, user authentication, and session management
+func NewAuthHandler(securityManager *models.SecurityManager) *AuthHandler {
 	return &AuthHandler{
 		securityManager: securityManager,
-		sessionManager:  sessionManager,
 	}
 }
 
@@ -187,22 +183,25 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Create a new session for the authenticated user
-	// Sessions are managed with TTL and automatic cleanup
-	session, err := h.sessionManager.CreateSession(userEntity.ID, userEntity.Username, roles)
+	// Create session in database (this is what security middleware uses)
+	ipAddress := r.RemoteAddr
+	userAgent := r.Header.Get("User-Agent")
+	logger.Debug("Creating database session for user %s", userEntity.ID)
+	dbSession, err := h.securityManager.CreateSession(userEntity, ipAddress, userAgent)
 	if err != nil {
-		logger.Error("failed to create session for user %s: %v", userEntity.ID, err)
+		logger.Error("failed to create database session for user %s: %v", userEntity.ID, err)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(AuthErrorResponse{Error: "Failed to create session"})
 		return
 	}
+	logger.Debug("Created database session with token: %s", dbSession.Token)
 
 	// Create response with session token
 	response := AuthLoginResponse{
-		Token:     session.Token,
+		Token:     dbSession.Token,
 		UserID:    userEntity.ID,
-		ExpiresAt: session.ExpiresAt.Format(time.RFC3339),
+		ExpiresAt: dbSession.ExpiresAt.Format(time.RFC3339),
 		User: AuthUserInfo{
 			ID:       userEntity.ID,
 			Username: userEntity.Username,
@@ -287,15 +286,8 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	}
 	token := parts[1]
 	
-	// Get session info for logging
-	session, exists := h.sessionManager.GetSession(token)
-	var username string
-	if exists {
-		username = session.Username
-	}
-
-	// Invalidate session
-	err := h.invalidateSession(token)
+	// Invalidate session in database
+	err := h.securityManager.InvalidateSession(token)
 	if err != nil {
 		logger.Error("failed to invalidate session: %v", err)
 		w.Header().Set("Content-Type", "application/json")
@@ -304,9 +296,7 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if username != "" {
-		logger.Info("User %s logged out", username)
-	}
+	logger.Debug("session invalidated successfully")
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{"message": "Logged out successfully"})
@@ -403,101 +393,23 @@ func (h *AuthHandler) WhoAmI(w http.ResponseWriter, r *http.Request) {
 
 // Helper functions
 
-// getUserRoles gets all roles for a user (direct and inherited through groups)
+// getUserRoles gets all roles for a user via tag-based RBAC
 func (h *AuthHandler) getUserRoles(user *models.SecurityUser) ([]string, error) {
-	// This is a simplified version - in production you might want to cache this
-	roles := []string{}
-
-	// Get direct roles
-	userRoles, err := h.getUserDirectRoles(user.ID)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, role := range userRoles {
-		roles = append(roles, role.Name)
-	}
-
-	// Get group-based roles
-	userGroups, err := h.getUserGroups(user.ID)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, group := range userGroups {
-		groupRoles, err := h.getGroupRoles(group.ID)
-		if err != nil {
-			continue // Skip this group if we can't get its roles
-		}
-
-		for _, role := range groupRoles {
-			// Avoid duplicates
-			found := false
-			for _, existingRole := range roles {
-				if existingRole == role.Name {
-					found = true
-					break
-				}
-			}
-			if !found {
-				roles = append(roles, role.Name)
-			}
+	var roles []string
+	userTags := user.Entity.GetTagsWithoutTimestamp()
+	
+	// Extract roles from rbac:role: tags
+	for _, tag := range userTags {
+		if strings.HasPrefix(tag, "rbac:role:") {
+			roleName := strings.TrimPrefix(tag, "rbac:role:")
+			roles = append(roles, roleName)
 		}
 	}
-
+	
 	return roles, nil
 }
 
-// getUserDirectRoles gets roles directly assigned to a user
-func (h *AuthHandler) getUserDirectRoles(userID string) ([]*models.SecurityRole, error) {
-	// This would use the SecurityManager's methods in production
-	// For now, we'll implement a basic version
-	return []*models.SecurityRole{}, nil
-}
-
-// getUserGroups gets groups a user belongs to
-func (h *AuthHandler) getUserGroups(userID string) ([]*models.Entity, error) {
-	// This would use the SecurityManager's methods in production
-	// For now, we'll implement a basic version
-	return []*models.Entity{}, nil
-}
-
-// getGroupRoles gets roles assigned to a group
-func (h *AuthHandler) getGroupRoles(groupID string) ([]*models.SecurityRole, error) {
-	// This would use the SecurityManager's methods in production
-	// For now, we'll implement a basic version
-	return []*models.SecurityRole{}, nil
-}
-
-// invalidateSession invalidates a session by deleting the session entity and its relationships
-func (h *AuthHandler) invalidateSession(token string) error {
-	// Get session info before deletion (if available) for audit purposes
-	session, exists := h.sessionManager.GetSession(token)
-	
-	// Delete the session from the session manager
-	h.sessionManager.DeleteSession(token)
-	
-	// Track logout event for audit purposes
-	if exists {
-		logoutEvent := &models.Entity{
-			ID: "auth_event_logout_" + session.UserID + "_" + time.Now().Format("20060102150405"),
-			Tags: []string{
-				"type:auth_event",
-				"status:success",
-				"user:" + session.UserID,
-				"event:logout",
-				"username:" + session.Username,
-			},
-			Content: []byte(fmt.Sprintf(`{"user_id":"%s","username":"%s","success":true,"details":"Logout successful","timestamp":"%s"}`, 
-				session.UserID, session.Username, time.Now().Format(time.RFC3339))),
-		}
-		if err := h.securityManager.GetEntityRepo().Create(logoutEvent); err != nil {
-			logger.Error("Failed to track logout event: %v", err)
-		}
-	}
-	
-	return nil
-}
+// Obsolete helper functions removed - using tag-based RBAC now
 
 // getClientIP extracts the client IP address from the request
 func getClientIP(r *http.Request) string {

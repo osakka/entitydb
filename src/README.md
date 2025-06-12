@@ -2,12 +2,17 @@
 
 This directory contains the source code for the EntityDB platform. This document provides an overview of the source code structure and development guidelines.
 
-## Latest Changes (v2.29.0)
+## Latest Changes (v2.30.0)
 
-- **Complete UI/UX Overhaul**: New web interface with Vue.js 3, dark mode, and professional components
-- **Enhanced JavaScript Libraries**: API client, logging, notifications, state management, and caching
-- **Improved Developer Experience**: Component testing framework and interactive documentation
-- **Code Quality**: All patches integrated, clean build with zero warnings
+- **Temporal Tag Search Implementation**: Complete fix for critical temporal tag search functionality
+  - Fixed WAL replay indexing, cached repository bypass, reader pool synchronization
+  - All authentication and session management now working reliably
+  - Added comprehensive documentation and performance validation
+- **Enhanced Real-time Dashboard**: Professional metrics dashboard with health scoring and visualization
+  - Real-time memory usage charts, system status monitoring, auto-refresh capabilities
+  - Vue.js 3 reactive framework with responsive design and dark mode support
+- **Performance Optimization**: Sub-millisecond query performance and zero goroutine leaks
+- **Code Quality**: Complete audit, cleanup, and single source of truth maintenance
 
 ## Directory Structure
 

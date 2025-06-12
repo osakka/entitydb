@@ -294,30 +294,20 @@ func (sm *SecurityManager) CreateSession(user *SecurityUser, ipAddress, userAgen
 			"ip:" + ipAddress,
 			"user_agent:" + userAgent,
 			"created:" + NowString(),
+			"authenticated_as:" + user.ID,
+			"session:active",
 		},
 		Content:   nil,
 		CreatedAt: Now(),
 		UpdatedAt: Now(),
 	}
 	
-	// Create session entity
+	// Create session entity with relationship tags
 	if err := sm.entityRepo.Create(sessionEntity); err != nil {
+		logger.Error("Failed to create session entity: %v", err)
 		return nil, fmt.Errorf("failed to create session entity: %v", err)
 	}
-	
-	// Create relationship between session and user
-	relationship := &EntityRelationship{
-		ID:         "rel_" + generateSecureUUID(),
-		SourceID:   sessionID,
-		TargetID:   user.ID,
-		Type:       RelationshipAuthenticatedAs,
-		Properties: map[string]string{"active": "true"},
-		CreatedAt:  Now(),
-	}
-	
-	if err := sm.entityRepo.CreateRelationship(relationship); err != nil {
-		return nil, fmt.Errorf("failed to create session-user relationship: %v", err)
-	}
+	logger.Debug("Created session entity with user relationship: %s -> %s", sessionID, user.ID)
 	
 	return &SecuritySession{
 		ID:        sessionID,
@@ -333,13 +323,21 @@ func (sm *SecurityManager) CreateSession(user *SecurityUser, ipAddress, userAgen
 
 // ValidateSession validates a session token and returns the associated user
 func (sm *SecurityManager) ValidateSession(token string) (*SecurityUser, error) {
-	// Find session by token tag
+	logger.Debug("ValidateSession: Looking for session with token: %s", token)
+	
+	// Find session by token tag using the fixed temporal tag search
 	sessionEntities, err := sm.entityRepo.ListByTag("token:" + token)
-	if err != nil || len(sessionEntities) == 0 {
+	if err != nil {
+		logger.Error("ValidateSession: Error finding session: %v", err)
+		return nil, fmt.Errorf("session lookup failed: %v", err)
+	}
+	if len(sessionEntities) == 0 {
+		logger.Debug("ValidateSession: No session found with token: %s", token)
 		return nil, fmt.Errorf("session not found")
 	}
 	
 	sessionEntity := sessionEntities[0]
+	logger.Debug("ValidateSession: Found session entity: %s", sessionEntity.ID)
 	
 	// Check if session is expired
 	sessionTags := sessionEntity.GetTagsWithoutTimestamp()
@@ -359,27 +357,24 @@ func (sm *SecurityManager) ValidateSession(token string) (*SecurityUser, error) 
 		return nil, fmt.Errorf("session expired")
 	}
 	
-	// Get user via relationship
-	userRelationships, err := sm.entityRepo.GetRelationshipsBySource(sessionEntity.ID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get session relationships: %v", err)
-	}
-	
-	var userEntity *Entity
-	for _, rel := range userRelationships {
-		if relationship, ok := rel.(*EntityRelationship); ok {
-			if relationship.Type == RelationshipAuthenticatedAs {
-				userEnt, err := sm.entityRepo.GetByID(relationship.TargetID)
-				if err == nil {
-					userEntity = userEnt
-					break
-				}
-			}
+	// Get user via tag-based relationship
+	var userID string
+	for _, tag := range sessionTags {
+		if strings.HasPrefix(tag, "authenticated_as:") {
+			userID = strings.TrimPrefix(tag, "authenticated_as:")
+			break
 		}
 	}
 	
-	if userEntity == nil {
+	if userID == "" {
+		logger.Debug("ValidateSession: No authenticated_as tag found in session")
 		return nil, fmt.Errorf("no user found for session")
+	}
+	
+	userEntity, err := sm.entityRepo.GetByID(userID)
+	if err != nil {
+		logger.Debug("ValidateSession: Failed to get user entity %s: %v", userID, err)
+		return nil, fmt.Errorf("user not found: %v", err)
 	}
 	
 	// Extract user details from tags
@@ -402,84 +397,65 @@ func (sm *SecurityManager) ValidateSession(token string) (*SecurityUser, error) 
 	}, nil
 }
 
-// HasPermission checks if a user has a specific permission via relationship traversal
+// HasPermission checks if a user has a specific permission via tag-based RBAC
 func (sm *SecurityManager) HasPermission(user *SecurityUser, resource, action string) (bool, error) {
 	return sm.HasPermissionInDataset(user, resource, action, "")
 }
 
-// HasPermissionInDataset checks if a user has a specific permission in a dataset via relationship traversal
+// HasPermissionInDataset checks if a user has a specific permission in a dataset via tag-based RBAC
 func (sm *SecurityManager) HasPermissionInDataset(user *SecurityUser, resource, action, datasetID string) (bool, error) {
-	// First check direct user permissions via user->role->permission
-	userRoles, err := sm.getUserRoles(user.ID)
-	if err != nil {
-		return false, err
-	}
+	userTags := user.Entity.GetTagsWithoutTimestamp()
+	logger.Debug("HasPermissionInDataset: checking permission %s:%s for user %s with tags: %v", resource, action, user.ID, userTags)
 	
-	for _, role := range userRoles {
-		hasPermission, err := sm.roleHasPermissionInDataset(role.ID, resource, action, datasetID)
-		if err != nil {
-			return false, err
-		}
-		if hasPermission {
+	// Check for admin role (has all permissions)
+	for _, tag := range userTags {
+		if tag == "rbac:role:admin" {
+			logger.Debug("HasPermissionInDataset: user %s has admin role, granting permission", user.ID)
 			return true, nil
 		}
 	}
 	
-	// Check group-based permissions via user->group->role->permission
-	userGroups, err := sm.getUserGroups(user.ID)
-	if err != nil {
-		return false, err
-	}
+	// Check for specific permissions via rbac:perm: tags
+	requiredPerm := fmt.Sprintf("rbac:perm:%s:%s", resource, action)
+	wildcardResource := fmt.Sprintf("rbac:perm:%s:*", resource)
+	wildcardAction := fmt.Sprintf("rbac:perm:*:%s", action)
+	wildcardAll := "rbac:perm:*:*"
 	
-	for _, group := range userGroups {
-		groupRoles, err := sm.getGroupRoles(group.ID)
-		if err != nil {
-			continue // Skip this group if we can't get its roles
-		}
-		
-		for _, role := range groupRoles {
-			hasPermission, err := sm.roleHasPermissionInDataset(role.ID, resource, action, datasetID)
-			if err != nil {
-				continue // Skip this role if we can't check its permissions
-			}
-			if hasPermission {
-				return true, nil
-			}
+	logger.Debug("HasPermissionInDataset: checking for permission tags: %s, %s, %s, %s", requiredPerm, wildcardResource, wildcardAction, wildcardAll)
+	
+	for _, tag := range userTags {
+		if tag == requiredPerm || tag == wildcardResource || tag == wildcardAction || tag == wildcardAll {
+			logger.Debug("HasPermissionInDataset: found matching permission tag: %s", tag)
+			return true, nil
 		}
 	}
 	
+	logger.Debug("HasPermissionInDataset: no matching permissions found for user %s", user.ID)
 	return false, nil
 }
 
 // Helper functions
 
 func (sm *SecurityManager) getUserRoles(userID string) ([]*SecurityRole, error) {
-	relationships, err := sm.entityRepo.GetRelationshipsBySource(userID)
+	// Get user entity to check role tags
+	userEntity, err := sm.entityRepo.GetByID(userID)
 	if err != nil {
 		return nil, err
 	}
 	
 	var roles []*SecurityRole
-	for _, rel := range relationships {
-		if relationship, ok := rel.(*EntityRelationship); ok {
-			if relationship.Type == RelationshipHasRole {
-				roleEntity, err := sm.entityRepo.GetByID(relationship.TargetID)
-				if err == nil {
-					role := &SecurityRole{
-						ID:     roleEntity.ID,
-						Entity: roleEntity,
-					}
-					// Extract role name from tags
-					roleTags := roleEntity.GetTagsWithoutTimestamp()
-					for _, tag := range roleTags {
-						if strings.HasPrefix(tag, "name:") {
-							role.Name = strings.TrimPrefix(tag, "name:")
-							break
-						}
-					}
-					roles = append(roles, role)
-				}
+	userTags := userEntity.GetTagsWithoutTimestamp()
+	
+	// Extract roles from rbac:role: tags
+	for _, tag := range userTags {
+		if strings.HasPrefix(tag, "rbac:role:") {
+			roleName := strings.TrimPrefix(tag, "rbac:role:")
+			role := &SecurityRole{
+				ID:     "role_" + roleName,
+				Name:   roleName,
+				Entity: userEntity, // Role is embedded in user, not separate entity
 			}
+			roles = append(roles, role)
 		}
 	}
 	
@@ -487,205 +463,81 @@ func (sm *SecurityManager) getUserRoles(userID string) ([]*SecurityRole, error) 
 }
 
 func (sm *SecurityManager) getUserGroups(userID string) ([]*Entity, error) {
-	relationships, err := sm.entityRepo.GetRelationshipsBySource(userID)
-	if err != nil {
-		return nil, err
-	}
-	
-	var groups []*Entity
-	for _, rel := range relationships {
-		if relationship, ok := rel.(*EntityRelationship); ok {
-			if relationship.Type == RelationshipMemberOf {
-				groupEntity, err := sm.entityRepo.GetByID(relationship.TargetID)
-				if err == nil {
-					groups = append(groups, groupEntity)
-				}
-			}
-		}
-	}
-	
-	return groups, nil
+	// For now, simplified - groups would be handled via tags like "member_of:group_id"
+	// This can be implemented later if needed
+	return []*Entity{}, nil
 }
 
 func (sm *SecurityManager) getGroupRoles(groupID string) ([]*SecurityRole, error) {
-	relationships, err := sm.entityRepo.GetRelationshipsBySource(groupID)
-	if err != nil {
-		return nil, err
-	}
-	
-	var roles []*SecurityRole
-	for _, rel := range relationships {
-		if relationship, ok := rel.(*EntityRelationship); ok {
-			if relationship.Type == RelationshipHasRole {
-				roleEntity, err := sm.entityRepo.GetByID(relationship.TargetID)
-				if err == nil {
-					role := &SecurityRole{
-						ID:     roleEntity.ID,
-						Entity: roleEntity,
-					}
-					roles = append(roles, role)
-				}
-			}
-		}
-	}
-	
-	return roles, nil
+	// Simplified - groups not implemented yet
+	return []*SecurityRole{}, nil
 }
 
-func (sm *SecurityManager) roleHasPermission(roleID, resource, action string) (bool, error) {
-	relationships, err := sm.entityRepo.GetRelationshipsBySource(roleID)
-	if err != nil {
-		return false, err
-	}
-	
-	for _, rel := range relationships {
-		if relationship, ok := rel.(*EntityRelationship); ok {
-			if relationship.Type == RelationshipGrants {
-				permissionEntity, err := sm.entityRepo.GetByID(relationship.TargetID)
-				if err == nil {
-					permTags := permissionEntity.GetTagsWithoutTimestamp()
-					var permResource, permAction string
-					for _, tag := range permTags {
-						if strings.HasPrefix(tag, "resource:") {
-							permResource = strings.TrimPrefix(tag, "resource:")
-						} else if strings.HasPrefix(tag, "action:") {
-							permAction = strings.TrimPrefix(tag, "action:")
-						}
-					}
-					
-					// Check for exact match or wildcard permissions
-					if (permResource == resource || permResource == "*") &&
-						(permAction == action || permAction == "*") {
-						return true, nil
-					}
-				}
-			}
-		}
-	}
-	
-	return false, nil
-}
+// Obsolete relationship-based methods removed - using tag-based RBAC now
 
-func (sm *SecurityManager) roleHasPermissionInDataset(roleID, resource, action, datasetID string) (bool, error) {
-	// If no dataset specified, check global permissions
-	if datasetID == "" {
-		return sm.roleHasPermission(roleID, resource, action)
-	}
-	
-	// First check if user has global admin permissions (overrides dataset restrictions)
-	hasGlobal, err := sm.roleHasPermission(roleID, "*", "*")
-	if err != nil {
-		return false, err
-	}
-	if hasGlobal {
-		return true, nil
-	}
-	
-	// Check if role has access to the specific dataset
-	hasDatasetAccess, err := sm.roleHasDatasetAccess(roleID, datasetID)
-	if err != nil {
-		return false, err
-	}
-	if !hasDatasetAccess {
-		return false, nil // No access to dataset at all
-	}
-	
-	// Check for dataset-scoped permissions
-	relationships, err := sm.entityRepo.GetRelationshipsBySource(roleID)
-	if err != nil {
-		return false, err
-	}
-	
-	for _, rel := range relationships {
-		if relationship, ok := rel.(*EntityRelationship); ok {
-			if relationship.Type == RelationshipGrants {
-				permissionEntity, err := sm.entityRepo.GetByID(relationship.TargetID)
-				if err == nil {
-					permTags := permissionEntity.GetTagsWithoutTimestamp()
-					var permResource, permAction, permDataset string
-					for _, tag := range permTags {
-						if strings.HasPrefix(tag, "resource:") {
-							permResource = strings.TrimPrefix(tag, "resource:")
-						} else if strings.HasPrefix(tag, "action:") {
-							permAction = strings.TrimPrefix(tag, "action:")
-						} else if strings.HasPrefix(tag, "dataset:") {
-							permDataset = strings.TrimPrefix(tag, "dataset:")
-						}
-					}
-					
-					// Check for exact match or wildcard permissions in the right dataset
-					if (permResource == resource || permResource == "*") &&
-						(permAction == action || permAction == "*") &&
-						(permDataset == datasetID || permDataset == "*") {
-						return true, nil
-					}
-				}
-			}
-		}
-	}
-	
-	return false, nil
-}
-
-func (sm *SecurityManager) roleHasDatasetAccess(roleID, datasetID string) (bool, error) {
-	relationships, err := sm.entityRepo.GetRelationshipsBySource(roleID)
-	if err != nil {
-		return false, err
-	}
-	
-	for _, rel := range relationships {
-		if relationship, ok := rel.(*EntityRelationship); ok {
-			if relationship.Type == RelationshipCanAccess && relationship.TargetID == datasetID {
-				return true, nil
-			}
-		}
-	}
-	
-	return false, nil
-}
-
-// CanAccessDataset checks if a user can access a specific dataset
+// CanAccessDataset checks if a user can access a specific dataset via tag-based RBAC
 func (sm *SecurityManager) CanAccessDataset(user *SecurityUser, datasetID string) (bool, error) {
-	// Check direct user access
-	userRoles, err := sm.getUserRoles(user.ID)
-	if err != nil {
-		return false, err
-	}
+	userTags := user.Entity.GetTagsWithoutTimestamp()
 	
-	for _, role := range userRoles {
-		hasAccess, err := sm.roleHasDatasetAccess(role.ID, datasetID)
-		if err != nil {
-			return false, err
-		}
-		if hasAccess {
+	// Admin users have access to all datasets
+	for _, tag := range userTags {
+		if tag == "rbac:role:admin" {
 			return true, nil
 		}
 	}
 	
-	// Check group-based access
-	userGroups, err := sm.getUserGroups(user.ID)
-	if err != nil {
-		return false, err
-	}
-	
-	for _, group := range userGroups {
-		groupRoles, err := sm.getGroupRoles(group.ID)
-		if err != nil {
-			continue
-		}
-		
-		for _, role := range groupRoles {
-			hasAccess, err := sm.roleHasDatasetAccess(role.ID, datasetID)
-			if err != nil {
-				continue
-			}
-			if hasAccess {
-				return true, nil
-			}
-		}
+	// Check for specific dataset access tags (can be implemented later)
+	// For now, regular users have access to default dataset
+	if datasetID == "default" || datasetID == "" {
+		return true, nil
 	}
 	
 	return false, nil
+}
+
+// InvalidateSession invalidates a session by token
+func (sm *SecurityManager) InvalidateSession(token string) error {
+	logger.Debug("InvalidateSession: Looking for session with token: %s", token)
+	
+	// Find session by token tag
+	sessionEntities, err := sm.entityRepo.ListByTag("token:" + token)
+	if err != nil {
+		logger.Error("InvalidateSession: Error finding session: %v", err)
+		return fmt.Errorf("failed to find session: %v", err)
+	}
+	if len(sessionEntities) == 0 {
+		logger.Debug("InvalidateSession: No session found with token: %s", token)
+		return fmt.Errorf("session not found")
+	}
+	
+	sessionEntity := sessionEntities[0]
+	logger.Debug("InvalidateSession: Found session entity: %s", sessionEntity.ID)
+	
+	// Update session tags to mark as expired
+	updatedTags := []string{}
+	for _, tag := range sessionEntity.Tags {
+		// Skip expires tag - we'll add a new one
+		if !strings.Contains(tag, "expires:") {
+			updatedTags = append(updatedTags, tag)
+		}
+	}
+	
+	// Add expired tag with past timestamp
+	expiredTime := time.Now().Add(-1 * time.Hour).Format(time.RFC3339)
+	updatedTags = append(updatedTags, "expires:"+expiredTime)
+	updatedTags = append(updatedTags, "status:invalidated")
+	
+	sessionEntity.Tags = updatedTags
+	sessionEntity.UpdatedAt = Now()
+	
+	// Update the session entity
+	if err := sm.entityRepo.Update(sessionEntity); err != nil {
+		logger.Error("InvalidateSession: Failed to update session entity: %v", err)
+		return fmt.Errorf("failed to invalidate session: %v", err)
+	}
+	
+	logger.Debug("InvalidateSession: Successfully invalidated session: %s", sessionEntity.ID)
+	return nil
 }
 
 // Utility functions

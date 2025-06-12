@@ -285,7 +285,7 @@ func main() {
 	server.entityHandler = api.NewEntityHandler(entityRepo)
 	server.relationHandler = api.NewEntityRelationshipHandler(relationRepo)
 	server.userHandler = api.NewUserHandler(entityRepo)
-	server.authHandler = api.NewAuthHandler(server.securityManager, server.sessionManager)
+	server.authHandler = api.NewAuthHandler(server.securityManager)
 	server.securityMiddleware = api.NewSecurityMiddleware(server.securityManager)
 	
 	// Initialize with default entities
@@ -296,8 +296,8 @@ func main() {
 	// This prevents the static file handler from intercepting API routes
 	router := mux.NewRouter()
 	
-	// Create RBAC-enabled handlers
-	entityHandlerRBAC := api.NewEntityHandlerRBAC(server.entityHandler, server.entityRepo, server.sessionManager)
+	// Create RBAC-enabled handlers using SecurityMiddleware
+	// Note: EntityHandlerRBAC is being deprecated in favor of SecurityMiddleware
 
 	// API routes on subrouter (for better ordering)
 	apiRouter := router.PathPrefix("/api/v1").Subrouter()
@@ -312,23 +312,23 @@ func main() {
 	apiRouter.HandleFunc("/status", server.handleStatus).Methods("GET") 
 	
 	// Entity endpoints with RBAC (all entity operations require authentication and permissions)
-	// Use method-specific handlers for more granular control
-	apiRouter.HandleFunc("/entities/list", entityHandlerRBAC.ListEntities()).Methods("GET")
-	apiRouter.HandleFunc("/entities/get", entityHandlerRBAC.GetEntity()).Methods("GET")
-	apiRouter.HandleFunc("/entities/create", entityHandlerRBAC.CreateEntity()).Methods("POST")
-	apiRouter.HandleFunc("/entities/update", entityHandlerRBAC.UpdateEntity()).Methods("PUT")
-	apiRouter.HandleFunc("/entities/query", entityHandlerRBAC.QueryEntities()).Methods("GET")
-	apiRouter.HandleFunc("/entities/listbytag", entityHandlerRBAC.ListByTag()).Methods("GET")
+	// Use SecurityMiddleware for modern tag-based RBAC
+	apiRouter.HandleFunc("/entities/list", server.securityMiddleware.RequirePermission("entity", "view")(server.entityHandler.ListEntities)).Methods("GET")
+	apiRouter.HandleFunc("/entities/get", server.securityMiddleware.RequirePermission("entity", "view")(server.entityHandler.GetEntity)).Methods("GET")
+	apiRouter.HandleFunc("/entities/create", server.securityMiddleware.RequirePermission("entity", "create")(server.entityHandler.CreateEntity)).Methods("POST")
+	apiRouter.HandleFunc("/entities/update", server.securityMiddleware.RequirePermission("entity", "update")(server.entityHandler.UpdateEntity)).Methods("PUT")
+	apiRouter.HandleFunc("/entities/query", server.securityMiddleware.RequirePermission("entity", "view")(server.entityHandler.QueryEntities)).Methods("GET")
+	apiRouter.HandleFunc("/entities/listbytag", server.securityMiddleware.RequirePermission("entity", "view")(server.entityHandler.ListEntities)).Methods("GET")
 	
 	// Entity temporal operations with RBAC
-	apiRouter.HandleFunc("/entities/as-of", entityHandlerRBAC.GetEntityAsOf()).Methods("GET")
-	apiRouter.HandleFunc("/entities/history", entityHandlerRBAC.GetEntityHistory()).Methods("GET")
-	apiRouter.HandleFunc("/entities/changes", entityHandlerRBAC.GetEntityChanges()).Methods("GET")
-	apiRouter.HandleFunc("/entities/diff", entityHandlerRBAC.GetEntityDiff()).Methods("GET")
+	apiRouter.HandleFunc("/entities/as-of", server.securityMiddleware.RequirePermission("entity", "view")(server.entityHandler.GetEntityAsOf)).Methods("GET")
+	apiRouter.HandleFunc("/entities/history", server.securityMiddleware.RequirePermission("entity", "view")(server.entityHandler.GetEntityHistory)).Methods("GET")
+	apiRouter.HandleFunc("/entities/changes", server.securityMiddleware.RequirePermission("entity", "view")(server.entityHandler.GetRecentChanges)).Methods("GET")
+	apiRouter.HandleFunc("/entities/diff", server.securityMiddleware.RequirePermission("entity", "view")(server.entityHandler.GetEntityDiff)).Methods("GET")
 	
 	// Chunking endpoints with RBAC  
-	apiRouter.HandleFunc("/entities/get-chunk", entityHandlerRBAC.GetChunk()).Methods("GET")
-	apiRouter.HandleFunc("/entities/stream-content", entityHandlerRBAC.StreamContent()).Methods("GET")
+	apiRouter.HandleFunc("/entities/get-chunk", server.securityMiddleware.RequirePermission("entity", "view")(server.entityHandler.GetEntity)).Methods("GET")
+	apiRouter.HandleFunc("/entities/stream-content", server.securityMiddleware.RequirePermission("entity", "view")(server.entityHandler.StreamEntity)).Methods("GET")
 	
 	// Deprecated temporal patch endpoint
 	apiRouter.HandleFunc("/patches/reindex-tags", func(w http.ResponseWriter, r *http.Request) {
