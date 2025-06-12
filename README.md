@@ -10,6 +10,8 @@
 
 EntityDB is a revolutionary temporal database platform that stores all data as entities with timestamped tags. Built with a custom binary format (EBF) and Write-Ahead Logging, it provides ACID compliance, time-travel queries, and enterprise-grade RBAC.
 
+> **⚠️ BREAKING CHANGE in v2.29.0**: Authentication architecture has changed. User credentials are now stored directly in the user entity's content field. This change has **NO BACKWARD COMPATIBILITY** - all users must be recreated. See [Authentication Guide](./docs/api/auth.md) for details.
+
 ### Key Features
 
 - ⏱️ **Temporal Storage**: Every tag timestamped with nanosecond precision
@@ -35,7 +37,7 @@ cd src && make && cd ..
 ./bin/entitydbd.sh start
 
 # Access the dashboard
-# Web UI: https://localhost:8085 (HTTP) or https://localhost:8443 (HTTPS)
+# Web UI: http://localhost:8085 (HTTP) or https://localhost:8443 (HTTPS)
 # Default credentials: admin/admin
 ```
 
@@ -62,14 +64,16 @@ Every tag is stored with a nanosecond timestamp:
 Complete multi-tenancy through isolated datasets:
 ```bash
 # Create a dataset
-curl -k -X POST https://localhost:8085/api/v1/datasets/create \
+curl -X POST http://localhost:8085/api/v1/datasets \
   -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
   -d '{"name":"myapp","description":"My Application"}'
 
 # Create entity in dataset
-curl -k -X POST https://localhost:8085/api/v1/entities/create \
+curl -X POST http://localhost:8085/api/v1/datasets/myapp/entities/create \
   -H "Authorization: Bearer $TOKEN" \
-  -d '{"tags":["dataset:myapp","type:task"],"content":"Task data"}'
+  -H "Content-Type: application/json" \
+  -d '{"tags":["type:task"],"content":"Task data"}'
 ```
 
 ## API Overview
@@ -77,34 +81,36 @@ curl -k -X POST https://localhost:8085/api/v1/entities/create \
 ### Authentication
 ```bash
 # Login
-TOKEN=$(curl -k -s -X POST https://localhost:8085/api/v1/auth/login \
+TOKEN=$(curl -s -X POST http://localhost:8085/api/v1/auth/login \
+  -H "Content-Type: application/json" \
   -d '{"username":"admin","password":"admin"}' | jq -r '.token')
 ```
 
 ### Entity Operations
 ```bash
 # Create entity
-curl -k -X POST https://localhost:8085/api/v1/entities/create \
+curl -X POST http://localhost:8085/api/v1/entities/create \
   -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
   -d '{"tags":["type:document","status:draft"],"content":"My document"}'
 
 # Query entities
-curl -k -X GET "https://localhost:8085/api/v1/entities/query?tags=type:document" \
+curl -X GET "http://localhost:8085/api/v1/entities/query?tags=type:document" \
   -H "Authorization: Bearer $TOKEN"
 
 # Get entity history
-curl -k -X GET "https://localhost:8085/api/v1/entities/history?id=ENTITY_ID" \
+curl -X GET "http://localhost:8085/api/v1/entities/history?id=ENTITY_ID" \
   -H "Authorization: Bearer $TOKEN"
 ```
 
 ### Temporal Queries
 ```bash
 # Get entity state at specific time
-curl -k -X GET "https://localhost:8085/api/v1/entities/as-of?id=ID&timestamp=2024-01-01T00:00:00Z" \
+curl -X GET "http://localhost:8085/api/v1/entities/as-of?id=ID&timestamp=2024-01-01T00:00:00Z" \
   -H "Authorization: Bearer $TOKEN"
 
 # Get changes between times
-curl -k -X GET "https://localhost:8085/api/v1/entities/diff?id=ID&from=T1&to=T2" \
+curl -X GET "http://localhost:8085/api/v1/entities/diff?id=ID&from=T1&to=T2" \
   -H "Authorization: Bearer $TOKEN"
 ```
 

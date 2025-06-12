@@ -185,6 +185,12 @@ The server automatically creates a default admin user if none exists:
 
 ## Recent Changes (v2.29.0)
 
+- **Complete UI/UX Overhaul**: Professional 5-phase implementation transforming the user interface
+  - **Foundation**: Centralized API client, structured logging, toast notifications, base components
+  - **Design System**: CSS variables, dark mode, responsive design, enhanced entity browser
+  - **State Management**: Vuex-inspired stores, lazy loading, virtual scrolling
+  - **Advanced Features**: Multi-tier caching, real-time charts, performance monitoring
+  - **Testing**: Component testing framework, interactive documentation
 - **Major Terminology Update**: Renamed "dataspace" to "dataset" throughout entire codebase
   - All API endpoints changed from `/dataspace` to `/dataset` with backward compatibility
   - Environment variables renamed from `ENTITYDB_DATASPACE_*` to `ENTITYDB_DATASET_*`

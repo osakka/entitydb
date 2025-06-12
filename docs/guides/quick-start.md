@@ -1,12 +1,14 @@
 # EntityDB Quick Start Guide
 
-Welcome to EntityDB! This guide will help you get started quickly.
+Welcome to EntityDB! This guide will help you get started quickly with EntityDB v2.29.0.
+
+> **⚠️ Important**: v2.29.0 includes breaking changes to authentication. See the [migration guide](../api/auth.md#v229-migration) if upgrading.
 
 ## Installation
 
 1. Clone the repository:
    ```bash
-   git clone https://git.home.arpa/osakka/entitydb.git
+   git clone https://git.home.arpa/itdlabs/entitydb.git
    cd entitydb
    ```
 
@@ -29,7 +31,9 @@ Welcome to EntityDB! This guide will help you get started quickly.
 ./bin/entitydbd.sh stop
 ```
 
-The server runs on port 8085 by default.
+The server runs on:
+- HTTP: port 8085 (default)
+- HTTPS: port 8443 (when SSL is enabled)
 
 ## Default Admin User
 
@@ -41,7 +45,7 @@ The server automatically creates a default admin user on first start:
 
 1. Login with default credentials:
    ```bash
-   TOKEN=$(curl -k -s -X POST https://localhost:8085/api/v1/auth/login \
+   TOKEN=$(curl -s -X POST http://localhost:8085/api/v1/auth/login \
      -H "Content-Type: application/json" \
      -d '{"username":"admin","password":"admin"}' | jq -r '.token')
    ```

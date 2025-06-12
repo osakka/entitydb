@@ -2,6 +2,13 @@
 
 This directory contains the source code for the EntityDB platform. This document provides an overview of the source code structure and development guidelines.
 
+## Latest Changes (v2.29.0)
+
+- **Complete UI/UX Overhaul**: New web interface with Vue.js 3, dark mode, and professional components
+- **Enhanced JavaScript Libraries**: API client, logging, notifications, state management, and caching
+- **Improved Developer Experience**: Component testing framework and interactive documentation
+- **Code Quality**: All patches integrated, clean build with zero warnings
+
 ## Directory Structure
 
 ```

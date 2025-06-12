@@ -11,29 +11,13 @@
     <!-- Icons -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
     
-    <!-- Widget System CSS -->
-    <link href="/css/widget-system.css" rel="stylesheet">
+    <!-- CSS -->
+    <link href="/css/design-system.css" rel="stylesheet">
     
-    <!-- ApexCharts for modern charts -->
-    <script src="https://cdn.jsdelivr.net/npm/apexcharts@3.44.0/dist/apexcharts.min.js"></script>
-    
-    <!-- Simple Grid Layout -->
-    <script src="/js/simple-grid-layout.js"></script>
-    
-    <!-- Remove chart.js adapter since we're using ApexCharts -->
-    
-    <!-- Load foundation components first -->
+    <!-- Core scripts -->
     <script src="/js/logger.js"></script>
     <script src="/js/api-client.js"></script>
     <script src="/js/notification-system.js"></script>
-    <script src="/js/loading-states.js"></script>
-    <script src="/js/base-component.js"></script>
-    
-    <!-- Load custom components -->
-    <script src="/js/entitydb-widgets.js"></script>
-    <script src="/js/entity-browser.js"></script>
-    <script src="/js/rbac-manager.js"></script>
-    <script src="/js/dataset-manager.js"></script>
     
     <style>
         * {
@@ -103,22 +87,6 @@
             transform: scale(1.53);
         }
 
-        /* Dataset Selector */
-        .dataset-selector {
-            background: transparent;
-            border: 1px solid #e9ecef;
-            border-radius: 4px;
-            padding: 6px 12px;
-            font-size: 14px;
-            color: #2c3e50;
-            cursor: pointer;
-        }
-
-        body.dark-mode .dataset-selector {
-            color: #e1e8ed;
-            border-color: #34495e;
-        }
-
         /* Navigation Tabs */
         .nav-tabs {
             display: flex;
@@ -175,289 +143,19 @@
             background: #1a1d21;
         }
 
-        /* Dashboard Layout */
-        .dashboard-container {
-            padding: 0;
-            height: 100%;
-            position: relative;
+        /* Tab Content */
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.3s ease-in;
         }
 
-        .dashboard-header {
-            background: rgba(255, 255, 255, 0.9);
-            padding: 20px;
-            border-radius: 12px;
-            margin-bottom: 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        body.dark-mode .dashboard-header {
-            background: rgba(44, 62, 80, 0.9);
-        }
-
-        /* Grid Layout Styles */
-        .simple-grid-layout {
-            position: relative;
-            min-height: 500px;
-            width: 100%;
-        }
-
-        .simple-grid-item {
-            transition: all 200ms ease;
-            background: #ffffff;
-            border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            overflow: hidden;
-        }
-
-        body.dark-mode .simple-grid-item {
-            background: #2c3e50;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-        }
-
-        .simple-grid-item.resizing {
-            opacity: 0.9;
-            z-index: 100;
-        }
-
-        .simple-grid-item.dragging {
-            opacity: 0.8;
-            transform: scale(1.02);
-            z-index: 100;
-            cursor: move;
-        }
-
-        .resize-handle {
-            position: absolute;
-            width: 20px;
-            height: 20px;
-            bottom: 0;
-            right: 0;
-            cursor: se-resize;
-        }
-
-        .resize-handle::after {
-            content: '';
-            position: absolute;
-            right: 3px;
-            bottom: 3px;
-            width: 5px;
-            height: 5px;
-            border-right: 2px solid rgba(0,0,0,0.4);
-            border-bottom: 2px solid rgba(0,0,0,0.4);
-        }
-
-        /* Widget Styles */
-        .widget-header {
-            padding: 16px 20px;
-            border-bottom: 1px solid #e9ecef;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        body.dark-mode .widget-header {
-            border-bottom-color: #34495e;
-        }
-
-        .widget-title {
-            font-size: 16px;
-            font-weight: 600;
-            color: #374151;
-        }
-
-        body.dark-mode .widget-title {
-            color: #e1e8ed;
-        }
-
-        .widget-actions {
-            display: flex;
-            gap: 8px;
-        }
-
-        .widget-action {
-            width: 32px;
-            height: 32px;
-            border: none;
-            background: none;
-            color: #6c757d;
-            cursor: pointer;
-            border-radius: 4px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.2s;
-        }
-
-        .widget-action:hover {
-            background: #f3f4f6;
-            color: #374151;
-        }
-
-        body.dark-mode .widget-action:hover {
-            background: #34495e;
-            color: #e1e8ed;
-        }
-
-        .widget-content {
-            padding: 20px;
-        }
-
-        /* Metric Card */
-        .metric-card {
-            text-align: center;
-            padding: 20px;
-        }
-
-        .metric-value {
-            font-size: 48px;
-            font-weight: 700;
-            color: #3498db;
-            margin-bottom: 8px;
-        }
-
-        .metric-label {
-            font-size: 14px;
-            color: #6c757d;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-
-        .metric-change {
-            font-size: 14px;
-            margin-top: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 4px;
-        }
-
-        .metric-change.positive {
-            color: #10b981;
-        }
-
-        .metric-change.negative {
-            color: #ef4444;
-        }
-
-        /* Buttons */
-        .btn {
-            padding: 10px 20px;
-            border: none;
-            border-radius: 6px;
-            font-size: 14px;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.2s;
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .btn-primary {
-            background: #3498db;
-            color: white;
-        }
-
-        .btn-primary:hover {
-            background: #2980b9;
-        }
-
-        .btn-secondary {
-            background: #e5e7eb;
-            color: #374151;
-        }
-
-        .btn-secondary:hover {
-            background: #d1d5db;
-        }
-
-        body.dark-mode .btn-secondary {
-            background: #34495e;
-            color: #e1e8ed;
-        }
-
-        body.dark-mode .btn-secondary:hover {
-            background: #415a77;
-        }
-
-        /* Modal */
-        .modal-backdrop {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.5);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 1000;
-        }
-
-        .modal {
-            background: white;
-            border-radius: 12px;
-            padding: 24px;
-            max-width: 800px;
-            max-height: 80vh;
-            overflow-y: auto;
-            position: relative;
-        }
-
-        body.dark-mode .modal {
-            background: #2c3e50;
-            color: #e1e8ed;
-        }
-
-        .modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 24px;
-        }
-
-        .widget-catalog {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-            gap: 16px;
-        }
-
-        .widget-option {
-            padding: 20px;
-            border: 2px solid #e5e7eb;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.2s;
-            text-align: center;
-        }
-
-        .widget-option:hover {
-            border-color: #3498db;
-            background: rgba(52, 152, 219, 0.05);
-        }
-
-        body.dark-mode .widget-option {
-            border-color: #34495e;
-        }
-
-        body.dark-mode .widget-option:hover {
-            border-color: #3498db;
-            background: rgba(52, 152, 219, 0.1);
-        }
-
-        .widget-option-icon {
-            font-size: 32px;
-            color: #3498db;
-            margin-bottom: 12px;
-        }
-
-        /* Stats Grid */
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-            gap: 16px;
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
         }
 
         /* Login Form */
@@ -517,112 +215,144 @@
             box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
         }
 
-        /* Notifications */
-        .notification {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            padding: 16px 24px;
-            border-radius: 8px;
-            color: white;
-            font-weight: 500;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            z-index: 10000;
-            animation: slideIn 0.3s ease-out;
+        /* Dashboard */
+        .dashboard-container {
+            padding: 24px;
         }
 
-        .notification.success {
-            background: #10b981;
-        }
-
-        .notification.error {
-            background: #ef4444;
-        }
-
-        .notification.info {
-            background: #3b82f6;
-        }
-
-        @keyframes slideIn {
-            from {
-                transform: translateX(100%);
-                opacity: 0;
-            }
-            to {
-                transform: translateX(0);
-                opacity: 1;
-            }
-        }
-
-        /* Chart container */
-        .chart-container {
-            position: relative;
-            height: 300px;
-            width: 100%;
-        }
-
-        /* Time Range Selector */
-        .time-range-selector {
+        .dashboard-header {
+            background: rgba(255, 255, 255, 0.9);
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
             display: flex;
+            justify-content: space-between;
             align-items: center;
-            gap: 8px;
-            background: rgba(0, 0, 0, 0.05);
-            padding: 8px 12px;
-            border-radius: 6px;
         }
 
-        body.dark-mode .time-range-selector {
-            background: rgba(255, 255, 255, 0.1);
+        body.dark-mode .dashboard-header {
+            background: rgba(44, 62, 80, 0.9);
         }
 
-        .time-select {
-            background: transparent;
+        .widget-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .widget {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        body.dark-mode .widget {
+            background: #2c3e50;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+
+        .widget-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid #e9ecef;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        body.dark-mode .widget-header {
+            border-bottom-color: #34495e;
+        }
+
+        .widget-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #374151;
+        }
+
+        body.dark-mode .widget-title {
+            color: #e1e8ed;
+        }
+
+        .widget-content {
+            padding: 20px;
+        }
+
+        /* Metric Card */
+        .metric-card {
+            text-align: center;
+            padding: 20px;
+        }
+
+        .metric-value {
+            font-size: 48px;
+            font-weight: 700;
+            color: #3498db;
+            margin-bottom: 8px;
+        }
+
+        .metric-label {
+            font-size: 14px;
+            color: #6c757d;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 10px 20px;
             border: none;
-            color: inherit;
+            border-radius: 6px;
             font-size: 14px;
             font-weight: 500;
             cursor: pointer;
-            outline: none;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
         }
 
-        .time-select option {
-            background: var(--bg-color, white);
-            color: var(--text-color, #2c3e50);
+        .btn-primary {
+            background: #3498db;
+            color: white;
         }
 
-        body.dark-mode .time-select option {
-            background: #2c3e50;
+        .btn-primary:hover {
+            background: #2980b9;
+        }
+
+        .btn-secondary {
+            background: #e5e7eb;
+            color: #374151;
+        }
+
+        .btn-secondary:hover {
+            background: #d1d5db;
+        }
+
+        body.dark-mode .btn-secondary {
+            background: #34495e;
             color: #e1e8ed;
         }
-        
-        /* Tab Content Display */
-        .tab-content {
-            display: none;
+
+        body.dark-mode .btn-secondary:hover {
+            background: #415a77;
         }
-        
-        .tab-content.active {
-            display: block;
+
+        /* Dataset selector */
+        .dataset-selector {
+            background: transparent;
+            border: 1px solid #e9ecef;
+            border-radius: 4px;
+            padding: 6px 12px;
+            font-size: 14px;
+            color: #2c3e50;
+            cursor: pointer;
         }
-        
-        /* Entity Browser Styles */
-        .entity-browser {
-            padding: 24px;
-            height: 100%;
-            display: block;
-        }
-        
-        /* RBAC Manager Styles */
-        .rbac-manager {
-            padding: 24px;
-            height: 100%;
-            display: block;
-        }
-        
-        /* Dataset Manager Styles */
-        .dataset-manager {
-            padding: 24px;
-            height: 100%;
-            display: block;
+
+        body.dark-mode .dataset-selector {
+            color: #e1e8ed;
+            border-color: #34495e;
         }
 
         /* Dark mode toggle */
@@ -643,6 +373,21 @@
 
         body.dark-mode .dark-mode-toggle:hover {
             background: rgba(255,255,255,0.1);
+        }
+
+        /* Loading spinner */
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
         }
     </style>
 </head>
@@ -666,9 +411,6 @@
                 </div>
                 <div class="header-right" style="display: flex; align-items: center; gap: 16px;">
                     <template v-if="isAuthenticated">
-                        <button @click="showDebugPanel = !showDebugPanel" class="dark-mode-toggle" title="Debug Panel" v-if="api && api.debug">
-                            <i class="fas fa-bug"></i>
-                        </button>
                         <button @click="toggleDarkMode" class="dark-mode-toggle" :title="isDarkMode ? 'Light Mode' : 'Dark Mode'">
                             <i :class="isDarkMode ? 'fas fa-sun' : 'fas fa-moon'"></i>
                         </button>
@@ -698,7 +440,7 @@
             <!-- Main Content Area -->
             <main class="main-content">
                 <!-- Login Screen -->
-                <div v-show="!isAuthenticated" class="login-container">
+                <div v-if="!isAuthenticated" class="login-container">
                     <div class="login-card">
                         <h2 style="margin-bottom: 32px; text-align: center;">Login to EntityDB</h2>
                         <form @submit.prevent="login">
@@ -723,7 +465,7 @@
                                 >
                             </div>
                             <button type="submit" class="btn btn-primary" style="width: 100%;" :disabled="loading">
-                                <loading-spinner v-if="loading" size="small" />
+                                <span v-if="loading" class="spinner"></span>
                                 <i v-else class="fas fa-sign-in-alt"></i> 
                                 {{ loading ? 'Logging in...' : 'Login' }}
                             </button>
@@ -731,507 +473,128 @@
                     </div>
                 </div>
 
-                <!-- Dashboard Tab -->
-                <div v-show="isAuthenticated && activeTab === 'dashboard'" class="dashboard-container">
-                    <div class="dashboard-header">
-                        <div>
-                            <h2 style="margin: 0; font-size: 24px; font-weight: 600;">Dashboard</h2>
-                            <span style="color: #6c757d; font-size: 14px;">Drag, resize, and customize your monitoring widgets</span>
-                        </div>
-                        <div style="display: flex; gap: 12px; align-items: center;">
-                            <!-- Time Range Selector -->
-                            <div class="time-range-selector">
-                                <i class="fas fa-clock"></i>
-                                <select v-model="dashboardTimeRange" @change="updateDashboardTimeRange" class="time-select">
-                                    <option value="5m">Last 5 minutes</option>
-                                    <option value="15m">Last 15 minutes</option>
-                                    <option value="1h">Last hour</option>
-                                    <option value="6h">Last 6 hours</option>
-                                    <option value="24h">Last 24 hours</option>
-                                    <option value="7d">Last 7 days</option>
-                                    <option value="30d">Last 30 days</option>
-                                </select>
+                <!-- Tab Contents -->
+                <template v-if="isAuthenticated">
+                    <!-- Dashboard Tab -->
+                    <div :class="['tab-content', { active: activeTab === 'dashboard' }]">
+                        <div class="dashboard-container">
+                            <div class="dashboard-header">
+                                <div>
+                                    <h2 style="margin: 0; font-size: 24px; font-weight: 600;">Dashboard</h2>
+                                    <span style="color: #6c757d; font-size: 14px;">System metrics and monitoring</span>
+                                </div>
+                                <div style="display: flex; gap: 12px;">
+                                    <button @click="loadSystemStats" class="btn btn-secondary">
+                                        <i class="fas fa-sync"></i> Refresh
+                                    </button>
+                                </div>
                             </div>
-                            <button @click="showAddWidget = true" class="btn btn-primary">
-                                <i class="fas fa-plus"></i> Add Widget
-                            </button>
-                            <button @click="saveDashboard" class="btn btn-secondary">
-                                <i class="fas fa-save"></i> Save Layout
-                            </button>
-                            <button @click="resetDashboard" class="btn btn-secondary">
-                                <i class="fas fa-undo"></i> Reset
-                            </button>
+
+                            <div class="widget-grid">
+                                <!-- Entity Count Widget -->
+                                <div class="widget">
+                                    <div class="widget-header">
+                                        <h3 class="widget-title">Total Entities</h3>
+                                    </div>
+                                    <div class="widget-content">
+                                        <div class="metric-card">
+                                            <div class="metric-value">{{ systemStats.totalEntities || 0 }}</div>
+                                            <div class="metric-label">Entities</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- User Count Widget -->
+                                <div class="widget">
+                                    <div class="widget-header">
+                                        <h3 class="widget-title">Active Users</h3>
+                                    </div>
+                                    <div class="widget-content">
+                                        <div class="metric-card">
+                                            <div class="metric-value">{{ systemStats.activeUsers || 0 }}</div>
+                                            <div class="metric-label">Users</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Memory Usage Widget -->
+                                <div class="widget">
+                                    <div class="widget-header">
+                                        <h3 class="widget-title">Memory Usage</h3>
+                                    </div>
+                                    <div class="widget-content">
+                                        <div class="metric-card">
+                                            <div class="metric-value">{{ systemStats.memoryUsage || '0 MB' }}</div>
+                                            <div class="metric-label">Memory</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Health Score Widget -->
+                                <div class="widget">
+                                    <div class="widget-header">
+                                        <h3 class="widget-title">Health Score</h3>
+                                    </div>
+                                    <div class="widget-content">
+                                        <div class="metric-card">
+                                            <div class="metric-value" style="color: #10b981;">{{ systemStats.healthScore || 0 }}%</div>
+                                            <div class="metric-label">System Health</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
-                    <!-- Loading Overlay -->
-                    <loading-overlay v-if="loading" :message="loadingMessage" />
-                    
-                    <!-- Widget Grid -->
-                    <grid-layout
-                        v-if="!loading && gridLayout.length > 0"
-                        v-model:layout="gridLayout"
-                        :col-num="12"
-                        :row-height="30"
-                        :is-draggable="true"
-                        :is-resizable="true"
-                        :is-mirrored="false"
-                        :responsive="true"
-                        :vertical-compact="true"
-                        :margin="[20, 20]"
-                        :use-css-transforms="true"
-                        @layout-updated="onLayoutUpdated"
-                    >
-                        <grid-item
-                            v-for="item in gridLayout"
-                            :key="item.i"
-                            :x="item.x"
-                            :y="item.y"
-                            :w="item.w"
-                            :h="item.h"
-                            :i="item.i"
-                        >
-                            <widget-component
-                                :widget="getWidget(item.i)"
-                                :system-stats="systemStats"
-                                @remove="removeWidget"
-                            />
-                        </grid-item>
-                    </grid-layout>
-
-                    <!-- Empty State -->
-                    <div v-if="!loading && widgets.length === 0" style="text-align: center; padding: 60px; color: #6c757d;">
-                        <i class="fas fa-th-large" style="font-size: 48px; margin-bottom: 16px; opacity: 0.3;"></i>
-                        <p style="font-size: 18px; margin-bottom: 24px;">No widgets added yet</p>
-                        <button @click="showAddWidget = true" class="btn btn-primary">
-                            <i class="fas fa-plus"></i> Add Your First Widget
-                        </button>
+                    <!-- Entities Tab -->
+                    <div :class="['tab-content', { active: activeTab === 'entities' }]">
+                        <div style="padding: 24px;">
+                            <h2>Entity Browser</h2>
+                            <p style="color: #6c757d; margin-top: 16px;">Browse and manage entities in the system.</p>
+                            <div id="entity-browser-container" style="margin-top: 24px;"></div>
+                        </div>
                     </div>
-                </div>
 
-                <!-- Entity Browser Tab -->
-                <entity-browser
-                    v-show="isAuthenticated && activeTab === 'entities'"
-                    :session-token="sessionToken"
-                    :current-dataset="currentDataset"
-                    :is-dark-mode="isDarkMode"
-                    @notification="showNotification"
-                    @error="handleError"
-                    @create-entity="showCreateEntity"
-                    @edit-entity="showEditEntity"
-                    @view-history="showEntityHistory"
-                    @view-relationships="showEntityRelationships"
-                />
+                    <!-- Performance Tab -->
+                    <div :class="['tab-content', { active: activeTab === 'performance' }]">
+                        <div style="padding: 24px;">
+                            <h2>Performance Monitoring</h2>
+                            <p style="color: #6c757d; margin-top: 16px;">Advanced performance metrics and analysis.</p>
+                        </div>
+                    </div>
 
-                <div v-show="isAuthenticated && activeTab === 'performance'" style="padding: 24px;">
-                    <h2>Performance Monitoring</h2>
-                    <p style="color: #6c757d; margin-top: 16px;">Advanced performance metrics and analysis.</p>
-                    <!-- Performance tab implementation here -->
-                </div>
+                    <!-- RBAC Tab -->
+                    <div :class="['tab-content', { active: activeTab === 'rbac' }]">
+                        <div style="padding: 24px;">
+                            <h2>RBAC Management</h2>
+                            <p style="color: #6c757d; margin-top: 16px;">Role-based access control and user management.</p>
+                        </div>
+                    </div>
 
-                <!-- RBAC Management Tab -->
-                <rbac-manager
-                    v-show="isAuthenticated && activeTab === 'rbac'"
-                    :session-token="sessionToken"
-                    :current-dataset="currentDataset"
-                    :is-dark-mode="isDarkMode"
-                    @notification="showNotification"
-                    @error="handleError"
-                />
+                    <!-- Integrity Tab -->
+                    <div :class="['tab-content', { active: activeTab === 'integrity' }]">
+                        <div style="padding: 24px;">
+                            <h2>Data Integrity</h2>
+                            <p style="color: #6c757d; margin-top: 16px;">Check and maintain data integrity.</p>
+                        </div>
+                    </div>
 
-                <div v-show="isAuthenticated && activeTab === 'integrity'" style="padding: 24px;">
-                    <h2>Data Integrity</h2>
-                    <p style="color: #6c757d; margin-top: 16px;">Check and maintain data integrity.</p>
-                    <!-- Integrity tab implementation here -->
-                </div>
-
-                <!-- Admin Tab with Dataset Management -->
-                <div v-show="isAuthenticated && activeTab === 'admin'" style="padding: 24px;">
-                    <dataset-manager
-                        :session-token="sessionToken"
-                        :current-dataset="currentDataset"
-                        :is-dark-mode="isDarkMode"
-                        @notification="showNotification"
-                        @error="handleError"
-                        @switch-dataset="switchDataset"
-                    />
-                </div>
+                    <!-- Admin Tab -->
+                    <div :class="['tab-content', { active: activeTab === 'admin' }]">
+                        <div style="padding: 24px;">
+                            <h2>Admin Panel</h2>
+                            <p style="color: #6c757d; margin-top: 16px;">System administration and dataset management.</p>
+                        </div>
+                    </div>
+                </template>
             </main>
         </div>
-
-        <!-- Add Widget Modal -->
-        <div v-if="showAddWidget" class="modal-backdrop" @click.self="showAddWidget = false">
-            <div class="modal">
-                <div class="modal-header">
-                    <h3 style="margin: 0;">Add Widget</h3>
-                    <button @click="showAddWidget = false" class="widget-action">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-                <div class="widget-catalog">
-                    <div 
-                        v-for="widgetType in availableWidgets" 
-                        :key="widgetType.type"
-                        @click="addWidget(widgetType)"
-                        class="widget-option"
-                    >
-                        <div class="widget-option-icon">
-                            <i :class="widgetType.icon"></i>
-                        </div>
-                        <div style="font-weight: 600; font-size: 12px;">{{ widgetType.name }}</div>
-                        <div style="font-size: 10px; color: #6c757d; margin-top: 4px;">
-                            {{ widgetType.description }}
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Debug Panel Modal -->
-        <div v-if="showDebugPanel" class="modal-backdrop" @click.self="showDebugPanel = false">
-            <div class="modal" style="max-width: 800px;">
-                <div class="modal-header">
-                    <h3 style="margin: 0;">Debug Panel</h3>
-                    <button @click="showDebugPanel = false" class="widget-action">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-                <div style="padding: 0 24px 24px;">
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
-                        <div>
-                            <h4>Debug Controls</h4>
-                            <button @click="toggleDebugMode" class="btn btn-secondary" style="margin-right: 10px;">
-                                {{ (api && api.debug) ? 'Disable' : 'Enable' }} Debug Mode
-                            </button>
-                            <button @click="exportLogs" class="btn btn-secondary">
-                                Export Logs
-                            </button>
-                        </div>
-                        <div>
-                            <h4>Performance</h4>
-                            <p><strong>Session ID:</strong> {{ logger ? logger.sessionId : 'N/A' }}</p>
-                            <p><strong>API Requests:</strong> {{ apiRequestCount || 0 }}</p>
-                            <p><strong>Last Error:</strong> {{ lastError ? lastError.message : 'None' }}</p>
-                        </div>
-                    </div>
-                    
-                    <div>
-                        <h4>Recent Errors</h4>
-                        <div style="max-height: 200px; overflow-y: auto; background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 12px;">
-                            <div v-for="error in recentErrors.slice(-10)" :key="error.timestamp">
-                                <strong>{{ new Date(error.timestamp).toLocaleTimeString() }}</strong> 
-                                [{{ error.component }}] {{ error.message }}
-                            </div>
-                            <div v-if="recentErrors.length === 0" style="color: #6c757d;">
-                                No recent errors
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Notifications -->
-        <transition name="notification">
-            <div 
-                v-if="notification"
-                :class="['notification', notification.type]"
-            >
-                {{ notification.message }}
-            </div>
-        </transition>
     </div>
 
     <script>
         const { createApp } = Vue;
-        
-        // Use our Simple Grid Layout
-        const GridLayout = window.SimpleGridLayout || {};
-        const GridItem = window.SimpleGridItem || {};
 
-        // Widget Component
-        const WidgetComponent = {
-            props: ['widget', 'systemStats'],
-            emits: ['remove'],
-            template: `
-                <div class="widget">
-                    <div class="widget-header">
-                        <h3 class="widget-title">{{ widget.config.title || widget.type }}</h3>
-                        <div class="widget-actions">
-                            <button @click="$emit('remove', widget.id)" class="widget-action" title="Remove">
-                                <i class="fas fa-times"></i>
-                            </button>
-                        </div>
-                    </div>
-                    <div class="widget-content">
-                        <component 
-                            :is="widgetComponents[widget.type] || 'div'" 
-                            :config="widget.config"
-                            :data="getWidgetData()"
-                            :widget-id="widget.id"
-                        />
-                    </div>
-                </div>
-            `,
-            mounted() {
-                // Initialize charts after component is mounted
-                if (this.widget.type === 'performance-chart' || 
-                    this.widget.type === 'request-rate' || 
-                    this.widget.type === 'error-rate' ||
-                    this.widget.type === 'storage-metrics') {
-                    this.$nextTick(() => {
-                        this.initChart();
-                    });
-                }
-                
-                // Initialize advanced widgets from EntityDBWidgets library
-                if (window.EntityDBWidgets && window.EntityDBWidgets.WidgetFactory) {
-                    const advancedTypes = ['query-performance', 'memory-analytics', 'session-metrics', 
-                                         'error-tracking', 'temporal-metrics', 'relationship-metrics',
-                                         'tag-index-metrics', 'activity-heatmap', 'realtime-metrics'];
-                    
-                    if (advancedTypes.includes(this.widget.type)) {
-                        this.$nextTick(() => {
-                            const container = this.$el.querySelector('.widget-content');
-                            if (container) {
-                                const widgetInstance = window.EntityDBWidgets.WidgetFactory.createWidget(
-                                    this.widget.type,
-                                    {
-                                        id: container,
-                                        title: this.widget.config.title,
-                                        refreshInterval: 30000,
-                                        isDarkMode: document.body.classList.contains('dark-mode')
-                                    }
-                                );
-                                widgetInstance.start();
-                                // Store instance for cleanup
-                                this.widgetInstance = widgetInstance;
-                            }
-                        });
-                    }
-                }
-            },
-            
-            beforeUnmount() {
-                // Cleanup advanced widgets
-                if (this.widgetInstance && this.widgetInstance.destroy) {
-                    this.widgetInstance.destroy();
-                }
-            },
-            methods: {
-                getWidgetData() {
-                    return this.systemStats;
-                },
-                initChart() {
-                    const chartEl = this.$el.querySelector('.chart-container');
-                    if (chartEl) {
-                        let options = {};
-                        
-                        if (this.widget.type === 'performance-chart') {
-                            options = {
-                                series: [{
-                                    name: 'CPU Usage',
-                                    data: [31, 40, 28, 51, 42, 109, 100]
-                                }, {
-                                    name: 'Memory Usage',
-                                    data: [11, 32, 45, 32, 34, 52, 41]
-                                }],
-                                chart: {
-                                    height: 250,
-                                    type: 'area',
-                                    toolbar: { show: false },
-                                    background: 'transparent'
-                                },
-                                dataLabels: { enabled: false },
-                                stroke: { curve: 'smooth' },
-                                xaxis: {
-                                    categories: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-                                },
-                                colors: ['#3498db', '#9b59b6']
-                            };
-                        } else if (this.widget.type === 'request-rate') {
-                            options = {
-                                series: [{
-                                    name: 'Requests/s',
-                                    data: [44, 55, 57, 56, 61, 58, 63, 60, 66]
-                                }],
-                                chart: {
-                                    type: 'line',
-                                    height: 250,
-                                    toolbar: { show: false }
-                                },
-                                stroke: { curve: 'smooth', width: 3 },
-                                colors: ['#27ae60']
-                            };
-                        } else if (this.widget.type === 'error-rate') {
-                            options = {
-                                series: [{
-                                    name: 'Errors',
-                                    data: [2, 3, 1, 4, 2, 1, 0, 1, 2]
-                                }],
-                                chart: {
-                                    type: 'bar',
-                                    height: 250,
-                                    toolbar: { show: false }
-                                },
-                                colors: ['#e74c3c']
-                            };
-                        }
-                        
-                        new ApexCharts(chartEl, options).render();
-                    }
-                }
-            },
-            computed: {
-                widgetComponents() {
-                    return {
-                        // Individual metric widgets
-                        'entity-count': {
-                            props: ['data'],
-                            template: `
-                                <div class="metric-card">
-                                    <div class="metric-value">{{ data.totalEntities || 0 }}</div>
-                                    <div class="metric-label">Total Entities</div>
-                                    <div class="metric-change positive">
-                                        <i class="fas fa-arrow-up"></i> 12%
-                                    </div>
-                                </div>
-                            `
-                        },
-                        'user-count': {
-                            props: ['data'],
-                            template: `
-                                <div class="metric-card">
-                                    <div class="metric-value">{{ data.activeUsers || 0 }}</div>
-                                    <div class="metric-label">Active Users</div>
-                                    <div class="metric-change positive">
-                                        <i class="fas fa-arrow-up"></i> 5%
-                                    </div>
-                                </div>
-                            `
-                        },
-                        'memory-usage': {
-                            props: ['data'],
-                            template: `
-                                <div class="metric-card">
-                                    <div class="metric-value">{{ data.memoryUsage || '0 MB' }}</div>
-                                    <div class="metric-label">Memory Usage</div>
-                                    <div class="metric-change negative">
-                                        <i class="fas fa-arrow-down"></i> 3%
-                                    </div>
-                                </div>
-                            `
-                        },
-                        'goroutines': {
-                            props: ['data'],
-                            template: `
-                                <div class="metric-card">
-                                    <div class="metric-value">{{ data.goroutines || 0 }}</div>
-                                    <div class="metric-label">Goroutines</div>
-                                    <div class="metric-change positive">
-                                        <i class="fas fa-arrow-up"></i> 2%
-                                    </div>
-                                </div>
-                            `
-                        },
-                        'health-score': {
-                            props: ['data'],
-                            template: `
-                                <div style="text-align: center;">
-                                    <div style="font-size: 48px; font-weight: 700; color: #10b981;">
-                                        {{ data.healthScore || 95 }}%
-                                    </div>
-                                    <div style="font-size: 18px; color: #6c757d; margin-top: 8px;">
-                                        Excellent
-                                    </div>
-                                    <div style="margin-top: 16px;">
-                                        <div style="height: 8px; background: #e9ecef; border-radius: 4px; overflow: hidden;">
-                                            <div :style="{ 
-                                                height: '100%', 
-                                                width: (data.healthScore || 95) + '%', 
-                                                background: '#10b981',
-                                                transition: 'width 0.3s'
-                                            }"></div>
-                                        </div>
-                                    </div>
-                                </div>
-                            `
-                        },
-                        'performance-chart': {
-                            props: ['data', 'widgetId'],
-                            template: `
-                                <div class="chart-container" :id="'chart-' + widgetId"></div>
-                            `
-                        },
-                        'request-rate': {
-                            props: ['data', 'widgetId'],
-                            template: `
-                                <div class="chart-container" :id="'chart-' + widgetId"></div>
-                            `
-                        },
-                        'error-rate': {
-                            props: ['data', 'widgetId'],
-                            template: `
-                                <div class="chart-container" :id="'chart-' + widgetId"></div>
-                            `
-                        },
-                        'storage-metrics': {
-                            props: ['data'],
-                            template: `
-                                <div>
-                                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
-                                        <div style="text-align: center;">
-                                            <div style="font-size: 24px; font-weight: 600; color: #3498db;">{{ Math.floor(Math.random() * 100) }}ms</div>
-                                            <div style="font-size: 12px; color: #6c757d;">Avg Read Time</div>
-                                        </div>
-                                        <div style="text-align: center;">
-                                            <div style="font-size: 24px; font-weight: 600; color: #9b59b6;">{{ Math.floor(Math.random() * 100) }}ms</div>
-                                            <div style="font-size: 12px; color: #6c757d;">Avg Write Time</div>
-                                        </div>
-                                    </div>
-                                    <div style="text-align: center; color: #6c757d; font-size: 12px;">
-                                        <i class="fas fa-database"></i> Database: entities.ebf
-                                    </div>
-                                </div>
-                            `
-                        },
-                        'auth-metrics': {
-                            props: ['data'],
-                            template: `
-                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
-                                    <div style="text-align: center;">
-                                        <div style="font-size: 32px; font-weight: 600; color: #27ae60;">{{ Math.floor(Math.random() * 50) }}</div>
-                                        <div style="font-size: 12px; color: #6c757d;">Successful Logins</div>
-                                    </div>
-                                    <div style="text-align: center;">
-                                        <div style="font-size: 32px; font-weight: 600; color: #e74c3c;">{{ Math.floor(Math.random() * 5) }}</div>
-                                        <div style="font-size: 12px; color: #6c757d;">Failed Logins</div>
-                                    </div>
-                                    <div style="text-align: center; grid-column: span 2; margin-top: 16px;">
-                                        <div style="font-size: 24px; font-weight: 600; color: #3498db;">{{ Math.floor(Math.random() * 20) }}</div>
-                                        <div style="font-size: 12px; color: #6c757d;">Active Sessions</div>
-                                    </div>
-                                </div>
-                            `
-                        }
-                    };
-                }
-            }
-        };
-
-        // Main Vue App
         createApp({
-            components: {
-                'widget-component': WidgetComponent,
-                'grid-layout': GridLayout,
-                'grid-item': GridItem,
-                'apexchart': window.VueApexCharts || {},
-                'entity-browser': window.EntityBrowser || {},
-                'rbac-manager': window.RBACManager || {},
-                'dataset-manager': window.DatasetManager || {},
-                // Loading components
-                ...LoadingStates.components
-            },
             data() {
                 return {
                     // Auth state
@@ -1260,200 +623,27 @@
                     // Dark mode
                     isDarkMode: false,
                     
-                    // Dashboard state
-                    widgets: [],
-                    gridLayout: [],
-                    showAddWidget: false,
-                    dashboardTimeRange: '1h',
-                    availableWidgets: [
-                        {
-                            type: 'entity-count',
-                            name: 'Entity Count',
-                            description: 'Total entities',
-                            icon: 'fas fa-database',
-                            defaultGrid: { w: 3, h: 4 }
-                        },
-                        {
-                            type: 'user-count',
-                            name: 'Active Users',
-                            description: 'Currently active',
-                            icon: 'fas fa-users',
-                            defaultGrid: { w: 3, h: 4 }
-                        },
-                        {
-                            type: 'memory-usage',
-                            name: 'Memory Usage',
-                            description: 'System memory',
-                            icon: 'fas fa-memory',
-                            defaultGrid: { w: 3, h: 4 }
-                        },
-                        {
-                            type: 'goroutines',
-                            name: 'Goroutines',
-                            description: 'Active goroutines',
-                            icon: 'fas fa-code-branch',
-                            defaultGrid: { w: 3, h: 4 }
-                        },
-                        {
-                            type: 'health-score',
-                            name: 'Health Score',
-                            description: 'System health',
-                            icon: 'fas fa-heartbeat',
-                            defaultGrid: { w: 3, h: 6 }
-                        },
-                        {
-                            type: 'performance-chart',
-                            name: 'Performance',
-                            description: 'CPU & Memory',
-                            icon: 'fas fa-chart-area',
-                            defaultGrid: { w: 6, h: 8 }
-                        },
-                        {
-                            type: 'request-rate',
-                            name: 'Request Rate',
-                            description: 'Requests/sec',
-                            icon: 'fas fa-exchange-alt',
-                            defaultGrid: { w: 6, h: 8 }
-                        },
-                        {
-                            type: 'error-rate',
-                            name: 'Error Rate',
-                            description: 'Error tracking',
-                            icon: 'fas fa-exclamation-triangle',
-                            defaultGrid: { w: 6, h: 8 }
-                        },
-                        {
-                            type: 'storage-metrics',
-                            name: 'Storage',
-                            description: 'DB performance',
-                            icon: 'fas fa-hdd',
-                            defaultGrid: { w: 6, h: 6 }
-                        },
-                        {
-                            type: 'auth-metrics',
-                            name: 'Authentication',
-                            description: 'Login metrics',
-                            icon: 'fas fa-key',
-                            defaultGrid: { w: 6, h: 6 }
-                        },
-                        // Add new widget types from our library
-                        {
-                            type: 'query-performance',
-                            name: 'Query Performance',
-                            description: 'Query latency trends',
-                            icon: 'fas fa-tachometer-alt',
-                            defaultGrid: { w: 6, h: 8 }
-                        },
-                        {
-                            type: 'storage-metrics',
-                            name: 'Storage Metrics',
-                            description: 'Read/write performance',
-                            icon: 'fas fa-hdd',
-                            defaultGrid: { w: 6, h: 8 }
-                        },
-                        {
-                            type: 'memory-analytics',
-                            name: 'Memory Analytics',
-                            description: 'Memory usage breakdown',
-                            icon: 'fas fa-memory',
-                            defaultGrid: { w: 6, h: 8 }
-                        },
-                        {
-                            type: 'session-metrics',
-                            name: 'Session Metrics',
-                            description: 'Active sessions & auth',
-                            icon: 'fas fa-user-clock',
-                            defaultGrid: { w: 4, h: 6 }
-                        },
-                        {
-                            type: 'error-tracking',
-                            name: 'Error Tracking',
-                            description: 'Error rates and types',
-                            icon: 'fas fa-exclamation-triangle',
-                            defaultGrid: { w: 8, h: 6 }
-                        },
-                        {
-                            type: 'temporal-metrics',
-                            name: 'Temporal Operations',
-                            description: 'Temporal query metrics',
-                            icon: 'fas fa-history',
-                            defaultGrid: { w: 6, h: 6 }
-                        },
-                        {
-                            type: 'relationship-metrics',
-                            name: 'Relationships',
-                            description: 'Entity relationships',
-                            icon: 'fas fa-project-diagram',
-                            defaultGrid: { w: 6, h: 6 }
-                        },
-                        {
-                            type: 'tag-index-metrics',
-                            name: 'Tag Index',
-                            description: 'Index performance',
-                            icon: 'fas fa-tags',
-                            defaultGrid: { w: 6, h: 6 }
-                        },
-                        {
-                            type: 'activity-heatmap',
-                            name: 'Activity Heatmap',
-                            description: 'System activity patterns',
-                            icon: 'fas fa-fire',
-                            defaultGrid: { w: 12, h: 8 }
-                        },
-                        {
-                            type: 'realtime-metrics',
-                            name: 'Real-time Stream',
-                            description: 'Live metric stream',
-                            icon: 'fas fa-stream',
-                            defaultGrid: { w: 6, h: 8 }
-                        }
-                    ],
-                    
                     // System data
                     systemStats: {},
                     
                     // UI state
-                    notification: null,
-                    layoutSaveTimeout: null,
+                    loading: false,
                     
                     // Infrastructure
                     logger: null,
-                    api: null,
-                    
-                    // Loading states
-                    loading: false,
-                    loadingMessage: '',
-                    
-                    // Debug panel
-                    showDebugPanel: false,
-                    apiRequestCount: 0,
-                    lastError: null
+                    api: null
                 };
             },
             
             created() {
                 // Initialize logger and API client
-                this.logger = new Logger('Dashboard');
-                this.api = new EntityDBClient();
+                this.logger = window.Logger ? new window.Logger('Dashboard') : console;
+                this.api = window.EntityDBClient ? new window.EntityDBClient() : null;
                 this.logger.info('EntityDB Dashboard created');
             },
             
             mounted() {
                 this.logger.info('EntityDB Dashboard mounted');
-                this.logger.debug('Components available:', {
-                    GridLayout: !!window.SimpleGridLayout,
-                    GridItem: !!window.SimpleGridItem,
-                    EntityBrowser: !!window.EntityBrowser,
-                    RBACManager: !!window.RBACManager,
-                    DatasetManager: !!window.DatasetManager,
-                    EntityDBWidgets: !!window.EntityDBWidgets,
-                    Logger: !!window.Logger,
-                    EntityDBClient: !!window.EntityDBClient,
-                    NotificationSystem: !!window.notificationSystem
-                });
-                
-                // First check server connectivity
-                this.checkServerConnection();
                 
                 // Check for saved auth
                 const token = localStorage.getItem('entitydb-admin-token');
@@ -1465,9 +655,6 @@
                         this.sessionToken = token;
                         this.currentUser = JSON.parse(user);
                         this.isAuthenticated = true;
-                        console.log('Restored session for user:', this.currentUser.username);
-                        console.log('Initial tab:', this.activeTab);
-                        this.loadDashboard();
                         this.loadSystemStats();
                     } catch (e) {
                         console.error('Failed to restore session:', e);
@@ -1488,57 +675,19 @@
                         this.loadSystemStats();
                     }
                 }, 30000);
-                
-                // Add keyboard shortcuts
-                document.addEventListener('keydown', this.handleKeyboardShortcuts);
-            },
-            
-            beforeUnmount() {
-                document.removeEventListener('keydown', this.handleKeyboardShortcuts);
             },
             
             methods: {
-                // Server connectivity check
-                async checkServerConnection() {
-                    try {
-                        console.log('Checking server connection...');
-                        console.log('Current URL:', window.location.href);
-                        console.log('Origin:', window.location.origin);
-                        
-                        // Try health endpoint first (no auth required)
-                        const healthResponse = await fetch('/health', {
-                            method: 'GET',
-                            mode: 'same-origin',
-                            credentials: 'same-origin',
-                            cache: 'no-cache'
-                        });
-                        
-                        console.log('Health check response:', healthResponse.status);
-                        
-                        if (!healthResponse.ok) {
-                            console.error('Server health check failed:', healthResponse.status);
-                            this.showNotification('Server health check failed', 'error');
-                        } else {
-                            console.log('Server is healthy');
-                        }
-                    } catch (error) {
-                        console.error('Server connection check failed:', error);
-                        console.error('This usually means:');
-                        console.error('1. EntityDB server is not running');
-                        console.error('2. SSL certificate issues (try accepting the certificate)');
-                        console.error('3. Wrong port (should be 8085 for HTTPS)');
-                        
-                        // Show user-friendly error
-                        this.showNotification('Cannot connect to EntityDB server. Please ensure it is running on port 8085.', 'error');
-                    }
-                },
-                
                 // Authentication
                 async login() {
                     this.loading = true;
-                    this.loadingMessage = 'Authenticating...';
                     this.logger.info('Attempting login', { username: this.loginForm.username });
+                    
                     try {
+                        if (!this.api) {
+                            throw new Error('API client not available');
+                        }
+                        
                         const data = await this.api.login(this.loginForm.username, this.loginForm.password);
                         
                         this.logger.info('Login successful', { user: data.user });
@@ -1556,18 +705,12 @@
                         
                         this.notify('Login successful!', 'success');
                         
-                        this.loadDashboard();
                         this.loadSystemStats();
                     } catch (error) {
                         this.logger.error('Login failed', error);
-                        if (error instanceof APIError) {
-                            this.notify(error.message, 'error');
-                        } else {
-                            this.notify('Login error: ' + error.message, 'error');
-                        }
+                        this.notify(error.message || 'Login failed', 'error');
                     } finally {
                         this.loading = false;
-                        this.loadingMessage = '';
                     }
                 },
                 
@@ -1576,7 +719,9 @@
                     this.isAuthenticated = false;
                     this.sessionToken = null;
                     this.currentUser = null;
-                    this.api.setToken(null);
+                    if (this.api) {
+                        this.api.setToken(null);
+                    }
                     localStorage.removeItem('entitydb-admin-token');
                     localStorage.removeItem('entitydb-admin-user');
                     this.notify('Logged out', 'info');
@@ -1587,67 +732,18 @@
                     console.log(`Switching from tab '${this.activeTab}' to '${tabId}'`);
                     this.activeTab = tabId;
                     
-                    // Force Vue to update
-                    this.$nextTick(() => {
-                        console.log('Tab switched, current tab:', this.activeTab);
-                        
-                        // Log what should be visible
-                        const visibleElements = {
-                            dashboard: this.isAuthenticated && this.activeTab === 'dashboard',
-                            entities: this.isAuthenticated && this.activeTab === 'entities',
-                            performance: this.isAuthenticated && this.activeTab === 'performance',
-                            rbac: this.isAuthenticated && this.activeTab === 'rbac',
-                            integrity: this.isAuthenticated && this.activeTab === 'integrity',
-                            admin: this.isAuthenticated && this.activeTab === 'admin'
-                        };
-                        console.log('Visible elements:', visibleElements);
-                    });
-                },
-                
-                // Keyboard shortcuts
-                handleKeyboardShortcuts(event) {
-                    if (!this.isAuthenticated) return;
-                    
-                    // Ctrl + 1-6 for tab switching
-                    if (event.ctrlKey && event.key >= '1' && event.key <= '6') {
-                        event.preventDefault();
-                        const tabIndex = parseInt(event.key) - 1;
-                        if (this.tabs[tabIndex]) {
-                            this.switchTab(this.tabs[tabIndex].id);
-                        }
+                    // Initialize entity browser when entities tab is accessed
+                    if (tabId === 'entities' && window.entityBrowser && !window.entityBrowserInitialized) {
+                        this.$nextTick(() => {
+                            const container = document.getElementById('entity-browser-container');
+                            if (container) {
+                                // Share the API client with entity browser
+                                window.apiClient = this.api;
+                                window.entityBrowser.mount(container);
+                                window.entityBrowserInitialized = true;
+                            }
+                        });
                     }
-                    
-                    // Ctrl + D for toggle dark mode
-                    if (event.ctrlKey && event.key === 'd') {
-                        event.preventDefault();
-                        this.toggleDarkMode();
-                    }
-                    
-                    // Ctrl + R for refresh current view
-                    if (event.ctrlKey && event.key === 'r') {
-                        event.preventDefault();
-                        this.refreshCurrentView();
-                    }
-                    
-                    // Escape to close modals
-                    if (event.key === 'Escape') {
-                        this.showAddWidget = false;
-                    }
-                },
-                
-                // Refresh current view
-                refreshCurrentView() {
-                    this.logger.info('Refreshing current view', { tab: this.activeTab });
-                    switch (this.activeTab) {
-                        case 'dashboard':
-                            this.loadDashboard();
-                            this.loadSystemStats();
-                            break;
-                        default:
-                            // For other tabs, we'll emit a refresh event
-                            this.$emit('refresh-tab', this.activeTab);
-                    }
-                    this.notify('View refreshed', 'info');
                 },
                 
                 // Dark mode
@@ -1660,207 +756,8 @@
                 
                 // Dataset
                 switchDataset() {
-                    this.showNotification(`Switched to ${this.currentDataset} dataset`, 'info');
-                    // Reload data for new dataset
-                    this.loadDashboard();
+                    this.notify(`Switched to ${this.currentDataset} dataset`, 'info');
                     this.loadSystemStats();
-                },
-                
-                // Dashboard methods
-                async loadDashboard() {
-                    try {
-                        this.logger.info('Loading dashboard', { 
-                            user: this.currentUser ? this.currentUser.username : 'No user'
-                        });
-                        
-                        const entities = await this.api.listEntities({ tags: 'type:dashboard_layout' });
-                        this.logger.debug('Loaded dashboard entities', { count: entities.length });
-                        
-                        const userLayout = entities.find(e => 
-                            e.tags && e.tags.some(t => t === `user:${this.currentUser.username}`)
-                        );
-                        
-                        if (userLayout && userLayout.content) {
-                            const content = this.isBase64(userLayout.content) 
-                                ? atob(userLayout.content) 
-                                : userLayout.content;
-                            const layout = JSON.parse(content);
-                            this.widgets = layout.widgets || [];
-                            this.gridLayout = layout.gridLayout || [];
-                            this.logger.info('Loaded dashboard layout', { widgets: this.widgets.length });
-                            
-                            // If we have widgets but no grid layout, generate it
-                            if (this.widgets.length > 0 && this.gridLayout.length === 0) {
-                                this.updateGridLayout();
-                            }
-                        } else {
-                            // No saved dashboard - that's OK, show empty state
-                            this.logger.debug('No saved dashboard found', { user: this.currentUser.username });
-                        }
-                    } catch (error) {
-                        this.logger.error('Error loading dashboard', error);
-                        
-                        if (error instanceof APIError && error.status === 401) {
-                            this.logger.warn('Authentication failed - token may be expired');
-                            this.logout();
-                            return;
-                        }
-                        
-                        // Check if it's a network error
-                        if (error.name === 'TypeError' && error.message.includes('NetworkError')) {
-                            this.logger.error('Network error - Server may not be running or SSL certificate issue');
-                            this.notify('Unable to connect to server. Redirecting to connection help...', 'error');
-                            
-                            // If we're having repeated connection issues, redirect to help page
-                            setTimeout(() => {
-                                if (!this.isAuthenticated) {
-                                    window.location.href = '/connection-help.html';
-                                }
-                            }, 2000);
-                        } else {
-                            this.notify('Failed to load dashboard', 'error');
-                        }
-                    }
-                },
-                
-                // Removed loadDefaultDashboard - we want to show real state, not mock data
-                
-                async saveDashboard() {
-                    const layout = {
-                        widgets: this.widgets,
-                        gridLayout: this.gridLayout,
-                        theme: this.isDarkMode ? 'dark' : 'light',
-                        lastModified: new Date().toISOString()
-                    };
-                    
-                    const entity = {
-                        id: `dashboard_layout_${this.currentUser.username}`,
-                        tags: [
-                            'type:dashboard_layout',
-                            `user:${this.currentUser.username}`,
-                            'version:1'
-                        ],
-                        content: JSON.stringify(layout)
-                    };
-                    
-                    try {
-                        let response = await fetch('/api/v1/entities/create', {
-                            method: 'POST',
-                            headers: {
-                                'Authorization': `Bearer ${this.sessionToken}`,
-                                'Content-Type': 'application/json'
-                            },
-                            body: JSON.stringify(entity)
-                        });
-                        
-                        if (response.status === 409) {
-                            // Entity exists, update it
-                            response = await fetch(`/api/v1/entities/update?id=${entity.id}`, {
-                                method: 'PUT',
-                                headers: {
-                                    'Authorization': `Bearer ${this.sessionToken}`,
-                                    'Content-Type': 'application/json'
-                                },
-                                body: JSON.stringify({
-                                    tags: entity.tags,
-                                    content: entity.content
-                                })
-                            });
-                        }
-                        
-                        if (response.ok) {
-                            this.showNotification('Dashboard saved!', 'success');
-                        } else {
-                            throw new Error('Failed to save');
-                        }
-                    } catch (error) {
-                        this.showNotification('Failed to save dashboard', 'error');
-                    }
-                },
-                
-                addWidget(widgetType) {
-                    const widget = {
-                        id: 'widget-' + Date.now(),
-                        type: widgetType.type,
-                        config: {
-                            title: widgetType.name
-                        }
-                    };
-                    
-                    this.widgets.push(widget);
-                    
-                    // Add to grid layout
-                    const newGridItem = {
-                        i: widget.id,
-                        x: (this.gridLayout.length * 3) % 12,
-                        y: this.gridLayout.length + 10,
-                        w: widgetType.defaultGrid.w,
-                        h: widgetType.defaultGrid.h
-                    };
-                    this.gridLayout.push(newGridItem);
-                    
-                    this.showAddWidget = false;
-                    this.showNotification(`Added ${widgetType.name}`, 'success');
-                    
-                    // Auto-save after adding
-                    setTimeout(() => this.saveDashboard(), 1000);
-                },
-                
-                removeWidget(widgetId) {
-                    this.widgets = this.widgets.filter(w => w.id !== widgetId);
-                    this.gridLayout = this.gridLayout.filter(item => item.i !== widgetId);
-                    this.showNotification('Widget removed', 'info');
-                    
-                    // Auto-save after removing
-                    setTimeout(() => this.saveDashboard(), 1000);
-                },
-                
-                getWidget(widgetId) {
-                    return this.widgets.find(w => w.id === widgetId);
-                },
-                
-                updateGridLayout() {
-                    // Ensure gridLayout is initialized
-                    if (!this.gridLayout) {
-                        this.gridLayout = [];
-                    }
-                    
-                    // Convert widgets to grid layout format
-                    this.gridLayout = this.widgets.map((widget, index) => {
-                        const widgetType = this.availableWidgets.find(w => w.type === widget.type);
-                        const defaultGrid = widgetType ? widgetType.defaultGrid : { w: 4, h: 4 };
-                        
-                        return {
-                            i: widget.id,
-                            x: (index * 3) % 12,
-                            y: Math.floor(index / 4) * 4,
-                            w: defaultGrid.w,
-                            h: defaultGrid.h
-                        };
-                    });
-                },
-                
-                onLayoutUpdated(newLayout) {
-                    if (newLayout) {
-                        this.gridLayout = newLayout;
-                    }
-                    // Auto-save layout changes
-                    if (this.layoutSaveTimeout) {
-                        clearTimeout(this.layoutSaveTimeout);
-                    }
-                    this.layoutSaveTimeout = setTimeout(() => {
-                        this.saveDashboard();
-                    }, 2000);
-                },
-                
-                resetDashboard() {
-                    if (confirm('Clear all widgets from dashboard?')) {
-                        this.widgets = [];
-                        this.gridLayout = [];
-                        this.showNotification('Dashboard cleared', 'info');
-                        // Save the empty state
-                        this.saveDashboard();
-                    }
                 },
                 
                 // System data
@@ -1894,84 +791,16 @@
                     }
                 },
                 
-                // Dashboard methods
-                updateDashboardTimeRange() {
-                    // Update all widgets with new time range
-                    this.$emit('time-range-changed', this.dashboardTimeRange);
-                    this.showNotification(`Time range updated to ${this.dashboardTimeRange}`, 'info');
-                    
-                    // Refresh widget data
-                    this.widgets.forEach(widget => {
-                        // Trigger widget refresh with new time range
-                        widget.timeRange = this.dashboardTimeRange;
-                    });
-                },
-                
-                // UI helpers
-                // Notification methods
-                showNotification(message, type = 'info', options = {}) {
-                    // Backwards compatibility
-                    return this.notify(message, type, options);
-                },
-                
-                notify(message, type = 'info', options = {}) {
-                    this.logger.debug('Showing notification', { message, type });
-                    return window.notificationSystem.show(message, type, options);
-                },
-                
-                handleError(error) {
-                    console.error('Error:', error);
-                    this.showNotification(error.message || 'An error occurred', 'error');
-                },
-                
-                // Entity browser handlers
-                showCreateEntity() {
-                    // Implement entity creation modal
-                    this.showNotification('Entity creation coming soon', 'info');
-                },
-                
-                showEditEntity(entity) {
-                    // Implement entity editing modal
-                    this.showNotification(`Editing ${entity.id}`, 'info');
-                },
-                
-                showEntityHistory(entity) {
-                    // Implement entity history view
-                    this.showNotification(`Viewing history for ${entity.id}`, 'info');
-                },
-                
-                showEntityRelationships(entity) {
-                    // Implement entity relationships view
-                    this.showNotification(`Viewing relationships for ${entity.id}`, 'info');
-                },
-                
-                // Debug methods
-                toggleDebugMode() {
-                    const newDebugMode = !(this.api && this.api.debug);
-                    if (this.api) {
-                        this.api.setDebug(newDebugMode);
+                // Notifications
+                notify(message, type = 'info') {
+                    if (window.notificationSystem) {
+                        window.notificationSystem.show(message, type);
+                    } else {
+                        console.log(`[${type.toUpperCase()}] ${message}`);
                     }
-                    if (this.logger) {
-                        this.logger.enabled = newDebugMode;
-                    }
-                    window.entitydbLogger.setDebugMode(newDebugMode);
-                    this.notify(`Debug mode ${newDebugMode ? 'enabled' : 'disabled'}`, 'info');
-                },
-                
-                exportLogs() {
-                    window.entitydbLogger.exportErrors();
-                    this.notify('Logs exported', 'success');
                 },
                 
                 // Utilities
-                isBase64(str) {
-                    try {
-                        return btoa(atob(str)) === str;
-                    } catch (err) {
-                        return false;
-                    }
-                },
-                
                 formatBytes(bytes) {
                     const units = ['B', 'KB', 'MB', 'GB'];
                     let i = 0;
@@ -1990,14 +819,11 @@
                     }
                     return uptime;
                 }
-            },
-            
-            computed: {
-                recentErrors() {
-                    return window.entitydbLogger.getStoredErrors();
-                }
             }
         }).mount('#app');
     </script>
+
+    <!-- Load entity browser if available -->
+    <script src="/js/entity-browser.js"></script>
 </body>
 </html>

@@ -425,5 +425,49 @@ body.dark-mode .skeleton-group {
 `;
 document.head.appendChild(loadingStyles);
 
+// Create Vue components object for easy integration
+LoadingStates.components = {
+    'loading-spinner': {
+        props: {
+            size: { type: String, default: 'medium' },
+            color: { type: String, default: 'primary' }
+        },
+        template: `
+            <div :class="['spinner', 'spinner-' + size]">
+                <div :class="['spinner-border', 'spinner-' + color]"></div>
+            </div>
+        `
+    },
+    'loading-overlay': {
+        props: {
+            message: { type: String, default: 'Loading...' },
+            fullscreen: { type: Boolean, default: false }
+        },
+        template: `
+            <div :class="['loading-overlay', { 'loading-overlay--fullscreen': fullscreen }]">
+                <div class="loading-overlay-content">
+                    <div class="spinner spinner-large">
+                        <div class="spinner-border spinner-primary"></div>
+                    </div>
+                    <div v-if="message" class="loading-message">{{ message }}</div>
+                </div>
+            </div>
+        `
+    },
+    'skeleton-loader': {
+        props: {
+            width: { type: String, default: '100%' },
+            height: { type: String, default: '20px' },
+            animated: { type: Boolean, default: true }
+        },
+        template: `
+            <div 
+                :class="['skeleton-loader', { 'skeleton-animated': animated }]"
+                :style="{ width, height }"
+            ></div>
+        `
+    }
+};
+
 // Export for use in other modules
 window.LoadingStates = LoadingStates;

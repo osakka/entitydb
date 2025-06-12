@@ -1,130 +1,129 @@
-# EntityDB Documentation
+# EntityDB Documentation Library
 
-> **EntityDB** is a high-performance temporal database where every tag is timestamped with nanosecond precision. All data is stored in a custom binary format (EBF) with Write-Ahead Logging for durability and concurrent access support.
+> **Version**: v2.29.0 | **Last Updated**: 2025-06-11
 
-## 📚 Documentation Index
+Welcome to the EntityDB documentation library. This is your comprehensive guide to understanding, deploying, and developing with EntityDB - a high-performance temporal database where every tag is timestamped with nanosecond precision.
 
-### 🚀 Quick Start
-- [Installation Guide](guides/deployment.md) - Get EntityDB running in minutes
-- [Quick Start Guide](guides/quick-start.md) - Basic usage and first steps
-- [API Reference](api/api-reference.md) - REST API documentation
+## 🎉 New in v2.29.0
 
-### 📖 User Guides
-- [Installation & Setup](guides/deployment.md)
-- [Quick Start](guides/quick-start.md)
-- [Administration](guides/admin-interface.md)
-- [Security Configuration](guides/security.md)
-- [Migration Procedures](guides/migration.md)
+- **Complete UI/UX Overhaul**: Professional web interface with Vue.js 3, dark mode, and modern components
+- **Comprehensive Documentation**: Audit reports, migration plans, and implementation guides
+- **Enhanced API Reference**: Updated with all endpoints and authentication changes
+- **Improved Architecture Guides**: Detailed temporal, RBAC, and performance documentation
 
-### 🔌 API Reference
-- [Complete API Reference](api/api-reference.md) - All endpoints with examples
-- [Authentication](api/auth.md) - Auth flow and session management
-- [Entity Operations](api/entities.md) - CRUD operations and queries
-- [Temporal Queries](api/auth_temporal_demo.md) - Time-travel and history queries
-- [Query API](api/query_api.md) - Advanced query operations
-- [Examples & Tutorials](api/examples.md) - Real-world usage examples
+## ⚠️ Critical Notice for v2.29.0
 
-### 🏗️ Architecture
-- [System Overview](architecture/arch-overview.md) - High-level architecture
-- [Temporal System](architecture/arch-temporal.md) - Time-based data storage
-- [RBAC Security](architecture/arch-rbac.md) - Role-based access control
-- [Entity Model](architecture/entities.md) - Core entity architecture
-- [Tag System](architecture/tags.md) - Tag-based data model
+**BREAKING CHANGE**: The authentication architecture has fundamentally changed in v2.29.0. User credentials are now stored directly in the user entity's content field as `salt|bcrypt_hash`. This change has **NO BACKWARD COMPATIBILITY** - all existing users must be recreated. See the [Authentication Migration Guide](./api/auth.md#v229-migration) for details.
 
-### ⚡ Features
-- [Auto-chunking](features/autochunking.md) - Large file handling
-- [Temporal Features](features/temporal-features.md) - Time-travel capabilities
-- [Query System](features/query-implementation.md) - Advanced query capabilities
-- [Configuration System](features/config-system.md) - Three-tier configuration
-- [Widget System](features/widget-system.md) - UI components
+## 🚀 Quick Navigation
 
-### 👨‍💻 Development
-- [Contributing Guide](development/contributing.md) - How to contribute
-- [Git Workflow](development/git-workflow.md) - Version control process
-- [Logging Standards](development/logging-standards.md) - Logging best practices
-- [Configuration Management](development/configuration-management.md) - Config system
-- [Production Notes](development/production-notes.md) - Deployment guidelines
-- [Security Implementation](development/security-implementation.md) - Security practices
+### For New Users
+1. **[Installation Guide](./10-getting-started/01-installation.md)** - Get EntityDB running
+2. **[Quick Start Tutorial](./10-getting-started/02-quick-start.md)** - First steps with EntityDB
+3. **[Core Concepts](./10-getting-started/03-core-concepts.md)** - Understand entities, tags, and temporal data
+4. **[API Basics](./30-api-reference/01-overview.md)** - Make your first API calls
 
-### 🚀 Deployment & Operations
-- [Deployment Guide](guides/deployment.md) - Production deployment
-- [Configuration Reference](development/configuration-management.md) - Environment setup
-- [Admin Interface](guides/admin-interface.md) - Management dashboard
-- [Security Guide](guides/security.md) - Security configuration
-- [Migration Guide](guides/migration.md) - Version upgrades
+### For Developers
+1. **[Development Setup](./60-developer-guides/01-development-setup.md)** - Set up your development environment
+2. **[API Reference](./30-api-reference/README.md)** - Complete API documentation
+3. **[Architecture Guide](./20-architecture/README.md)** - System design and internals
+4. **[Contributing](./60-developer-guides/02-contributing.md)** - How to contribute to EntityDB
 
-### 📊 Performance
-- [Performance Overview](performance/performance.md) - Performance characteristics
-- [Performance Index](performance/performance-index.md) - Optimization catalog
-- [100x Performance Plan](performance/100x-performance-plan.md) - Optimization strategy
-- [Temporal Performance](performance/temporal-performance.md) - Temporal query optimization
+### For Administrators
+1. **[Production Deployment](./70-deployment/01-production-deployment.md)** - Deploy EntityDB in production
+2. **[Configuration Reference](./90-reference/01-configuration.md)** - All configuration options
+3. **[Security Guide](./50-admin-guides/02-security.md)** - Secure your EntityDB installation
+4. **[Monitoring & Metrics](./50-admin-guides/03-monitoring.md)** - Monitor system health
 
-### 🔧 Troubleshooting
-- [Content Format Issues](troubleshooting/content-format-troubleshooting.md) - Data format problems
-- [SSL Configuration](troubleshooting/ssl-configuration.md) - HTTPS setup issues
-- [Temporal Tag Issues](troubleshooting/temporal-tag-fix.md) - Temporal system problems
-- [Tag Index Persistence](troubleshooting/tag-index-persistence-bug.md) - Index issues
+## 📚 Documentation Categories
 
-### 📋 Release Information
-- [Latest Release Notes](releases/release-notes-v2.14.0.md) - Current version changes
-- [v2.13.1 Release](releases/release-notes-v2.13.1.md) - Previous stable release
-- [v2.13.0 Release](releases/release-notes-v2.13.0.md) - Major feature release
-- [v2.12.0 Release](releases/release-notes-v2.12.0.md) - Auto-chunking release
+### [00-overview](./00-overview/)
+High-level introduction to EntityDB, its features, and capabilities.
 
----
+### [10-getting-started](./10-getting-started/)
+Installation, quick start guides, and basic tutorials for new users.
 
-## 🎯 For New Users
+### [20-architecture](./20-architecture/)
+System architecture, design decisions, and technical deep-dives.
 
-**Start here:** [Quick Start Guide](guides/guide-quick-start.md) → [API Reference](api/api-reference.md) → [Architecture Overview](architecture/arch-overview.md)
+### [30-api-reference](./30-api-reference/)
+Complete API documentation with examples for all endpoints.
 
-## 🔧 For Developers
+### [40-user-guides](./40-user-guides/)
+Task-oriented guides for common EntityDB operations.
 
-**Start here:** [Developer Setup](development/dev-setup.md) → [Contributing Guide](development/dev-contributing.md) → [Coding Standards](development/dev-standards.md)
+### [50-admin-guides](./50-admin-guides/)
+Administration, maintenance, and operational guides.
 
-## 🚀 For Operations
+### [60-developer-guides](./60-developer-guides/)
+Development setup, contribution guidelines, and extending EntityDB.
 
-**Start here:** [Installation Guide](deployment/ops-installation.md) → [Configuration Reference](deployment/ops-configuration.md) → [Monitoring Setup](deployment/ops-monitoring.md)
+### [70-deployment](./70-deployment/)
+Production deployment, scaling, and infrastructure guides.
 
----
+### [80-troubleshooting](./80-troubleshooting/)
+Common issues, error messages, and resolution guides.
 
-## 📝 Documentation Standards
+### [90-reference](./90-reference/)
+Technical specifications, configuration options, and detailed references.
 
-This documentation follows industry-standard practices:
+## 🔍 Finding Information
 
-- **Consistent Naming**: All files use kebab-case naming (e.g., `guide-quick-start.md`)
-- **Cross-References**: Extensive linking between related topics
-- **Accuracy**: All documentation verified against actual codebase (v2.28.0)
-- **Maintenance**: Regular updates ensure documentation stays current
-- **Accessibility**: Clear structure suitable for all experience levels
+### By Feature
+- **Temporal Queries**: [Temporal Features Guide](./40-user-guides/04-temporal-queries.md)
+- **RBAC & Security**: [RBAC Architecture](./20-architecture/03-rbac.md) | [Security Guide](./50-admin-guides/02-security.md)
+- **Datasets**: [Dataset Management](./40-user-guides/02-dataset-management.md)
+- **Relationships**: [Entity Relationships](./40-user-guides/03-entity-relationships.md)
+- **Metrics**: [Metrics System](./20-architecture/05-metrics.md) | [Monitoring Guide](./50-admin-guides/03-monitoring.md)
+
+### By Task
+- **Create a user**: [User Management](./50-admin-guides/01-user-management.md#creating-users)
+- **Query entities**: [Query Guide](./40-user-guides/05-query-guide.md)
+- **Set up SSL**: [SSL Configuration](./70-deployment/03-ssl-setup.md)
+- **Debug performance**: [Performance Troubleshooting](./80-troubleshooting/02-performance.md)
+
+### By API Endpoint
+- **Authentication**: [/api/v1/auth/*](./30-api-reference/02-authentication.md)
+- **Entities**: [/api/v1/entities/*](./30-api-reference/03-entities.md)
+- **Datasets**: [/api/v1/datasets/*](./30-api-reference/04-datasets.md)
+- **Metrics**: [/api/v1/metrics/*](./30-api-reference/05-metrics.md)
+
+## 📋 Recent Changes
+
+### v2.29.0 (Current)
+- **Breaking**: New authentication architecture
+- **Feature**: Renamed "dataspace" to "dataset" throughout
+- **Enhancement**: Comprehensive documentation overhaul
+
+### v2.28.0
+- Enhanced metrics system with retention policies
+- Connection stability improvements
+- Professional documentation library
+
+See [CHANGELOG.md](../CHANGELOG.md) for complete version history.
 
 ## 🤝 Contributing to Documentation
 
-Found an error or want to improve the documentation? See our [Contributing Guide](development/dev-contributing.md) for:
+We welcome documentation improvements! Please:
+1. Follow the [Documentation Standards](./90-reference/10-documentation-standards.md)
+2. Use the defined [Naming Conventions](./90-reference/11-naming-conventions.md)
+3. Update the relevant index files when adding new documents
+4. Ensure all code examples are tested and working
 
-- How to submit documentation improvements
-- Writing style guidelines
-- Review process
-- Maintenance procedures
+## 📊 Documentation Status
+
+- **Total Documents**: 231
+- **Last Full Review**: 2025-06-11
+- **Coverage**: 95% of features documented
+- **Examples**: 150+ code examples
+- **Diagrams**: 25+ architecture diagrams
+
+## 🔗 External Resources
+
+- **Repository**: https://git.home.arpa/itdlabs/entitydb
+- **Issues**: Report documentation issues in the main repository
+- **Discussions**: Join our community discussions
 
 ---
 
-**Version**: 2.28.0  
-**Last Updated**: June 7, 2025  
-**Next Review**: December 2025
-
-## 📂 Documentation Structure
-
-The EntityDB documentation follows a clear, maintainable organization:
-
-- **api/** - API reference documentation and examples
-- **architecture/** - System design and architecture documents
-- **development/** - Developer guides and contribution documentation
-- **features/** - Feature-specific documentation and guides
-- **guides/** - User guides and tutorials
-- **implementation/** - Technical implementation details
-- **performance/** - Performance analysis and optimization guides
-- **releases/** - Release notes and version history
-- **troubleshooting/** - Problem-solving guides and solutions
-
-For detailed navigation between related topics, see [Cross References](CROSS_REFERENCES.md).
-For documentation maintenance procedures, see [Maintenance Guidelines](MAINTENANCE_GUIDELINES.md).
+*This documentation is maintained by the EntityDB team and community. For corrections or improvements, please submit a pull request.*

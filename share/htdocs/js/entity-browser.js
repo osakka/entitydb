@@ -1,767 +1,384 @@
-// EntityDB Entity Browser Component
-// A comprehensive entity browsing and management interface
+/**
+ * EntityDB Enhanced Entity Browser Component
+ * Simplified version for compatibility
+ */
 
-const EntityBrowser = {
-    name: 'EntityBrowser',
-    template: `
-        <div class="entity-browser">
-            <!-- Browser Header -->
-            <div class="browser-header">
-                <div class="browser-title">
-                    <h2>Entity Browser</h2>
-                    <span class="browser-subtitle">
-                        {{ filteredEntities.length }} of {{ totalEntities }} entities 
-                        <span v-if="currentDataset">in {{ currentDataset }}</span>
-                    </span>
-                </div>
-                
-                <div class="browser-actions">
-                    <button @click="createEntity" class="btn btn-primary">
-                        <i class="fas fa-plus"></i> Create Entity
-                    </button>
-                    <button @click="refreshEntities" class="btn btn-secondary">
-                        <i class="fas fa-sync" :class="{ 'fa-spin': loading }"></i> Refresh
-                    </button>
-                </div>
-            </div>
+class EntityBrowser {
+    constructor() {
+        this.currentDataset = localStorage.getItem('entitydb.dataset') || 'default';
+        this.entities = [];
+        this.selectedEntities = new Set();
+        this.loading = false;
+        this.container = null;
+    }
 
-            <!-- Search and Filters -->
-            <div class="browser-controls">
-                <div class="search-bar">
-                    <i class="fas fa-search search-icon"></i>
-                    <input 
-                        v-model="searchQuery" 
-                        @input="debounceSearch"
-                        type="text" 
-                        class="search-input" 
-                        placeholder="Search entities by ID, tags, or content..."
-                    >
-                    <button v-if="searchQuery" @click="clearSearch" class="clear-search">
-                        <i class="fas fa-times"></i>
+    async mount(container) {
+        this.container = container;
+        this.render();
+        await this.loadEntities();
+    }
+
+    render() {
+        if (!this.container) return;
+        
+        this.container.innerHTML = `
+            <div class="entity-browser">
+                <div class="toolbar">
+                    <button class="btn btn-primary" onclick="entityBrowser.showCreateDialog()">
+                        <i class="fas fa-plus"></i> New Entity
+                    </button>
+                    <button class="btn btn-secondary" onclick="entityBrowser.refresh()">
+                        <i class="fas fa-sync"></i> Refresh
                     </button>
                 </div>
 
-                <div class="filter-controls">
-                    <div class="filter-group">
-                        <label>Type:</label>
-                        <select v-model="filters.type" @change="applyFilters" class="filter-select">
-                            <option value="">All Types</option>
-                            <option value="user">Users</option>
-                            <option value="entity">Entities</option>
-                            <option value="config">Config</option>
-                            <option value="dashboard_layout">Dashboards</option>
-                            <option value="metric">Metrics</option>
-                        </select>
-                    </div>
-
-                    <div class="filter-group">
-                        <label>Time Range:</label>
-                        <select v-model="filters.timeRange" @change="applyFilters" class="filter-select">
-                            <option value="">All Time</option>
-                            <option value="1h">Last Hour</option>
-                            <option value="24h">Last 24 Hours</option>
-                            <option value="7d">Last 7 Days</option>
-                            <option value="30d">Last 30 Days</option>
-                        </select>
-                    </div>
-
-                    <div class="filter-group">
-                        <label>Tags:</label>
-                        <div class="tag-filter-input">
-                            <input 
-                                v-model="tagInput"
-                                @keyup.enter="addTagFilter"
-                                type="text" 
-                                placeholder="Add tag filter..."
-                                class="filter-input"
-                            >
-                            <button @click="addTagFilter" class="btn-small">
-                                <i class="fas fa-plus"></i>
-                            </button>
-                        </div>
-                    </div>
-
-                    <div v-if="filters.tags.length > 0" class="active-filters">
-                        <span v-for="tag in filters.tags" :key="tag" class="tag-chip">
-                            {{ tag }}
-                            <button @click="removeTagFilter(tag)" class="tag-remove">
-                                <i class="fas fa-times"></i>
-                            </button>
-                        </span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- View Mode Toggle -->
-            <div class="view-controls">
-                <div class="view-mode-toggle">
-                    <button 
-                        @click="viewMode = 'grid'" 
-                        :class="['view-btn', { active: viewMode === 'grid' }]"
-                        title="Grid View"
-                    >
-                        <i class="fas fa-th"></i>
-                    </button>
-                    <button 
-                        @click="viewMode = 'list'" 
-                        :class="['view-btn', { active: viewMode === 'list' }]"
-                        title="List View"
-                    >
-                        <i class="fas fa-list"></i>
-                    </button>
-                    <button 
-                        @click="viewMode = 'timeline'" 
-                        :class="['view-btn', { active: viewMode === 'timeline' }]"
-                        title="Timeline View"
-                    >
-                        <i class="fas fa-stream"></i>
-                    </button>
-                </div>
-
-                <div class="sort-controls">
-                    <label>Sort by:</label>
-                    <select v-model="sortBy" @change="sortEntities" class="sort-select">
-                        <option value="created">Created Date</option>
-                        <option value="modified">Modified Date</option>
-                        <option value="id">Entity ID</option>
-                        <option value="type">Type</option>
-                        <option value="size">Size</option>
-                    </select>
-                    <button @click="toggleSortOrder" class="sort-order-btn">
-                        <i :class="sortOrder === 'asc' ? 'fas fa-arrow-up' : 'fas fa-arrow-down'"></i>
-                    </button>
-                </div>
-            </div>
-
-            <!-- Entity Grid View -->
-            <div v-if="viewMode === 'grid'" class="entity-grid">
-                <div 
-                    v-for="entity in paginatedEntities" 
-                    :key="entity.id"
-                    @click="selectEntity(entity)"
-                    :class="['entity-card', { selected: selectedEntity?.id === entity.id }]"
-                >
-                    <div class="entity-card-header">
-                        <i :class="getEntityIcon(entity)" class="entity-icon"></i>
-                        <div class="entity-type">{{ getEntityType(entity) }}</div>
-                        <div class="entity-actions">
-                            <button @click.stop="viewEntityHistory(entity)" class="action-btn" title="View History">
-                                <i class="fas fa-history"></i>
-                            </button>
-                            <button @click.stop="editEntity(entity)" class="action-btn" title="Edit">
-                                <i class="fas fa-edit"></i>
-                            </button>
-                            <button @click.stop="deleteEntity(entity)" class="action-btn danger" title="Delete">
-                                <i class="fas fa-trash"></i>
-                            </button>
-                        </div>
-                    </div>
-                    
-                    <div class="entity-card-body">
-                        <div class="entity-id">{{ truncateId(entity.id) }}</div>
-                        <div class="entity-timestamp">
-                            <i class="fas fa-clock"></i> {{ formatTimestamp(entity.created) }}
-                        </div>
-                        
-                        <div class="entity-tags">
-                            <span v-for="tag in getDisplayTags(entity)" :key="tag" class="entity-tag">
-                                {{ tag }}
-                            </span>
-                            <span v-if="entity.tags.length > 3" class="more-tags">
-                                +{{ entity.tags.length - 3 }} more
-                            </span>
-                        </div>
-                        
-                        <div v-if="entity.content" class="entity-preview">
-                            {{ getContentPreview(entity) }}
+                <div class="entity-list" id="entity-list">
+                    <div class="loading-placeholder" style="display: flex; align-items: center; justify-content: center; height: 200px; color: #6c757d;">
+                        <div>
+                            <i class="fas fa-database" style="font-size: 48px; margin-bottom: 16px; opacity: 0.3;"></i>
+                            <p>Loading entities...</p>
                         </div>
                     </div>
                 </div>
             </div>
+        `;
+    }
 
-            <!-- Entity List View -->
-            <div v-if="viewMode === 'list'" class="entity-list">
-                <table class="entity-table">
-                    <thead>
-                        <tr>
-                            <th @click="setSortBy('id')" class="sortable">
-                                ID <i v-if="sortBy === 'id'" :class="sortOrder === 'asc' ? 'fas fa-arrow-up' : 'fas fa-arrow-down'"></i>
-                            </th>
-                            <th @click="setSortBy('type')" class="sortable">
-                                Type <i v-if="sortBy === 'type'" :class="sortOrder === 'asc' ? 'fas fa-arrow-up' : 'fas fa-arrow-down'"></i>
-                            </th>
-                            <th>Tags</th>
-                            <th @click="setSortBy('size')" class="sortable">
-                                Size <i v-if="sortBy === 'size'" :class="sortOrder === 'asc' ? 'fas fa-arrow-up' : 'fas fa-arrow-down'"></i>
-                            </th>
-                            <th @click="setSortBy('created')" class="sortable">
-                                Created <i v-if="sortBy === 'created'" :class="sortOrder === 'asc' ? 'fas fa-arrow-up' : 'fas fa-arrow-down'"></i>
-                            </th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr 
-                            v-for="entity in paginatedEntities" 
-                            :key="entity.id"
-                            @click="selectEntity(entity)"
-                            :class="{ selected: selectedEntity?.id === entity.id }"
-                        >
-                            <td class="entity-id-cell">
-                                <i :class="getEntityIcon(entity)"></i>
-                                {{ truncateId(entity.id) }}
-                            </td>
-                            <td>{{ getEntityType(entity) }}</td>
-                            <td>
-                                <div class="tag-list">
-                                    <span v-for="tag in entity.tags.slice(0, 3)" :key="tag" class="mini-tag">
-                                        {{ tag }}
-                                    </span>
-                                    <span v-if="entity.tags.length > 3" class="more-count">
-                                        +{{ entity.tags.length - 3 }}
-                                    </span>
-                                </div>
-                            </td>
-                            <td>{{ formatSize(entity.size || 0) }}</td>
-                            <td>{{ formatTimestamp(entity.created) }}</td>
-                            <td class="action-cell">
-                                <button @click.stop="viewEntityHistory(entity)" class="action-btn" title="History">
-                                    <i class="fas fa-history"></i>
-                                </button>
-                                <button @click.stop="editEntity(entity)" class="action-btn" title="Edit">
+    async loadEntities() {
+        // Try to get API client - it might be set by the main app
+        const apiClient = window.apiClient || (window.EntityDBClient ? new window.EntityDBClient() : null);
+        
+        if (!apiClient) {
+            this.showError('API client not available');
+            return;
+        }
+
+        this.loading = true;
+        
+        try {
+            // Get the token from localStorage
+            const token = localStorage.getItem('entitydb-admin-token');
+            if (token && apiClient.setToken) {
+                apiClient.setToken(token);
+            }
+            
+            const response = await apiClient.get('/entities/list', {
+                dataset: this.currentDataset,
+                limit: 100
+            });
+            
+            this.entities = response.data || response || [];
+            this.renderEntities();
+        } catch (error) {
+            console.error('Failed to load entities:', error);
+            this.showError('Failed to load entities');
+        } finally {
+            this.loading = false;
+        }
+    }
+
+    renderEntities() {
+        const listContainer = document.getElementById('entity-list');
+        if (!listContainer) return;
+
+        if (this.entities.length === 0) {
+            listContainer.innerHTML = `
+                <div style="text-align: center; padding: 60px; color: #6c757d;">
+                    <i class="fas fa-inbox" style="font-size: 48px; margin-bottom: 16px; opacity: 0.3;"></i>
+                    <p style="font-size: 18px; margin-bottom: 24px;">No entities found</p>
+                    <button class="btn btn-primary" onclick="entityBrowser.showCreateDialog()">
+                        <i class="fas fa-plus"></i> Create First Entity
+                    </button>
+                </div>
+            `;
+            return;
+        }
+
+        listContainer.innerHTML = `
+            <div class="entity-grid">
+                ${this.entities.map(entity => `
+                    <div class="entity-card" data-id="${entity.id}">
+                        <div class="entity-header">
+                            <h4>${this.getEntityTitle(entity)}</h4>
+                            <div class="entity-actions">
+                                <button class="btn btn-sm btn-secondary" onclick="entityBrowser.editEntity('${entity.id}')">
                                     <i class="fas fa-edit"></i>
                                 </button>
-                                <button @click.stop="deleteEntity(entity)" class="action-btn danger" title="Delete">
+                                <button class="btn btn-sm btn-danger" onclick="entityBrowser.deleteEntity('${entity.id}')">
                                     <i class="fas fa-trash"></i>
                                 </button>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-
-            <!-- Entity Timeline View -->
-            <div v-if="viewMode === 'timeline'" class="entity-timeline">
-                <div v-for="(group, date) in timelineGroups" :key="date" class="timeline-group">
-                    <div class="timeline-date">{{ formatDate(date) }}</div>
-                    <div class="timeline-entities">
-                        <div 
-                            v-for="entity in group" 
-                            :key="entity.id"
-                            @click="selectEntity(entity)"
-                            :class="['timeline-entity', { selected: selectedEntity?.id === entity.id }]"
-                        >
-                            <div class="timeline-time">{{ formatTime(entity.created) }}</div>
-                            <div class="timeline-content">
-                                <i :class="getEntityIcon(entity)"></i>
-                                <span class="timeline-type">{{ getEntityType(entity) }}</span>
-                                <span class="timeline-id">{{ truncateId(entity.id) }}</span>
-                                <div class="timeline-tags">
-                                    <span v-for="tag in entity.tags.slice(0, 2)" :key="tag" class="mini-tag">
-                                        {{ tag }}
-                                    </span>
-                                </div>
                             </div>
+                        </div>
+                        <div class="entity-meta">
+                            <small class="text-muted">ID: ${entity.id}</small><br>
+                            <small class="text-muted">Updated: ${this.formatDate(entity.updated_at)}</small>
+                        </div>
+                        <div class="entity-tags">
+                            ${entity.tags ? entity.tags.map(tag => `
+                                <span class="badge badge-secondary">${this.escapeHtml(tag)}</span>
+                            `).join('') : ''}
                         </div>
                     </div>
-                </div>
+                `).join('')}
             </div>
+        `;
+    }
 
-            <!-- Pagination -->
-            <div v-if="totalPages > 1" class="pagination">
-                <button 
-                    @click="currentPage = 1" 
-                    :disabled="currentPage === 1"
-                    class="page-btn"
-                >
-                    <i class="fas fa-angle-double-left"></i>
-                </button>
-                <button 
-                    @click="currentPage--" 
-                    :disabled="currentPage === 1"
-                    class="page-btn"
-                >
-                    <i class="fas fa-angle-left"></i>
-                </button>
-                
-                <span class="page-info">
-                    Page {{ currentPage }} of {{ totalPages }}
-                </span>
-                
-                <button 
-                    @click="currentPage++" 
-                    :disabled="currentPage === totalPages"
-                    class="page-btn"
-                >
-                    <i class="fas fa-angle-right"></i>
-                </button>
-                <button 
-                    @click="currentPage = totalPages" 
-                    :disabled="currentPage === totalPages"
-                    class="page-btn"
-                >
-                    <i class="fas fa-angle-double-right"></i>
-                </button>
+    showError(message) {
+        const listContainer = document.getElementById('entity-list');
+        if (!listContainer) return;
 
-                <select v-model.number="pageSize" @change="currentPage = 1" class="page-size-select">
-                    <option value="10">10 per page</option>
-                    <option value="25">25 per page</option>
-                    <option value="50">50 per page</option>
-                    <option value="100">100 per page</option>
-                </select>
+        listContainer.innerHTML = `
+            <div style="text-align: center; padding: 60px; color: #dc3545;">
+                <i class="fas fa-exclamation-triangle" style="font-size: 48px; margin-bottom: 16px;"></i>
+                <p style="font-size: 18px;">${message}</p>
+                <button class="btn btn-secondary" onclick="entityBrowser.refresh()">
+                    <i class="fas fa-sync"></i> Try Again
+                </button>
             </div>
+        `;
+    }
 
-            <!-- Entity Detail Panel -->
-            <transition name="slide">
-                <div v-if="selectedEntity" class="entity-detail-panel">
-                    <div class="detail-header">
-                        <h3>Entity Details</h3>
-                        <button @click="selectedEntity = null" class="close-btn">
-                            <i class="fas fa-times"></i>
-                        </button>
-                    </div>
-
-                    <div class="detail-content">
-                        <div class="detail-section">
-                            <h4>Basic Information</h4>
-                            <div class="detail-field">
-                                <label>Entity ID:</label>
-                                <code>{{ selectedEntity.id }}</code>
-                                <button @click="copyToClipboard(selectedEntity.id)" class="copy-btn">
-                                    <i class="fas fa-copy"></i>
-                                </button>
-                            </div>
-                            <div class="detail-field">
-                                <label>Type:</label>
-                                <span>{{ getEntityType(selectedEntity) }}</span>
-                            </div>
-                            <div class="detail-field">
-                                <label>Created:</label>
-                                <span>{{ formatFullTimestamp(selectedEntity.created) }}</span>
-                            </div>
-                            <div class="detail-field">
-                                <label>Size:</label>
-                                <span>{{ formatSize(selectedEntity.size || 0) }}</span>
-                            </div>
-                        </div>
-
-                        <div class="detail-section">
-                            <h4>Tags ({{ selectedEntity.tags.length }})</h4>
-                            <div class="tag-cloud">
-                                <span v-for="tag in selectedEntity.tags" :key="tag" class="detail-tag">
-                                    {{ tag }}
-                                </span>
-                            </div>
-                        </div>
-
-                        <div v-if="selectedEntity.content" class="detail-section">
-                            <h4>Content</h4>
-                            <div class="content-viewer">
-                                <pre v-if="isJSON(selectedEntity.content)">{{ formatJSON(selectedEntity.content) }}</pre>
-                                <div v-else class="content-text">{{ selectedEntity.content }}</div>
-                            </div>
-                        </div>
-
-                        <div class="detail-actions">
-                            <button @click="viewEntityHistory(selectedEntity)" class="btn btn-secondary">
-                                <i class="fas fa-history"></i> View History
-                            </button>
-                            <button @click="viewEntityRelationships(selectedEntity)" class="btn btn-secondary">
-                                <i class="fas fa-project-diagram"></i> Relationships
-                            </button>
-                            <button @click="editEntity(selectedEntity)" class="btn btn-primary">
-                                <i class="fas fa-edit"></i> Edit Entity
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </transition>
-        </div>
-    `,
-    
-    props: ['sessionToken', 'currentDataset', 'isDarkMode'],
-    
-    data() {
-        return {
-            entities: [],
-            filteredEntities: [],
-            totalEntities: 0,
-            selectedEntity: null,
-            loading: false,
-            error: null,
-            
-            // Search and filters
-            searchQuery: '',
-            searchTimeout: null,
-            filters: {
-                type: '',
-                timeRange: '',
-                tags: []
-            },
-            tagInput: '',
-            
-            // View controls
-            viewMode: 'grid', // grid, list, timeline
-            sortBy: 'created',
-            sortOrder: 'desc',
-            
-            // Pagination
-            currentPage: 1,
-            pageSize: 25,
-            
-            // Cache
-            entityCache: new Map(),
-            lastRefresh: null
-        };
-    },
-    
-    computed: {
-        paginatedEntities() {
-            const start = (this.currentPage - 1) * this.pageSize;
-            const end = start + this.pageSize;
-            return this.filteredEntities.slice(start, end);
-        },
-        
-        totalPages() {
-            return Math.ceil(this.filteredEntities.length / this.pageSize);
-        },
-        
-        timelineGroups() {
-            const groups = {};
-            this.paginatedEntities.forEach(entity => {
-                const date = new Date(entity.created).toDateString();
-                if (!groups[date]) {
-                    groups[date] = [];
-                }
-                groups[date].push(entity);
-            });
-            return groups;
+    showCreateDialog() {
+        if (window.notificationSystem) {
+            window.notificationSystem.info('Entity creation dialog coming soon');
+        } else {
+            alert('Entity creation dialog coming soon');
         }
-    },
-    
-    mounted() {
-        this.loadEntities();
-    },
-    
-    methods: {
-        async loadEntities() {
-            this.loading = true;
-            this.error = null;
-            
-            try {
-                const response = await fetch('/api/v1/entities/list', {
-                    headers: {
-                        'Authorization': `Bearer ${this.sessionToken}`
-                    }
-                });
-                
-                if (!response.ok) {
-                    throw new Error('Failed to load entities');
-                }
-                
-                const data = await response.json();
-                this.entities = data.map(entity => ({
-                    ...entity,
-                    created: entity.created || new Date().toISOString(),
-                    size: entity.content ? entity.content.length : 0
-                }));
-                
-                this.totalEntities = this.entities.length;
-                this.applyFilters();
-                this.lastRefresh = new Date();
-                
-                // Cache entities
-                this.entities.forEach(entity => {
-                    this.entityCache.set(entity.id, entity);
-                });
-                
-            } catch (error) {
-                this.error = error.message;
-                this.$emit('error', error);
-            } finally {
-                this.loading = false;
-            }
-        },
+    }
+
+    editEntity(entityId) {
+        if (window.notificationSystem) {
+            window.notificationSystem.info(`Edit entity ${entityId} - coming soon`);
+        } else {
+            alert(`Edit entity ${entityId} - coming soon`);
+        }
+    }
+
+    async deleteEntity(entityId) {
+        if (!confirm('Delete this entity?')) return;
+
+        const apiClient = window.apiClient || (window.EntityDBClient ? new window.EntityDBClient() : null);
         
-        refreshEntities() {
-            this.loadEntities();
-        },
-        
-        debounceSearch() {
-            clearTimeout(this.searchTimeout);
-            this.searchTimeout = setTimeout(() => {
-                this.applyFilters();
-            }, 300);
-        },
-        
-        clearSearch() {
-            this.searchQuery = '';
-            this.applyFilters();
-        },
-        
-        applyFilters() {
-            let filtered = [...this.entities];
-            
-            // Search filter
-            if (this.searchQuery) {
-                const query = this.searchQuery.toLowerCase();
-                filtered = filtered.filter(entity => {
-                    return entity.id.toLowerCase().includes(query) ||
-                           entity.tags.some(tag => tag.toLowerCase().includes(query)) ||
-                           (entity.content && entity.content.toLowerCase().includes(query));
-                });
+        if (!apiClient) {
+            this.showError('API client not available');
+            return;
+        }
+
+        try {
+            // Get the token from localStorage
+            const token = localStorage.getItem('entitydb-admin-token');
+            if (token && apiClient.setToken) {
+                apiClient.setToken(token);
             }
             
-            // Type filter
-            if (this.filters.type) {
-                filtered = filtered.filter(entity => {
-                    return entity.tags.some(tag => tag.includes(`type:${this.filters.type}`));
-                });
-            }
+            await apiClient.delete(`/entities/${entityId}`);
+            this.entities = this.entities.filter(e => e.id !== entityId);
+            this.renderEntities();
             
-            // Time range filter
-            if (this.filters.timeRange) {
-                const now = new Date();
-                const ranges = {
-                    '1h': 60 * 60 * 1000,
-                    '24h': 24 * 60 * 60 * 1000,
-                    '7d': 7 * 24 * 60 * 60 * 1000,
-                    '30d': 30 * 24 * 60 * 60 * 1000
-                };
-                const cutoff = new Date(now - ranges[this.filters.timeRange]);
-                
-                filtered = filtered.filter(entity => {
-                    return new Date(entity.created) >= cutoff;
-                });
+            if (window.notificationSystem) {
+                window.notificationSystem.success('Entity deleted');
             }
-            
-            // Tag filters
-            if (this.filters.tags.length > 0) {
-                filtered = filtered.filter(entity => {
-                    return this.filters.tags.every(tag => 
-                        entity.tags.some(entityTag => entityTag.includes(tag))
-                    );
-                });
-            }
-            
-            this.filteredEntities = filtered;
-            this.sortEntities();
-            this.currentPage = 1;
-        },
-        
-        addTagFilter() {
-            if (this.tagInput && !this.filters.tags.includes(this.tagInput)) {
-                this.filters.tags.push(this.tagInput);
-                this.tagInput = '';
-                this.applyFilters();
-            }
-        },
-        
-        removeTagFilter(tag) {
-            const index = this.filters.tags.indexOf(tag);
-            if (index > -1) {
-                this.filters.tags.splice(index, 1);
-                this.applyFilters();
-            }
-        },
-        
-        setSortBy(field) {
-            if (this.sortBy === field) {
-                this.sortOrder = this.sortOrder === 'asc' ? 'desc' : 'asc';
-            } else {
-                this.sortBy = field;
-                this.sortOrder = 'asc';
-            }
-            this.sortEntities();
-        },
-        
-        toggleSortOrder() {
-            this.sortOrder = this.sortOrder === 'asc' ? 'desc' : 'asc';
-            this.sortEntities();
-        },
-        
-        sortEntities() {
-            const multiplier = this.sortOrder === 'asc' ? 1 : -1;
-            
-            this.filteredEntities.sort((a, b) => {
-                let aVal, bVal;
-                
-                switch (this.sortBy) {
-                    case 'id':
-                        return a.id.localeCompare(b.id) * multiplier;
-                    case 'type':
-                        aVal = this.getEntityType(a);
-                        bVal = this.getEntityType(b);
-                        return aVal.localeCompare(bVal) * multiplier;
-                    case 'size':
-                        return ((a.size || 0) - (b.size || 0)) * multiplier;
-                    case 'created':
-                    case 'modified':
-                        aVal = new Date(a.created).getTime();
-                        bVal = new Date(b.created).getTime();
-                        return (aVal - bVal) * multiplier;
-                    default:
-                        return 0;
-                }
-            });
-        },
-        
-        selectEntity(entity) {
-            this.selectedEntity = entity;
-            this.$emit('entity-selected', entity);
-        },
-        
-        async createEntity() {
-            this.$emit('create-entity');
-        },
-        
-        async editEntity(entity) {
-            this.$emit('edit-entity', entity);
-        },
-        
-        async deleteEntity(entity) {
-            if (confirm(`Are you sure you want to delete entity ${entity.id}?`)) {
-                try {
-                    const response = await fetch(`/api/v1/entities/delete?id=${entity.id}`, {
-                        method: 'DELETE',
-                        headers: {
-                            'Authorization': `Bearer ${this.sessionToken}`
-                        }
-                    });
-                    
-                    if (response.ok) {
-                        this.$emit('entity-deleted', entity);
-                        this.loadEntities();
-                    } else {
-                        throw new Error('Failed to delete entity');
-                    }
-                } catch (error) {
-                    this.$emit('error', error);
-                }
-            }
-        },
-        
-        async viewEntityHistory(entity) {
-            this.$emit('view-history', entity);
-        },
-        
-        async viewEntityRelationships(entity) {
-            this.$emit('view-relationships', entity);
-        },
-        
-        // Helper methods
-        getEntityType(entity) {
-            const typeTag = entity.tags.find(tag => tag.startsWith('type:'));
-            return typeTag ? typeTag.split(':')[1] : 'entity';
-        },
-        
-        getEntityIcon(entity) {
-            const type = this.getEntityType(entity);
-            const icons = {
-                user: 'fas fa-user',
-                config: 'fas fa-cog',
-                dashboard_layout: 'fas fa-th-large',
-                metric: 'fas fa-chart-line',
-                entity: 'fas fa-cube'
-            };
-            return icons[type] || 'fas fa-cube';
-        },
-        
-        getDisplayTags(entity) {
-            return entity.tags.slice(0, 3);
-        },
-        
-        getContentPreview(entity) {
-            if (!entity.content) return '';
-            const content = typeof entity.content === 'string' 
-                ? entity.content 
-                : JSON.stringify(entity.content);
-            return content.length > 100 
-                ? content.substring(0, 100) + '...' 
-                : content;
-        },
-        
-        truncateId(id) {
-            return id.length > 20 ? id.substring(0, 8) + '...' + id.substring(id.length - 8) : id;
-        },
-        
-        formatTimestamp(timestamp) {
-            const date = new Date(timestamp);
-            const now = new Date();
-            const diff = now - date;
-            
-            if (diff < 60000) return 'Just now';
-            if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
-            if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
-            if (diff < 604800000) return `${Math.floor(diff / 86400000)}d ago`;
-            
-            return date.toLocaleDateString();
-        },
-        
-        formatFullTimestamp(timestamp) {
-            return new Date(timestamp).toLocaleString();
-        },
-        
-        formatDate(dateStr) {
-            return new Date(dateStr).toLocaleDateString('en-US', {
-                weekday: 'long',
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric'
-            });
-        },
-        
-        formatTime(timestamp) {
-            return new Date(timestamp).toLocaleTimeString('en-US', {
-                hour: '2-digit',
-                minute: '2-digit'
-            });
-        },
-        
-        formatSize(bytes) {
-            const units = ['B', 'KB', 'MB', 'GB'];
-            let i = 0;
-            while (bytes > 1024 && i < units.length - 1) {
-                bytes /= 1024;
-                i++;
-            }
-            return `${Math.round(bytes * 10) / 10} ${units[i]}`;
-        },
-        
-        isJSON(content) {
-            try {
-                JSON.parse(content);
-                return true;
-            } catch {
-                return false;
-            }
-        },
-        
-        formatJSON(content) {
-            try {
-                return JSON.stringify(JSON.parse(content), null, 2);
-            } catch {
-                return content;
-            }
-        },
-        
-        async copyToClipboard(text) {
-            try {
-                await navigator.clipboard.writeText(text);
-                this.$emit('notification', { message: 'Copied to clipboard!', type: 'success' });
-            } catch (error) {
-                this.$emit('notification', { message: 'Failed to copy', type: 'error' });
+        } catch (error) {
+            console.error('Failed to delete entity:', error);
+            if (window.notificationSystem) {
+                window.notificationSystem.error('Failed to delete entity');
             }
         }
     }
-};
 
-// Export for use in other modules
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = EntityBrowser;
+    refresh() {
+        this.loadEntities();
+    }
+
+    // Utility methods
+    getEntityTitle(entity) {
+        if (!entity.tags) return `Entity ${entity.id}`;
+        
+        const titleTag = entity.tags.find(t => t.startsWith('title:'));
+        if (titleTag) {
+            return this.escapeHtml(titleTag.split(':').slice(1).join(':'));
+        }
+        
+        const typeTag = entity.tags.find(t => t.startsWith('type:'));
+        if (typeTag) {
+            const type = typeTag.split(':')[1];
+            return `${type.charAt(0).toUpperCase() + type.slice(1)} ${entity.id}`;
+        }
+        
+        return `Entity ${entity.id}`;
+    }
+
+    formatDate(dateStr) {
+        if (!dateStr) return 'Unknown';
+        
+        const date = new Date(dateStr);
+        const now = new Date();
+        const diff = now - date;
+        
+        if (diff < 60000) return 'just now';
+        if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
+        if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
+        
+        return date.toLocaleDateString();
+    }
+
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
 }
 
-// Also make it available globally for browser use
-if (typeof window !== 'undefined') {
-    window.EntityBrowser = EntityBrowser;
+// Add CSS for entity browser
+const entityBrowserStyles = document.createElement('style');
+entityBrowserStyles.textContent = `
+.entity-browser {
+    padding: 20px;
 }
+
+.toolbar {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.entity-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+}
+
+.entity-card {
+    background: white;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    padding: 16px;
+    transition: all 0.2s;
+}
+
+.entity-card:hover {
+    border-color: #3498db;
+    box-shadow: 0 2px 8px rgba(52, 152, 219, 0.1);
+}
+
+body.dark-mode .entity-card {
+    background: #2c3e50;
+    border-color: #34495e;
+    color: #e1e8ed;
+}
+
+body.dark-mode .entity-card:hover {
+    border-color: #3498db;
+    box-shadow: 0 2px 8px rgba(52, 152, 219, 0.2);
+}
+
+.entity-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 12px;
+}
+
+.entity-header h4 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: #2c3e50;
+    flex: 1;
+    margin-right: 12px;
+}
+
+body.dark-mode .entity-header h4 {
+    color: #e1e8ed;
+}
+
+.entity-actions {
+    display: flex;
+    gap: 4px;
+}
+
+.entity-meta {
+    margin-bottom: 12px;
+    line-height: 1.4;
+}
+
+.entity-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.badge {
+    display: inline-block;
+    padding: 2px 8px;
+    font-size: 11px;
+    font-weight: 500;
+    border-radius: 12px;
+}
+
+.badge-secondary {
+    background-color: #6c757d;
+    color: white;
+}
+
+.btn {
+    padding: 6px 12px;
+    border: none;
+    border-radius: 4px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.btn-primary {
+    background: #3498db;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #2980b9;
+}
+
+.btn-secondary {
+    background: #6c757d;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background: #5a6268;
+}
+
+.btn-danger {
+    background: #dc3545;
+    color: white;
+}
+
+.btn-danger:hover {
+    background: #c82333;
+}
+
+.btn-sm {
+    padding: 4px 8px;
+    font-size: 12px;
+}
+
+.text-muted {
+    color: #6c757d;
+}
+
+body.dark-mode .text-muted {
+    color: #95a5a6;
+}
+`;
+document.head.appendChild(entityBrowserStyles);
+
+// Create global instance  
+window.entityBrowser = new EntityBrowser();
+window.EntityBrowser = EntityBrowser;

@@ -1,12 +1,16 @@
 # EntityDB API Reference
 
-> **Current Version**: 2.27.0  
+> **Current Version**: 2.29.0  
 > **Base URL**: `https://localhost:8443` (HTTPS) or `http://localhost:8085` (HTTP)  
 > **Content-Type**: `application/json`
 
+## ⚠️ Breaking Change in v2.29.0
+
+The authentication architecture has fundamentally changed. User credentials are now stored directly in the user entity's content field as `salt|bcrypt_hash`. This has **NO BACKWARD COMPATIBILITY** - existing users must be recreated.
+
 ## Authentication
 
-EntityDB uses session-based authentication. Most endpoints require a valid session token.
+EntityDB uses JWT session-based authentication. Most endpoints require a valid session token.
 
 ### Login
 

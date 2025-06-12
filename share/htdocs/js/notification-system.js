@@ -7,7 +7,6 @@
 class NotificationSystem {
     constructor() {
         this.notifications = new Map();
-        this.container = this.createContainer();
         this.queue = [];
         this.maxVisible = 3;
         this.defaultDuration = 5000;
@@ -20,7 +19,17 @@ class NotificationSystem {
             'bottom-center': { bottom: '20px', left: '50%', transform: 'translateX(-50%)' }
         };
         this.position = 'top-right';
-        this.logger = new Logger('NotificationSystem');
+        this.logger = window.Logger ? new window.Logger('NotificationSystem') : console;
+        this.container = null;
+        
+        // Initialize when DOM is ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => {
+                this.container = this.createContainer();
+            });
+        } else {
+            this.container = this.createContainer();
+        }
     }
     
     /**
@@ -64,6 +73,11 @@ class NotificationSystem {
      * Show notification
      */
     show(message, type = 'info', options = {}) {
+        // Ensure container exists
+        if (!this.container) {
+            this.container = this.createContainer();
+        }
+        
         const id = Date.now() + Math.random();
         const notification = {
             id,
@@ -79,12 +93,16 @@ class NotificationSystem {
             data: options.data || {}
         };
         
-        this.logger.debug('Showing notification', notification);
+        if (this.logger && this.logger.debug) {
+            this.logger.debug('Showing notification', notification);
+        }
         
         // Check if we need to queue
         if (this.notifications.size >= this.maxVisible) {
             this.queue.push(notification);
-            this.logger.debug('Notification queued', { queueLength: this.queue.length });
+            if (this.logger && this.logger.debug) {
+                this.logger.debug('Notification queued', { queueLength: this.queue.length });
+            }
             return id;
         }
         
