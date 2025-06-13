@@ -499,7 +499,15 @@ func matchesWildcard(tag, pattern string) bool {
 }
 
 // sortByCreatedAt sorts entities by creation time in ascending order (oldest first).
-// Uses bubble sort for simplicity - suitable for small to medium result sets.
+//
+// Algorithm Choice: Bubble Sort
+// - Simple, stable sort with O(n²) time complexity
+// - Chosen for code clarity and in-place sorting
+// - Suitable for EntityDB's typical query result sizes (<1000 entities)
+// - Memory efficient: O(1) additional space
+// - For larger datasets, consider upgrading to quicksort or mergesort
+//
+// Performance: O(n²) time, O(1) space - acceptable for small result sets
 func sortByCreatedAt(entities []*Entity) {
 	for i := 0; i < len(entities)-1; i++ {
 		for j := 0; j < len(entities)-i-1; j++ {
@@ -511,7 +519,9 @@ func sortByCreatedAt(entities []*Entity) {
 }
 
 // sortByCreatedAtDesc sorts entities by creation time in descending order (newest first).
-// Uses bubble sort for simplicity - suitable for small to medium result sets.
+//
+// Algorithm Choice: Bubble Sort (see sortByCreatedAt for rationale)
+// Performance: O(n²) time, O(1) space - optimized for EntityDB's typical use cases
 func sortByCreatedAtDesc(entities []*Entity) {
 	for i := 0; i < len(entities)-1; i++ {
 		for j := 0; j < len(entities)-i-1; j++ {
@@ -561,9 +571,29 @@ func (q *EntityQuery) applyFilters(entities []*Entity) []*Entity {
 	return result
 }
 
-// evaluateFilter checks if an entity matches a single filter condition.
-// Supports filtering on standard fields (id, timestamps, tag count) as well as
-// content and tag-based filtering with namespace support.
+// evaluateFilter checks if an entity matches a single filter condition using field-specific logic.
+//
+// Filter Evaluation Algorithm:
+// 1. Identify filter field type (built-in vs tag-based)
+// 2. Extract relevant data from entity based on field type
+// 3. Apply operator-specific comparison logic
+// 4. Return boolean match result
+//
+// Supported Field Types:
+//   - "created_at", "updated_at": Timestamp comparison using nanosecond precision
+//   - "id": String matching on entity identifier
+//   - "tag_count": Numeric comparison on total tag count
+//   - "content_type": Searches for content:type:* tags and compares values
+//   - "content_value": String search within entity binary content
+//   - "tag:*": Namespace-based tag filtering (e.g., "tag:status" matches "status:*")
+//
+// Tag Search Strategy:
+// - For tag namespace filters, iterates through all entity tags
+// - Matches namespace prefix, extracts value portion after colon
+// - Applies string comparison logic to extracted values
+// - Returns true on first match (OR logic within namespace)
+//
+// Performance: O(n) where n is number of tags for tag-based filters
 func (q *EntityQuery) evaluateFilter(entity *Entity, filter Filter) bool {
 	switch filter.Field {
 	case "created_at":
@@ -768,7 +798,14 @@ func (q *EntityQuery) evaluateTimeFilter(value int64, filter Filter) bool {
 }
 
 // applySorting applies the specified sorting to entities and returns a sorted copy.
+//
 // The original slice is not modified. If no ordering is specified, entities are returned unchanged.
+//
+// Sorting Strategy:
+// - Uses bubble sort implementation for all fields (see individual sort functions for rationale)
+// - Creates defensive copy to prevent mutation of input slice
+// - Delegates to field-specific sort functions for type-safe comparisons
+// - Optimized for EntityDB's typical query result sizes (<1000 entities)
 func (q *EntityQuery) applySorting(entities []*Entity) []*Entity {
 	if q.orderBy == "" {
 		return entities

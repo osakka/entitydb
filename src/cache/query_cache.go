@@ -143,7 +143,11 @@ func (c *QueryCache) Invalidate(pattern string) {
 	}
 }
 
-// GetStats returns cache statistics
+// GetStats returns cache performance statistics for monitoring and optimization.
+//
+// Returns:
+//   - int: Total number of entries currently in cache
+//   - int: Number of entries that have been accessed more than once (indicates cache effectiveness)
 func (c *QueryCache) GetStats() (int, int) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()

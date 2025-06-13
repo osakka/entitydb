@@ -27,7 +27,14 @@ type CompressedContent struct {
 	OriginalSize int
 }
 
-// CompressContent compresses content if it's above the threshold
+// CompressContent compresses content if it's above the threshold for storage efficiency.
+//
+// Parameters:
+//   - content: Raw byte data to potentially compress
+//
+// Returns:
+//   - *CompressedContent: Wrapper containing compressed/uncompressed data with metadata
+//   - error: Compression errors (typically gzip encoding failures)
 func CompressContent(content []byte) (*CompressedContent, error) {
 	if len(content) < CompressionThreshold {
 		// Don't compress small content

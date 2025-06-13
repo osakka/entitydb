@@ -51,25 +51,25 @@ const (
 	RelationshipDelegates       = "delegates"       // Role delegates to another Role in Dataset
 )
 
-// SecurityUser represents a user in the security system
+// SecurityUser represents a user in the security system with authentication capabilities.
 type SecurityUser struct {
-	ID       string
-	Username string
-	Email    string
-	Status   string
-	Entity   *Entity
+	ID       string  // Unique identifier matching the underlying entity ID
+	Username string  // Login username (must be unique across the system)
+	Email    string  // Contact email address (optional, used for notifications)
+	Status   string  // Account status: "active", "inactive", "suspended", "deleted"
+	Entity   *Entity // Underlying entity containing user data and permissions
 }
 
-// SecuritySession represents an active session
+// SecuritySession represents an active user session with tracking and expiration.
 type SecuritySession struct {
-	ID        string
-	Token     string
-	UserID    string
-	ExpiresAt time.Time
-	CreatedAt time.Time
-	IPAddress string
-	UserAgent string
-	Entity    *Entity
+	ID        string    // Unique session identifier (cryptographically secure)
+	Token     string    // Authentication token presented by client
+	UserID    string    // ID of the authenticated user this session belongs to
+	ExpiresAt time.Time // Session expiration timestamp (UTC)
+	CreatedAt time.Time // Session creation timestamp (UTC)
+	IPAddress string    // Client IP address for security auditing
+	UserAgent string    // Client user agent string for device tracking
+	Entity    *Entity   // Underlying entity storing session metadata and audit trail
 }
 
 // SecurityRole represents a role in the system

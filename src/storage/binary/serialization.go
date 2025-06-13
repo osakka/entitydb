@@ -8,7 +8,22 @@ import (
 	"time"
 )
 
-// SerializeEntity serializes an entity to binary format
+// SerializeEntity serializes an entity to EntityDB Binary Format (EBF).
+//
+// Binary Format Structure:
+//   - Tag count (uint16)
+//   - For each tag: length (uint16) + tag bytes
+//   - Content count (uint16, 0 or 1)
+//   - Content data (if present)
+//   - Created timestamp (int64)
+//   - Updated timestamp (int64)
+//
+// Parameters:
+//   - entity: Entity instance to serialize (must not be nil)
+//
+// Returns:
+//   - []byte: Serialized binary data in EBF format
+//   - error: Encoding errors (buffer write failures, timestamp issues)
 func SerializeEntity(entity *models.Entity) ([]byte, error) {
 	buf := new(bytes.Buffer)
 	

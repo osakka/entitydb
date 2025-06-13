@@ -59,10 +59,18 @@ func NewEntityHandler(repo models.EntityRepository) *EntityHandler {
 	}
 }
 
-// stripTimestampsFromEntity returns a copy of the entity with timestamps removed from tags.
+// stripTimestampsFromEntity returns a copy of the entity with timestamps conditionally removed from tags.
+//
 // EntityDB stores all tags with nanosecond timestamps in the format "TIMESTAMP|tag".
 // By default, the API strips these timestamps for backward compatibility.
-// Set includeTimestamps=true to see the raw temporal tags.
+//
+// Parameters:
+//   - entity: The source entity to process
+//   - includeTimestamps: If true, returns entity unchanged; if false, strips timestamps
+//
+// Returns:
+//   - *models.Entity: New entity instance with cleaned tags (if includeTimestamps=false)
+//     or original entity pointer (if includeTimestamps=true). Content and metadata unchanged.
 func (h *EntityHandler) stripTimestampsFromEntity(entity *models.Entity, includeTimestamps bool) *models.Entity {
 	if includeTimestamps {
 		return entity
@@ -83,7 +91,16 @@ func asTemporalRepository(repo models.EntityRepository) (*binary.TemporalReposit
 }
 
 // parseInt safely parses a string to an integer using fmt.Sscanf.
-// This is more strict than strconv.Atoi and ensures the entire string is a valid integer.
+//
+// This is more strict than strconv.Atoi and ensures the entire string is a valid integer
+// without leading/trailing whitespace or extra characters.
+//
+// Parameters:
+//   - s: String to parse (must be exactly an integer, no extra characters)
+//
+// Returns:
+//   - int: Parsed integer value
+//   - error: fmt.Sscanf error if parsing fails (invalid format, overflow, extra chars)
 func parseInt(s string) (int, error) {
 	var i int
 	_, err := fmt.Sscanf(s, "%d", &i)
