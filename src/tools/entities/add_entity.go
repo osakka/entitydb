@@ -3,6 +3,8 @@ package main
 import (
 	"crypto/rand"
 	"database/sql"
+	"entitydb/config"
+	"flag"
 	"fmt"
 	"log"
 	"os"
@@ -33,30 +35,45 @@ func generateID(prefix string) string {
 }
 
 func main() {
-	if len(os.Args) < 3 {
-		fmt.Println("Usage: go run add_entity.go <type> <title> [tag1:value1 tag2:value2 ...]")
-		fmt.Println("Example: go run add_entity.go workspace \"New Workspace\" status:active owner:admin")
+	// Initialize configuration system
+	configManager := config.NewConfigManager(nil)
+	configManager.RegisterFlags()
+	
+	var (
+		entityType = flag.String("type", "", "Entity type (required)")
+		title = flag.String("title", "", "Entity title (required)")
+		tags = flag.String("tags", "", "Comma-separated tags in format tag1:value1,tag2:value2")
+	)
+	flag.Parse()
+	
+	cfg, err := configManager.Initialize()
+	if err != nil {
+		log.Fatalf("Configuration error: %v", err)
+	}
+	
+	if *entityType == "" || *title == "" {
+		fmt.Println("Usage: add_entity --type=<type> --title=<title> [--tags=tag1:value1,tag2:value2]")
+		fmt.Println("Example: add_entity --type=workspace --title=\"New Workspace\" --tags=status:active,owner:admin")
 		os.Exit(1)
 	}
-
-	entityType := os.Args[1]
-	title := os.Args[2]
 	
 	// Parse optional tags
-	tags := make(map[string]string)
-	if len(os.Args) > 3 {
-		for _, tagPair := range os.Args[3:] {
+	tagMap := make(map[string]string)
+	if *tags != "" {
+		for _, tagPair := range strings.Split(*tags, ",") {
+			tagPair = strings.TrimSpace(tagPair)
 			parts := strings.SplitN(tagPair, ":", 2)
 			if len(parts) == 2 {
-				tags[parts[0]] = parts[1]
+				tagMap[parts[0]] = parts[1]
 			} else {
 				fmt.Printf("Warning: Ignoring invalid tag format '%s'. Expected format: tag:value\n", tagPair)
 			}
 		}
 	}
 
-	// Connect to database
-	db, err := sql.Open("sqlite3", "/opt/entitydb/var/db/entitydb.db")
+	// Connect to database using configured path
+	dbPath := cfg.DatabasePath()
+	db, err := sql.Open("sqlite3", dbPath)
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
@@ -76,23 +93,23 @@ func main() {
 	}
 
 	// Add type tag
-	addTagToEntity(db, entityID, "type", entityType)
+	addTagToEntity(db, entityID, "type", *entityType)
 	
 	// Add title content
-	addContentToEntity(db, entityID, "title", title)
+	addContentToEntity(db, entityID, "title", *title)
 	
 	// Add additional tags
-	for tag, value := range tags {
+	for tag, value := range tagMap {
 		addTagToEntity(db, entityID, tag, value)
 	}
 
 	fmt.Printf("Entity created successfully:\n")
 	fmt.Printf("  ID: %s\n", entityID)
-	fmt.Printf("  Type: %s\n", entityType)
-	fmt.Printf("  Title: %s\n", title)
-	if len(tags) > 0 {
+	fmt.Printf("  Type: %s\n", *entityType)
+	fmt.Printf("  Title: %s\n", *title)
+	if len(tagMap) > 0 {
 		fmt.Printf("  Tags:\n")
-		for tag, value := range tags {
+		for tag, value := range tagMap {
 			fmt.Printf("    %s: %s\n", tag, value)
 		}
 	}

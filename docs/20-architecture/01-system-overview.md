@@ -1,7 +1,6 @@
 # EntityDB Architecture Overview
 
-> **Version**: 2.27.0  
-> **Last Updated**: June 7, 2025
+> **Version**: v2.30.0 | **Last Updated**: 2025-06-12 | **Status**: AUTHORITATIVE
 
 ## System Architecture
 

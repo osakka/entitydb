@@ -2,58 +2,48 @@
 package main
 
 import (
+	"entitydb/config"
 	"flag"
-	"os"
-	"path/filepath"
+	"fmt"
+	"log"
 )
 
-// ToolConfig holds configuration for tools
+// ToolConfig holds configuration for tools - now wraps the main Config
 type ToolConfig struct {
-	DataPath    string
+	*config.Config
 	APIEndpoint string
 	Debug       bool
 }
 
-// GetToolConfig returns configuration for tools with proper defaults
+// GetToolConfig returns configuration for tools using the centralized config system
 func GetToolConfig() *ToolConfig {
-	// Determine EntityDB root directory
-	execPath, _ := os.Executable()
-	entityDBRoot := filepath.Join(filepath.Dir(execPath), "..", "..")
+	// Initialize configuration system
+	configManager := config.NewConfigManager(nil)
+	configManager.RegisterFlags()
+	flag.Parse()
 	
-	// Use environment variables with relative path defaults
-	dataPath := os.Getenv("ENTITYDB_DATA_PATH")
-	if dataPath == "" {
-		dataPath = filepath.Join(entityDBRoot, "var")
+	cfg, err := configManager.Initialize()
+	if err != nil {
+		log.Fatalf("Configuration error: %v", err)
 	}
 	
-	apiEndpoint := os.Getenv("ENTITYDB_API_ENDPOINT")
-	if apiEndpoint == "" {
-		// Check if SSL is enabled
-		if os.Getenv("ENTITYDB_USE_SSL") == "true" {
-			port := os.Getenv("ENTITYDB_SSL_PORT")
-			if port == "" {
-				port = "8085"
-			}
-			apiEndpoint = "https://localhost:" + port
-		} else {
-			port := os.Getenv("ENTITYDB_PORT")
-			if port == "" {
-				port = "8085"
-			}
-			apiEndpoint = "http://localhost:" + port
-		}
+	// Build API endpoint from configuration
+	var apiEndpoint string
+	if cfg.UseSSL {
+		apiEndpoint = fmt.Sprintf("https://localhost:%d", cfg.SSLPort)
+	} else {
+		apiEndpoint = fmt.Sprintf("http://localhost:%d", cfg.Port)
 	}
 	
 	return &ToolConfig{
-		DataPath:    dataPath,
+		Config:      cfg,
 		APIEndpoint: apiEndpoint,
-		Debug:       os.Getenv("ENTITYDB_DEBUG") == "true",
+		Debug:       cfg.DevMode,
 	}
 }
 
-// RegisterToolFlags registers common tool flags
+// RegisterToolFlags registers common tool flags (now delegates to ConfigManager)
 func RegisterToolFlags(cfg *ToolConfig) {
-	flag.StringVar(&cfg.DataPath, "data-path", cfg.DataPath, "Path to EntityDB data directory")
-	flag.StringVar(&cfg.APIEndpoint, "api-endpoint", cfg.APIEndpoint, "EntityDB API endpoint URL")
-	flag.BoolVar(&cfg.Debug, "debug", cfg.Debug, "Enable debug logging")
+	// Tool-specific flags can be added here if needed
+	// The core configuration flags are handled by ConfigManager.RegisterFlags()
 }

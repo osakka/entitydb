@@ -1,6 +1,7 @@
 package main
 
 import (
+	"entitydb/config"
 	"flag"
 	"fmt"
 	"log"
@@ -9,21 +10,27 @@ import (
 )
 
 func main() {
-	var storagePath string
-	var dryRun bool
+	// Initialize configuration system
+	configManager := config.NewConfigManager(nil)
+	configManager.RegisterFlags()
 	
-	flag.StringVar(&storagePath, "storage", "/opt/entitydb/var", "Path to EntityDB storage")
+	var dryRun bool
 	flag.BoolVar(&dryRun, "dry-run", false, "Show what would be done without making changes")
 	flag.Parse()
+	
+	cfg, err := configManager.Initialize()
+	if err != nil {
+		log.Fatalf("Configuration error: %v", err)
+	}
 	
 	// Logger is already configured
 	
 	fmt.Printf("EntityDB RBAC Tag Migration Tool\n")
-	fmt.Printf("Storage path: %s\n", storagePath)
+	fmt.Printf("Storage path: %s\n", cfg.DataPath)
 	fmt.Printf("Dry run: %v\n\n", dryRun)
 	
-	// Open repository
-	repo, err := binary.NewEntityRepository(storagePath)
+	// Open repository using configured path
+	repo, err := binary.NewEntityRepository(cfg.DataPath)
 	if err != nil {
 		log.Fatalf("Failed to open repository: %v", err)
 	}

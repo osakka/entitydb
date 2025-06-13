@@ -12,7 +12,7 @@ EntityDB is a revolutionary temporal database platform that stores all data as e
 
 > **🎉 NEW in v2.30.0**: Complete temporal tag search implementation with enhanced UI dashboard. All authentication issues resolved, real-time metrics dashboard added, and comprehensive performance optimizations.
 
-> **⚠️ BREAKING CHANGE in v2.29.0**: Authentication architecture has changed. User credentials are now stored directly in the user entity's content field. This change has **NO BACKWARD COMPATIBILITY** - all users must be recreated. See [Authentication Guide](./docs/api/auth.md) for details.
+> **⚠️ BREAKING CHANGE in v2.29.0**: Authentication architecture has changed. User credentials are now stored directly in the user entity's content field. This change has **NO BACKWARD COMPATIBILITY** - all users must be recreated. See [Authentication Guide](./docs/30-api-reference/02-authentication.md) for details.
 
 ### Key Features
 
@@ -39,7 +39,7 @@ cd src && make && cd ..
 ./bin/entitydbd.sh start
 
 # Access the dashboard
-# Web UI: http://localhost:8085 (HTTP) or https://localhost:8443 (HTTPS)
+# Web UI: https://localhost:8085 (SSL enabled by default)
 # Default credentials: admin/admin
 ```
 
@@ -66,13 +66,13 @@ Every tag is stored with a nanosecond timestamp:
 Complete multi-tenancy through isolated datasets:
 ```bash
 # Create a dataset
-curl -X POST http://localhost:8085/api/v1/datasets \
+curl -k -X POST https://localhost:8085/api/v1/datasets \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"name":"myapp","description":"My Application"}'
 
 # Create entity in dataset
-curl -X POST http://localhost:8085/api/v1/datasets/myapp/entities/create \
+curl -k -X POST https://localhost:8085/api/v1/datasets/myapp/entities/create \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"tags":["type:task"],"content":"Task data"}'
@@ -83,7 +83,7 @@ curl -X POST http://localhost:8085/api/v1/datasets/myapp/entities/create \
 ### Authentication
 ```bash
 # Login
-TOKEN=$(curl -s -X POST http://localhost:8085/api/v1/auth/login \
+TOKEN=$(curl -s -k -X POST https://localhost:8085/api/v1/auth/login \
   -H "Content-Type: application/json" \
   -d '{"username":"admin","password":"admin"}' | jq -r '.token')
 ```
@@ -91,28 +91,28 @@ TOKEN=$(curl -s -X POST http://localhost:8085/api/v1/auth/login \
 ### Entity Operations
 ```bash
 # Create entity
-curl -X POST http://localhost:8085/api/v1/entities/create \
+curl -k -X POST https://localhost:8085/api/v1/entities/create \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"tags":["type:document","status:draft"],"content":"My document"}'
 
 # Query entities
-curl -X GET "http://localhost:8085/api/v1/entities/query?tags=type:document" \
+curl -k -X GET "https://localhost:8085/api/v1/entities/query?tags=type:document" \
   -H "Authorization: Bearer $TOKEN"
 
 # Get entity history
-curl -X GET "http://localhost:8085/api/v1/entities/history?id=ENTITY_ID" \
+curl -k -X GET "https://localhost:8085/api/v1/entities/history?id=ENTITY_ID" \
   -H "Authorization: Bearer $TOKEN"
 ```
 
 ### Temporal Queries
 ```bash
 # Get entity state at specific time
-curl -X GET "http://localhost:8085/api/v1/entities/as-of?id=ID&timestamp=2024-01-01T00:00:00Z" \
+curl -k -X GET "https://localhost:8085/api/v1/entities/as-of?id=ID&timestamp=2024-01-01T00:00:00Z" \
   -H "Authorization: Bearer $TOKEN"
 
 # Get changes between times
-curl -X GET "http://localhost:8085/api/v1/entities/diff?id=ID&from=T1&to=T2" \
+curl -k -X GET "https://localhost:8085/api/v1/entities/diff?id=ID&from=T1&to=T2" \
   -H "Authorization: Bearer $TOKEN"
 ```
 
@@ -136,12 +136,12 @@ EntityDB uses a layered architecture optimized for temporal operations:
 
 ## Documentation
 
-- [Quick Start Guide](./docs/guides/quick-start.md)
-- [API Reference](./docs/api/api-reference.md)
-- [Architecture Overview](./docs/architecture/arch-overview.md)
-- [RBAC & Security](./docs/guides/security.md)
-- [Development Guide](./docs/development/contributing.md)
-- [Performance Tuning](./docs/performance/performance.md)
+- [Quick Start Guide](./docs/10-getting-started/02-quick-start.md)
+- [API Reference](./docs/30-api-reference/01-entities.md)
+- [Architecture Overview](./docs/20-architecture/01-system-overview.md)
+- [RBAC & Security](./docs/50-admin-guides/01-security-configuration.md)
+- [Development Guide](./docs/60-developer-guides/01-contributing.md)
+- [Performance Tuning](./docs/performance/performance-optimization-results.md)
 
 ## Project Structure
 
@@ -185,9 +185,9 @@ EntityDB uses a comprehensive three-tier configuration system:
 
 ```bash
 # Server Configuration
-ENTITYDB_PORT=8085                    # HTTP server port
-ENTITYDB_SSL_PORT=8085               # HTTPS server port
-ENTITYDB_USE_SSL=true                # Enable SSL/TLS
+ENTITYDB_PORT=8085                    # HTTP server port (when SSL disabled)
+ENTITYDB_SSL_PORT=8085               # HTTPS server port (when SSL enabled)
+ENTITYDB_USE_SSL=true                # Enable SSL/TLS (true by default)
 
 # Paths
 ENTITYDB_DATA_PATH=/opt/entitydb/var # Database storage path
@@ -205,7 +205,7 @@ ENTITYDB_METRICS_INTERVAL=30         # Metrics collection interval
 - **Default**: `/opt/entitydb/share/config/entitydb.env`
 - **Instance**: `/opt/entitydb/var/entitydb.env` (overrides defaults)
 
-For complete configuration documentation, see [Configuration Management Guide](./docs/development/configuration-management.md).
+For complete configuration documentation, see [Configuration Management Guide](./docs/60-developer-guides/04-configuration-management.md).
 
 ## Performance
 
@@ -223,7 +223,7 @@ Benchmarks show:
 
 ## Contributing
 
-See [Contributing Guide](./docs/development/contributing.md) for development guidelines.
+See [Contributing Guide](./docs/60-developer-guides/01-contributing.md) for development guidelines.
 
 ## License
 

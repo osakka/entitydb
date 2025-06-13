@@ -203,6 +203,7 @@ func main() {
 	// Initialize configuration with proper hierarchy
 	cfg, err := configManager.Initialize()
 	if err != nil {
+		// Cannot use logger yet since configuration initialization failed
 		fmt.Fprintf(os.Stderr, "Failed to initialize configuration: %v\n", err)
 		os.Exit(1)
 	}

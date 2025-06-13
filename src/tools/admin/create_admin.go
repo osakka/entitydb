@@ -2,9 +2,12 @@ package main
 
 import (
 	"encoding/json"
+	"entitydb/config"
+	"flag"
 	"fmt"
 	"golang.org/x/crypto/bcrypt"
 	"io/ioutil"
+	"log"
 	"os"
 	"path/filepath"
 )
@@ -18,6 +21,16 @@ type Entity struct {
 }
 
 func main() {
+	// Initialize configuration system
+	configManager := config.NewConfigManager(nil)
+	configManager.RegisterFlags()
+	flag.Parse()
+	
+	cfg, err := configManager.Initialize()
+	if err != nil {
+		log.Fatalf("Configuration error: %v", err)
+	}
+	
 	// Create a new entity for admin user
 	adminUser := &Entity{
 		ID: "user_admin",
@@ -62,8 +75,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Write to file
-	filePath := filepath.Join("/opt/entitydb/var", "admin_user.json")
+	// Write to file using configured path
+	filePath := filepath.Join(cfg.DataPath, "admin_user.json")
 	err = ioutil.WriteFile(filePath, entityJSON, 0644)
 	if err != nil {
 		fmt.Printf("Error writing file: %v\n", err)

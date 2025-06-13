@@ -2,6 +2,8 @@ package main
 
 import (
 	"database/sql"
+	"entitydb/config"
+	"flag"
 	"fmt"
 	"log"
 	"golang.org/x/crypto/bcrypt"
@@ -49,8 +51,19 @@ func createUser(db *sql.DB, username, password, email, fullName string, roles st
 }
 
 func main() {
-	// Connect to database
-	db, err := sql.Open("sqlite3", "/opt/entitydb/var/db/entitydb.db")
+	// Initialize configuration system
+	configManager := config.NewConfigManager(nil)
+	configManager.RegisterFlags()
+	flag.Parse()
+	
+	cfg, err := configManager.Initialize()
+	if err != nil {
+		log.Fatalf("Configuration error: %v", err)
+	}
+	
+	// Connect to database using configured path
+	dbPath := cfg.DatabasePath()
+	db, err := sql.Open("sqlite3", dbPath)
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}

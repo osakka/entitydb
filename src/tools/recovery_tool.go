@@ -1,31 +1,43 @@
 package main
 
 import (
+	"entitydb/config"
 	"entitydb/storage/binary"
 	"flag"
 	"fmt"
+	"log"
 	"os"
 )
 
 func main() {
+	// Initialize configuration system
+	configManager := config.NewConfigManager(nil)
+	configManager.RegisterFlags()
+	
 	var (
-		dataPath     = flag.String("data", "./var", "Path to EntityDB data directory")
 		operation    = flag.String("op", "check", "Operation: check, repair-index, repair-wal, validate-checksums")
 		entityID     = flag.String("entity", "", "Entity ID for specific operations")
 	)
 	flag.Parse()
 	
+	cfg, err := configManager.Initialize()
+	if err != nil {
+		log.Fatalf("Configuration error: %v", err)
+	}
+	
+	dataPath := cfg.DataPath
+	
 	// Initialize logger (logger is already initialized)
 	
 	// Create recovery manager
-	recovery := binary.NewRecoveryManager(*dataPath)
+	recovery := binary.NewRecoveryManager(dataPath)
 	
 	switch *operation {
 	case "check":
-		checkIntegrity(*dataPath)
+		checkIntegrity(dataPath)
 		
 	case "repair-index":
-		repairIndex(*dataPath)
+		repairIndex(dataPath)
 		
 	case "repair-wal":
 		if err := recovery.RepairWAL(); err != nil {
@@ -35,14 +47,14 @@ func main() {
 		fmt.Println("WAL repair completed successfully")
 		
 	case "validate-checksums":
-		validateChecksums(*dataPath)
+		validateChecksums(dataPath)
 		
 	case "recover-entity":
 		if *entityID == "" {
 			fmt.Fprintf(os.Stderr, "Entity ID required for recovery\n")
 			os.Exit(1)
 		}
-		recoverEntity(*dataPath, *entityID)
+		recoverEntity(dataPath, *entityID)
 		
 	default:
 		fmt.Fprintf(os.Stderr, "Unknown operation: %s\n", *operation)

@@ -1,18 +1,30 @@
 package main
 
 import (
+	"entitydb/config"
 	"entitydb/logger"
 	"entitydb/storage/binary"
+	"flag"
 	"log"
 	"os"
 	"strings"
 )
 
 func main() {
+	// Initialize configuration system
+	configManager := config.NewConfigManager(nil)
+	configManager.RegisterFlags()
+	flag.Parse()
+	
+	cfg, err := configManager.Initialize()
+	if err != nil {
+		log.Fatalf("Configuration error: %v", err)
+	}
+	
 	logger.Info("[main] === Force Complete Reindex ===")
 
 	// Remove the persistent index file to force a complete rebuild
-	indexFile := "var/entities.idx"
+	indexFile := cfg.DataPath + "/data/" + cfg.DatabaseFilename + cfg.IndexSuffix
 	if _, err := os.Stat(indexFile); err == nil {
 		logger.Info("[main] Removing existing index file: %s", indexFile)
 		if err := os.Remove(indexFile); err != nil {
@@ -22,7 +34,7 @@ func main() {
 
 	// Open repository - this will trigger a complete index rebuild
 	logger.Info("[main] Opening repository to trigger reindex...")
-	repo, err := binary.NewEntityRepository("var")
+	repo, err := binary.NewEntityRepository(cfg.DataPath)
 	if err != nil {
 		log.Fatalf("Failed to open repository: %v", err)
 	}

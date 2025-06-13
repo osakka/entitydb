@@ -1,23 +1,29 @@
 package main
 
 import (
+	"entitydb/config"
 	"entitydb/storage/binary"
+	"flag"
 	"fmt"
 	"log"
 	"os"
 )
 
 func main() {
-	if len(os.Args) < 2 {
-		fmt.Println("Usage: rebuild_tag_index <data_path>")
-		fmt.Println("Example: rebuild_tag_index ../var")
-		os.Exit(1)
+	// Initialize configuration system
+	configManager := config.NewConfigManager(nil)
+	configManager.RegisterFlags()
+	flag.Parse()
+	
+	cfg, err := configManager.Initialize()
+	if err != nil {
+		log.Fatalf("Configuration error: %v", err)
 	}
 	
-	dataPath := os.Args[1]
+	dataPath := cfg.DataPath
 	
-	// Delete the old corrupt index
-	indexPath := dataPath + "/entities.idx"
+	// Delete the old corrupt index using configurable index path
+	indexPath := cfg.DataPath + "/data/" + cfg.DatabaseFilename + cfg.IndexSuffix
 	if err := os.Remove(indexPath); err != nil && !os.IsNotExist(err) {
 		log.Printf("Warning: Failed to remove old index: %v", err)
 	} else {

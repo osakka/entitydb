@@ -1,6 +1,8 @@
 package main
 
 import (
+	"entitydb/config"
+	"flag"
 	"fmt"
 	"log"
 	"strings"
@@ -8,14 +10,24 @@ import (
 )
 
 func main() {
-	// Create a high performance repository
-	baseRepo, err := binary.NewEntityRepository("../var")
+	// Initialize configuration system
+	configManager := config.NewConfigManager(nil)
+	configManager.RegisterFlags()
+	flag.Parse()
+	
+	cfg, err := configManager.Initialize()
+	if err != nil {
+		log.Fatalf("Configuration error: %v", err)
+	}
+	
+	// Create a high performance repository using configured path
+	baseRepo, err := binary.NewEntityRepository(cfg.DataPath)
 	if err != nil {
 		log.Fatalf("Failed to create base repository: %v", err)
 	}
 	defer baseRepo.Close()
 
-	highPerfRepo, err := binary.NewHighPerformanceRepository("../var")
+	highPerfRepo, err := binary.NewHighPerformanceRepository(cfg.DataPath)
 	if err != nil {
 		log.Fatalf("Failed to create high performance repository: %v", err)
 	}

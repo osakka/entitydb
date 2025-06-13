@@ -3,6 +3,8 @@ package main
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"entitydb/config"
+	"flag"
 	"fmt"
 	"log"
 
@@ -19,10 +21,20 @@ func generateSalt() string {
 }
 
 func main() {
+	// Initialize configuration system
+	configManager := config.NewConfigManager(nil)
+	configManager.RegisterFlags()
+	flag.Parse()
+	
+	cfg, err := configManager.Initialize()
+	if err != nil {
+		log.Fatalf("Configuration error: %v", err)
+	}
+	
 	logger.SetLogLevel("INFO")
 	
 	factory := &binary.RepositoryFactory{}
-	repo, err := factory.CreateRepository("/opt/entitydb/var")
+	repo, err := factory.CreateRepository(cfg.DataPath)
 	if err != nil {
 		log.Fatalf("Failed to create repository: %v", err)
 	}

@@ -1,18 +1,31 @@
 package main
 
 import (
+	"entitydb/config"
 	"entitydb/storage/binary"
 	"entitydb/logger"
+	"flag"
 	"fmt"
+	"log"
 	"strings"
 )
 
 func main() {
+	// Initialize configuration system
+	configManager := config.NewConfigManager(nil)
+	configManager.RegisterFlags()
+	flag.Parse()
+	
+	cfg, err := configManager.Initialize()
+	if err != nil {
+		log.Fatalf("Configuration error: %v", err)
+	}
+	
 	// Initialize logger
 	logger.SetLogLevel("info")
 	
-	// Create repository
-	repo, err := binary.NewEntityRepository("/opt/entitydb/var")
+	// Create repository using configured path
+	repo, err := binary.NewEntityRepository(cfg.DataPath)
 	if err != nil {
 		logger.Fatalf("Failed to create repository: %v", err)
 	}

@@ -1,48 +1,231 @@
-# EntityDB Authentication Integration
+# EntityDB Authentication API
 
-This document describes the implementation of the integrated authentication system for EntityDB.
+> **Version**: v2.30.0 | **Last Updated**: 2025-06-12 | **Status**: AUTHORITATIVE
 
 ## Overview
 
-The authentication system provides standard REST endpoints for user authentication that work with the entity-based architecture while maintaining backward compatibility with existing clients.
+EntityDB provides a secure authentication system using JWT session tokens with embedded credential storage. As of v2.29.0, user credentials are stored directly in the user entity's content field as `salt|bcrypt_hash`, eliminating the need for separate credential entities.
 
-## Authentication Endpoints
+> **⚠️ BREAKING CHANGE in v2.29.0**: Authentication architecture has fundamentally changed. User credentials are now embedded in user entities. **NO BACKWARD COMPATIBILITY** - all users must be recreated.
 
-The following endpoints are implemented:
+## Authentication Flow
 
-- `/api/v1/auth/login` - Authenticates users and issues tokens
-- `/api/v1/auth/status` - Checks token validity and returns user info
-- `/api/v1/auth/logout` - Invalidates tokens
-- `/api/v1/auth/refresh` - Issues new tokens
+1. **Login**: Submit username/password to receive session token
+2. **Authorization**: Include `Authorization: Bearer <token>` header in API requests
+3. **Session Management**: Tokens expire automatically and can be refreshed
+4. **Logout**: Invalidate token to end session
 
-## Integration Details
+## API Endpoints
 
-The authentication system is directly integrated into the main server code (`server_db.go`), avoiding any cross-origin issues. It uses the existing user storage and token management functions.
+### POST /api/v1/auth/login
 
-## Testing
+Authenticate user with username and password.
 
-Test pages are available at:
-- `/final_test.html` - Comprehensive test for all authentication features
-- `/simple_debug.html` - Simple debugging tool for auth endpoints
+**Request**:
+```bash
+curl -k -X POST https://localhost:8085/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "admin",
+    "password": "admin"
+  }'
+```
 
-## Default Credentials
+**Response** (200 OK):
+```json
+{
+  "token": "session_12345abcdef...",
+  "expires_at": "2025-06-12T23:45:00Z",
+  "user_id": "user_admin_12345",
+  "user": {
+    "id": "user_admin_12345",
+    "username": "admin",
+    "email": "admin@entitydb.local",
+    "roles": ["admin", "user"]
+  }
+}
+```
 
-- Username: `admin`
-- Password: `password`
+**Error Responses**:
+- `400 Bad Request`: Invalid request body or missing credentials
+- `401 Unauthorized`: Invalid username or password
+- `500 Internal Server Error`: Failed to create session
 
-Other available users:
-- `osakka` / `mypassword` (admin)
-- `regular_user` / `password123` (regular user)
-- `readonly_user` / `password123` (read-only user)
+### POST /api/v1/auth/logout
 
-## Implementation Notes
+Invalidate current session token.
 
-The implementation follows these principles:
-1. Keeps the entity-based architecture intact
-2. Provides standard authentication endpoints
-3. Maintains backward compatibility
-4. Integrates seamlessly with the UI
+**Request**:
+```bash
+curl -k -X POST https://localhost:8085/api/v1/auth/logout \
+  -H "Authorization: Bearer $TOKEN"
+```
 
-## Maintenance
+**Response** (200 OK):
+```json
+{
+  "message": "Logged out successfully"
+}
+```
 
-For future maintenance, all authentication logic is centralized in the `handleAuth` function and its helper methods in `server_db.go`.
+**Error Responses**:
+- `401 Unauthorized`: No token provided or invalid token format
+- `500 Internal Server Error`: Failed to invalidate session
+
+### POST /api/v1/auth/refresh
+
+Refresh session token to extend expiration.
+
+**Request**:
+```bash
+curl -k -X POST https://localhost:8085/api/v1/auth/refresh \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+**Response** (200 OK):
+```json
+{
+  "token": "new_session_67890xyz...",
+  "expires_at": "2025-06-13T12:00:00Z",
+  "user_id": "user_admin_12345",
+  "user": {
+    "id": "user_admin_12345",
+    "username": "admin",
+    "email": "admin@entitydb.local",
+    "roles": ["admin", "user"]
+  }
+}
+```
+
+### GET /api/v1/auth/whoami
+
+Get information about currently authenticated user.
+
+**Request**:
+```bash
+curl -k -X GET https://localhost:8085/api/v1/auth/whoami \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+**Response** (200 OK):
+```json
+{
+  "id": "user_admin_12345",
+  "username": "admin",
+  "email": "admin@entitydb.local",
+  "roles": ["admin", "user"]
+}
+```
+
+## Authorization Header Format
+
+All authenticated API requests must include the Authorization header:
+
+```
+Authorization: Bearer <session-token>
+```
+
+**Example**:
+```bash
+curl -k -X GET https://localhost:8085/api/v1/entities/list \
+  -H "Authorization: Bearer session_12345abcdef..."
+```
+
+## Default Admin User
+
+EntityDB automatically creates a default admin user on first startup:
+
+- **Username**: `admin`
+- **Password**: `admin`
+- **Roles**: `admin`, `user`
+
+> **⚠️ Security Warning**: Change the default admin password immediately in production environments.
+
+## User Roles and Permissions
+
+Users are assigned roles through RBAC tags:
+
+- `rbac:role:admin` - Full administrative access
+- `rbac:role:user` - Standard user access
+
+Permissions are checked via tag-based RBAC:
+- `rbac:perm:entity:create` - Create entities
+- `rbac:perm:entity:view` - View entities
+- `rbac:perm:entity:update` - Update entities
+- `rbac:perm:system:admin` - System administration
+
+## Security Features
+
+### Password Security
+- Passwords hashed using bcrypt with cost 10
+- Salt stored with hash in user entity content field
+- No plaintext password storage
+
+### Session Security
+- Session tokens generated using crypto/rand
+- Configurable session TTL (default: 1 hour)
+- Automatic session cleanup for expired tokens
+- IP address and user agent tracking
+
+### Authentication Tracking
+- Failed login attempts are logged
+- Session activity monitoring
+- Authentication metrics available via `/api/v1/rbac/metrics`
+
+## Error Handling
+
+All authentication endpoints return structured error responses:
+
+```json
+{
+  "error": "Detailed error message"
+}
+```
+
+Common error scenarios:
+- **Invalid credentials**: Username/password mismatch
+- **Missing token**: Authorization header not provided
+- **Expired token**: Session has exceeded TTL
+- **Invalid token format**: Malformed Authorization header
+
+## Integration Examples
+
+### Login and Store Token
+```bash
+# Login and extract token
+TOKEN=$(curl -s -k -X POST https://localhost:8085/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"admin"}' | jq -r '.token')
+
+# Use token for authenticated requests
+curl -k -X GET https://localhost:8085/api/v1/entities/list \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+### Session Management
+```bash
+# Check current user
+curl -k -X GET https://localhost:8085/api/v1/auth/whoami \
+  -H "Authorization: Bearer $TOKEN"
+
+# Refresh token
+curl -k -X POST https://localhost:8085/api/v1/auth/refresh \
+  -H "Authorization: Bearer $TOKEN"
+
+# Logout
+curl -k -X POST https://localhost:8085/api/v1/auth/logout \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+## Related Documentation
+
+- [User Management](../50-admin-guides/01-user-management.md)
+- [RBAC System](../20-architecture/03-rbac.md)
+- [Security Configuration](../50-admin-guides/02-security.md)
+- [API Overview](./01-overview.md)
+
+## Version History
+
+- **v2.30.0**: Current authentication system with embedded credentials
+- **v2.29.0**: Major authentication architecture change - embedded credentials introduced
+- **v2.28.0**: Session-based authentication with JWT tokens

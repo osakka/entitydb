@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"entitydb/config"
 	"flag"
 	"fmt"
 	"log"
@@ -31,14 +32,23 @@ func main() {
 	flag.BoolVar(&timestamps, "timestamps", true, "Include timestamps in tags")
 	flag.Parse()
 
+	// Initialize configuration system
+	configManager := config.NewConfigManager(nil)
+	configManager.RegisterFlags()
+	
+	cfg, err := configManager.Initialize()
+	if err != nil {
+		log.Fatalf("Configuration error: %v", err)
+	}
+
 	if id == "" {
 		fmt.Println("Error: Entity ID is required")
 		flag.Usage()
 		os.Exit(1)
 	}
 
-	// Initialize the repository
-	repo, err := binary.NewEntityRepository("/opt/entitydb/var")
+	// Initialize the repository using configured path
+	repo, err := binary.NewEntityRepository(cfg.DataPath)
 	if err != nil {
 		log.Fatalf("Failed to initialize repository: %v", err)
 	}
