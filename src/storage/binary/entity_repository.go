@@ -219,7 +219,7 @@ func (r *EntityRepository) buildIndexes() error {
 	indexFile := r.getDataFile() + ".idx"
 	if _, err := os.Stat(indexFile); err == nil {
 		logger.Debug("Loading persisted tag index from %s", indexFile)
-		if loadedIndex, err := LoadTagIndexV2(r.getDataFile()); err == nil {
+		if loadedIndex, err := LoadTagIndex(r.getDataFile()); err == nil {
 			r.tagIndex = loadedIndex
 			r.persistentIndexLoaded = true
 			
@@ -2982,7 +2982,7 @@ func (r *EntityRepository) SaveTagIndex() error {
 		indexToSave = r.shardedTagIndex.ToMap()
 	}
 	
-	if err := SaveTagIndexV2(r.getDataFile(), indexToSave); err != nil {
+	if err := SaveTagIndex(r.getDataFile(), indexToSave); err != nil {
 		return fmt.Errorf("failed to save tag index: %w", err)
 	}
 	

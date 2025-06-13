@@ -13,12 +13,12 @@ import (
 )
 
 const (
-	TagIndexMagicV2   = "TDX2"
-	TagIndexVersionV2 = 2
+	TagIndexMagic   = "TDX2"
+	TagIndexVersion = 2
 )
 
-// SaveTagIndexV2 saves the tag index in a simple, reliable format
-func SaveTagIndexV2(dataFile string, tagIndex map[string][]string) error {
+// SaveTagIndex saves the tag index in a simple, reliable format
+func SaveTagIndex(dataFile string, tagIndex map[string][]string) error {
 	// Create index filename
 	dir := filepath.Dir(dataFile)
 	base := filepath.Base(dataFile)
@@ -32,13 +32,13 @@ func SaveTagIndexV2(dataFile string, tagIndex map[string][]string) error {
 	}
 	
 	// Write magic and version
-	if _, err := file.Write([]byte(TagIndexMagicV2)); err != nil {
+	if _, err := file.Write([]byte(TagIndexMagic)); err != nil {
 		file.Close()
 		os.Remove(tempFile)
 		return err
 	}
 	
-	if err := binary.Write(file, binary.LittleEndian, uint16(TagIndexVersionV2)); err != nil {
+	if err := binary.Write(file, binary.LittleEndian, uint16(TagIndexVersion)); err != nil {
 		file.Close()
 		os.Remove(tempFile)
 		return err
@@ -104,8 +104,8 @@ func SaveTagIndexV2(dataFile string, tagIndex map[string][]string) error {
 	return nil
 }
 
-// LoadTagIndexV2 loads the tag index from disk
-func LoadTagIndexV2(dataFile string) (map[string][]string, error) {
+// LoadTagIndex loads the tag index from disk
+func LoadTagIndex(dataFile string) (map[string][]string, error) {
 	// Create index filename
 	dir := filepath.Dir(dataFile)
 	base := filepath.Base(dataFile)
@@ -126,7 +126,7 @@ func LoadTagIndexV2(dataFile string) (map[string][]string, error) {
 	if _, err := io.ReadFull(file, magic); err != nil {
 		return nil, fmt.Errorf("failed to read magic: %w", err)
 	}
-	if string(magic) != TagIndexMagicV2 {
+	if string(magic) != TagIndexMagic {
 		return nil, fmt.Errorf("invalid magic: %s", magic)
 	}
 	
@@ -135,7 +135,7 @@ func LoadTagIndexV2(dataFile string) (map[string][]string, error) {
 	if err := binary.Read(file, binary.LittleEndian, &version); err != nil {
 		return nil, fmt.Errorf("failed to read version: %w", err)
 	}
-	if version != TagIndexVersionV2 {
+	if version != TagIndexVersion {
 		return nil, fmt.Errorf("unsupported version: %d", version)
 	}
 	

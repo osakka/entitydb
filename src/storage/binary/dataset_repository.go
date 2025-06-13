@@ -94,7 +94,7 @@ func (r *DatasetRepository) CreateDataset(dataset *models.Dataset) error {
 		return fmt.Errorf("dataset %s already exists", dataset.Name)
 	}
 	
-	// Create dataset index (use .ebf extension so SaveTagIndexV2 creates .idx)
+	// Create dataset index (use .ebf extension so SaveTagIndex creates .idx)
 	dsIndex := &DatasetIndexImpl{
 		name:      dataset.Name,
 		indexPath: filepath.Join(r.indexPath, dataset.Name+".ebf"),
@@ -307,7 +307,7 @@ func (r *DatasetRepository) loadDatasetIndexes() error {
 	for _, entry := range entries {
 		if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".idx") {
 			name := strings.TrimSuffix(entry.Name(), ".idx")
-			// Use .ebf extension for consistency with SaveTagIndexV2
+			// Use .ebf extension for consistency with SaveTagIndex
 			indexPath := filepath.Join(r.indexPath, name+".ebf")
 			
 			dsIndex := &DatasetIndexImpl{
@@ -418,13 +418,13 @@ func (d *DatasetIndexImpl) QueryByTags(tags []string, matchAll bool) ([]string, 
 func (d *DatasetIndexImpl) SaveToFile(filepath string) error {
 	// For now, use the same format as tag index persistence
 	// TODO: Implement custom binary format for dataset indexes
-	return SaveTagIndexV2(filepath, d.tagIndex)
+	return SaveTagIndex(filepath, d.tagIndex)
 }
 
 // LoadFromFile loads the dataset index
 func (d *DatasetIndexImpl) LoadFromFile(filepath string) error {
 	// For now, use the same format as tag index persistence
-	tagIndex, err := LoadTagIndexV2(filepath)
+	tagIndex, err := LoadTagIndex(filepath)
 	if err != nil {
 		return err
 	}
