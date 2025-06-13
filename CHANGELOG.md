@@ -5,6 +5,25 @@ All notable changes to the EntityDB Platform will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.30.3] - 2025-06-13
+
+### Fixed
+- **Critical Server Restart Requirement**: Complete resolution of persistent timeout issues
+  - **Root Cause Identified**: Server configuration changes require restart to take effect
+  - **Investigation Process**: Systematic trace from symptoms back to configuration deployment
+  - **Server Process Analysis**: Identified running server (PID 700099) started before timeout configuration changes
+  - **Configuration Timestamp Verification**: Config file modified at 13:17, server started at 13:53 with old values
+  - **Solution**: Server restart to pick up new 60-second timeout values from environment configuration
+  - **Verification**: Authentication now works in 0.3s, entities API responds normally
+  - **Entity Browser UI Fix**: Fixed JavaScript race condition where renderEntities() returned early while loading=true
+  - **No Regression**: All authentication and entities functionality now working correctly
+
+### Changed
+- **Development Workflow**: Established systematic root cause analysis methodology
+  - Step-by-step investigation starting from first principles rather than attacking symptoms
+  - Configuration deployment verification as mandatory step in timeout troubleshooting
+  - Server process lifecycle awareness for configuration management
+
 ## [2.30.2] - 2025-06-13
 
 ### Fixed

@@ -201,6 +201,7 @@ class EntityBrowserEnhanced {
         } finally {
             this.loading = false;
             this.updateLoadingState();
+            this.renderEntities(); // Re-render entities after loading is complete
         }
     }
 
