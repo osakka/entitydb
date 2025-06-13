@@ -139,20 +139,27 @@ func (a *MetricsAggregator) aggregateMetric(metricName, unit, aggregation, descr
 		}
 		
 		for _, tag := range fullEntity.Tags {
-			// Handle temporal tags
+			// Temporal Tag Processing Algorithm:
+			// 1. Default to current time for non-temporal tags
+			// 2. Detect temporal format by looking for pipe delimiter (|)
+			// 3. Extract timestamp portion (before |) and tag portion (after |)
+			// 4. Parse timestamp as epoch nanoseconds 
+			// 5. Skip malformed timestamps but continue processing other tags
 			actualTag := tag
 			tagTime := now
 			
-			// Temporal tags have format: "TIMESTAMP|tag"
+			// Check for temporal tag format: "TIMESTAMP|tag"
 			if idx := strings.Index(tag, "|"); idx != -1 {
-				// Extract timestamp and tag
-				timestampStr := tag[:idx]
-				actualTag = tag[idx+1:]
+				// Split into timestamp and tag components
+				timestampStr := tag[:idx]    // Everything before the pipe
+				actualTag = tag[idx+1:]      // Everything after the pipe
 				
+				// Parse timestamp as epoch nanoseconds (EntityDB standard format)
 				if ts, err := strconv.ParseInt(timestampStr, 10, 64); err == nil {
-					tagTime = time.Unix(0, ts)
+					tagTime = time.Unix(0, ts)  // Convert nanoseconds to time.Time
 					logger.Trace("Parsed temporal tag: timestamp=%d (%s), tag=%s", ts, tagTime.Format(time.RFC3339), actualTag)
 				} else {
+					// Malformed timestamp - log and skip this tag
 					logger.Debug("Failed to parse timestamp from tag: %s, error: %v", tag, err)
 					continue
 				}

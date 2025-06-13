@@ -18,12 +18,27 @@ type SkipListNode struct {
 	forward []*SkipListNode
 }
 
-// SkipList provides O(log n) lookups with cache-friendly access patterns
+// SkipList provides O(log n) lookups with cache-friendly access patterns.
+// 
+// Skip List Algorithm:
+// - Probabilistic data structure that maintains multiple levels of linked lists
+// - Each level acts as an "express lane" that skips over elements
+// - Level 0 contains all elements, higher levels contain fewer elements
+// - Search starts at highest level and works down, following fast paths
+// - Insertion randomly determines node height using geometric distribution
+// - Expected time complexity: O(log n) for search, insert, delete
+// - Space complexity: O(n) with low constant factor
+//
+// Performance Benefits:
+// - Better cache locality than trees due to sequential access patterns  
+// - Lock-free reads possible with careful implementation
+// - Simpler than balanced trees while maintaining similar performance
+// - Good performance under concurrent access with read/write locks
 type SkipList struct {
-	header *SkipListNode
-	level  int
-	mu     sync.RWMutex
-	rng    *rand.Rand
+	header *SkipListNode  // Sentinel node at start of all levels
+	level  int            // Current maximum level in use (0-based)
+	mu     sync.RWMutex   // Reader/writer lock for thread safety
+	rng    *rand.Rand     // Random number generator for level assignment
 }
 
 // NewSkipList creates a new skip list index
@@ -95,29 +110,46 @@ func (sl *SkipList) Insert(key string, entityID string) {
 	}
 }
 
-// Search finds all entity IDs for a given key
+// Search finds all entity IDs for a given key using skip list traversal algorithm.
+//
+// Search Algorithm:
+// 1. Acquire read lock for thread safety
+// 2. Start at header node (sentinel)
+// 3. For each level from highest to lowest:
+//    a. Move forward while next node exists and key is less than target
+//    b. When we can't go further, drop to next level down
+// 4. After traversing all levels, move one step forward on level 0
+// 5. Check if we found exact match, return entity IDs or nil
+//
+// Time Complexity: O(log n) expected, O(n) worst case
+// The probabilistic nature ensures good average performance
 func (sl *SkipList) Search(key string) []string {
 	sl.mu.RLock()
 	defer sl.mu.RUnlock()
 	
 	current := sl.header
 	
-	// Find node
+	// Skip list traversal: start high, work down
+	// This creates an efficient "guided search" path
 	for i := sl.level; i >= 0; i-- {
+		// Move forward on current level while key is smaller
 		for current.forward[i] != nil && current.forward[i].key < key {
 			current = current.forward[i]
 		}
+		// Drop down to next level and continue search
 	}
 	
+	// Move to actual candidate node on level 0
 	current = current.forward[0]
 	
 	if current != nil && current.key == key {
-		// Return copy to avoid concurrent modification
+		// Found exact match - return defensive copy to prevent races
 		result := make([]string, len(current.value))
 		copy(result, current.value)
 		return result
 	}
 	
+	// Key not found
 	return nil
 }
 

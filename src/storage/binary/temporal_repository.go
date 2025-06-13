@@ -166,39 +166,63 @@ func (r *TemporalRepository) buildTemporalIndexes() {
 	logger.Info("Built temporal indexes in %v", time.Since(start))
 }
 
-// indexEntityTemporal indexes a single entity's temporal data
+// indexEntityTemporal indexes a single entity's temporal data using multi-level indexing.
+//
+// Temporal Indexing Algorithm:
+// 1. Create timeline structure for this entity
+// 2. For each temporal tag:
+//    a. Parse timestamp and clean tag content
+//    b. Add to timeline (per-entity chronological index)
+//    c. Add to global B-tree timeline (cross-entity temporal index)  
+//    d. Add to time bucket index (range query optimization)
+// 3. Sort entity timeline by timestamp for binary search
+// 4. Store complete timeline for this entity
+//
+// Index Structures Created:
+// - timeline: Per-entity chronological tag history
+// - timelineIndex: Global B-tree for temporal range queries
+// - bucketIndex: Time-bucketed index for efficient range scans
+//
+// Concurrency Strategy:
+// - Read-lock bucket existence check to minimize contention
+// - Write-lock bucket creation only when needed (double-checked locking)
+// - Sharded locks on bucket updates to distribute contention
+// - Global timeline lock only for B-tree updates
 func (r *TemporalRepository) indexEntityTemporal(entity *models.Entity) {
+	// Initialize timeline for this entity
 	timeline := &Timeline{
 		entityID:   entity.ID,
 		timestamps: make([]int64, 0),
 		tags:       make(map[int64][]string),
 	}
 	
-	// Parse all temporal tags
+	// Process each tag to extract temporal information
 	for _, tag := range entity.Tags {
 		timestamp, cleanTag, err := ParseTemporalTagImproved(tag)
 		if err != nil {
-			continue // Skip non-temporal tags
+			continue // Skip non-temporal tags (legacy format)
 		}
 		
+		// Add to entity timeline (chronological per-entity index)
 		timeline.timestamps = append(timeline.timestamps, timestamp)
 		timeline.tags[timestamp] = append(timeline.tags[timestamp], cleanTag)
 		
-		// Update timeline index
+		// Add to global timeline index (B-tree for cross-entity queries)
 		r.timelineMu.Lock()
 		r.timelineIndex.Put(timestamp, entity.ID)
 		r.timelineMu.Unlock()
 		
-		// Update bucket index with sharded locking
+		// Add to time bucket index for range query optimization
 		bucket := TimeBucket{r.bucketSize}.GetBucket(timestamp)
 		bucketKey := fmt.Sprintf("bucket:%d", bucket)
 		
-		// First check if bucket exists (read lock)
+		// Double-checked locking pattern for bucket creation
+		// First check: read lock (fast path for existing buckets)
 		r.bucketIndexMu.RLock()
 		_, exists := r.bucketIndex[bucket]
 		r.bucketIndexMu.RUnlock()
 		
-		// Create bucket if needed (write lock)
+		// Second check: write lock only if bucket doesn't exist
 		if !exists {
 			r.bucketIndexMu.Lock()
 			if r.bucketIndex[bucket] == nil {
@@ -209,7 +233,7 @@ func (r *TemporalRepository) indexEntityTemporal(entity *models.Entity) {
 			r.bucketIndexMu.Unlock()
 		}
 		
-		// Update bucket with sharded lock
+		// Update bucket with sharded locking to reduce contention
 		r.bucketLocks.WithLock(bucketKey, func() {
 			r.bucketIndex[bucket].mu.Lock()
 			r.bucketIndex[bucket].items[entity.ID] = true
@@ -217,12 +241,12 @@ func (r *TemporalRepository) indexEntityTemporal(entity *models.Entity) {
 		})
 	}
 	
-	// Sort timestamps
+	// Sort timestamps for efficient binary search during queries
 	sort.Slice(timeline.timestamps, func(i, j int) bool {
 		return timeline.timestamps[i] < timeline.timestamps[j]
 	})
 	
-	// Store timeline
+	// Store complete timeline for this entity
 	r.entityTimelines[entity.ID] = timeline
 }
 

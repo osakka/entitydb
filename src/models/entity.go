@@ -366,18 +366,38 @@ func (e *Entity) HasTag(tag string) bool {
 }
 
 // GetTagValue returns the most recent value for a given tag namespace.
-// This method handles temporal tags and returns the latest value.
+// This method implements sophisticated temporal tag resolution with multiple timestamp formats.
 //
-// For tags without values (e.g., "archived"), returns empty string.
-// For non-existent tags, returns empty string.
+// Algorithm:
+// 1. Initialize tracking variables for latest value and timestamp
+// 2. Iterate through all entity tags
+// 3. For each tag:
+//    a. Parse temporal format (TIMESTAMP|tag) to extract timestamp and clean tag
+//    b. Support multiple timestamp formats: RFC3339Nano and epoch nanoseconds
+//    c. Check if clean tag matches the requested namespace (key:*)
+//    d. Extract value portion after the colon separator
+//    e. Compare timestamp - keep only the most recent value
+// 4. Return the value from the most recent timestamp, or empty string if none found
+//
+// Temporal Format Support:
+//   - RFC3339Nano: "2024-01-01T10:00:00.000000000|status:active" 
+//   - Epoch nanos: "1704110400000000000|status:active"
+//   - Fallback: Skip malformed timestamps but continue processing
+//
+// Tag Structure: "TIMESTAMP|namespace:value"
+//   - namespace: The tag category (e.g., "status", "type", "priority")
+//   - value: The actual value (e.g., "active", "user", "high")
+//
+// Performance: O(n) where n is the number of tags on the entity
+// Memory: O(1) additional space (only stores latest value)
 //
 // Example:
-//
-//	// Given tags with timestamps:
+//	// Given temporal tags:
 //	// "2024-01-01T10:00:00.000000000|status:draft"
-//	// "2024-01-05T14:30:00.000000000|status:published"
+//	// "2024-01-05T14:30:00.000000000|status:published" 
+//	// "1704542400000000000|status:archived"
 //	value := entity.GetTagValue("status")
-//	// value = "published" (most recent)
+//	// Returns: "archived" (most recent by timestamp)
 func (e *Entity) GetTagValue(key string) string {
 	// Look for the most recent tag with the given key prefix
 	var latestValue string
