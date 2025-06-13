@@ -188,11 +188,6 @@ func (cm *ConfigManager) RegisterFlags() {
 	flag.StringVar(&cm.config.SwaggerHost, "entitydb-swagger-host", cm.config.SwaggerHost,
 		"Swagger API documentation host")
 	
-	// Trace subsystems - all long flags
-	var traceSubsystems string
-	flag.StringVar(&traceSubsystems, "entitydb-trace-subsystems", "",
-		"Comma-separated list of trace subsystems to enable")
-
 	// Rate Limiting - all long flags
 	flag.BoolVar(&cm.config.EnableRateLimit, "entitydb-enable-rate-limit", cm.config.EnableRateLimit,
 		"Enable rate limiting")
@@ -200,6 +195,34 @@ func (cm *ConfigManager) RegisterFlags() {
 		"Number of requests allowed per window")
 	flag.IntVar(&cm.config.RateLimitWindowMinutes, "entitydb-rate-limit-window-minutes", cm.config.RateLimitWindowMinutes,
 		"Rate limit window in minutes")
+
+	// File and Path Configuration - all long flags
+	flag.StringVar(&cm.config.DatabaseFilename, "entitydb-database-filename", cm.config.DatabaseFilename,
+		"Main database filename")
+	flag.StringVar(&cm.config.WALSuffix, "entitydb-wal-suffix", cm.config.WALSuffix,
+		"Write-Ahead Log file suffix")
+	flag.StringVar(&cm.config.IndexSuffix, "entitydb-index-suffix", cm.config.IndexSuffix,
+		"Index file suffix")
+	flag.StringVar(&cm.config.BackupPath, "entitydb-backup-path", cm.config.BackupPath,
+		"Backup directory path")
+	flag.StringVar(&cm.config.TempPath, "entitydb-temp-path", cm.config.TempPath,
+		"Temporary files directory")
+	flag.StringVar(&cm.config.PIDFile, "entitydb-pid-file", cm.config.PIDFile,
+		"Process ID file path")
+	flag.StringVar(&cm.config.LogFile, "entitydb-log-file", cm.config.LogFile,
+		"Server log file path")
+
+	// Development and Debugging - all long flags
+	flag.BoolVar(&cm.config.DevMode, "entitydb-dev-mode", cm.config.DevMode,
+		"Enable development mode")
+	flag.IntVar(&cm.config.DebugPort, "entitydb-debug-port", cm.config.DebugPort,
+		"Debug/profiling port")
+	flag.BoolVar(&cm.config.ProfileEnabled, "entitydb-profile-enabled", cm.config.ProfileEnabled,
+		"Enable CPU and memory profiling")
+
+	// Trace Configuration - all long flags
+	flag.StringVar(&cm.config.TraceSubsystems, "entitydb-trace-subsystems", cm.config.TraceSubsystems,
+		"Comma-separated list of trace subsystems to enable")
 
 	// Essential short flags only
 	flag.Bool("v", false, "Show version information")
@@ -259,7 +282,36 @@ func (cm *ConfigManager) applyFlags() {
 			}
 		case "entitydb-swagger-host":
 			cm.config.SwaggerHost = f.Value.String()
-		// Add other flags as needed
+		
+		// File and Path Configuration
+		case "entitydb-database-filename":
+			cm.config.DatabaseFilename = f.Value.String()
+		case "entitydb-wal-suffix":
+			cm.config.WALSuffix = f.Value.String()
+		case "entitydb-index-suffix":
+			cm.config.IndexSuffix = f.Value.String()
+		case "entitydb-backup-path":
+			cm.config.BackupPath = f.Value.String()
+		case "entitydb-temp-path":
+			cm.config.TempPath = f.Value.String()
+		case "entitydb-pid-file":
+			cm.config.PIDFile = f.Value.String()
+		case "entitydb-log-file":
+			cm.config.LogFile = f.Value.String()
+		
+		// Development and Debugging
+		case "entitydb-dev-mode":
+			cm.config.DevMode = f.Value.String() == "true"
+		case "entitydb-debug-port":
+			if v, err := strconv.Atoi(f.Value.String()); err == nil {
+				cm.config.DebugPort = v
+			}
+		case "entitydb-profile-enabled":
+			cm.config.ProfileEnabled = f.Value.String() == "true"
+		
+		// Trace Configuration
+		case "entitydb-trace-subsystems":
+			cm.config.TraceSubsystems = f.Value.String()
 		}
 	})
 }

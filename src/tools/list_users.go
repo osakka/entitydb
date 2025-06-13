@@ -1,15 +1,27 @@
 package main
 
 import (
+	"entitydb/config"
 	"entitydb/storage/binary"
+	"flag"
 	"fmt"
 	"log"
 	"strings"
 )
 
 func main() {
-	// Open repository
-	repo, err := binary.NewEntityRepository("../var")
+	// Initialize configuration system
+	configManager := config.NewConfigManager(nil)
+	configManager.RegisterFlags()
+	flag.Parse()
+	
+	cfg, err := configManager.Initialize()
+	if err != nil {
+		log.Fatalf("Configuration error: %v", err)
+	}
+	
+	// Open repository using configured path
+	repo, err := binary.NewEntityRepository(cfg.DataPath)
 	if err != nil {
 		log.Fatalf("Failed to open repository: %v", err)
 	}

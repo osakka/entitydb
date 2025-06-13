@@ -250,9 +250,84 @@ type Config struct {
 	
 	// AppVersion is the application version for API documentation.
 	// Environment: ENTITYDB_APP_VERSION
-	// Default: "2.28.0"
+	// Default: "2.30.0"
 	// Should match build version for consistency
 	AppVersion string
+	
+	// File and Path Configuration
+	// ===========================
+	
+	// DatabaseFilename is the main database file name.
+	// Environment: ENTITYDB_DATABASE_FILENAME
+	// Default: "entities.db"
+	// Used in database path construction
+	DatabaseFilename string
+	
+	// WALSuffix is the suffix appended to database path for WAL files.
+	// Environment: ENTITYDB_WAL_SUFFIX
+	// Default: ".wal"
+	// Example: entities.db.wal
+	WALSuffix string
+	
+	// IndexSuffix is the suffix for index files.
+	// Environment: ENTITYDB_INDEX_SUFFIX
+	// Default: ".idx"
+	// Example: entities.db.idx
+	IndexSuffix string
+	
+	// BackupPath is the directory for database backups.
+	// Environment: ENTITYDB_BACKUP_PATH
+	// Default: "./backup"
+	// Relative to DataPath or absolute path
+	BackupPath string
+	
+	// TempPath is the directory for temporary files.
+	// Environment: ENTITYDB_TEMP_PATH
+	// Default: "./tmp"
+	// Relative to DataPath or absolute path
+	TempPath string
+	
+	// PIDFile is the path to the server process ID file.
+	// Environment: ENTITYDB_PID_FILE
+	// Default: "./var/entitydb.pid"
+	// Used by daemon scripts for process management
+	PIDFile string
+	
+	// LogFile is the path to the server log file.
+	// Environment: ENTITYDB_LOG_FILE
+	// Default: "./var/entitydb.log"
+	// Used when running as daemon
+	LogFile string
+	
+	// Development and Debugging Configuration
+	// ======================================
+	
+	// DevMode enables development mode features.
+	// Environment: ENTITYDB_DEV_MODE
+	// Default: false
+	// Enables additional logging, debug endpoints, relaxed security
+	DevMode bool
+	
+	// DebugPort is the port for debug/pprof endpoints.
+	// Environment: ENTITYDB_DEBUG_PORT
+	// Default: 6060
+	// Only active when DevMode is enabled
+	DebugPort int
+	
+	// ProfileEnabled enables CPU and memory profiling.
+	// Environment: ENTITYDB_PROFILE_ENABLED
+	// Default: false
+	// Useful for performance analysis
+	ProfileEnabled bool
+	
+	// Trace Subsystems Configuration
+	// ==============================
+	
+	// TraceSubsystems is a comma-separated list of trace subsystems to enable.
+	// Environment: ENTITYDB_TRACE_SUBSYSTEMS
+	// Default: "" (none enabled)
+	// Available: auth, storage, wal, chunking, metrics, locks, query, dataset, relationship, temporal
+	TraceSubsystems string
 }
 
 // Load creates a new Config instance with values loaded from environment variables.
@@ -333,7 +408,24 @@ func Load() *Config {
 		
 		// Application Info
 		AppName:          getEnv("ENTITYDB_APP_NAME", "EntityDB Server"),
-		AppVersion:       getEnv("ENTITYDB_APP_VERSION", "2.28.0"),
+		AppVersion:       getEnv("ENTITYDB_APP_VERSION", "2.30.0"),
+		
+		// File and Path Configuration
+		DatabaseFilename: getEnv("ENTITYDB_DATABASE_FILENAME", "entities.db"),
+		WALSuffix:        getEnv("ENTITYDB_WAL_SUFFIX", ".wal"),
+		IndexSuffix:      getEnv("ENTITYDB_INDEX_SUFFIX", ".idx"),
+		BackupPath:       getEnv("ENTITYDB_BACKUP_PATH", "./backup"),
+		TempPath:         getEnv("ENTITYDB_TEMP_PATH", "./tmp"),
+		PIDFile:          getEnv("ENTITYDB_PID_FILE", "./var/entitydb.pid"),
+		LogFile:          getEnv("ENTITYDB_LOG_FILE", "./var/entitydb.log"),
+		
+		// Development and Debugging
+		DevMode:          getEnvBool("ENTITYDB_DEV_MODE", false),
+		DebugPort:        getEnvInt("ENTITYDB_DEBUG_PORT", 6060),
+		ProfileEnabled:   getEnvBool("ENTITYDB_PROFILE_ENABLED", false),
+		
+		// Trace Subsystems
+		TraceSubsystems:  getEnv("ENTITYDB_TRACE_SUBSYSTEMS", ""),
 	}
 }
 
@@ -342,18 +434,18 @@ func Load() *Config {
 // The database file uses the custom EBF (EntityDB Binary Format) and contains
 // all entity data, relationships, and metadata. This path is constructed by
 // combining the configured DataPath with the standard database subdirectory
-// and filename.
+// and configurable filename.
 //
 // Path Structure:
-//   {DataPath}/data/entities.db
+//   {DataPath}/data/{DatabaseFilename}
 //
-// For example, with default DataPath of "./var":
+// For example, with default values:
 //   ./var/data/entities.db
 //
 // The database file is accompanied by related files in the same directory:
-//   - entities.db      - Main database file (EBF format)
-//   - entities.db.wal  - Write-Ahead Log for durability
-//   - *.idx            - Various index files for performance
+//   - {DatabaseFilename}           - Main database file (EBF format)
+//   - {DatabaseFilename}{WALSuffix} - Write-Ahead Log for durability
+//   - *.{IndexSuffix}              - Various index files for performance
 //
 // Returns:
 //   Complete filesystem path to the EntityDB database file.
@@ -363,7 +455,85 @@ func Load() *Config {
 //   by the EntityDB process. The server will create the database file
 //   if it doesn't exist but won't create parent directories.
 func (c *Config) DatabasePath() string {
-	return c.DataPath + "/data/entities.db"
+	return c.DataPath + "/data/" + c.DatabaseFilename
+}
+
+// WALPath returns the full path to the Write-Ahead Log file.
+//
+// The WAL file is used for durability and transaction support, storing
+// uncommitted changes before they are written to the main database file.
+//
+// Returns:
+//   Complete filesystem path to the WAL file (DatabasePath + WALSuffix)
+//
+// Example:
+//   ./var/data/entities.db.wal
+func (c *Config) WALPath() string {
+	return c.DatabasePath() + c.WALSuffix
+}
+
+// BackupFullPath returns the full path to the backup directory.
+//
+// If BackupPath is relative, it's resolved relative to DataPath.
+// If BackupPath is absolute, it's used as-is.
+//
+// Returns:
+//   Complete filesystem path to the backup directory
+//
+// Example:
+//   ./var/backup (relative)
+//   /opt/entitydb/backup (absolute)
+func (c *Config) BackupFullPath() string {
+	if strings.HasPrefix(c.BackupPath, "/") {
+		return c.BackupPath
+	}
+	return c.DataPath + "/" + strings.TrimPrefix(c.BackupPath, "./")
+}
+
+// TempFullPath returns the full path to the temporary files directory.
+//
+// If TempPath is relative, it's resolved relative to DataPath.
+// If TempPath is absolute, it's used as-is.
+//
+// Returns:
+//   Complete filesystem path to the temporary directory
+//
+// Example:
+//   ./var/tmp (relative)
+//   /tmp/entitydb (absolute)
+func (c *Config) TempFullPath() string {
+	if strings.HasPrefix(c.TempPath, "/") {
+		return c.TempPath
+	}
+	return c.DataPath + "/" + strings.TrimPrefix(c.TempPath, "./")
+}
+
+// PIDFullPath returns the full path to the PID file.
+//
+// If PIDFile is relative, it's resolved relative to DataPath.
+// If PIDFile is absolute, it's used as-is.
+//
+// Returns:
+//   Complete filesystem path to the PID file
+func (c *Config) PIDFullPath() string {
+	if strings.HasPrefix(c.PIDFile, "/") {
+		return c.PIDFile
+	}
+	return c.DataPath + "/" + strings.TrimPrefix(c.PIDFile, "./")
+}
+
+// LogFullPath returns the full path to the log file.
+//
+// If LogFile is relative, it's resolved relative to DataPath.
+// If LogFile is absolute, it's used as-is.
+//
+// Returns:
+//   Complete filesystem path to the log file
+func (c *Config) LogFullPath() string {
+	if strings.HasPrefix(c.LogFile, "/") {
+		return c.LogFile
+	}
+	return c.DataPath + "/" + strings.TrimPrefix(c.LogFile, "./")
 }
 
 // =============================================================================
