@@ -120,7 +120,7 @@ func (sm *SecurityManager) CreateUser(username, password, email string) (*Securi
 	// Create user entity with credentials in content
 	tags := []string{
 		"type:" + EntityTypeUser,
-		"dataset:_system",
+		"dataset:system",
 		"identity:username:" + username,
 		"identity:uuid:" + userID,
 		"status:active",
@@ -288,7 +288,7 @@ func (sm *SecurityManager) CreateSession(user *SecurityUser, ipAddress, userAgen
 		ID: sessionID,
 		Tags: []string{
 			"type:" + EntityTypeSession,
-			"dataset:_system",
+			"dataset:system",
 			"token:" + token,
 			"expires:" + expiresAt.Format(time.RFC3339),
 			"ip:" + ipAddress,

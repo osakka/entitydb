@@ -182,7 +182,15 @@ func (lm *LockManager) ReleaseWriteLock() {
 func (lm *LockManager) GetStats() LockStats {
 	lm.stats.mu.Lock()
 	defer lm.stats.mu.Unlock()
-	return lm.stats
+	// Return a copy without the mutex to avoid copying lock value
+	return LockStats{
+		mu:          sync.Mutex{}, // fresh mutex
+		ReadLocks:   lm.stats.ReadLocks,
+		WriteLocks:  lm.stats.WriteLocks,
+		WaitTime:    lm.stats.WaitTime,
+		HeldTime:    lm.stats.HeldTime,
+		Contentions: lm.stats.Contentions,
+	}
 }
 
 // CleanupOldLocks removes locks for entities that haven't been accessed recently

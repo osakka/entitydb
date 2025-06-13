@@ -1740,3 +1740,70 @@ func (h *EntityHandler) TestTemporalFixHandler(w http.ResponseWriter, r *http.Re
 	w.Header().Set("Content-Type", "application/json")
 	w.Write([]byte(`{"status":"ok","message":"Temporal handlers are integrated"}`))
 }
+
+// GetEntitySummary provides a lightweight summary for change detection
+func (h *EntityHandler) GetEntitySummary(w http.ResponseWriter, r *http.Request) {
+	logger.TraceIf("api", "GetEntitySummary called from %s", r.RemoteAddr)
+	
+	// Get all entities to build summary
+	entities, err := h.repo.List()
+	if err != nil {
+		logger.Error("failed to get entities for summary: %v", err)
+		RespondJSON(w, http.StatusInternalServerError, map[string]string{
+			"error": "Failed to retrieve entities",
+		})
+		return
+	}
+	
+	// Build summary statistics
+	totalCount := len(entities)
+	typeCount := make(map[string]int)
+	var lastUpdated int64 = 0
+	var recentEntities []string
+	
+	// Process entities to build summary
+	for _, entity := range entities {
+		// Count by type
+		entityType := "unknown"
+		for _, tag := range entity.Tags {
+			// Strip timestamp from tag
+			cleanTag := tag
+			if strings.Contains(tag, "|") {
+				parts := strings.SplitN(tag, "|", 2)
+				if len(parts) == 2 {
+					cleanTag = parts[1]
+				}
+			}
+			
+			if strings.HasPrefix(cleanTag, "type:") {
+				entityType = strings.TrimPrefix(cleanTag, "type:")
+				break
+			}
+		}
+		typeCount[entityType]++
+		
+		// Track most recent update
+		if entity.UpdatedAt > lastUpdated {
+			lastUpdated = entity.UpdatedAt
+		}
+		
+		// Collect recent entities (last 10)
+		if len(recentEntities) < 10 {
+			recentEntities = append(recentEntities, entity.ID)
+		}
+	}
+	
+	// Build summary response
+	summary := map[string]interface{}{
+		"total_count":     totalCount,
+		"type_counts":     typeCount,
+		"last_updated":    lastUpdated,
+		"recent_entities": recentEntities,
+		"timestamp":       time.Now().UnixNano(),
+	}
+	
+	logger.TraceIf("api", "entity summary: %d total entities, %d types, last updated: %d", 
+		totalCount, len(typeCount), lastUpdated)
+	
+	RespondJSON(w, http.StatusOK, summary)
+}

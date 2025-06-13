@@ -80,7 +80,7 @@ var (
 	// Default: "2.28.0" (current development version)
 	// Build override: -ldflags "-X main.Version=x.y.z"
 	// Used in: version command output, API responses, swagger documentation
-	Version = "2.28.0"
+	Version = "2.31.0"
 	
 	// BuildDate is the date when the binary was compiled.
 	// Default: "unknown" (for development builds)
@@ -320,6 +320,7 @@ func main() {
 	apiRouter.HandleFunc("/entities/update", server.securityMiddleware.RequirePermission("entity", "update")(server.entityHandler.UpdateEntity)).Methods("PUT")
 	apiRouter.HandleFunc("/entities/query", server.securityMiddleware.RequirePermission("entity", "view")(server.entityHandler.QueryEntities)).Methods("GET")
 	apiRouter.HandleFunc("/entities/listbytag", server.securityMiddleware.RequirePermission("entity", "view")(server.entityHandler.ListEntities)).Methods("GET")
+	apiRouter.HandleFunc("/entities/summary", server.securityMiddleware.RequirePermission("entity", "view")(server.entityHandler.GetEntitySummary)).Methods("GET")
 	
 	// Entity temporal operations with RBAC
 	apiRouter.HandleFunc("/entities/as-of", server.securityMiddleware.RequirePermission("entity", "view")(server.entityHandler.GetEntityAsOf)).Methods("GET")
@@ -405,14 +406,19 @@ func main() {
 	comprehensiveMetricsHandler := api.NewComprehensiveMetricsHandler(server.entityRepo)
 	apiRouter.HandleFunc("/metrics/comprehensive", comprehensiveMetricsHandler.ServeHTTP).Methods("GET")
 	
-	// Start background metrics collector with configured interval
+	// DISABLED: Background metrics collector - old entities have too many temporal tags
+	// Even with sharded indexing, the old metric entities with 1000+ tags cause hangs
+	// Need to clean up existing bloated entities before re-enabling
+	/*
 	logger.Info("Metrics collection interval set to %v", cfg.MetricsInterval)
 	
 	backgroundCollector := api.NewBackgroundMetricsCollector(server.entityRepo, cfg.MetricsInterval)
 	backgroundCollector.Start()
 	defer backgroundCollector.Stop()
+	*/
 	
-	// Start metrics retention manager if enabled
+	// DISABLED: Metrics retention manager - part of metrics feedback loop
+	/*
 	if cfg.MetricsRetentionRaw > 0 {
 		retentionManager := api.NewMetricsRetentionManager(
 			server.entityRepo,
@@ -425,6 +431,7 @@ func main() {
 		defer retentionManager.Stop()
 		logger.Info("Metrics retention manager started")
 	}
+	*/
 	
 	// Initialize query metrics collector
 	api.InitQueryMetrics(server.entityRepo)
@@ -434,12 +441,14 @@ func main() {
 	// Initialize error metrics collector
 	api.InitErrorMetrics(server.entityRepo)
 	
-	// Initialize metrics aggregator for UI display  
+	// DISABLED: Metrics aggregator - part of metrics feedback loop
+	/*
 	logger.Info("Metrics aggregation interval set to %v", cfg.AggregationInterval)
 	
 	metricsAggregator := api.NewMetricsAggregator(server.entityRepo, cfg.AggregationInterval)
 	metricsAggregator.Start()
 	defer metricsAggregator.Stop()
+	*/
 	
 	// Generic application metrics endpoint - applications can filter by namespace
 	applicationMetricsHandler := api.NewApplicationMetricsHandler(server.entityRepo)

@@ -44,17 +44,34 @@ var byteSlicePool = sync.Pool{
 	},
 }
 
-// decoderPool provides reusable JSON decoders
-var decoderPool = sync.Pool{
+// EncoderWrapper wraps a JSON encoder with a buffer for pooling
+type EncoderWrapper struct {
+	Encoder *json.Encoder
+	Buffer  *bytes.Buffer
+}
+
+// DecoderWrapper wraps a JSON decoder for pooling
+type DecoderWrapper struct {
+	Decoder *json.Decoder
+}
+
+// encoderPool provides reusable JSON encoder wrappers
+var encoderPool = sync.Pool{
 	New: func() interface{} {
-		return json.NewDecoder(nil)
+		buf := &bytes.Buffer{}
+		return &EncoderWrapper{
+			Encoder: json.NewEncoder(buf),
+			Buffer:  buf,
+		}
 	},
 }
 
-// encoderPool provides reusable JSON encoders
-var encoderPool = sync.Pool{
+// decoderPool provides reusable JSON decoder wrappers  
+var decoderPool = sync.Pool{
 	New: func() interface{} {
-		return json.NewEncoder(nil)
+		return &DecoderWrapper{
+			Decoder: json.NewDecoder(strings.NewReader("")),
+		}
 	},
 }
 
@@ -137,22 +154,25 @@ func PutStringBuilder(sb *strings.Builder) {
 	stringBuilderPool.Put(sb)
 }
 
-// GetJSONDecoder gets a JSON decoder from the pool
-func GetJSONDecoder() *json.Decoder {
-	return decoderPool.Get().(*json.Decoder)
+// GetJSONDecoder gets a JSON decoder wrapper from the pool
+func GetJSONDecoder() *DecoderWrapper {
+	return decoderPool.Get().(*DecoderWrapper)
 }
 
-// PutJSONDecoder returns a JSON decoder to the pool
-func PutJSONDecoder(dec *json.Decoder) {
+// PutJSONDecoder returns a JSON decoder wrapper to the pool
+func PutJSONDecoder(dec *DecoderWrapper) {
 	decoderPool.Put(dec)
 }
 
-// GetJSONEncoder gets a JSON encoder from the pool
-func GetJSONEncoder() *json.Encoder {
-	return encoderPool.Get().(*json.Encoder)
+// GetJSONEncoder gets a JSON encoder wrapper from the pool
+func GetJSONEncoder() *EncoderWrapper {
+	wrapper := encoderPool.Get().(*EncoderWrapper)
+	// Reset the buffer for reuse
+	wrapper.Buffer.Reset()
+	return wrapper
 }
 
-// PutJSONEncoder returns a JSON encoder to the pool
-func PutJSONEncoder(enc *json.Encoder) {
+// PutJSONEncoder returns a JSON encoder wrapper to the pool
+func PutJSONEncoder(enc *EncoderWrapper) {
 	encoderPool.Put(enc)
 }

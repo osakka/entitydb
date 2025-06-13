@@ -140,7 +140,7 @@ func (si *SecurityInitializer) createDefaultPermissions() error {
 			ID: perm.id,
 			Tags: []string{
 				"type:" + EntityTypePermission,
-				"dataset:_system",
+				"dataset:system",
 				"resource:" + perm.resource,
 				"action:" + perm.action,
 				"scope:" + perm.scope,
@@ -180,7 +180,7 @@ func (si *SecurityInitializer) createDefaultRoles() error {
 			ID: role.id,
 			Tags: []string{
 				"type:" + EntityTypeRole,
-				"dataset:_system",
+				"dataset:system",
 				"name:" + role.name,
 				fmt.Sprintf("level:%d", role.level),
 				"scope:" + role.scope,
@@ -231,7 +231,7 @@ func (si *SecurityInitializer) createDefaultGroups() error {
 			ID: group.id,
 			Tags: []string{
 				"type:" + EntityTypeGroup,
-				"dataset:_system",
+				"dataset:system",
 				"name:" + group.name,
 				"level:" + group.level,
 				"created:" + NowString(),
@@ -421,7 +421,7 @@ func (si *SecurityInitializer) createDefaultDatasets() error {
 		ID: "dataset_system",
 		Tags: []string{
 			"type:dataset",
-			"dataset:_system",
+			"dataset:system",
 			"name:_system",
 			"description:System dataset for internal entities",
 			"system:true",

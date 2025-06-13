@@ -29,8 +29,8 @@ func TestChunkedContentRetrieval(t *testing.T) {
 	entity.AddTag("content:chunks:2")
 	entity.AddTag("content:chunk-size:5000")
 	
-	// Create a mock handler
-	handler := &api.EntityHandler{} 
+	// Create a mock handler (unused in this test but kept for reference)
+	_ = &api.EntityHandler{} 
 	
 	// Check if IsChunked function recognizes chunked entity
 	isChunked := entity.IsChunked()

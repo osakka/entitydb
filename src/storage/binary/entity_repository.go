@@ -40,6 +40,14 @@ type EntityRepository struct {
 	shardedTagIndex *ShardedTagIndex
 	useShardedIndex bool // Feature flag for gradual rollout
 	
+	// Tag variant cache for optimized temporal tag lookups
+	tagVariantCache *TagVariantCache
+	useVariantCache bool // Feature flag for tag variant optimization
+	
+	// Batch writer for improved write throughput
+	batchWriter     *BatchWriter
+	useBatchWrites  bool // Feature flag for batched write operations
+	
 	// In-memory entity storage
 	entities     map[string]*models.Entity // id -> entity
 	
@@ -75,6 +83,376 @@ type EntityRepository struct {
 	recovery *RecoveryManager
 }
 
+// temporalEntry represents a temporal index entry for parallel processing
+type temporalEntry struct {
+	entityID  string
+	tag       string
+	timestamp time.Time
+}
+
+// namespaceEntry represents a namespace index entry for parallel processing
+type namespaceEntry struct {
+	entityID string
+	tag      string
+}
+
+// TagVariantCache pre-computes and caches tag lookup variants for optimized temporal tag queries
+type TagVariantCache struct {
+	mu            sync.RWMutex
+	variantToTag  map[string][]string  // clean tag -> list of entities with that tag variant
+	tagToVariants map[string][]string  // temporal tag -> list of clean variants
+}
+
+// NewTagVariantCache creates a new tag variant cache
+func NewTagVariantCache() *TagVariantCache {
+	return &TagVariantCache{
+		variantToTag:  make(map[string][]string),
+		tagToVariants: make(map[string][]string),
+	}
+}
+
+// AddTagVariant adds a tag variant mapping
+func (tvc *TagVariantCache) AddTagVariant(temporalTag, cleanTag, entityID string) {
+	tvc.mu.Lock()
+	defer tvc.mu.Unlock()
+	
+	// Add entity to the clean tag variant
+	if !contains(tvc.variantToTag[cleanTag], entityID) {
+		tvc.variantToTag[cleanTag] = append(tvc.variantToTag[cleanTag], entityID)
+	}
+	
+	// Track that this temporal tag has this clean variant
+	if !contains(tvc.tagToVariants[temporalTag], cleanTag) {
+		tvc.tagToVariants[temporalTag] = append(tvc.tagToVariants[temporalTag], cleanTag)
+	}
+}
+
+// GetEntitiesForVariant returns all entities for a clean tag variant
+func (tvc *TagVariantCache) GetEntitiesForVariant(cleanTag string) []string {
+	tvc.mu.RLock()
+	defer tvc.mu.RUnlock()
+	
+	if entities, exists := tvc.variantToTag[cleanTag]; exists {
+		// Return a copy to prevent external modification
+		result := make([]string, len(entities))
+		copy(result, entities)
+		return result
+	}
+	return nil
+}
+
+// RemoveEntityFromVariant removes an entity from all its tag variants
+func (tvc *TagVariantCache) RemoveEntityFromVariant(entityID string) {
+	tvc.mu.Lock()
+	defer tvc.mu.Unlock()
+	
+	// Remove entity from all clean tag variants
+	for cleanTag, entities := range tvc.variantToTag {
+		newEntities := make([]string, 0, len(entities))
+		for _, id := range entities {
+			if id != entityID {
+				newEntities = append(newEntities, id)
+			}
+		}
+		if len(newEntities) > 0 {
+			tvc.variantToTag[cleanTag] = newEntities
+		} else {
+			delete(tvc.variantToTag, cleanTag)
+		}
+	}
+}
+
+// GetVariantStats returns statistics about the tag variant cache
+func (tvc *TagVariantCache) GetVariantStats() (int, int) {
+	tvc.mu.RLock()
+	defer tvc.mu.RUnlock()
+	return len(tvc.variantToTag), len(tvc.tagToVariants)
+}
+
+// contains checks if a slice contains a string
+func contains(slice []string, item string) bool {
+	for _, s := range slice {
+		if s == item {
+			return true
+		}
+	}
+	return false
+}
+
+// BatchWriter handles batched write operations for improved throughput
+type BatchWriter struct {
+	mu           sync.Mutex
+	pending      map[string]*models.Entity  // entityID -> entity (pending writes)
+	pendingOps   []batchOperation           // ordered list of operations
+	batchSize    int                        // max entities per batch
+	flushTimer   *time.Timer               // automatic flush timer
+	flushInterval time.Duration             // how often to auto-flush
+	repo         *EntityRepository          // parent repository
+	isRunning    bool                       // whether background flushing is active
+	stopChan     chan struct{}             // signal to stop background flushing
+}
+
+// batchOperation represents a single operation in a batch
+type batchOperation struct {
+	opType   string         // "create", "update", "addtag"
+	entityID string         // target entity ID
+	entity   *models.Entity // entity data (for create/update)
+	tag      string         // tag data (for addtag)
+}
+
+// NewBatchWriter creates a new batch writer
+func NewBatchWriter(repo *EntityRepository, batchSize int, flushInterval time.Duration) *BatchWriter {
+	return &BatchWriter{
+		pending:       make(map[string]*models.Entity),
+		pendingOps:    make([]batchOperation, 0, batchSize),
+		batchSize:     batchSize,
+		flushInterval: flushInterval,
+		repo:          repo,
+		stopChan:      make(chan struct{}),
+	}
+}
+
+// Start begins background batch processing
+func (bw *BatchWriter) Start() {
+	bw.mu.Lock()
+	if bw.isRunning {
+		bw.mu.Unlock()
+		return
+	}
+	bw.isRunning = true
+	bw.mu.Unlock()
+	
+	go bw.backgroundFlush()
+	logger.Info("Batch writer started with batch size %d, flush interval %v", bw.batchSize, bw.flushInterval)
+}
+
+// Stop stops background batch processing and flushes pending operations
+func (bw *BatchWriter) Stop() {
+	bw.mu.Lock()
+	if !bw.isRunning {
+		bw.mu.Unlock()
+		return
+	}
+	bw.isRunning = false
+	bw.mu.Unlock()
+	
+	close(bw.stopChan)
+	bw.Flush() // Final flush
+	logger.Info("Batch writer stopped")
+}
+
+// backgroundFlush handles automatic flushing on timer
+func (bw *BatchWriter) backgroundFlush() {
+	ticker := time.NewTicker(bw.flushInterval)
+	defer ticker.Stop()
+	
+	for {
+		select {
+		case <-ticker.C:
+			if bw.shouldFlush() {
+				bw.Flush()
+			}
+		case <-bw.stopChan:
+			return
+		}
+	}
+}
+
+// shouldFlush checks if a flush is needed
+func (bw *BatchWriter) shouldFlush() bool {
+	bw.mu.Lock()
+	defer bw.mu.Unlock()
+	return len(bw.pendingOps) > 0
+}
+
+// AddCreate adds a create operation to the batch
+func (bw *BatchWriter) AddCreate(entity *models.Entity) error {
+	bw.mu.Lock()
+	defer bw.mu.Unlock()
+	
+	// Add to pending operations
+	bw.pendingOps = append(bw.pendingOps, batchOperation{
+		opType:   "create",
+		entityID: entity.ID,
+		entity:   entity,
+	})
+	bw.pending[entity.ID] = entity
+	
+	// Check if we need to flush
+	if len(bw.pendingOps) >= bw.batchSize {
+		go bw.Flush() // Flush asynchronously to avoid blocking
+	}
+	
+	return nil
+}
+
+// AddUpdate adds an update operation to the batch
+func (bw *BatchWriter) AddUpdate(entity *models.Entity) error {
+	bw.mu.Lock()
+	defer bw.mu.Unlock()
+	
+	bw.pendingOps = append(bw.pendingOps, batchOperation{
+		opType:   "update",
+		entityID: entity.ID,
+		entity:   entity,
+	})
+	bw.pending[entity.ID] = entity
+	
+	if len(bw.pendingOps) >= bw.batchSize {
+		go bw.Flush()
+	}
+	
+	return nil
+}
+
+// AddTag adds a tag operation to the batch
+func (bw *BatchWriter) AddTag(entityID, tag string) error {
+	bw.mu.Lock()
+	defer bw.mu.Unlock()
+	
+	bw.pendingOps = append(bw.pendingOps, batchOperation{
+		opType:   "addtag",
+		entityID: entityID,
+		tag:      tag,
+	})
+	
+	if len(bw.pendingOps) >= bw.batchSize {
+		go bw.Flush()
+	}
+	
+	return nil
+}
+
+// Flush executes all pending batch operations
+func (bw *BatchWriter) Flush() error {
+	bw.mu.Lock()
+	
+	if len(bw.pendingOps) == 0 {
+		bw.mu.Unlock()
+		return nil
+	}
+	
+	// Capture pending operations
+	ops := make([]batchOperation, len(bw.pendingOps))
+	copy(ops, bw.pendingOps)
+	entities := make(map[string]*models.Entity)
+	for k, v := range bw.pending {
+		entities[k] = v
+	}
+	
+	// Clear pending state
+	bw.pendingOps = bw.pendingOps[:0]
+	bw.pending = make(map[string]*models.Entity)
+	
+	bw.mu.Unlock()
+	
+	return bw.executeBatch(ops, entities)
+}
+
+// executeBatch performs the actual batch execution
+func (bw *BatchWriter) executeBatch(ops []batchOperation, entities map[string]*models.Entity) error {
+	startTime := time.Now()
+	logger.Debug("Executing batch of %d operations", len(ops))
+	
+	// Phase 1: Batch WAL logging
+	walEntities := make([]*models.Entity, 0, len(entities))
+	for _, entity := range entities {
+		walEntities = append(walEntities, entity)
+	}
+	
+	if err := bw.batchWALLog(walEntities); err != nil {
+		logger.Error("Batch WAL logging failed: %v", err)
+		return err
+	}
+	
+	// Phase 2: Batch lock acquisition (sorted by ID to prevent deadlocks)
+	entityIDs := make([]string, 0, len(entities))
+	for id := range entities {
+		entityIDs = append(entityIDs, id)
+	}
+	
+	// Sort to prevent deadlocks
+	for i := 0; i < len(entityIDs); i++ {
+		for j := i + 1; j < len(entityIDs); j++ {
+			if entityIDs[i] > entityIDs[j] {
+				entityIDs[i], entityIDs[j] = entityIDs[j], entityIDs[i]
+			}
+		}
+	}
+	
+	// Acquire locks in sorted order
+	for _, id := range entityIDs {
+		bw.repo.lockManager.AcquireEntityLock(id, WriteLock)
+	}
+	defer func() {
+		// Release locks in reverse order
+		for i := len(entityIDs) - 1; i >= 0; i-- {
+			bw.repo.lockManager.ReleaseEntityLock(entityIDs[i], WriteLock)
+		}
+	}()
+	
+	// Phase 3: Process operations and batch index updates
+	bw.repo.mu.Lock()
+	
+	// Process AddTag operations
+	for _, op := range ops {
+		if op.opType == "addtag" {
+			if entity, exists := bw.repo.entities[op.entityID]; exists {
+				// Add the tag to the entity
+				entity.Tags = append(entity.Tags, op.tag)
+				entity.UpdatedAt = models.Now()
+				entities[op.entityID] = entity  // Update the batch entities map
+			}
+		}
+	}
+	
+	// Update indexes for all entities
+	for _, entity := range entities {
+		bw.repo.updateIndexes(entity)
+		bw.repo.entities[entity.ID] = entity
+	}
+	bw.repo.mu.Unlock()
+	
+	// Phase 4: Batch disk writes (only for create/update operations)
+	writeEntities := make([]*models.Entity, 0, len(entities))
+	for _, entity := range entities {
+		writeEntities = append(writeEntities, entity)
+	}
+	
+	if err := bw.batchDiskWrite(writeEntities); err != nil {
+		logger.Error("Batch disk write failed: %v", err)
+		return err
+	}
+	
+	// Phase 5: Single cache invalidation
+	bw.repo.cache.Clear()
+	
+	duration := time.Since(startTime)
+	logger.Debug("Batch execution completed: %d operations in %v", len(ops), duration)
+	
+	return nil
+}
+
+// batchWALLog logs multiple entities to WAL efficiently
+func (bw *BatchWriter) batchWALLog(entities []*models.Entity) error {
+	for _, entity := range entities {
+		if err := bw.repo.wal.LogCreate(entity); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// batchDiskWrite writes multiple entities to disk efficiently
+func (bw *BatchWriter) batchDiskWrite(entities []*models.Entity) error {
+	for _, entity := range entities {
+		if err := bw.repo.writerManager.WriteEntity(entity); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // NewEntityRepository creates a new binary entity repository
 func NewEntityRepository(dataPath string) (*EntityRepository, error) {
 	// Ensure data directory exists
@@ -85,6 +463,14 @@ func NewEntityRepository(dataPath string) (*EntityRepository, error) {
 	// Check environment variable for sharded index feature flag
 	// Default to true for better performance, can be disabled by setting to "false"
 	useSharded := os.Getenv("ENTITYDB_USE_SHARDED_INDEX") != "false"
+	
+	// Check environment variable for tag variant cache feature flag
+	// Default to true for optimized temporal tag lookups
+	useVariants := os.Getenv("ENTITYDB_USE_VARIANT_CACHE") != "false"
+	
+	// Check environment variable for batch writes feature flag
+	// Default to true for improved write throughput
+	useBatchWrites := os.Getenv("ENTITYDB_USE_BATCH_WRITES") != "false"
 	
 	repo := &EntityRepository{
 		dataPath:        dataPath,
@@ -99,10 +485,27 @@ func NewEntityRepository(dataPath string) (*EntityRepository, error) {
 		lastCheckpoint:  time.Now(),  // Initialize checkpoint time
 		shardedTagIndex: NewShardedTagIndex(),
 		useShardedIndex: useSharded,
+		tagVariantCache: NewTagVariantCache(),
+		useVariantCache: useVariants,
+		useBatchWrites:  useBatchWrites,
 	}
 	
 	if useSharded {
 		logger.Info("Using sharded tag index for improved concurrency")
+	}
+	
+	if useVariants {
+		logger.Info("Using tag variant cache for optimized temporal tag lookups")
+	}
+	
+	if useBatchWrites {
+		// Initialize batch writer with reasonable defaults
+		batchSize := 10         // batch up to 10 entities
+		flushInterval := 100 * time.Millisecond  // flush every 100ms
+		repo.batchWriter = NewBatchWriter(repo, batchSize, flushInterval)
+		repo.batchWriter.Start()
+		logger.Info("Using batch writes for improved write throughput (batch size: %d, flush interval: %v)", 
+			batchSize, flushInterval)
 	}
 	
 	// Ensure the data file exists with a proper header before trying to read it
@@ -190,12 +593,50 @@ func NewEntityRepository(dataPath string) (*EntityRepository, error) {
 	return repo, nil
 }
 
+// Close properly shuts down the repository and its resources
+func (r *EntityRepository) Close() error {
+	var errors []error
+	
+	// Stop batch writer if running
+	if r.useBatchWrites && r.batchWriter != nil {
+		r.batchWriter.Stop()
+	}
+	
+	// Close WAL
+	if r.wal != nil {
+		if err := r.wal.Close(); err != nil {
+			errors = append(errors, fmt.Errorf("error closing WAL: %w", err))
+		}
+	}
+	
+	// Close current file
+	if r.currentFile != nil {
+		if err := r.currentFile.Close(); err != nil {
+			errors = append(errors, fmt.Errorf("error closing data file: %w", err))
+		}
+	}
+	
+	// Close writer manager
+	if r.writerManager != nil {
+		if err := r.writerManager.Close(); err != nil {
+			errors = append(errors, fmt.Errorf("error closing writer manager: %w", err))
+		}
+	}
+	
+	if len(errors) > 0 {
+		return fmt.Errorf("repository close errors: %v", errors)
+	}
+	
+	logger.Info("EntityRepository closed successfully")
+	return nil
+}
+
 // getDataFile returns the path to the current data file
 func (r *EntityRepository) getDataFile() string {
 	return filepath.Join(r.dataPath, "entities.ebf")
 }
 
-// buildIndexes reads the entire file and builds in-memory indexes
+// buildIndexes reads the entire file and builds in-memory indexes with parallel processing
 func (r *EntityRepository) buildIndexes() error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -223,14 +664,10 @@ func (r *EntityRepository) buildIndexes() error {
 			r.tagIndex = loadedIndex
 			r.persistentIndexLoaded = true
 			
-			// If using sharded index, populate it from loaded index
+			// If using sharded index, populate it from loaded index in parallel
 			if r.useShardedIndex {
-				logger.Debug("Populating sharded index from loaded data")
-				for tag, entities := range loadedIndex {
-					for _, entityID := range entities {
-						r.shardedTagIndex.AddTag(tag, entityID)
-					}
-				}
+				logger.Debug("Populating sharded index from loaded data with parallel processing")
+				r.populateShardedIndexParallel(loadedIndex)
 			}
 			
 			logger.Info("Loaded persisted tag index with %d tags", len(loadedIndex))
@@ -270,6 +707,214 @@ func (r *EntityRepository) buildIndexes() error {
 		// Load entities and optionally build indexes
 		logger.Debug("Loading entities from disk: %d found", len(entities))
 	}
+	// Process entities with parallel indexing for better performance
+	if len(entities) > 0 {
+		if !r.persistentIndexLoaded && !entitiesAlreadyLoaded {
+			// Use parallel indexing for large datasets
+			logger.Debug("Building indexes in parallel for %d entities", len(entities))
+			r.buildIndexesParallel(entities, entitiesAlreadyLoaded)
+		} else {
+			// Sequential processing for smaller datasets or when indexes are pre-loaded
+			logger.Debug("Processing entities sequentially (%d entities)", len(entities))
+			r.buildIndexesSequential(entities, entitiesAlreadyLoaded)
+		}
+	}
+	
+	return nil
+}
+
+// populateShardedIndexParallel populates the sharded index from loaded data using parallel processing
+func (r *EntityRepository) populateShardedIndexParallel(loadedIndex map[string][]string) {
+	// Convert map to slice for parallel processing
+	type indexEntry struct {
+		tag      string
+		entities []string
+	}
+	
+	entries := make([]indexEntry, 0, len(loadedIndex))
+	for tag, entities := range loadedIndex {
+		entries = append(entries, indexEntry{tag: tag, entities: entities})
+	}
+	
+	// Process in parallel chunks
+	const chunkSize = 100
+	numWorkers := 4 // Reasonable number of workers for index population
+	
+	if len(entries) > chunkSize {
+		// Use worker goroutines for large datasets
+		entryChan := make(chan indexEntry, numWorkers)
+		var wg sync.WaitGroup
+		
+		// Start workers
+		for i := 0; i < numWorkers; i++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				for entry := range entryChan {
+					for _, entityID := range entry.entities {
+						r.shardedTagIndex.AddTag(entry.tag, entityID)
+					}
+				}
+			}()
+		}
+		
+		// Send work to workers
+		for _, entry := range entries {
+			entryChan <- entry
+		}
+		close(entryChan)
+		
+		// Wait for completion
+		wg.Wait()
+		logger.Debug("Populated sharded index using %d workers", numWorkers)
+	} else {
+		// Sequential processing for small datasets
+		for _, entry := range entries {
+			for _, entityID := range entry.entities {
+				r.shardedTagIndex.AddTag(entry.tag, entityID)
+			}
+		}
+	}
+}
+
+// buildIndexesParallel builds indexes using parallel processing for better performance
+func (r *EntityRepository) buildIndexesParallel(entities []*models.Entity, entitiesAlreadyLoaded bool) {
+	const chunkSize = 50  // Process entities in chunks of 50
+	numWorkers := 4       // Use 4 workers for parallel processing
+	
+	// Create channels for work distribution
+	entityChan := make(chan *models.Entity, numWorkers)
+	var wg sync.WaitGroup
+	
+	// Temporary storage for parallel results (to avoid lock contention)
+	type indexResult struct {
+		entityID        string
+		tagMappings     map[string]bool  // Set of tags for this entity
+		contentMappings map[string]bool  // Set of content for this entity
+		temporalEntries []temporalEntry  // Temporal index entries
+		namespaceEntries []namespaceEntry // Namespace index entries
+	}
+	
+	
+	resultChan := make(chan indexResult, len(entities))
+	
+	// Start worker goroutines
+	for i := 0; i < numWorkers; i++ {
+		wg.Add(1)
+		go func(workerID int) {
+			defer wg.Done()
+			logger.Trace("Index worker %d started", workerID)
+			
+			for entity := range entityChan {
+				result := indexResult{
+					entityID:         entity.ID,
+					tagMappings:      make(map[string]bool),
+					contentMappings:  make(map[string]bool),
+					temporalEntries:  make([]temporalEntry, 0),
+					namespaceEntries: make([]namespaceEntry, 0),
+				}
+				
+				// Process tags
+				for _, tag := range entity.Tags {
+					result.tagMappings[tag] = true
+					
+					// Handle temporal tags
+					if strings.Contains(tag, "|") {
+						parts := strings.SplitN(tag, "|", 2)
+						if len(parts) == 2 {
+							// Index non-timestamped version
+							actualTag := parts[1]
+							result.tagMappings[actualTag] = true
+							
+							// Temporal index entry
+							if timestampNanos, err := strconv.ParseInt(parts[0], 10, 64); err == nil {
+								timestamp := time.Unix(0, timestampNanos)
+								result.temporalEntries = append(result.temporalEntries, temporalEntry{
+									entityID:  entity.ID,
+									tag:       tag,
+									timestamp: timestamp,
+								})
+							}
+						}
+					}
+					
+					// Namespace index entry
+					result.namespaceEntries = append(result.namespaceEntries, namespaceEntry{
+						entityID: entity.ID,
+						tag:      tag,
+					})
+				}
+				
+				// Process content
+				if len(entity.Content) > 0 {
+					contentStr := string(entity.Content)
+					result.contentMappings[contentStr] = true
+				}
+				
+				resultChan <- result
+			}
+			logger.Trace("Index worker %d finished", workerID)
+		}(i)
+	}
+	
+	// Send entities to workers
+	go func() {
+		for _, entity := range entities {
+			// Add to entity cache (only if not already loaded)
+			if !entitiesAlreadyLoaded {
+				r.entities[entity.ID] = entity
+			}
+			entityChan <- entity
+		}
+		close(entityChan)
+	}()
+	
+	// Wait for workers to complete
+	wg.Wait()
+	close(resultChan)
+	
+	// Collect results and update indexes (this must be sequential to avoid race conditions)
+	logger.Debug("Collecting parallel indexing results...")
+	for result := range resultChan {
+		// Update tag indexes and tag variant cache
+		for tag := range result.tagMappings {
+			if r.useShardedIndex {
+				r.shardedTagIndex.AddTag(tag, result.entityID)
+			} else {
+				r.tagIndex[tag] = append(r.tagIndex[tag], result.entityID)
+			}
+			
+			// Update tag variant cache for temporal tags
+			if r.useVariantCache && strings.Contains(tag, "|") {
+				parts := strings.SplitN(tag, "|", 2)
+				if len(parts) == 2 {
+					cleanTag := parts[1]
+					r.tagVariantCache.AddTagVariant(tag, cleanTag, result.entityID)
+				}
+			}
+		}
+		
+		// Update content index
+		for content := range result.contentMappings {
+			r.contentIndex[content] = append(r.contentIndex[content], result.entityID)
+		}
+		
+		// Update temporal index
+		for _, entry := range result.temporalEntries {
+			r.temporalIndex.AddEntry(entry.entityID, entry.tag, entry.timestamp)
+		}
+		
+		// Update namespace index
+		for _, entry := range result.namespaceEntries {
+			r.namespaceIndex.AddTag(entry.entityID, entry.tag)
+		}
+	}
+	
+	logger.Debug("Parallel indexing completed for %d entities using %d workers", len(entities), numWorkers)
+}
+
+// buildIndexesSequential builds indexes using sequential processing (fallback method)
+func (r *EntityRepository) buildIndexesSequential(entities []*models.Entity, entitiesAlreadyLoaded bool) {
 	for _, entity := range entities {
 		// Add to entity cache (only if not already loaded)
 		if !entitiesAlreadyLoaded {
@@ -295,7 +940,13 @@ func (r *EntityRepository) buildIndexes() error {
 					if strings.Contains(tag, "|") {
 						parts := strings.SplitN(tag, "|", 2)
 						if len(parts) == 2 {
-							r.shardedTagIndex.AddTag(parts[1], entity.ID)
+							cleanTag := parts[1]
+							r.shardedTagIndex.AddTag(cleanTag, entity.ID)
+							
+							// Update tag variant cache
+							if r.useVariantCache {
+								r.tagVariantCache.AddTagVariant(tag, cleanTag, entity.ID)
+							}
 						}
 					}
 				} else {
@@ -310,6 +961,11 @@ func (r *EntityRepository) buildIndexes() error {
 							// This is critical for authentication and tag lookups
 							actualTag := parts[1]
 							r.tagIndex[actualTag] = append(r.tagIndex[actualTag], entity.ID)
+							
+							// Update tag variant cache
+							if r.useVariantCache {
+								r.tagVariantCache.AddTagVariant(tag, actualTag, entity.ID)
+							}
 							
 							// Log relationship tag indexing
 							if strings.HasPrefix(actualTag, "_source:") || strings.HasPrefix(actualTag, "_target:") || strings.HasPrefix(actualTag, "_relationship:") {
@@ -348,8 +1004,6 @@ func (r *EntityRepository) buildIndexes() error {
 			r.contentIndex[contentStr] = append(r.contentIndex[contentStr], entity.ID)
 		}
 	}
-	
-	return nil
 }
 
 // updateIndexes updates in-memory indexes for a new or updated entity
@@ -383,6 +1037,11 @@ func (r *EntityRepository) updateIndexes(entity *models.Entity) {
 	// CRITICAL: First remove all existing index entries for this entity
 	// This prevents duplicate entries when updating
 	if existingEntity, exists := r.entities[entity.ID]; exists {
+		// Remove entity from tag variant cache first
+		if r.useVariantCache {
+			r.tagVariantCache.RemoveEntityFromVariant(entity.ID)
+		}
+		
 		for _, tag := range existingEntity.Tags {
 			// Remove from tag index
 			removeEntityFromTag(tag, entity.ID)
@@ -438,6 +1097,11 @@ func (r *EntityRepository) updateIndexes(entity *models.Entity) {
 				actualTag := parts[1]
 				logger.Trace("Indexing non-timestamped: %s for %s", actualTag, entity.ID)
 				addEntityToTag(actualTag, entity.ID)
+				
+				// Update tag variant cache
+				if r.useVariantCache {
+					r.tagVariantCache.AddTagVariant(tag, actualTag, entity.ID)
+				}
 			}
 		}
 		
@@ -486,6 +1150,15 @@ func (r *EntityRepository) Create(entity *models.Entity) error {
 	// Note: Checksum generation disabled - was causing systematic validation failures
 	// without providing real security value. Can be re-implemented properly if needed.
 	logger.Trace("Entity prepared for storage: %s (%d bytes content)", entity.ID, len(entity.Content))
+	
+	// Use batch writer if enabled for better throughput
+	if r.useBatchWrites && r.batchWriter != nil {
+		logger.Trace("Using batch writer for entity creation: %s", entity.ID)
+		return r.batchWriter.AddCreate(entity)
+	}
+	
+	// Fallback to individual write operation
+	logger.Trace("Using individual write for entity creation: %s", entity.ID)
 	
 	// Log to WAL first
 	if err := r.wal.LogCreate(entity); err != nil {
@@ -1159,9 +1832,19 @@ func (r *EntityRepository) ListByTag(tag string) ([]*models.Entity, error) {
 		// Direct lookup first
 		directMatches := r.shardedTagIndex.GetEntitiesForTag(tag)
 		
-		// Also check for temporal versions of the tag
-		// This requires a scan, but it's parallelized across shards
-		temporalMatches := r.shardedTagIndex.OptimizedListByTag(tag, true)
+		var temporalMatches []string
+		if r.useVariantCache {
+			// OPTIMIZED: Use pre-computed tag variant cache instead of scanning
+			logger.Trace("Using tag variant cache for optimized temporal lookup")
+			temporalMatches = r.tagVariantCache.GetEntitiesForVariant(tag)
+			if temporalMatches == nil {
+				temporalMatches = []string{}
+			}
+		} else {
+			// FALLBACK: Use slow temporal tag scanning
+			logger.Trace("Using legacy temporal tag scanning (variant cache disabled)")
+			temporalMatches = r.shardedTagIndex.OptimizedListByTag(tag, true)
+		}
 		
 		// Combine and deduplicate
 		seen := make(map[string]bool)
@@ -1178,7 +1861,8 @@ func (r *EntityRepository) ListByTag(tag string) ([]*models.Entity, error) {
 			}
 		}
 		
-		logger.Trace("Sharded index found %d matches", len(matchingEntityIDs))
+		logger.Trace("Sharded index found %d matches (%d direct, %d temporal)", 
+			len(matchingEntityIDs), len(directMatches), len(temporalMatches))
 		
 	} else {
 		// Legacy path with global lock
@@ -1202,32 +1886,46 @@ func (r *EntityRepository) ListByTag(tag string) ([]*models.Entity, error) {
 			}
 		}
 		
-		// Then check for temporal tags with timestamp prefix
-		matchCount := 0
-		for indexedTag, entityIDs := range r.tagIndex {
-			// Skip if this is exactly the tag we already processed
-			if indexedTag == tag {
-				continue
+		// Optimized temporal tag lookup using pre-computed variant cache
+		var temporalEntityIDs []string
+		if r.useVariantCache {
+			// OPTIMIZED: O(1) lookup using pre-computed tag variants
+			logger.Trace("Using tag variant cache for optimized temporal lookup (legacy path)")
+			temporalEntityIDs = r.tagVariantCache.GetEntitiesForVariant(tag)
+			if temporalEntityIDs == nil {
+				temporalEntityIDs = []string{}
 			}
-			
-			// Extract the actual tag part (after the timestamp)
-			tagParts := strings.SplitN(indexedTag, "|", 2)
-			if len(tagParts) == 2 {
-				actualTag := tagParts[1]
+		} else {
+			// FALLBACK: O(n) scan through all temporal tags
+			logger.Trace("Using legacy temporal tag scanning (variant cache disabled)")
+			for indexedTag, entityIDs := range r.tagIndex {
+				// Skip if this is exactly the tag we already processed
+				if indexedTag == tag {
+					continue
+				}
 				
-				// Check if the actual tag matches our search tag
-				if actualTag == tag {
-					matchCount++
-					for _, entityID := range entityIDs {
-						if !uniqueEntityIDs[entityID] {
-							uniqueEntityIDs[entityID] = true
-							matchingEntityIDs = append(matchingEntityIDs, entityID)
-						}
+				// Extract the actual tag part (after the timestamp)
+				tagParts := strings.SplitN(indexedTag, "|", 2)
+				if len(tagParts) == 2 {
+					actualTag := tagParts[1]
+					
+					// Check if the actual tag matches our search tag
+					if actualTag == tag {
+						temporalEntityIDs = append(temporalEntityIDs, entityIDs...)
 					}
 				}
 			}
 		}
-		logger.Trace("Found %d temporal matches", matchCount)
+		
+		// Add temporal matches to result set
+		for _, entityID := range temporalEntityIDs {
+			if !uniqueEntityIDs[entityID] {
+				uniqueEntityIDs[entityID] = true
+				matchingEntityIDs = append(matchingEntityIDs, entityID)
+			}
+		}
+		
+		logger.Trace("Found %d temporal matches", len(temporalEntityIDs))
 		
 		r.mu.RUnlock()
 	}
@@ -1715,6 +2413,15 @@ func (r *EntityRepository) AddTag(entityID, tag string) error {
 	if !strings.Contains(tag, "|") {
 		timestampedTag = fmt.Sprintf("%s|%s", models.NowString(), tag)
 	}
+	
+	// Use batch writer if enabled for better throughput
+	if r.useBatchWrites && r.batchWriter != nil {
+		logger.Trace("Using batch writer for AddTag: %s -> %s", entityID, tag)
+		return r.batchWriter.AddTag(entityID, timestampedTag)
+	}
+	
+	// Fallback to individual tag addition
+	logger.Trace("Using individual write for AddTag: %s -> %s", entityID, tag)
 	
 	// Check if tag already exists (check both timestamped and non-timestamped versions)
 	for _, existingTag := range entity.Tags {
@@ -3002,35 +3709,6 @@ func (r *EntityRepository) SaveTagIndexIfNeeded() error {
 	return nil
 }
 
-// Close closes the repository and saves any pending data
-func (r *EntityRepository) Close() error {
-	logger.Debug("Closing entity repository")
-	
-	// Save tag index if dirty
-	if err := r.SaveTagIndex(); err != nil {
-		logger.Error("Failed to save tag index on close: %v", err)
-	}
-	
-	// Close WAL
-	if r.wal != nil {
-		if err := r.wal.Close(); err != nil {
-			logger.Error("Failed to close WAL: %v", err)
-		}
-	}
-	
-	// Close current file
-	if r.currentFile != nil {
-		if err := r.currentFile.Close(); err != nil {
-			logger.Error("Failed to close current file: %v", err)
-		}
-	}
-	
-	// Clear reader pool
-	r.readerPool = sync.Pool{}
-	
-	logger.Debug("Entity repository closed")
-	return nil
-}
 
 // saveEntities writes all entities to disk - exposed for WALOnlyRepository
 func (r *EntityRepository) saveEntities() error {

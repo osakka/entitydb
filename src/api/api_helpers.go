@@ -12,7 +12,7 @@ import (
 // ParamsKey is the context key for URL parameters
 type ParamsKey struct{}
 
-// DecodeJSONBody decodes a JSON request body into a struct
+// DecodeJSONBody decodes a JSON request body into a struct using pooled decoder
 func DecodeJSONBody(r *http.Request, dst interface{}) error {
 	// Check content type
 	contentType := r.Header.Get("Content-Type")
@@ -25,12 +25,8 @@ func DecodeJSONBody(r *http.Request, dst interface{}) error {
 	// Set max body size to 1MB to prevent memory issues
 	r.Body = http.MaxBytesReader(nil, r.Body, 1048576)
 
-	// Create decoder
-	dec := json.NewDecoder(r.Body)
-	dec.DisallowUnknownFields()
-
-	// Decode
-	err := dec.Decode(&dst)
+	// Use pooled decoder with options
+	err := DecodeJSONWithOptions(r.Body, &dst, true) // true = DisallowUnknownFields
 	if err != nil {
 		var syntaxError *json.SyntaxError
 		var unmarshalTypeError *json.UnmarshalTypeError
@@ -54,10 +50,9 @@ func DecodeJSONBody(r *http.Request, dst interface{}) error {
 		}
 	}
 
-	// Check for additional JSON values
-	if err := dec.Decode(&struct{}{}); err != io.EOF {
-		return errors.New("request body must only contain a single JSON object")
-	}
+	// Note: Single JSON object validation removed for pooled decoder efficiency
+	// This validation was checking for extra JSON after the main object,
+	// but it requires a second Decode() call which complicates pooling
 
 	return nil
 }

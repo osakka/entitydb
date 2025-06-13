@@ -103,7 +103,7 @@ func (h *DatasetHandler) CreateDataset(w http.ResponseWriter, r *http.Request) {
 		ID:   uuid.New().String(),
 		Tags: []string{
 			"type:dataset",
-			"dataset:_system", // Dataset entities belong to the system dataset
+			"dataset:system", // Dataset entities belong to the system dataset
 			"name:" + req.Name,
 			"id:" + req.Name,
 		},

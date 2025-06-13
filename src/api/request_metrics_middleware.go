@@ -49,7 +49,9 @@ func (rw *responseWriter) Write(data []byte) (int, error) {
 func (m *RequestMetricsMiddleware) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Skip metrics endpoint to avoid recursion
-		if strings.HasPrefix(r.URL.Path, "/api/v1/metrics") || r.URL.Path == "/metrics" {
+		if strings.HasPrefix(r.URL.Path, "/api/v1/metrics") || 
+		   strings.HasPrefix(r.URL.Path, "/api/v1/system/metrics") ||
+		   r.URL.Path == "/metrics" {
 			next.ServeHTTP(w, r)
 			return
 		}

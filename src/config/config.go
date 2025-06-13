@@ -250,7 +250,7 @@ type Config struct {
 	
 	// AppVersion is the application version for API documentation.
 	// Environment: ENTITYDB_APP_VERSION
-	// Default: "2.30.0"
+	// Default: "2.31.0"
 	// Should match build version for consistency
 	AppVersion string
 	
@@ -408,7 +408,7 @@ func Load() *Config {
 		
 		// Application Info
 		AppName:          getEnv("ENTITYDB_APP_NAME", "EntityDB Server"),
-		AppVersion:       getEnv("ENTITYDB_APP_VERSION", "2.30.0"),
+		AppVersion:       getEnv("ENTITYDB_APP_VERSION", "2.31.0"),
 		
 		// File and Path Configuration
 		DatabaseFilename: getEnv("ENTITYDB_DATABASE_FILENAME", "entities.db"),

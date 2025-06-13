@@ -205,6 +205,15 @@ type Entity struct {
 	
 	// UpdatedAt is the last modification timestamp in nanoseconds since Unix epoch
 	UpdatedAt int64 `json:"updated_at,omitempty"`
+	
+	// Performance optimization: cache for tag values
+	// Maps tag key to latest value, built lazily on first access
+	tagValueCache map[string]string `json:"-"`
+	cacheValid    bool              `json:"-"`
+	
+	// Cache for cleaned tags (without timestamps)
+	cleanTagsCache []string `json:"-"`
+	cleanCacheValid bool    `json:"-"`
 }
 
 // ContentItem represents legacy content storage format.
@@ -295,6 +304,8 @@ func (e *Entity) AddTag(tag string) {
 	// Format as temporal tag and intern for memory efficiency
 	temporalTag := FormatTemporalTag(tag)
 	e.Tags = append(e.Tags, Intern(temporalTag))
+	// Invalidate cache since tags were modified
+	e.invalidateTagValueCache()
 }
 
 // AddTagWithValue is a convenience method for adding namespace:value tags.
@@ -307,6 +318,7 @@ func (e *Entity) AddTag(tag string) {
 func (e *Entity) AddTagWithValue(key, value string) {
 	tag := fmt.Sprintf("%s:%s", key, value)
 	e.AddTag(tag)
+	// Cache invalidation is handled by AddTag
 }
 
 // GetTagsWithoutTimestamp returns all tags with their timestamps stripped.
@@ -327,24 +339,36 @@ func (e *Entity) AddTagWithValue(key, value string) {
 //	cleanTags := entity.GetTagsWithoutTimestamp()
 //	// cleanTags = ["status:active", "type:user"]
 func (e *Entity) GetTagsWithoutTimestamp() []string {
-	result := []string{}
+	e.buildCleanTagsCache()
+	// Return a copy to prevent external modification
+	result := make([]string, len(e.cleanTagsCache))
+	copy(result, e.cleanTagsCache)
+	return result
+}
+
+// buildCleanTagsCache builds or rebuilds the clean tags cache
+func (e *Entity) buildCleanTagsCache() {
+	if e.cleanCacheValid && e.cleanTagsCache != nil {
+		return // Cache is already valid
+	}
+	
+	// Pre-allocate slice with known capacity
+	e.cleanTagsCache = make([]string, 0, len(e.Tags))
+	
 	for _, tag := range e.Tags {
-		// Handle multiple timestamp formats:
-		// 1. ISO|tag (standard format)
-		// 2. ISO|NANO|tag (double timestamp format from temporal repository)
-		// 3. NANO|tag (numeric only format)
-		
-		parts := strings.Split(tag, "|")
-		if len(parts) >= 2 {
-			// Take the last part as the tag value
-			actualTag := parts[len(parts)-1]
-			result = append(result, actualTag)
+		// Fast path: find last pipe character
+		lastPipe := strings.LastIndex(tag, "|")
+		if lastPipe >= 0 {
+			// Extract tag after timestamp
+			actualTag := tag[lastPipe+1:]
+			e.cleanTagsCache = append(e.cleanTagsCache, actualTag)
 		} else {
 			// No timestamp delimiter found, return as is
-			result = append(result, tag)
+			e.cleanTagsCache = append(e.cleanTagsCache, tag)
 		}
 	}
-	return result
+	
+	e.cleanCacheValid = true
 }
 
 // HasTag checks if the entity has a specific tag, ignoring timestamps.
@@ -356,8 +380,8 @@ func (e *Entity) GetTagsWithoutTimestamp() []string {
 //	    // Entity is active
 //	}
 func (e *Entity) HasTag(tag string) bool {
-	cleanTags := e.GetTagsWithoutTimestamp()
-	for _, cleanTag := range cleanTags {
+	e.buildCleanTagsCache()
+	for _, cleanTag := range e.cleanTagsCache {
 		if cleanTag == tag {
 			return true
 		}
@@ -399,9 +423,25 @@ func (e *Entity) HasTag(tag string) bool {
 //	value := entity.GetTagValue("status")
 //	// Returns: "archived" (most recent by timestamp)
 func (e *Entity) GetTagValue(key string) string {
-	// Look for the most recent tag with the given key prefix
-	var latestValue string
-	var latestTimestamp int64
+	// Use cached value if available
+	e.buildTagValueCache()
+	if value, exists := e.tagValueCache[key]; exists {
+		return value
+	}
+	return ""
+}
+
+// buildTagValueCache builds or rebuilds the tag value cache for O(1) lookups
+func (e *Entity) buildTagValueCache() {
+	if e.cacheValid && e.tagValueCache != nil {
+		return // Cache is already valid
+	}
+	
+	// Initialize cache
+	e.tagValueCache = make(map[string]string)
+	
+	// Track latest timestamp for each key
+	latestTimestamp := make(map[string]int64)
 	
 	for _, tag := range e.Tags {
 		parts := strings.Split(tag, "|")
@@ -418,21 +458,42 @@ func (e *Entity) GetTagValue(key string) string {
 				}
 			}
 			
-			// Check if this tag matches our key
+			// Extract the actual tag
 			actualTag := parts[len(parts)-1]
-			if strings.HasPrefix(actualTag, key+":") {
-				tagParts := strings.SplitN(actualTag, ":", 2)
-				if len(tagParts) == 2 && tagParts[0] == key {
-					timestampNanos := timestamp.UnixNano()
-					if timestampNanos > latestTimestamp {
-						latestTimestamp = timestampNanos
-						latestValue = tagParts[1]
-					}
+			if colonIndex := strings.Index(actualTag, ":"); colonIndex > 0 {
+				key := actualTag[:colonIndex]
+				value := actualTag[colonIndex+1:]
+				
+				timestampNanos := timestamp.UnixNano()
+				if existingTimestamp, exists := latestTimestamp[key]; !exists || timestampNanos > existingTimestamp {
+					latestTimestamp[key] = timestampNanos
+					e.tagValueCache[key] = value
 				}
 			}
 		}
 	}
-	return latestValue
+	
+	e.cacheValid = true
+}
+
+// invalidateTagValueCache invalidates all caches when tags are modified
+func (e *Entity) invalidateTagValueCache() {
+	e.cacheValid = false
+	e.tagValueCache = nil
+	e.cleanCacheValid = false
+	e.cleanTagsCache = nil
+}
+
+// SetTags replaces all tags and invalidates the cache (used by storage layer)
+func (e *Entity) SetTags(tags []string) {
+	e.Tags = tags
+	e.invalidateTagValueCache()
+}
+
+// AppendTag adds a tag without timestamp formatting (used by storage layer for pre-formatted tags)
+func (e *Entity) AppendTag(tag string) {
+	e.Tags = append(e.Tags, tag)
+	e.invalidateTagValueCache()
 }
 
 // SetContent sets content with automatic chunking if needed

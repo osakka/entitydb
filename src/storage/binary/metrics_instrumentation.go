@@ -4,6 +4,7 @@ import (
 	"entitydb/logger"
 	"entitydb/models"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -204,11 +205,8 @@ func (m *StorageMetrics) storeMetric(name string, value float64, unit string, de
 		return
 	}
 	
-	// Build metric ID with labels
+	// Use single entity per metric name (not per label combination)
 	metricID := "metric_" + name
-	for k, v := range labels {
-		metricID += "_" + k + "_" + v
-	}
 	
 	logger.Trace("StorageMetrics.storeMetric: storing metric %s = %.2f", metricID, value)
 	
@@ -222,18 +220,9 @@ func (m *StorageMetrics) storeMetric(name string, value float64, unit string, de
 			"name:" + name,
 			"unit:" + unit,
 			"description:" + description,
+			"retention:count:1000", 
+			"retention:period:43200",
 		}
-		
-		// Add label tags
-		for k, v := range labels {
-			tags = append(tags, fmt.Sprintf("label:%s:%s", k, v))
-		}
-		
-		// Initial value
-		tags = append(tags, fmt.Sprintf("value:%.2f", value))
-		
-		// Retention for storage metrics: 12 hours, 1000 data points
-		tags = append(tags, "retention:count:1000", "retention:period:43200")
 		
 		newEntity := &models.Entity{
 			ID:      metricID,
@@ -246,25 +235,70 @@ func (m *StorageMetrics) storeMetric(name string, value float64, unit string, de
 			return
 		}
 		logger.Debug("Successfully created metric entity %s", metricID)
-		return
 	}
 	
-	// For counters, increment the current value
+	// Build value tag with labels embedded
+	valueTag := fmt.Sprintf("value:%.2f", value)
+	
+	// Add sorted labels to value tag for dimensional data
+	if len(labels) > 0 {
+		var sortedKeys []string
+		for k := range labels {
+			sortedKeys = append(sortedKeys, k)
+		}
+		sort.Strings(sortedKeys)
+		
+		var labelParts []string
+		for _, k := range sortedKeys {
+			labelParts = append(labelParts, fmt.Sprintf("%s=%s", k, labels[k]))
+		}
+		valueTag += ":" + strings.Join(labelParts, ":")
+	}
+	
+	// For counters, we need special handling
 	if unit == "count" {
+		// For counters with labels, we need to track the current value for this label combination
 		currentValue := 0.0
-		for _, tag := range entity.GetTagsWithoutTimestamp() {
-			if strings.HasPrefix(tag, "value:") {
-				if val, err := strconv.ParseFloat(strings.TrimPrefix(tag, "value:"), 64); err == nil {
-					currentValue = val
-					break
+		targetLabelString := ""
+		var labelParts []string
+		
+		if len(labels) > 0 {
+			var sortedKeys []string
+			for k := range labels {
+				sortedKeys = append(sortedKeys, k)
+			}
+			sort.Strings(sortedKeys)
+			
+			for _, k := range sortedKeys {
+				labelParts = append(labelParts, fmt.Sprintf("%s=%s", k, labels[k]))
+			}
+			targetLabelString = ":" + strings.Join(labelParts, ":")
+		}
+		
+		// Look for existing value with same labels
+		if entity != nil {
+			for _, tag := range entity.GetTagsWithoutTimestamp() {
+				if strings.HasPrefix(tag, "value:") && strings.Contains(tag, targetLabelString) {
+					valueStr := strings.TrimPrefix(tag, "value:")
+					if colonIdx := strings.Index(valueStr, ":"); colonIdx > 0 {
+						valueStr = valueStr[:colonIdx]
+					}
+					if val, err := strconv.ParseFloat(valueStr, 64); err == nil {
+						currentValue = val
+						break
+					}
 				}
 			}
 		}
-		value = currentValue + value
+		
+		// Update value tag with incremented value
+		valueTag = fmt.Sprintf("value:%.2f", currentValue + value)
+		if len(labels) > 0 {
+			valueTag += ":" + strings.Join(labelParts, ":")
+		}
 	}
 	
-	// Add temporal value tag
-	valueTag := fmt.Sprintf("value:%.2f", value)
+	// Add temporal value tag to single metric entity
 	if err := m.repo.AddTag(metricID, valueTag); err != nil {
 		// Don't log error to avoid recursion
 	}
