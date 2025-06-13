@@ -3,7 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EntityDB Control Center - Temporal Datasets</title>
+    <title>EntityDB Control Center - Temporal Datasets v2.30.2</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#3498db">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="EntityDB">
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
     
     <!-- Vue 3 Production Build -->
     <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
@@ -13,11 +24,20 @@
     
     <!-- CSS -->
     <link href="/css/design-system.css" rel="stylesheet">
+    <link href="/css/entity-browser-enhanced.css" rel="stylesheet">
+    <link href="/css/entity-modal-system.css" rel="stylesheet">
+    <link href="/css/temporal-query-system.css" rel="stylesheet">
     
     <!-- Core scripts -->
-    <script src="/js/logger.js"></script>
-    <script src="/js/api-client.js"></script>
-    <script src="/js/notification-system.js"></script>
+    <script src="/js/logger.js?v=2.30.2"></script>
+    <script src="/js/api-client.js?v=2.30.2"></script>
+    <script src="/js/notification-system.js?v=2.30.2"></script>
+    <script src="/js/advanced-search-system.js?v=2.30.2"></script>
+    <script src="/js/data-export-system.js?v=2.30.2"></script>
+    <script src="/js/temporal-query-system.js?v=2.30.2"></script>
+    <script src="/js/entity-browser-enhanced.js?v=2.30.2"></script>
+    <script src="/js/entity-modal-system.js?v=2.30.2"></script>
+    <script src="/js/relationship-visualization.js?v=2.30.2"></script>
     
     <style>
         * {
@@ -613,6 +633,110 @@
             background: rgba(255,255,255,0.1);
         }
 
+        /* PWA Install Banner */
+        .pwa-install-banner {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            right: 20px;
+            background: #3498db;
+            color: white;
+            padding: 16px;
+            border-radius: 8px;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.2);
+            z-index: 10000;
+            animation: slideUp 0.3s ease-out;
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translateY(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .install-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .install-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex: 1;
+        }
+
+        .install-info i {
+            font-size: 20px;
+        }
+
+        .install-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .install-actions .btn {
+            color: white;
+            border-color: rgba(255,255,255,0.3);
+        }
+
+        .install-actions .btn-primary {
+            background: rgba(255,255,255,0.2);
+        }
+
+        .install-actions .btn-primary:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
+        .install-actions .btn-ghost {
+            background: transparent;
+        }
+
+        .install-actions .btn-ghost:hover {
+            background: rgba(255,255,255,0.1);
+        }
+
+        @media (max-width: 768px) {
+            .pwa-install-banner {
+                left: 10px;
+                right: 10px;
+                bottom: 10px;
+            }
+            
+            .install-content {
+                flex-direction: column;
+                text-align: center;
+                gap: 12px;
+            }
+            
+            .install-actions {
+                justify-content: center;
+            }
+        }
+
+        /* Offline indicator */
+        .offline-indicator {
+            position: fixed;
+            top: 70px;
+            right: 20px;
+            background: #e74c3c;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 4px;
+            font-size: 14px;
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
         /* Loading spinner */
         .spinner {
             display: inline-block;
@@ -627,6 +751,160 @@
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
+
+        /* Temporal Overview Styles */
+        .temporal-overview {
+            display: flex;
+            flex-direction: column;
+            gap: 32px;
+        }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .feature-card {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            border: 1px solid #e9ecef;
+            transition: all 0.2s ease;
+        }
+
+        .feature-card:hover {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            border-color: #93c5fd;
+        }
+
+        body.dark-mode .feature-card {
+            background: #2c3e50;
+            border-color: #34495e;
+        }
+
+        .feature-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: rgba(52, 152, 219, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 16px;
+        }
+
+        .feature-icon i {
+            font-size: 20px;
+            color: #3498db;
+        }
+
+        .feature-card h3 {
+            margin: 0 0 8px 0;
+            font-size: 18px;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        body.dark-mode .feature-card h3 {
+            color: #e1e8ed;
+        }
+
+        .feature-card p {
+            margin: 0 0 16px 0;
+            color: #6c757d;
+            line-height: 1.5;
+        }
+
+        .feature-stats {
+            display: flex;
+            gap: 12px;
+        }
+
+        .stat-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+            color: #6c757d;
+        }
+
+        .stat-item i {
+            color: #3498db;
+        }
+
+        .quick-actions, .recent-queries {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            border: 1px solid #e9ecef;
+        }
+
+        body.dark-mode .quick-actions,
+        body.dark-mode .recent-queries {
+            background: #2c3e50;
+            border-color: #34495e;
+        }
+
+        .quick-actions h3, .recent-queries h3 {
+            margin: 0 0 16px 0;
+            font-size: 18px;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        body.dark-mode .quick-actions h3,
+        body.dark-mode .recent-queries h3 {
+            color: #e1e8ed;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .query-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .query-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 16px;
+            background: #f8fafc;
+            border-radius: 8px;
+            border: 1px solid #e9ecef;
+        }
+
+        body.dark-mode .query-item {
+            background: #34495e;
+            border-color: #415a77;
+        }
+
+        .query-info {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .query-title {
+            font-weight: 500;
+            color: #2c3e50;
+        }
+
+        body.dark-mode .query-title {
+            color: #e1e8ed;
+        }
+
+        .query-meta {
+            color: #6c757d;
+            font-size: 12px;
+        }
     </style>
 </head>
 <body>
@@ -639,7 +917,7 @@
                         <img :src="isDarkMode ? '/logo_white.svg' : '/logo_black.svg'" alt="EntityDB">
                     </div>
                     <span v-if="isAuthenticated" style="color: #6c757d; font-size: 14px;">
-                        v2.30.0 | 
+                        v2.30.2 | 
                         <select v-model="currentDataset" @change="switchDataset" class="dataset-selector">
                             <option value="default">default</option>
                             <option value="_system">_system</option>
@@ -649,6 +927,17 @@
                 </div>
                 <div class="header-right" style="display: flex; align-items: center; gap: 16px;">
                     <template v-if="isAuthenticated">
+                        <!-- Offline Indicator -->
+                        <div v-if="!isOnline" class="offline-indicator">
+                            <i class="fas fa-wifi" style="text-decoration: line-through;"></i>
+                            <span>Offline</span>
+                        </div>
+                        
+                        <!-- PWA Install Button -->
+                        <button v-if="deferredPrompt && !isInstalled" @click="installPWA" class="btn btn-sm btn-secondary" title="Install EntityDB">
+                            <i class="fas fa-download"></i>
+                        </button>
+                        
                         <button @click="toggleDarkMode" class="dark-mode-toggle" :title="isDarkMode ? 'Light Mode' : 'Dark Mode'">
                             <i :class="isDarkMode ? 'fas fa-sun' : 'fas fa-moon'"></i>
                         </button>
@@ -911,6 +1200,114 @@
                         </div>
                     </div>
 
+                    <!-- Temporal Queries Tab -->
+                    <div :class="['tab-content', { active: activeTab === 'temporal' }]">
+                        <div style="padding: 24px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+                                <div>
+                                    <h2>Temporal Queries</h2>
+                                    <p style="color: #6c757d; margin-top: 8px;">Explore entities across time with advanced temporal navigation.</p>
+                                </div>
+                                <button @click="openTemporalNavigator" class="btn btn-primary">
+                                    <i class="fas fa-clock"></i> Open Temporal Navigator
+                                </button>
+                            </div>
+
+                            <div class="temporal-overview">
+                                <div class="feature-grid">
+                                    <div class="feature-card">
+                                        <div class="feature-icon">
+                                            <i class="fas fa-play-circle"></i>
+                                        </div>
+                                        <h3>Live Mode</h3>
+                                        <p>View current state in real-time with automatic updates.</p>
+                                        <div class="feature-stats">
+                                            <span class="stat-item">
+                                                <i class="fas fa-sync"></i>
+                                                Auto-refresh every 5s
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    <div class="feature-card">
+                                        <div class="feature-icon">
+                                            <i class="fas fa-clock"></i>
+                                        </div>
+                                        <h3>Point in Time</h3>
+                                        <p>Query entities as they existed at any specific timestamp.</p>
+                                        <div class="feature-stats">
+                                            <span class="stat-item">
+                                                <i class="fas fa-calendar"></i>
+                                                Nanosecond precision
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    <div class="feature-card">
+                                        <div class="feature-icon">
+                                            <i class="fas fa-history"></i>
+                                        </div>
+                                        <h3>Time Range Analysis</h3>
+                                        <p>Compare entities across time periods and analyze trends.</p>
+                                        <div class="feature-stats">
+                                            <span class="stat-item">
+                                                <i class="fas fa-chart-line"></i>
+                                                Timeline visualization
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    <div class="feature-card">
+                                        <div class="feature-icon">
+                                            <i class="fas fa-code-branch"></i>
+                                        </div>
+                                        <h3>Change Tracking</h3>
+                                        <p>Track entity modifications with detailed diff analysis.</p>
+                                        <div class="feature-stats">
+                                            <span class="stat-item">
+                                                <i class="fas fa-edit"></i>
+                                                Tag & content diffs
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="quick-actions">
+                                    <h3>Quick Actions</h3>
+                                    <div class="action-buttons">
+                                        <button @click="queryLast24Hours" class="btn btn-outline-primary">
+                                            <i class="fas fa-calendar-day"></i> Last 24 Hours
+                                        </button>
+                                        <button @click="queryLastWeek" class="btn btn-outline-primary">
+                                            <i class="fas fa-calendar-week"></i> Last Week
+                                        </button>
+                                        <button @click="querySelectedEntities" class="btn btn-outline-primary" :disabled="!hasSelectedEntities">
+                                            <i class="fas fa-search"></i> Query Selected Entities
+                                        </button>
+                                        <button @click="compareTimePoints" class="btn btn-outline-secondary">
+                                            <i class="fas fa-balance-scale"></i> Compare Time Points
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div class="recent-queries" v-if="recentTemporalQueries.length > 0">
+                                    <h3>Recent Queries</h3>
+                                    <div class="query-list">
+                                        <div v-for="query in recentTemporalQueries" :key="query.id" class="query-item">
+                                            <div class="query-info">
+                                                <span class="query-title">{{ query.title }}</span>
+                                                <small class="query-meta">{{ query.entityCount }} entities • {{ formatDate(query.timestamp) }}</small>
+                                            </div>
+                                            <button @click="rerunQuery(query)" class="btn btn-sm btn-ghost">
+                                                <i class="fas fa-redo"></i> Rerun
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Performance Tab -->
                     <div :class="['tab-content', { active: activeTab === 'performance' }]">
                         <div style="padding: 24px;">
@@ -950,7 +1347,7 @@
     <script>
         const { createApp } = Vue;
 
-        createApp({
+        const app = createApp({
             data() {
                 return {
                     // Auth state
@@ -970,6 +1367,7 @@
                     tabs: [
                         { id: 'dashboard', name: 'Dashboard', icon: 'fas fa-th-large' },
                         { id: 'entities', name: 'Entities', icon: 'fas fa-database' },
+                        { id: 'temporal', name: 'Temporal Queries', icon: 'fas fa-history' },
                         { id: 'performance', name: 'Performance', icon: 'fas fa-tachometer-alt' },
                         { id: 'rbac', name: 'RBAC Metrics', icon: 'fas fa-user-shield' },
                         { id: 'integrity', name: 'Integrity', icon: 'fas fa-shield-alt' },
@@ -988,21 +1386,52 @@
                     // UI state
                     loading: false,
                     
+                    // Temporal queries
+                    recentTemporalQueries: [],
+                    
                     // Infrastructure
                     logger: null,
-                    api: null
+                    api: null,
+                    
+                    // PWA
+                    deferredPrompt: null,
+                    isInstalled: false,
+                    swRegistration: null,
+                    isOnline: navigator.onLine
                 };
+            },
+
+            computed: {
+                hasSelectedEntities() {
+                    return window.entityBrowserEnhanced && window.entityBrowserEnhanced.selectedEntities.size > 0;
+                }
             },
             
             created() {
                 // Initialize logger and API client
+                console.log('Vue app created, checking dependencies...');
+                console.log('window.Logger available:', !!window.Logger);
+                console.log('window.EntityDBClient available:', !!window.EntityDBClient);
+                
                 this.logger = window.Logger ? new window.Logger('Dashboard') : console;
                 this.api = window.EntityDBClient ? new window.EntityDBClient() : null;
+                
+                // Enable API debugging
+                if (this.api) {
+                    this.api.setDebug(true);
+                }
+                
+                console.log('Logger initialized:', this.logger);
+                console.log('API client initialized:', this.api);
+                
                 this.logger.info('EntityDB Dashboard created');
             },
             
             mounted() {
                 this.logger.info('EntityDB Dashboard mounted');
+                
+                // Initialize PWA features
+                this.initPWA();
                 
                 // Check for saved auth
                 const token = localStorage.getItem('entitydb-admin-token');
@@ -1048,21 +1477,38 @@
                         this.loadSystemStats();
                     }
                 }, 5000);
+                
+                // Listen for online/offline events
+                window.addEventListener('online', () => {
+                    this.isOnline = true;
+                    this.notify('Connection restored', 'success');
+                });
+                
+                window.addEventListener('offline', () => {
+                    this.isOnline = false;
+                    this.notify('You are now offline', 'warning');
+                });
             },
             
             methods: {
                 // Authentication
                 async login() {
+                    console.log('Login method called');
                     this.loading = true;
+                    console.log('Loading set to true, api client:', this.api);
                     this.logger.info('Attempting login', { username: this.loginForm.username });
                     
                     try {
                         if (!this.api) {
+                            console.error('API client not available');
                             throw new Error('API client not available');
                         }
                         
+                        console.log('About to call API login');
+                        
                         const data = await this.api.login(this.loginForm.username, this.loginForm.password);
                         
+                        console.log('API login response:', data);
                         this.logger.info('Login successful', { user: data.user });
                         
                         this.sessionToken = data.token;
@@ -1085,9 +1531,16 @@
                             this.initMemoryChart();
                         });
                     } catch (error) {
+                        console.error('Login error caught:', error);
+                        console.error('Error details:', {
+                            message: error.message,
+                            status: error.status,
+                            stack: error.stack
+                        });
                         this.logger.error('Login failed', error);
                         this.notify(error.message || 'Login failed', 'error');
                     } finally {
+                        console.log('Login finally block - setting loading to false');
                         this.loading = false;
                     }
                 },
@@ -1111,13 +1564,13 @@
                     this.activeTab = tabId;
                     
                     // Initialize entity browser when entities tab is accessed
-                    if (tabId === 'entities' && window.entityBrowser && !window.entityBrowserInitialized) {
+                    if (tabId === 'entities' && window.entityBrowserEnhanced && !window.entityBrowserInitialized) {
                         this.$nextTick(() => {
                             const container = document.getElementById('entity-browser-container');
                             if (container) {
                                 // Share the API client with entity browser
                                 window.apiClient = this.api;
-                                window.entityBrowser.mount(container);
+                                window.entityBrowserEnhanced.mount(container);
                                 window.entityBrowserInitialized = true;
                             }
                         });
@@ -1371,16 +1824,321 @@
                     return Math.round(bytes) + ' ' + units[i];
                 },
                 
-                formatUptime(uptime) {
-                    // Parse Go duration string
-                    const match = uptime.match(/(\d+)h(\d+)m/);
-                    if (match) {
-                        return `${match[1]}h ${match[2]}m`;
+                formatUptime(uptimeSeconds) {
+                    if (!uptimeSeconds && uptimeSeconds !== 0) return 'Unknown';
+                    
+                    const hours = Math.floor(uptimeSeconds / 3600);
+                    const minutes = Math.floor((uptimeSeconds % 3600) / 60);
+                    const seconds = Math.floor(uptimeSeconds % 60);
+                    
+                    if (hours > 0) {
+                        return `${hours}h ${minutes}m`;
+                    } else if (minutes > 0) {
+                        return `${minutes}m ${seconds}s`;
+                    } else {
+                        return `${seconds}s`;
                     }
-                    return uptime;
+                },
+
+                // Temporal query methods
+                openTemporalNavigator() {
+                    if (window.temporalQuerySystem) {
+                        window.temporalQuerySystem.openTemporalNavigator();
+                    } else {
+                        this.notify('Temporal query system not available', 'error');
+                    }
+                },
+
+                async queryLast24Hours() {
+                    if (!window.temporalQuerySystem) {
+                        this.notify('Temporal query system not available', 'error');
+                        return;
+                    }
+
+                    try {
+                        const endTime = Date.now() * 1000000;
+                        const startTime = endTime - (24 * 60 * 60 * 1000 * 1000000);
+                        
+                        let entityIds = [];
+                        if (window.entityBrowserEnhanced) {
+                            entityIds = window.entityBrowserEnhanced.entities.map(e => e.id).slice(0, 10);
+                        }
+
+                        if (entityIds.length === 0) {
+                            this.notify('No entities available for temporal query', 'warning');
+                            return;
+                        }
+
+                        const results = await window.temporalQuerySystem.performTemporalQuery(entityIds, {
+                            queryType: 'changes',
+                            startTime: startTime,
+                            endTime: endTime
+                        });
+
+                        this.addToRecentQueries('Last 24 Hours', entityIds.length, results);
+                        this.notify(`Queried ${entityIds.length} entities for last 24 hours`, 'success');
+                    } catch (error) {
+                        this.notify('Temporal query failed: ' + error.message, 'error');
+                    }
+                },
+
+                async queryLastWeek() {
+                    if (!window.temporalQuerySystem) {
+                        this.notify('Temporal query system not available', 'error');
+                        return;
+                    }
+
+                    try {
+                        const endTime = Date.now() * 1000000;
+                        const startTime = endTime - (7 * 24 * 60 * 60 * 1000 * 1000000);
+                        
+                        let entityIds = [];
+                        if (window.entityBrowserEnhanced) {
+                            entityIds = window.entityBrowserEnhanced.entities.map(e => e.id).slice(0, 10);
+                        }
+
+                        if (entityIds.length === 0) {
+                            this.notify('No entities available for temporal query', 'warning');
+                            return;
+                        }
+
+                        const results = await window.temporalQuerySystem.performTemporalQuery(entityIds, {
+                            queryType: 'changes',
+                            startTime: startTime,
+                            endTime: endTime
+                        });
+
+                        this.addToRecentQueries('Last Week', entityIds.length, results);
+                        this.notify(`Queried ${entityIds.length} entities for last week`, 'success');
+                    } catch (error) {
+                        this.notify('Temporal query failed: ' + error.message, 'error');
+                    }
+                },
+
+                async querySelectedEntities() {
+                    if (!window.entityBrowserEnhanced || window.entityBrowserEnhanced.selectedEntities.size === 0) {
+                        this.notify('No entities selected', 'warning');
+                        return;
+                    }
+
+                    if (!window.temporalQuerySystem) {
+                        this.notify('Temporal query system not available', 'error');
+                        return;
+                    }
+
+                    try {
+                        const selectedIds = Array.from(window.entityBrowserEnhanced.selectedEntities);
+                        const endTime = Date.now() * 1000000;
+                        const startTime = endTime - (24 * 60 * 60 * 1000 * 1000000); // Last 24 hours
+
+                        const results = await window.temporalQuerySystem.performTemporalQuery(selectedIds, {
+                            queryType: 'changes',
+                            startTime: startTime,
+                            endTime: endTime
+                        });
+
+                        this.addToRecentQueries(`Selected Entities (${selectedIds.length})`, selectedIds.length, results);
+                        this.notify(`Queried ${selectedIds.length} selected entities`, 'success');
+                    } catch (error) {
+                        this.notify('Temporal query failed: ' + error.message, 'error');
+                    }
+                },
+
+                compareTimePoints() {
+                    this.notify('Compare time points - feature coming soon', 'info');
+                },
+
+                addToRecentQueries(title, entityCount, results) {
+                    const query = {
+                        id: Date.now(),
+                        title: title,
+                        entityCount: entityCount,
+                        timestamp: Date.now(),
+                        results: results
+                    };
+
+                    this.recentTemporalQueries.unshift(query);
+                    
+                    // Keep only last 10 queries
+                    this.recentTemporalQueries = this.recentTemporalQueries.slice(0, 10);
+                },
+
+                rerunQuery(query) {
+                    this.notify(`Rerunning query: ${query.title}`, 'info');
+                    // Implementation would depend on storing query parameters
+                },
+
+                formatDate(timestamp) {
+                    return new Date(timestamp).toLocaleString();
+                },
+
+                // PWA Methods
+                async initPWA() {
+                    // Register service worker
+                    if ('serviceWorker' in navigator) {
+                        try {
+                            this.swRegistration = await navigator.serviceWorker.register('/sw.js');
+                            this.logger.info('Service Worker registered successfully');
+                            
+                            // Listen for service worker updates
+                            this.swRegistration.addEventListener('updatefound', () => {
+                                const newWorker = this.swRegistration.installing;
+                                newWorker.addEventListener('statechange', () => {
+                                    if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                        this.notify('New version available! Refresh to update.', 'info');
+                                    }
+                                });
+                            });
+                            
+                            // Listen for service worker messages
+                            navigator.serviceWorker.addEventListener('message', this.handleServiceWorkerMessage);
+                        } catch (error) {
+                            this.logger.error('Service Worker registration failed:', error);
+                        }
+                    }
+                    
+                    // Listen for beforeinstallprompt event
+                    window.addEventListener('beforeinstallprompt', (e) => {
+                        e.preventDefault();
+                        this.deferredPrompt = e;
+                        this.showInstallPrompt();
+                    });
+                    
+                    // Check if already installed
+                    window.addEventListener('appinstalled', () => {
+                        this.isInstalled = true;
+                        this.deferredPrompt = null;
+                        this.notify('EntityDB installed successfully!', 'success');
+                    });
+                    
+                    // Check if running as PWA
+                    if (window.matchMedia('(display-mode: standalone)').matches || 
+                        window.navigator.standalone === true) {
+                        this.isInstalled = true;
+                    }
+                },
+
+                showInstallPrompt() {
+                    if (!this.deferredPrompt || this.isInstalled) return;
+                    
+                    // Show install banner/button
+                    const installBanner = document.createElement('div');
+                    installBanner.className = 'pwa-install-banner';
+                    installBanner.innerHTML = `
+                        <div class="install-content">
+                            <div class="install-info">
+                                <i class="fas fa-download"></i>
+                                <span>Install EntityDB for offline access</span>
+                            </div>
+                            <div class="install-actions">
+                                <button class="btn btn-sm btn-primary" onclick="window.entitydbApp.installPWA()">Install</button>
+                                <button class="btn btn-sm btn-ghost" onclick="window.entitydbApp.dismissInstallPrompt()">Dismiss</button>
+                            </div>
+                        </div>
+                    `;
+                    
+                    document.body.appendChild(installBanner);
+                    
+                    // Auto-hide after 10 seconds
+                    setTimeout(() => {
+                        this.dismissInstallPrompt();
+                    }, 10000);
+                },
+
+                async installPWA() {
+                    if (!this.deferredPrompt) return;
+                    
+                    try {
+                        const result = await this.deferredPrompt.prompt();
+                        this.logger.info('PWA install prompt result:', result);
+                        
+                        if (result.outcome === 'accepted') {
+                            this.notify('Installing EntityDB...', 'info');
+                        }
+                        
+                        this.deferredPrompt = null;
+                        this.dismissInstallPrompt();
+                    } catch (error) {
+                        this.logger.error('PWA installation failed:', error);
+                        this.notify('Installation failed', 'error');
+                    }
+                },
+
+                dismissInstallPrompt() {
+                    const banner = document.querySelector('.pwa-install-banner');
+                    if (banner) {
+                        banner.remove();
+                    }
+                },
+
+                handleServiceWorkerMessage(event) {
+                    const { type, success, error } = event.data;
+                    
+                    switch (type) {
+                        case 'sync-start':
+                            this.notify('Syncing offline changes...', 'info');
+                            break;
+                            
+                        case 'sync-complete':
+                            if (success) {
+                                this.notify('Offline changes synced successfully', 'success');
+                            } else {
+                                this.notify(`Sync failed: ${error}`, 'error');
+                            }
+                            break;
+                    }
+                },
+
+                async clearAppCache() {
+                    if (!this.swRegistration) {
+                        this.notify('Service worker not available', 'error');
+                        return;
+                    }
+                    
+                    try {
+                        const messageChannel = new MessageChannel();
+                        
+                        const response = await new Promise((resolve) => {
+                            messageChannel.port1.onmessage = (event) => {
+                                resolve(event.data);
+                            };
+                            
+                            this.swRegistration.active.postMessage({
+                                type: 'CLEAR_CACHE'
+                            }, [messageChannel.port2]);
+                        });
+                        
+                        if (response.success) {
+                            this.notify('App cache cleared successfully', 'success');
+                            window.location.reload();
+                        } else {
+                            this.notify('Failed to clear cache', 'error');
+                        }
+                    } catch (error) {
+                        this.logger.error('Cache clear failed:', error);
+                        this.notify('Failed to clear cache', 'error');
+                    }
+                },
+
+                async updateServiceWorker() {
+                    if (!this.swRegistration) {
+                        this.notify('Service worker not available', 'error');
+                        return;
+                    }
+                    
+                    try {
+                        await this.swRegistration.update();
+                        this.notify('Checking for updates...', 'info');
+                    } catch (error) {
+                        this.logger.error('Service worker update failed:', error);
+                        this.notify('Update check failed', 'error');
+                    }
                 }
             }
-        }).mount('#app');
+        });
+        
+        // Make app instance globally accessible for PWA install handlers
+        window.entitydbApp = app.mount('#app');
     </script>
 
     <!-- Load entity browser if available -->

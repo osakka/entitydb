@@ -2,17 +2,22 @@
 
 This directory contains the source code for the EntityDB platform. This document provides an overview of the source code structure and development guidelines.
 
-## Latest Changes (v2.30.0)
+## Latest Changes (v2.30.2)
 
-- **Temporal Tag Search Implementation**: Complete fix for critical temporal tag search functionality
-  - Fixed WAL replay indexing, cached repository bypass, reader pool synchronization
-  - All authentication and session management now working reliably
-  - Added comprehensive documentation and performance validation
-- **Enhanced Real-time Dashboard**: Professional metrics dashboard with health scoring and visualization
-  - Real-time memory usage charts, system status monitoring, auto-refresh capabilities
-  - Vue.js 3 reactive framework with responsive design and dark mode support
-- **Performance Optimization**: Sub-millisecond query performance and zero goroutine leaks
-- **Code Quality**: Complete audit, cleanup, and single source of truth maintenance
+- **Authentication Timeout Resolution**: Complete root cause fix for recurring authentication timeouts
+  - Optimized HTTP timeout configuration from 15s to 60s for read/write operations
+  - Increased idle timeout to 300s for better connection reuse
+  - Production-ready timeout values eliminating need for server restarts
+- **Complete UI/UX Enhancement**: Professional 5-phase implementation  
+  - Enhanced entity browser with modal forms and real-time filtering
+  - Advanced search system with suggestions and faceted filtering
+  - Data export system supporting JSON, CSV, XML formats
+  - Temporal query interface with timeline navigation and diff analysis
+  - Progressive Web App with offline support and mobile optimization
+- **System Stability**: Enterprise-grade reliability improvements
+  - Clean build with zero warnings, comprehensive code audit
+  - Single source of truth maintenance with proper trash organization
+  - Production deployment ready with SSL and proper configuration
 
 ## Directory Structure
 

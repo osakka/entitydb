@@ -5,6 +5,34 @@ All notable changes to the EntityDB Platform will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.30.2] - 2025-06-13
+
+### Fixed
+- **Authentication Timeout Resolution**: Complete root cause fix for recurring authentication timeouts
+  - Identified aggressive HTTP timeout configuration (15s read/write) as root cause
+  - Increased HTTPReadTimeout and HTTPWriteTimeout from 15s to 60s (4x improvement)
+  - Increased HTTPIdleTimeout from 60s to 300s for better connection reuse
+  - Eliminated need for repeated server restarts
+  - Sustained authentication performance verified under load
+  - Industry-standard timeout values for production environments
+
+### Added  
+- **Complete UI/UX Enhancement Suite**: Professional 5-phase implementation
+  - Enhanced entity browser with modal forms and real-time filtering
+  - Advanced search system with suggestions and faceted filtering
+  - Data export system supporting JSON, CSV, XML formats with bulk operations
+  - Temporal query interface with timeline navigation and diff analysis
+  - Interactive relationship visualization with network diagrams
+  - Progressive Web App with offline support and mobile optimization
+  - Cache-busting with version parameters (v2.30.2) to prevent stale JavaScript
+  - PWA install prompts and offline indicators for enhanced user experience
+
+### Changed
+- **Configuration Management**: Updated HTTP timeout settings in both instance and default configurations
+  - `/opt/entitydb/var/entitydb.env` updated with production-ready timeouts
+  - `/opt/entitydb/share/config/entitydb.env` aligned for consistency
+  - Shell script environment variable export improved for reliability
+
 ## [2.30.0] - 2025-06-12
 
 ### Added

@@ -9,7 +9,7 @@
 > This eliminates separate credential entities and relationships. Users with credentials have the `has:credentials` tag.
 > NO BACKWARD COMPATIBILITY - all users must be recreated.
 
-## Current State (v2.30.0)
+## Current State (v2.30.2)
 
 EntityDB now features a unified Entity model with autochunking:
 - **Unified Entity Model**: Single content field ([]byte) per entity
@@ -32,6 +32,8 @@ EntityDB now features a unified Entity model with autochunking:
 - **Professional Logging**: Structured logging with contextual error messages, appropriate log levels, and automatic file/function/line information
 - **Temporal Tag Search Fix**: Complete resolution of temporal tag search issues including WAL replay indexing, cached repository bypass, reader pool synchronization, and authentication stability
 - **Enhanced UI Dashboard**: Real-time metrics dashboard with comprehensive system monitoring, health scoring, memory charting, and responsive design
+- **Authentication Stability**: Resolved recurring timeout issues with optimized HTTP timeout configuration for production-grade reliability
+- **Complete UI/UX Suite**: Professional web interface with PWA support, advanced search, data export, temporal queries, and relationship visualization
 
 ## What's Implemented
 

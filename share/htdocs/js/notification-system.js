@@ -504,10 +504,17 @@ body.dark-mode .notification-action:hover {
     }
 }
 `;
-document.head.appendChild(notificationStyles);
 
-// Create global instance
-window.notificationSystem = new NotificationSystem();
+// Wait for DOM to be ready before initializing
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+        document.head.appendChild(notificationStyles);
+        window.notificationSystem = new NotificationSystem();
+    });
+} else {
+    document.head.appendChild(notificationStyles);
+    window.notificationSystem = new NotificationSystem();
+}
 
 // Export for use in other modules
 window.NotificationSystem = NotificationSystem;

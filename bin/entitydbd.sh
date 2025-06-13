@@ -36,7 +36,9 @@ load_environment() {
     fi
     
     # Export all ENTITYDB_ variables for the Go process
-    for var in $(env | grep ^ENTITYDB_ | cut -d= -f1); do
+    # After sourcing the config files, we need to export the variables
+    # so they are available to child processes
+    for var in $(set | grep '^ENTITYDB_' | cut -d= -f1); do
         export "$var"
     done
 }
@@ -118,7 +120,10 @@ start_server() {
     # Start the server - ConfigManager handles all configuration logic!
     # No need to build command line flags - environment variables are enough
     print_message "$BLUE" "Starting server with ConfigManager handling all configuration..."
-    "$SERVER_BIN" > "$LOG_FILE" 2>&1 &
+    
+    # Ensure environment variables are properly passed to the spawned process
+    # by explicitly running with env to pass current environment
+    env "$SERVER_BIN" > "$LOG_FILE" 2>&1 &
     
     # Save PID
     SERVER_PID=$!
