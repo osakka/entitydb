@@ -29,15 +29,16 @@
     <link href="/css/temporal-query-system.css" rel="stylesheet">
     
     <!-- Core scripts -->
-    <script src="/js/logger.js?v=2.30.2"></script>
-    <script src="/js/api-client.js?v=2.30.2"></script>
-    <script src="/js/notification-system.js?v=2.30.2"></script>
-    <script src="/js/advanced-search-system.js?v=2.30.2"></script>
-    <script src="/js/data-export-system.js?v=2.30.2"></script>
-    <script src="/js/temporal-query-system.js?v=2.30.2"></script>
-    <script src="/js/entity-browser-enhanced.js?v=2.30.2"></script>
-    <script src="/js/entity-modal-system.js?v=2.30.2"></script>
-    <script src="/js/relationship-visualization.js?v=2.30.2"></script>
+    <script src="/js/logger.js?v=2.30.3"></script>
+    <script src="/js/api-client.js?v=2.30.3"></script>
+    <script src="/js/notification-system.js?v=2.30.3"></script>
+    <script src="/js/realtime-update-service.js?v=2.30.3"></script>
+    <script src="/js/advanced-search-system.js?v=2.30.3"></script>
+    <script src="/js/data-export-system.js?v=2.30.3"></script>
+    <script src="/js/temporal-query-system.js?v=2.30.3"></script>
+    <script src="/js/entity-browser-enhanced.js?v=2.30.3"></script>
+    <script src="/js/entity-modal-system.js?v=2.30.3"></script>
+    <script src="/js/relationship-visualization.js?v=2.30.3"></script>
     
     <style>
         * {
@@ -444,6 +445,49 @@
 
         .stat-value.success {
             color: #10b981;
+        }
+
+        .stat-value.status-active {
+            color: #10b981;
+            font-weight: 600;
+        }
+
+        .stat-value.status-inactive {
+            color: #ef4444;
+            font-weight: 600;
+        }
+
+        /* Real-time Stats */
+        .realtime-stats {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .realtime-stats .stat-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 0;
+            border-bottom: 1px solid #f3f4f6;
+        }
+
+        body.dark-mode .realtime-stats .stat-row {
+            border-bottom-color: #374151;
+        }
+
+        .realtime-stats .stat-item {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 2px;
+            flex: 1;
+        }
+
+        .widget-controls {
+            display: flex;
+            gap: 8px;
+            align-items: center;
         }
 
         /* Performance Grid */
@@ -905,6 +949,62 @@
             color: #6c757d;
             font-size: 12px;
         }
+
+        /* Real-time status indicator */
+        .realtime-status {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 12px;
+            border-radius: 16px;
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        body.dark-mode .realtime-status {
+            background: #343a40;
+            border-color: #495057;
+            color: #e9ecef;
+        }
+
+        .realtime-status i {
+            font-size: 8px;
+            opacity: 0.6;
+            animation: pulse-dim 2s infinite;
+        }
+
+        .realtime-status.active i {
+            color: #28a745;
+            opacity: 1;
+            animation: pulse-success 2s infinite;
+        }
+
+        .realtime-status.connected i {
+            color: #007bff;
+            animation: pulse-active 1s infinite;
+        }
+
+        @keyframes pulse-dim {
+            0%, 100% { opacity: 0.4; }
+            50% { opacity: 0.6; }
+        }
+
+        @keyframes pulse-success {
+            0%, 100% { opacity: 0.8; }
+            50% { opacity: 1; }
+        }
+
+        @keyframes pulse-active {
+            0%, 100% { opacity: 0.8; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.1); }
+        }
+
+        .realtime-status:not(.active) i {
+            color: #6c757d;
+        }
     </style>
 </head>
 <body>
@@ -1010,10 +1110,12 @@
                                     <h2 style="margin: 0; font-size: 24px; font-weight: 600;">Dashboard</h2>
                                     <span style="color: #6c757d; font-size: 14px;">System metrics and monitoring</span>
                                 </div>
-                                <div style="display: flex; gap: 12px;">
-                                    <button @click="loadSystemStats" class="btn btn-secondary">
-                                        <i class="fas fa-sync"></i> Refresh
-                                    </button>
+                                <div style="display: flex; gap: 12px; align-items: center;">
+                                    <div class="realtime-status" :class="{ 'active': realTimeStatus.isEnabled, 'connected': realTimeStatus.isOnline }">
+                                        <i class="fas fa-circle"></i>
+                                        <span>{{ realTimeStatus.isEnabled ? (realTimeStatus.isOnline ? 'Live' : 'Offline') : 'Paused' }}</span>
+                                    </div>
+                                    <small style="color: #6c757d;">{{ realTimeStatus.lastUpdate }}</small>
                                 </div>
                             </div>
 
@@ -1184,6 +1286,56 @@
                                     <div class="widget-content">
                                         <div class="chart-container">
                                             <canvas id="memoryChart" width="400" height="200"></canvas>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Real-time Performance -->
+                                <div class="widget" v-if="realTimeStatus.performance">
+                                    <div class="widget-header">
+                                        <h3 class="widget-title">
+                                            <i class="fas fa-wifi"></i> Real-time Performance
+                                        </h3>
+                                        <div class="widget-controls">
+                                            <button @click="requestImmediateUpdate" class="btn-small" :disabled="!realTimeStatus.isEnabled">
+                                                <i class="fas fa-sync"></i> Refresh Now
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="widget-content">
+                                        <div class="realtime-stats">
+                                            <div class="stat-row">
+                                                <div class="stat-item">
+                                                    <span class="stat-label">Status:</span>
+                                                    <span class="stat-value" :class="realTimeStatus.isEnabled ? 'status-active' : 'status-inactive'">
+                                                        {{ realTimeStatus.isEnabled ? 'Active' : 'Disabled' }}
+                                                    </span>
+                                                </div>
+                                                <div class="stat-item">
+                                                    <span class="stat-label">Checks:</span>
+                                                    <span class="stat-value">{{ realTimeStatus.performance.totalChecks }}</span>
+                                                </div>
+                                            </div>
+                                            <div class="stat-row">
+                                                <div class="stat-item">
+                                                    <span class="stat-label">Changes:</span>
+                                                    <span class="stat-value">{{ realTimeStatus.performance.changesDetected }}</span>
+                                                </div>
+                                                <div class="stat-item">
+                                                    <span class="stat-label">Avg Response:</span>
+                                                    <span class="stat-value">{{ realTimeStatus.performance.avgResponseTime }}ms</span>
+                                                </div>
+                                            </div>
+                                            <div class="stat-row">
+                                                <div class="stat-item">
+                                                    <span class="stat-label">Last Response:</span>
+                                                    <span class="stat-value">{{ realTimeStatus.performance.lastResponseTime }}ms</span>
+                                                </div>
+                                                <div class="stat-item">
+                                                    <span class="stat-label">Interval:</span>
+                                                    <span class="stat-value">{{ Math.round(realTimeStatus.performance.currentInterval / 1000) }}s</span>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -1397,7 +1549,15 @@
                     deferredPrompt: null,
                     isInstalled: false,
                     swRegistration: null,
-                    isOnline: navigator.onLine
+                    isOnline: navigator.onLine,
+                    
+                    // Real-time updates
+                    realTimeStatus: {
+                        isEnabled: false,
+                        isOnline: false,
+                        lastUpdate: '',
+                        lastCheck: null
+                    }
                 };
             },
 
@@ -1457,26 +1617,13 @@
                     document.body.classList.add('dark-mode');
                 }
                 
-                // Initialize memory chart after Vue has rendered the DOM
+                // Initialize memory chart and real-time updates after Vue has rendered the DOM
                 this.$nextTick(() => {
                     if (this.isAuthenticated) {
                         this.initMemoryChart();
+                        this.initRealTimeUpdates();
                     }
                 });
-                
-                // Auto-refresh system stats every 30 seconds
-                setInterval(() => {
-                    if (this.isAuthenticated) {
-                        this.loadSystemStats();
-                    }
-                }, 30000);
-                
-                // Fast refresh for chart updates every 5 seconds  
-                setInterval(() => {
-                    if (this.isAuthenticated && this.activeTab === 'dashboard') {
-                        this.loadSystemStats();
-                    }
-                }, 5000);
                 
                 // Listen for online/offline events
                 window.addEventListener('online', () => {
@@ -1619,6 +1766,122 @@
                             http: { requests_per_minute: 0, total_requests: 0, avg_response_time: 0 }
                         };
                     }
+                },
+
+                // Real-time update methods
+                initRealTimeUpdates() {
+                    if (!window.realTimeUpdateService) {
+                        this.logger.warn('Real-time update service not available');
+                        return;
+                    }
+                    
+                    // Configure API client and start service
+                    window.realTimeUpdateService.setApiClient(this.api);
+                    window.realTimeUpdateService.setDebug(localStorage.getItem('entitydb-debug') === 'true');
+                    
+                    // Subscribe to changes
+                    window.realTimeUpdateService.subscribe('dashboard', (changes) => {
+                        this.handleRealTimeChanges(changes);
+                    }, ['entities', 'metrics']);
+                    
+                    // Subscribe entity browser if available
+                    if (window.entityBrowserEnhanced) {
+                        window.realTimeUpdateService.subscribe('entityBrowser', (changes) => {
+                            this.handleEntityBrowserChanges(changes);
+                        }, ['entities']);
+                    }
+                    
+                    // Start monitoring
+                    window.realTimeUpdateService.start();
+                    
+                    // Update status
+                    this.updateRealTimeStatus();
+                    
+                    // Update status every 5 seconds
+                    setInterval(() => {
+                        this.updateRealTimeStatus();
+                    }, 5000);
+                    
+                    this.logger.info('Real-time updates initialized');
+                },
+                
+                updateRealTimeStatus() {
+                    if (!window.realTimeUpdateService) return;
+                    
+                    const status = window.realTimeUpdateService.getStatus();
+                    const perfStats = window.realTimeUpdateService.getPerformanceStats();
+                    
+                    this.realTimeStatus.isEnabled = status.isEnabled;
+                    this.realTimeStatus.isOnline = status.isOnline;
+                    this.realTimeStatus.performance = {
+                        totalChecks: perfStats.totalChecks || 0,
+                        changesDetected: perfStats.changesDetected || 0,
+                        avgResponseTime: Math.round(perfStats.avgResponseTime || 0),
+                        lastResponseTime: Math.round(perfStats.lastResponseTime || 0),
+                        currentInterval: perfStats.currentInterval || 3000,
+                        subscribers: perfStats.subscribers || 0
+                    };
+                    
+                    if (status.lastCheck) {
+                        const lastCheck = new Date(status.lastCheck);
+                        const now = new Date();
+                        const diffSeconds = Math.floor((now - lastCheck) / 1000);
+                        
+                        if (diffSeconds < 60) {
+                            this.realTimeStatus.lastUpdate = `${diffSeconds}s ago`;
+                        } else if (diffSeconds < 3600) {
+                            this.realTimeStatus.lastUpdate = `${Math.floor(diffSeconds/60)}m ago`;
+                        } else {
+                            this.realTimeStatus.lastUpdate = 'Over 1h ago';
+                        }
+                    } else {
+                        this.realTimeStatus.lastUpdate = 'Never';
+                    }
+                },
+                
+                handleRealTimeChanges(changes) {
+                    this.logger.debug('Real-time changes detected:', changes);
+                    
+                    // Handle entity changes
+                    if (changes.entities) {
+                        this.logger.info('Entities changed, refreshing dashboard data');
+                        this.loadSystemStats();
+                        
+                        // Show notification for new entities
+                        if (changes.entities.details && changes.entities.details.recentEntities) {
+                            const count = changes.entities.details.recentEntities.length;
+                            this.notify(`${count} entities updated`, 'info');
+                        }
+                    }
+                    
+                    // Handle metrics changes
+                    if (changes.metrics) {
+                        this.logger.info('Metrics changed, refreshing dashboard');
+                        this.loadSystemStats();
+                    }
+                },
+                
+                handleEntityBrowserChanges(changes) {
+                    // Refresh entity browser if it's initialized and changes occurred
+                    if (window.entityBrowserEnhanced && changes.entities) {
+                        this.logger.info('Auto-refreshing entity browser');
+                        window.entityBrowserEnhanced.loadEntities();
+                    }
+                },
+                
+                // Request immediate real-time update (useful after user actions)
+                async requestImmediateUpdate() {
+                    if (window.realTimeUpdateService) {
+                        this.logger.info('Requesting immediate update...');
+                        const success = await window.realTimeUpdateService.requestImmediateUpdate();
+                        if (success) {
+                            this.notify('Data refreshed', 'success');
+                        } else {
+                            this.notify('Could not refresh data', 'warning');
+                        }
+                        return success;
+                    }
+                    return false;
                 },
 
                 // Dashboard helper methods

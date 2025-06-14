@@ -1,6 +1,6 @@
 # EntityDB Entities API Reference
 
-> **Version**: v2.30.0 | **Last Updated**: 2025-06-12 | **Status**: AUTHORITATIVE
+> **Version**: v2.31.0 | **Last Updated**: 2025-06-13 | **Status**: AUTHORITATIVE
 
 This document covers the core entity operations in EntityDB, including CRUD operations, temporal queries, and the tag-based data model.
 
@@ -683,6 +683,6 @@ All API endpoints return consistent error responses:
 
 ## Version History
 
-- **v2.30.0**: Current entity API with embedded credentials and temporal tag search fixes
+- **v2.31.0**: Current entity API with embedded credentials and temporal tag search fixes
 - **v2.29.0**: Major authentication architecture change, dataset terminology
 - **v2.28.0**: Enhanced entity model with temporal utilities and metrics integration

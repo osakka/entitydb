@@ -31,14 +31,14 @@ EntityDB (EntityDB) is a distributed system designed to manage AI agents, issues
 
 ## System Components
 
-### Server (server_db.go)
+### Server (main.go)
 
 The main server implementation provides:
 - HTTP request routing
 - JWT authentication
 - Entity CRUD operations
-- In-memory entity storage
-- SQLite database persistence
+- Binary format entity storage
+- Custom binary format (EBF) persistence
 - Static file serving
 
 Key features:
@@ -179,50 +179,37 @@ Tags are resolved hierarchically:
 - Content-Type validation
 - Authorization header checks
 
-## Database Design
+## Storage Design
 
-### Entity Table
-```sql
-CREATE TABLE entities (
-    id TEXT PRIMARY KEY,
-    type TEXT NOT NULL,
-    tags TEXT NOT NULL,  -- JSON array
-    content TEXT,        -- JSON data
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    created_by TEXT
-);
-```
+### Binary Format (EBF)
 
-### Entity Relationships Table
-```sql
-CREATE TABLE entity_relationships (
-    id TEXT PRIMARY KEY,
-    source_id TEXT NOT NULL,
-    target_id TEXT NOT NULL,
-    type TEXT NOT NULL,
-    properties TEXT,     -- JSON data
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    created_by TEXT,
-    FOREIGN KEY (source_id) REFERENCES entities(id),
-    FOREIGN KEY (target_id) REFERENCES entities(id)
-);
-```
+EntityDB uses a custom binary format with the following structure:
+
+#### Entity Record
+- 64-byte entity ID (fixed-width string)
+- Variable-length temporal tags with nanosecond timestamps
+- Binary content (any size, auto-chunked if >4MB)
+- Metadata headers for efficient indexing
+
+#### Relationship Records
+- Source entity ID (64 bytes)
+- Target entity ID (64 bytes)
+- Relationship type (variable length)
+- Temporal metadata and timestamps
+- Efficient binary indexing for relationship queries
 
 ## Scalability Considerations
 
 ### Current Limitations
-- In-memory entity storage in server_db.go
-- No connection pooling
 - Single-server deployment
-- No caching layer
+- Binary format optimized for single-node operation
+- No distributed caching layer
 
 ### Future Scalability
-- Implement proper database repository pattern
-- Add Redis caching layer
-- Support horizontal scaling
-- Implement connection pooling
+- Add Redis caching layer for metadata
+- Support horizontal scaling with binary format replication
 - Add message queue for async operations
+- Implement distributed binary format storage
 
 ## API Design Patterns
 
@@ -275,14 +262,14 @@ CREATE TABLE entity_relationships (
 - Compiled Go binary
 - Embedded static files
 - Configuration via flags/environment
-- SQLite database co-located
+- Binary format (EBF) database files co-located
 
 ### Directory Structure
 ```
 /opt/entitydb/
 ├── bin/entitydb         # Server binary
 ├── var/
-│   ├── db/         # SQLite database
+│   ├── db/         # Binary format (EBF) database files
 │   └── log/        # Application logs
 ├── share/
 │   ├── htdocs/     # Web UI files
@@ -310,9 +297,9 @@ CREATE TABLE entity_relationships (
    - Change data capture
 
 3. **Distributed Storage**
-   - PostgreSQL for ACID compliance
-   - Redis for caching
-   - S3 for file storage
+   - Distributed binary format (EBF) with replication
+   - Redis for metadata caching
+   - S3 for backup and archival storage
 
 4. **Container Orchestration**
    - Docker containers

@@ -1,8 +1,8 @@
 # EntityDB Quick Start Guide
 
-> **Version**: v2.30.0 | **Last Updated**: 2025-06-12 | **Status**: GUIDANCE
+> **Version**: v2.31.0 | **Last Updated**: 2025-06-13 | **Status**: GUIDANCE
 
-Welcome to EntityDB! This guide will get you up and running with EntityDB v2.30.0 in just a few minutes.
+Welcome to EntityDB! This guide will get you up and running with EntityDB v2.31.0 in just a few minutes.
 
 > **⚠️ Critical**: v2.29.0+ includes major authentication changes. User credentials are now embedded in user entities. All users from previous versions must be recreated.
 
@@ -162,17 +162,17 @@ All tags are timestamped with nanosecond precision, enabling:
 ### Architecture Deep-Dive
 - [System Overview](../20-architecture/01-system-overview.md) - High-level architecture
 - [Temporal Storage](../20-architecture/02-temporal-architecture.md) - Time-based features
-- [RBAC System](../20-architecture/03-rbac.md) - Access control
+- [RBAC System](../20-architecture/03-rbac-architecture.md) - Access control
 
 ### Advanced Features
 - [Temporal Queries](../40-user-guides/01-temporal-queries.md) - Time-travel operations
-- [Entity Relationships](../40-user-guides/03-entity-relationships.md) - Connect entities
+- [Advanced Queries](../40-user-guides/04-advanced-queries.md) - Connect entities
 - [Performance Tuning](../performance/performance-optimization-results.md) - Optimize for scale
 
 ### Administration
 - [Production Deployment](../70-deployment/02-production-checklist.md) - Deploy to production
 - [Security Configuration](../50-admin-guides/01-security-configuration.md) - Secure your installation
-- [Monitoring Setup](../50-admin-guides/03-monitoring.md) - Set up monitoring
+- [Deployment Guide](../50-admin-guides/02-deployment-guide.md) - Set up monitoring
 
 ## Troubleshooting
 

@@ -26,6 +26,7 @@ class EntityBrowserEnhanced {
         this.render();
         await this.loadEntities();
         this.setupEventListeners();
+        this.initRealTimeUpdates();
     }
 
     render() {
@@ -39,9 +40,10 @@ class EntityBrowserEnhanced {
                         <button class="btn btn-primary" onclick="entityBrowserEnhanced.showCreateDialog()">
                             <i class="fas fa-plus"></i> New Entity
                         </button>
-                        <button class="btn btn-secondary" onclick="entityBrowserEnhanced.refresh()">
-                            <i class="fas fa-sync"></i> Refresh
-                        </button>
+                        <div class="realtime-status" id="realtime-indicator">
+                            <i class="fas fa-circle"></i>
+                            <span>Live Updates</span>
+                        </div>
                         <div class="bulk-actions" id="bulk-actions" style="display: none;">
                             <button class="btn btn-outline-primary" onclick="entityBrowserEnhanced.bulkTag()">
                                 <i class="fas fa-tags"></i> Tag Selected
@@ -1268,6 +1270,55 @@ class EntityBrowserEnhanced {
 
     showFilterDialog() {
         this.showNotification('Advanced filters - coming soon', 'info');
+    }
+
+    // Real-time update methods
+    initRealTimeUpdates() {
+        if (!window.realTimeUpdateService) {
+            console.warn('Real-time update service not available in entity browser');
+            return;
+        }
+
+        // Subscribe to entity changes
+        window.realTimeUpdateService.subscribe('entityBrowser', (changes) => {
+            this.handleRealTimeChanges(changes);
+        }, ['entities']);
+
+        // Update status indicator
+        this.updateRealTimeStatus();
+        
+        // Update status every 5 seconds
+        setInterval(() => {
+            this.updateRealTimeStatus();
+        }, 5000);
+    }
+
+    updateRealTimeStatus() {
+        const indicator = document.getElementById('realtime-indicator');
+        if (!indicator || !window.realTimeUpdateService) return;
+
+        const status = window.realTimeUpdateService.getStatus();
+        
+        // Update classes based on status
+        indicator.classList.toggle('active', status.isEnabled);
+        indicator.classList.toggle('connected', status.isOnline);
+        
+        // Update text
+        const span = indicator.querySelector('span');
+        if (span) {
+            if (status.isEnabled) {
+                span.textContent = status.isOnline ? 'Live' : 'Offline';
+            } else {
+                span.textContent = 'Paused';
+            }
+        }
+    }
+
+    handleRealTimeChanges(changes) {
+        if (changes.entities) {
+            console.log('Entity browser: Auto-refreshing due to entity changes');
+            this.loadEntities();
+        }
     }
 }
 
