@@ -852,5 +852,34 @@ func (s *EntityDBServer) serveStaticFile(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	
+	// Set proper MIME type based on file extension
+	ext := strings.ToLower(filepath.Ext(fullPath))
+	switch ext {
+	case ".js":
+		w.Header().Set("Content-Type", "application/javascript; charset=utf-8")
+	case ".css":
+		w.Header().Set("Content-Type", "text/css; charset=utf-8")
+	case ".html":
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	case ".json":
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	case ".svg":
+		w.Header().Set("Content-Type", "image/svg+xml; charset=utf-8")
+	case ".png":
+		w.Header().Set("Content-Type", "image/png")
+	case ".jpg", ".jpeg":
+		w.Header().Set("Content-Type", "image/jpeg")
+	case ".ico":
+		w.Header().Set("Content-Type", "image/x-icon")
+	case ".woff":
+		w.Header().Set("Content-Type", "font/woff")
+	case ".woff2":
+		w.Header().Set("Content-Type", "font/woff2")
+	case ".ttf":
+		w.Header().Set("Content-Type", "font/ttf")
+	case ".eot":
+		w.Header().Set("Content-Type", "application/vnd.ms-fontobject")
+	}
+	
 	http.ServeFile(w, r, fullPath)
 }

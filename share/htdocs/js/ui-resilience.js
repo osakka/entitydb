@@ -57,11 +57,24 @@ class UIResilience {
             });
         });
         
-        observer.observe(document.body, {
-            childList: true,
-            subtree: true,
-            attributes: true
-        });
+        // Wait for DOM to be ready before observing
+        if (document.body) {
+            observer.observe(document.body, {
+                childList: true,
+                subtree: true,
+                attributes: true
+            });
+        } else {
+            document.addEventListener('DOMContentLoaded', () => {
+                if (document.body) {
+                    observer.observe(document.body, {
+                        childList: true,
+                        subtree: true,
+                        attributes: true
+                    });
+                }
+            });
+        }
         
         this.domObserver = observer;
     }
