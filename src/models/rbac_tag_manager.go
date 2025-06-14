@@ -326,9 +326,31 @@ func (rtm *RBACTagManager) SyncRolePermissions(userID string) error {
 	for _, roleName := range roles {
 		switch roleName {
 		case "admin":
-			// Admin gets all permissions
-			if err := rtm.AssignPermissionToUser(userID, "*", "*"); err != nil {
-				return fmt.Errorf("failed to assign admin permissions: %v", err)
+			// Admin gets all permissions - use the format expected by HasPermission
+			// The HasPermission function looks for "rbac:perm:*", not "rbac:perm:*:*"
+			user, err := rtm.entityRepo.GetByID(userID)
+			if err != nil {
+				return fmt.Errorf("failed to get user for admin permissions: %v", err)
+			}
+			
+			// Add the correct wildcard permission format
+			adminPermTag := "rbac:perm:*"
+			hasAdminPerm := false
+			
+			cleanTags := user.GetTagsWithoutTimestamp()
+			for _, tag := range cleanTags {
+				if tag == adminPermTag {
+					hasAdminPerm = true
+					break
+				}
+			}
+			
+			if !hasAdminPerm {
+				user.Tags = append(user.Tags, adminPermTag)
+				if err := rtm.entityRepo.Update(user); err != nil {
+					return fmt.Errorf("failed to assign admin permissions: %v", err)
+				}
+				logger.Info("Assigned admin wildcard permission to user %s", userID)
 			}
 		// Add more role mappings here as needed:
 		// case "viewer":
