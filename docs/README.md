@@ -40,10 +40,10 @@ Welcome to the EntityDB documentation library. This is your comprehensive guide 
 4. **[Git Workflow](./60-developer-guides/02-git-workflow.md)** - Development process and contribution guidelines
 
 ### For Administrators
-1. **[Production Checklist](./70-deployment/02-production-checklist.md)** - Deploy EntityDB in production
-2. **[Configuration Reference](./90-reference/01-configuration-reference.md)** - All configuration options
-3. **[Security Configuration](./50-admin-guides/01-security-configuration.md)** - Secure your EntityDB installation
-4. **[Deployment Guide](./50-admin-guides/02-deployment-guide.md)** - Monitor system health and deployment
+1. **[Production Deployment](./70-deployment/01-production-deployment.md)** - Deploy EntityDB in production
+2. **[User Management](./50-admin-guides/01-user-management.md)** - Create and manage users with RBAC
+3. **[Monitoring Guide](./50-admin-guides/02-monitoring-guide.md)** - Monitor system health and performance
+4. **[Configuration Reference](./90-reference/01-configuration-reference.md)** - All configuration options
 
 ## 📚 Documentation Categories
 
@@ -95,8 +95,8 @@ Technical specifications, configuration options, and detailed references.
 ### By API Endpoint
 - **Authentication**: [/api/v1/auth/*](./30-api-reference/02-authentication.md)
 - **Entities**: [/api/v1/entities/*](./30-api-reference/03-entities.md)
-- **Datasets**: [/api/v1/entities/*](./30-api-reference/03-entities.md) (Entity operations)
-- **Metrics**: [/api/v1/system/metrics](./30-api-reference/01-overview.md#system-endpoints)
+- **Datasets**: [Dataset API](./30-api-reference/04-datasets-metrics.md#dataset-operations)
+- **Metrics**: [Metrics API](./30-api-reference/04-datasets-metrics.md#metrics-api-reference)
 
 ## 📋 Recent Changes
 
