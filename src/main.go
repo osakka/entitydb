@@ -37,7 +37,7 @@ import (
 )
 
 // @title EntityDB API
-// @version 2.28.0
+// @version 2.31.0
 // @description A temporal database with pure entity-based architecture
 // @termsOfService https://github.com/osakka/entitydb
 
@@ -77,7 +77,7 @@ import (
 // to help with deployment tracking and support diagnostics.
 var (
 	// Version is the EntityDB version string, typically in semantic versioning format.
-	// Default: "2.28.0" (current development version)
+	// Default: "2.31.0" (current development version)
 	// Build override: -ldflags "-X main.Version=x.y.z"
 	// Used in: version command output, API responses, swagger documentation
 	Version = "2.31.0"
