@@ -28,10 +28,14 @@
     <link href="/css/entity-modal-system.css" rel="stylesheet">
     <link href="/css/temporal-query-system.css" rel="stylesheet">
     <link href="/css/performance-monitoring.css" rel="stylesheet">
+    <link href="/css/error-management.css" rel="stylesheet">
     
     <!-- Core scripts -->
     <script src="/js/logger.js?v=2.30.3"></script>
     <script src="/js/api-client.js?v=2.30.3"></script>
+    <script src="/js/error-handler.js?v=2.31.0"></script>
+    <script src="/js/request-debugger.js?v=2.31.0"></script>
+    <script src="/js/ui-resilience.js?v=2.31.0"></script>
     <script src="/js/notification-system.js?v=2.30.3"></script>
     <script src="/js/realtime-update-service.js?v=2.30.3"></script>
     <script src="/js/advanced-search-system.js?v=2.30.3"></script>
@@ -1723,6 +1727,218 @@
                         </div>
                     </div>
 
+                    <!-- Error Management Tab -->
+                    <div :class="['tab-content', { active: activeTab === 'errors' }]">
+                        <div class="error-dashboard">
+                            <!-- Error Dashboard Header -->
+                            <div class="dashboard-header" style="margin-bottom: 24px;">
+                                <div>
+                                    <h2 style="margin: 0; font-size: 24px; font-weight: 600;">Error Management & Troubleshooting</h2>
+                                    <p style="margin: 8px 0 0 0; color: #6c757d;">Monitor, debug, and resolve system errors and API issues</p>
+                                </div>
+                                <div style="display: flex; gap: 12px; align-items: center;">
+                                    <div class="realtime-status" :class="{ active: errorData.monitoring.enabled }">
+                                        <i class="fas fa-circle"></i>
+                                        <span>{{ errorData.monitoring.enabled ? 'Monitoring Active' : 'Monitoring Disabled' }}</span>
+                                    </div>
+                                    <button @click="clearAllErrors" class="btn btn-secondary" :disabled="errorData.errors.length === 0">
+                                        <i class="fas fa-trash"></i> Clear All
+                                    </button>
+                                    <button @click="exportErrorData" class="btn btn-secondary">
+                                        <i class="fas fa-download"></i> Export
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Error Statistics -->
+                            <div class="error-stats-grid">
+                                <div class="error-stat-card">
+                                    <div class="error-stat-number critical">{{ errorData.stats.total }}</div>
+                                    <div class="error-stat-label">Total Errors</div>
+                                </div>
+                                <div class="error-stat-card">
+                                    <div class="error-stat-number high">{{ errorData.stats.recent }}</div>
+                                    <div class="error-stat-label">Recent (1h)</div>
+                                </div>
+                                <div class="error-stat-card">
+                                    <div class="error-stat-number medium">{{ errorData.stats.unresolved }}</div>
+                                    <div class="error-stat-label">Unresolved</div>
+                                </div>
+                                <div class="error-stat-card">
+                                    <div class="error-stat-number low">{{ Math.round(errorData.requestStats.successRate) }}%</div>
+                                    <div class="error-stat-label">Success Rate</div>
+                                </div>
+                            </div>
+
+                            <!-- Error Filters -->
+                            <div class="error-filters">
+                                <div class="filter-group">
+                                    <label class="filter-label">Category</label>
+                                    <select v-model="errorData.filters.category" @change="filterErrors" class="filter-select">
+                                        <option value="">All Categories</option>
+                                        <option value="api">API</option>
+                                        <option value="ui">UI</option>
+                                        <option value="network">Network</option>
+                                        <option value="auth">Authentication</option>
+                                        <option value="validation">Validation</option>
+                                    </select>
+                                </div>
+                                <div class="filter-group">
+                                    <label class="filter-label">Severity</label>
+                                    <select v-model="errorData.filters.severity" @change="filterErrors" class="filter-select">
+                                        <option value="">All Severities</option>
+                                        <option value="critical">Critical</option>
+                                        <option value="high">High</option>
+                                        <option value="medium">Medium</option>
+                                        <option value="low">Low</option>
+                                    </select>
+                                </div>
+                                <div class="filter-group">
+                                    <label class="filter-label">Status</label>
+                                    <select v-model="errorData.filters.resolved" @change="filterErrors" class="filter-select">
+                                        <option value="">All</option>
+                                        <option value="false">Unresolved</option>
+                                        <option value="true">Resolved</option>
+                                    </select>
+                                </div>
+                                <div class="filter-group">
+                                    <label class="filter-label">Time Range</label>
+                                    <select v-model="errorData.filters.timeRange" @change="filterErrors" class="filter-select">
+                                        <option value="all">All Time</option>
+                                        <option value="1h">Last Hour</option>
+                                        <option value="24h">Last 24 Hours</option>
+                                        <option value="7d">Last 7 Days</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <!-- Error List -->
+                            <div class="error-list">
+                                <div class="error-list-header">
+                                    <h3 class="error-list-title">
+                                        Recent Errors ({{ errorData.filteredErrors.length }})
+                                    </h3>
+                                    <div class="error-list-controls">
+                                        <button @click="refreshErrors" class="btn btn-sm btn-outline">
+                                            <i class="fas fa-sync-alt"></i> Refresh
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <div v-if="errorData.filteredErrors.length === 0" class="error-empty">
+                                    <i class="fas fa-check-circle"></i>
+                                    <h3>No Errors Found</h3>
+                                    <p>{{ errorData.errors.length === 0 ? 'System is running smoothly!' : 'No errors match the current filters.' }}</p>
+                                </div>
+                                
+                                <div v-for="error in errorData.filteredErrors" :key="error.id" 
+                                     class="error-item" 
+                                     :class="{ resolved: error.resolved, expanded: error.expanded }"
+                                     @click="toggleErrorDetails(error)">
+                                    <div class="error-header">
+                                        <div>
+                                            <div class="error-title">{{ error.message }}</div>
+                                            <div style="display: flex; gap: 8px; align-items: center; margin-top: 4px;">
+                                                <span class="error-severity" :class="error.severity">{{ error.severity }}</span>
+                                                <span class="error-category" :class="error.category">{{ error.category }}</span>
+                                                <span v-if="error.count > 1" class="error-count">{{ error.count }}x</span>
+                                            </div>
+                                        </div>
+                                        <div class="error-meta">
+                                            <span class="error-timestamp">{{ formatTimestamp(error.timestamp) }}</span>
+                                        </div>
+                                    </div>
+                                    
+                                    <div v-if="error.expanded" class="error-details">
+                                        <div class="error-message">{{ error.message }}</div>
+                                        <div v-if="error.url" class="request-details">
+                                            <div><strong>URL:</strong> <span class="request-url">{{ error.url }}</span></div>
+                                            <div v-if="error.method"><strong>Method:</strong> <span class="request-method" :class="error.method.toLowerCase()">{{ error.method }}</span></div>
+                                            <div v-if="error.statusCode"><strong>Status:</strong> <span class="status-code" :class="getStatusClass(error.statusCode)">{{ error.statusCode }}</span></div>
+                                            <div v-if="error.duration"><strong>Duration:</strong> {{ error.duration.toFixed(2) }}ms</div>
+                                        </div>
+                                        <div v-if="error.stack" class="error-stack">{{ error.stack }}</div>
+                                        <div class="error-actions">
+                                            <button v-if="!error.resolved" @click.stop="resolveError(error.id)" class="btn-resolve">
+                                                <i class="fas fa-check"></i> Mark Resolved
+                                            </button>
+                                            <button v-if="error.requestId" @click.stop="showRequestTimeline(error.requestId)" class="btn-retry">
+                                                <i class="fas fa-timeline"></i> View Timeline
+                                            </button>
+                                            <button @click.stop="copyErrorDetails(error)" class="btn-ignore">
+                                                <i class="fas fa-copy"></i> Copy Details
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Request Debugger -->
+                            <div class="request-debugger" style="margin-top: 24px;">
+                                <div class="error-list-header">
+                                    <h3 class="error-list-title">Request Debugging</h3>
+                                    <div class="error-list-controls">
+                                        <span style="font-size: 12px; color: #6c757d;">{{ errorData.requestStats.total }} requests</span>
+                                        <button @click="clearRequestHistory" class="btn btn-sm btn-outline">
+                                            <i class="fas fa-trash"></i> Clear
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <div class="error-stats-grid" style="margin-bottom: 16px;">
+                                    <div class="error-stat-card">
+                                        <div class="error-stat-number low">{{ errorData.requestStats.successful }}</div>
+                                        <div class="error-stat-label">Successful</div>
+                                    </div>
+                                    <div class="error-stat-card">
+                                        <div class="error-stat-number high">{{ errorData.requestStats.failed }}</div>
+                                        <div class="error-stat-label">Failed</div>
+                                    </div>
+                                    <div class="error-stat-card">
+                                        <div class="error-stat-number medium">{{ Math.round(errorData.requestStats.averageDuration) }}ms</div>
+                                        <div class="error-stat-label">Avg Duration</div>
+                                    </div>
+                                    <div class="error-stat-card">
+                                        <div class="error-stat-number" :class="errorData.requestStats.pending > 0 ? 'medium' : 'low'">{{ errorData.requestStats.pending }}</div>
+                                        <div class="error-stat-label">Pending</div>
+                                    </div>
+                                </div>
+
+                                <div v-if="errorData.selectedRequestTimeline.length > 0" class="request-timeline">
+                                    <h4 style="margin: 0 0 16px 0;">Request Timeline: {{ errorData.selectedRequestId }}</h4>
+                                    <div v-for="entry in errorData.selectedRequestTimeline" :key="entry.id + entry.timestamp" 
+                                         class="timeline-item" :class="getTimelineClass(entry)">
+                                        <div class="timeline-time">{{ formatTimestamp(entry.timestamp) }}</div>
+                                        <div class="timeline-content">
+                                            <strong>{{ entry.type }}:</strong> {{ getTimelineDescription(entry) }}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div v-if="errorData.recentRequests.length > 0" style="margin-top: 16px;">
+                                    <h4 style="margin: 0 0 12px 0;">Recent API Requests</h4>
+                                    <div style="max-height: 300px; overflow-y: auto;">
+                                        <div v-for="request in errorData.recentRequests.slice(0, 10)" :key="request.id" 
+                                             class="error-item" style="cursor: pointer;"
+                                             @click="showRequestTimeline(request.id)">
+                                            <div class="error-header">
+                                                <div>
+                                                    <span class="request-method" :class="request.method ? request.method.toLowerCase() : 'get'">{{ request.method || 'GET' }}</span>
+                                                    <span class="request-url">{{ request.url }}</span>
+                                                </div>
+                                                <div class="error-meta">
+                                                    <span v-if="request.statusCode" class="status-code" :class="getStatusClass(request.statusCode)">{{ request.statusCode }}</span>
+                                                    <span v-if="request.duration" style="margin-left: 8px;">{{ request.duration.toFixed(2) }}ms</span>
+                                                    <span class="error-timestamp">{{ formatTimestamp(request.timestamp) }}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- RBAC Tab -->
                     <div :class="['tab-content', { active: activeTab === 'rbac' }]">
                         <div style="padding: 24px;">
@@ -1776,6 +1992,7 @@
                         { id: 'entities', name: 'Entities', icon: 'fas fa-database' },
                         { id: 'temporal', name: 'Temporal Queries', icon: 'fas fa-history' },
                         { id: 'performance', name: 'Performance', icon: 'fas fa-tachometer-alt' },
+                        { id: 'errors', name: 'Error Management', icon: 'fas fa-exclamation-triangle' },
                         { id: 'rbac', name: 'RBAC Metrics', icon: 'fas fa-user-shield' },
                         { id: 'integrity', name: 'Integrity', icon: 'fas fa-shield-alt' },
                         { id: 'admin', name: 'Admin', icon: 'fas fa-cog' }
@@ -1852,6 +2069,39 @@
                         }
                     },
                     
+                    // Error Management Data
+                    errorData: {
+                        monitoring: {
+                            enabled: true
+                        },
+                        errors: [],
+                        filteredErrors: [],
+                        recentRequests: [],
+                        selectedRequestTimeline: [],
+                        selectedRequestId: null,
+                        filters: {
+                            category: '',
+                            severity: '',
+                            resolved: '',
+                            timeRange: 'all'
+                        },
+                        stats: {
+                            total: 0,
+                            recent: 0,
+                            unresolved: 0,
+                            categories: {},
+                            severity: {}
+                        },
+                        requestStats: {
+                            total: 0,
+                            successful: 0,
+                            failed: 0,
+                            pending: 0,
+                            successRate: 100,
+                            averageDuration: 0
+                        }
+                    },
+                    
                     // Performance testing state
                     benchmarkRunning: false,
                     stressTestRunning: false,
@@ -1906,6 +2156,7 @@
                         this.currentUser = JSON.parse(user);
                         this.isAuthenticated = true;
                         this.loadSystemStats();
+                        this.initializeErrorHandlers();
                     } catch (e) {
                         console.error('Failed to restore session:', e);
                         localStorage.removeItem('entitydb-admin-token');
@@ -1970,6 +2221,9 @@
                         // Save to localStorage
                         localStorage.setItem('entitydb-admin-token', data.token);
                         localStorage.setItem('entitydb-admin-user', JSON.stringify(data.user));
+                        
+                        // Initialize error handlers
+                        this.initializeErrorHandlers();
                         
                         this.notify('Login successful!', 'success');
                         
@@ -3222,6 +3476,294 @@
                             this.loadPerformanceMetrics();
                         }
                     }, 5000); // Update every 5 seconds when on performance tab
+                },
+
+                // Error Management Methods
+                initializeErrorHandlers() {
+                    if (window.ErrorHandler) {
+                        // Subscribe to error events
+                        window.ErrorHandler.addListener((error) => {
+                            this.errorData.errors.unshift({
+                                ...error,
+                                expanded: false
+                            });
+                            this.updateErrorStats();
+                            this.filterErrors();
+                        });
+                        
+                        // Get existing errors
+                        this.errorData.errors = window.ErrorHandler.getErrors().map(error => ({
+                            ...error,
+                            expanded: false
+                        }));
+                        this.updateErrorStats();
+                        this.filterErrors();
+                    }
+                    
+                    if (window.RequestDebugger) {
+                        // Subscribe to request events
+                        window.addEventListener('request-debugger:log', (event) => {
+                            const logEntry = event.detail;
+                            if (logEntry.type === 'request' || logEntry.type === 'response') {
+                                this.updateRequestHistory(logEntry);
+                            }
+                        });
+                        
+                        // Get existing request history
+                        this.errorData.recentRequests = window.RequestDebugger.getLogs({ limit: 50 });
+                        this.updateRequestStats();
+                    }
+                },
+                
+                updateErrorStats() {
+                    const errors = this.errorData.errors;
+                    const now = Date.now();
+                    const oneHourAgo = now - 3600000;
+                    
+                    this.errorData.stats = {
+                        total: errors.length,
+                        recent: errors.filter(e => new Date(e.timestamp).getTime() > oneHourAgo).length,
+                        unresolved: errors.filter(e => !e.resolved).length,
+                        categories: this.getErrorCategoryCounts(errors),
+                        severity: this.getErrorSeverityCounts(errors)
+                    };
+                },
+                
+                updateRequestStats() {
+                    if (window.RequestDebugger) {
+                        const stats = window.RequestDebugger.getStats();
+                        this.errorData.requestStats = {
+                            total: stats.totalRequests,
+                            successful: stats.successfulResponses,
+                            failed: stats.failedResponses + stats.errors,
+                            pending: stats.totalRequests - stats.totalResponses,
+                            successRate: stats.successRate,
+                            averageDuration: stats.averageDuration
+                        };
+                    }
+                },
+                
+                updateRequestHistory(logEntry) {
+                    this.errorData.recentRequests.unshift(logEntry);
+                    if (this.errorData.recentRequests.length > 50) {
+                        this.errorData.recentRequests = this.errorData.recentRequests.slice(0, 50);
+                    }
+                    this.updateRequestStats();
+                },
+                
+                getErrorCategoryCounts(errors) {
+                    const counts = {};
+                    errors.forEach(error => {
+                        counts[error.category] = (counts[error.category] || 0) + error.count;
+                    });
+                    return counts;
+                },
+                
+                getErrorSeverityCounts(errors) {
+                    const counts = {};
+                    errors.forEach(error => {
+                        counts[error.severity] = (counts[error.severity] || 0) + error.count;
+                    });
+                    return counts;
+                },
+                
+                filterErrors() {
+                    let filtered = [...this.errorData.errors];
+                    
+                    if (this.errorData.filters.category) {
+                        filtered = filtered.filter(e => e.category === this.errorData.filters.category);
+                    }
+                    
+                    if (this.errorData.filters.severity) {
+                        filtered = filtered.filter(e => e.severity === this.errorData.filters.severity);
+                    }
+                    
+                    if (this.errorData.filters.resolved !== '') {
+                        const resolved = this.errorData.filters.resolved === 'true';
+                        filtered = filtered.filter(e => e.resolved === resolved);
+                    }
+                    
+                    if (this.errorData.filters.timeRange !== 'all') {
+                        const now = Date.now();
+                        let cutoff;
+                        switch (this.errorData.filters.timeRange) {
+                            case '1h':
+                                cutoff = now - 3600000;
+                                break;
+                            case '24h':
+                                cutoff = now - 86400000;
+                                break;
+                            case '7d':
+                                cutoff = now - 604800000;
+                                break;
+                            default:
+                                cutoff = 0;
+                        }
+                        filtered = filtered.filter(e => new Date(e.timestamp).getTime() > cutoff);
+                    }
+                    
+                    this.errorData.filteredErrors = filtered;
+                },
+                
+                toggleErrorDetails(error) {
+                    error.expanded = !error.expanded;
+                },
+                
+                resolveError(errorId) {
+                    const error = this.errorData.errors.find(e => e.id === errorId);
+                    if (error) {
+                        error.resolved = true;
+                        error.resolvedAt = new Date().toISOString();
+                        
+                        if (window.ErrorHandler) {
+                            window.ErrorHandler.resolveError(errorId);
+                        }
+                        
+                        this.updateErrorStats();
+                        this.filterErrors();
+                        this.notify('Error marked as resolved', 'success');
+                    }
+                },
+                
+                showRequestTimeline(requestId) {
+                    this.errorData.selectedRequestId = requestId;
+                    if (window.RequestDebugger) {
+                        this.errorData.selectedRequestTimeline = window.RequestDebugger.getRequestTimeline(requestId);
+                    }
+                },
+                
+                refreshErrors() {
+                    if (window.ErrorHandler) {
+                        this.errorData.errors = window.ErrorHandler.getErrors().map(error => ({
+                            ...error,
+                            expanded: false
+                        }));
+                        this.updateErrorStats();
+                        this.filterErrors();
+                    }
+                    
+                    if (window.RequestDebugger) {
+                        this.errorData.recentRequests = window.RequestDebugger.getLogs({ limit: 50 });
+                        this.updateRequestStats();
+                    }
+                    
+                    this.notify('Error data refreshed', 'info');
+                },
+                
+                clearAllErrors() {
+                    if (window.ErrorHandler) {
+                        window.ErrorHandler.clearErrors();
+                    }
+                    this.errorData.errors = [];
+                    this.errorData.filteredErrors = [];
+                    this.updateErrorStats();
+                    this.notify('All errors cleared', 'info');
+                },
+                
+                clearRequestHistory() {
+                    if (window.RequestDebugger) {
+                        window.RequestDebugger.clearLogs();
+                    }
+                    this.errorData.recentRequests = [];
+                    this.errorData.selectedRequestTimeline = [];
+                    this.errorData.selectedRequestId = null;
+                    this.updateRequestStats();
+                    this.notify('Request history cleared', 'info');
+                },
+                
+                exportErrorData() {
+                    const data = {
+                        errors: this.errorData.errors,
+                        requests: this.errorData.recentRequests,
+                        stats: this.errorData.stats,
+                        requestStats: this.errorData.requestStats,
+                        timestamp: new Date().toISOString()
+                    };
+                    
+                    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `entitydb-errors-${new Date().toISOString().split('T')[0]}.json`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    
+                    this.notify('Error data exported', 'success');
+                },
+                
+                copyErrorDetails(error) {
+                    const details = {
+                        id: error.id,
+                        type: error.type,
+                        message: error.message,
+                        category: error.category,
+                        severity: error.severity,
+                        timestamp: error.timestamp,
+                        url: error.url,
+                        method: error.method,
+                        statusCode: error.statusCode,
+                        stack: error.stack
+                    };
+                    
+                    navigator.clipboard.writeText(JSON.stringify(details, null, 2)).then(() => {
+                        this.notify('Error details copied to clipboard', 'success');
+                    }).catch(() => {
+                        this.notify('Failed to copy error details', 'error');
+                    });
+                },
+                
+                getStatusClass(statusCode) {
+                    if (statusCode >= 200 && statusCode < 300) return 'success';
+                    if (statusCode >= 300 && statusCode < 400) return 'redirect';
+                    if (statusCode >= 400 && statusCode < 500) return 'client-error';
+                    if (statusCode >= 500) return 'server-error';
+                    return '';
+                },
+                
+                getTimelineClass(entry) {
+                    if (entry.type === 'error') return 'error';
+                    if (entry.type === 'retry' || entry.type === 'retry_on_status') return 'warning';
+                    if (entry.type === 'response' && entry.ok) return 'success';
+                    return '';
+                },
+                
+                getTimelineDescription(entry) {
+                    switch (entry.type) {
+                        case 'request':
+                            return `${entry.method || 'GET'} ${entry.url}`;
+                        case 'response':
+                            return `${entry.status} ${entry.statusText} (${entry.duration ? entry.duration.toFixed(2) + 'ms' : 'unknown duration'})`;
+                        case 'error':
+                            return entry.error?.message || entry.message || 'Unknown error';
+                        case 'retry':
+                            return `Retry attempt ${entry.attempt}`;
+                        case 'retry_on_status':
+                            return `Retry on status ${entry.status} (attempt ${entry.attempt})`;
+                        case 'performance_warning':
+                            return entry.message;
+                        default:
+                            return JSON.stringify(entry);
+                    }
+                },
+                
+                formatTimestamp(timestamp) {
+                    const date = new Date(timestamp);
+                    const now = new Date();
+                    const diff = now - date;
+                    
+                    if (diff < 60000) {
+                        return 'just now';
+                    } else if (diff < 3600000) {
+                        const minutes = Math.floor(diff / 60000);
+                        return `${minutes}m ago`;
+                    } else if (diff < 86400000) {
+                        const hours = Math.floor(diff / 3600000);
+                        return `${hours}h ago`;
+                    } else {
+                        return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+                    }
                 },
 
                 // Utility methods
