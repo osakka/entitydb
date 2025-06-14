@@ -1133,7 +1133,7 @@
                                     <div class="status-info">
                                         <h3>System Status</h3>
                                         <p>{{ getHealthStatus() }}</p>
-                                        <small>Uptime: {{ formatUptime(systemMetrics.system?.uptime_seconds) }}</small>
+                                        <small>Uptime: {{ formatUptime(systemMetrics.system?.uptime_seconds || 0) }}</small>
                                     </div>
                                     <div class="status-value">
                                         <span class="health-score" :style="{ color: getHealthColor() }">{{ getHealthScore() }}%</span>
@@ -2651,18 +2651,35 @@
                 },
                 
                 formatUptime(uptimeSeconds) {
-                    if (!uptimeSeconds && uptimeSeconds !== 0) return 'Unknown';
-                    
-                    const hours = Math.floor(uptimeSeconds / 3600);
-                    const minutes = Math.floor((uptimeSeconds % 3600) / 60);
-                    const seconds = Math.floor(uptimeSeconds % 60);
-                    
-                    if (hours > 0) {
-                        return `${hours}h ${minutes}m`;
-                    } else if (minutes > 0) {
-                        return `${minutes}m ${seconds}s`;
-                    } else {
-                        return `${seconds}s`;
+                    try {
+                        // Debug logging to understand what's being passed
+                        if (typeof uptimeSeconds !== 'number' && uptimeSeconds !== null && uptimeSeconds !== undefined) {
+                            console.warn('formatUptime received non-number:', typeof uptimeSeconds, uptimeSeconds);
+                        }
+                        
+                        // Handle undefined, null, or non-numeric values
+                        if (!uptimeSeconds && uptimeSeconds !== 0) return 'Unknown';
+                        if (typeof uptimeSeconds !== 'number') {
+                            // Try to convert to number if it's a string
+                            const parsed = parseFloat(uptimeSeconds);
+                            if (isNaN(parsed)) return 'Unknown';
+                            uptimeSeconds = parsed;
+                        }
+                        
+                        const hours = Math.floor(uptimeSeconds / 3600);
+                        const minutes = Math.floor((uptimeSeconds % 3600) / 60);
+                        const seconds = Math.floor(uptimeSeconds % 60);
+                        
+                        if (hours > 0) {
+                            return `${hours}h ${minutes}m`;
+                        } else if (minutes > 0) {
+                            return `${minutes}m ${seconds}s`;
+                        } else {
+                            return `${seconds}s`;
+                        }
+                    } catch (error) {
+                        console.error('formatUptime error:', error, 'input:', uptimeSeconds);
+                        return 'Error';
                     }
                 },
 
