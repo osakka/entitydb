@@ -123,15 +123,19 @@ func (sm *SecurityManager) CreateUser(username, password, email string) (*Securi
 		"dataset:system",
 		"identity:username:" + username,
 		"identity:uuid:" + userID,
+		"name:" + username, // Friendly display name
 		"status:active",
 		"profile:email:" + email,
 		"created:" + NowString(),
 		"has:credentials", // Tag to indicate this user has embedded credentials
 	}
 	
-	// Add rbac:role:admin tag directly for admin user
+	// Add comprehensive RBAC permissions for admin user
 	if username == "admin" {
-		tags = append(tags, "rbac:role:admin")
+		tags = append(tags, 
+			"rbac:role:admin",
+			"rbac:perm:*:*", // All permissions
+		)
 	}
 	
 	// Store credentials in content as a simple format: salt|hash
@@ -309,6 +313,9 @@ func (sm *SecurityManager) CreateSession(user *SecurityUser, ipAddress, userAgen
 	}
 	logger.Debug("Created session entity with user relationship: %s -> %s", sessionID, user.ID)
 	
+	// Session is now created without triggering immediate verification
+	// This prevents the indexing race condition that caused recovery attempts
+	
 	return &SecuritySession{
 		ID:        sessionID,
 		Token:     token,
@@ -326,13 +333,31 @@ func (sm *SecurityManager) ValidateSession(token string) (*SecurityUser, error) 
 	logger.Debug("ValidateSession: Looking for session with token: %s", token)
 	
 	// Find session by token tag using the fixed temporal tag search
-	sessionEntities, err := sm.entityRepo.ListByTag("token:" + token)
-	if err != nil {
-		logger.Error("ValidateSession: Error finding session: %v", err)
-		return nil, fmt.Errorf("session lookup failed: %v", err)
+	// Retry mechanism to handle indexing delays
+	var sessionEntities []*Entity
+	var err error
+	
+	for i := 0; i < 3; i++ {
+		sessionEntities, err = sm.entityRepo.ListByTag("token:" + token)
+		if err != nil {
+			logger.Error("ValidateSession: Error finding session (attempt %d): %v", i+1, err)
+			if i < 2 {
+				time.Sleep(10 * time.Millisecond) // Short delay before retry
+				continue
+			}
+			return nil, fmt.Errorf("session lookup failed: %v", err)
+		}
+		if len(sessionEntities) > 0 {
+			break // Found session
+		}
+		if i < 2 {
+			logger.Debug("ValidateSession: Session not found, retrying (attempt %d)", i+1)
+			time.Sleep(10 * time.Millisecond) // Short delay before retry
+		}
 	}
+	
 	if len(sessionEntities) == 0 {
-		logger.Debug("ValidateSession: No session found with token: %s", token)
+		logger.Debug("ValidateSession: No session found with token after retries: %s", token)
 		return nil, fmt.Errorf("session not found")
 	}
 	

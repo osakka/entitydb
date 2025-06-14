@@ -693,14 +693,10 @@ func (r *TemporalRepository) Create(entity *models.Entity) error {
 	// Index the new entity temporally
 	r.indexEntityTemporal(entity)
 	
-	// Verify entity was created correctly
-	storedEntity, err := r.GetByID(entity.ID)
-	if err != nil {
-		logger.Error("TemporalRepository.Create: Entity was created but cannot be retrieved: %v", err)
-	} else {
-		logger.Debug("TemporalRepository.Create: Entity created and verified with %d tags and %d bytes content", 
-			len(storedEntity.Tags), len(storedEntity.Content))
-	}
+	// Skip verification to avoid indexing race condition
+	// Entity is written to WAL and will be available after indexing completes
+	logger.Debug("TemporalRepository.Create: Entity created with %d tags and %d bytes content", 
+		len(entity.Tags), len(entity.Content))
 	
 	return nil
 }

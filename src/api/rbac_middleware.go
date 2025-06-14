@@ -42,7 +42,7 @@ type rbacContextKey struct{}
 //
 // This middleware:
 //   1. Extracts the Bearer token from the Authorization header
-//   2. Validates the session token with the session manager
+//   2. Validates the session token with the security manager (database-based)
 //   3. Loads the user entity from the database
 //   4. Extracts RBAC permissions from user tags
 //   5. Checks if the user has the required permission
@@ -57,11 +57,11 @@ type rbacContextKey struct{}
 //   Users with "rbac:role:admin" or "rbac:perm:*" bypass all checks
 //
 // Usage:
-//   handler := RBACMiddleware(repo, sessions, RBACPermission{
+//   handler := RBACMiddleware(repo, securityManager, RBACPermission{
 //       Resource: "entity",
 //       Action: "create",
 //   })(actualHandler)
-func RBACMiddleware(entityRepo models.EntityRepository, sessionManager *models.SessionManager, requiredPerm RBACPermission) MiddlewareFunc {
+func RBACMiddleware(entityRepo models.EntityRepository, securityManager *models.SecurityManager, requiredPerm RBACPermission) MiddlewareFunc {
 	return func(next http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
 			// Get token from Authorization header
@@ -79,19 +79,15 @@ func RBACMiddleware(entityRepo models.EntityRepository, sessionManager *models.S
 			}
 			token := parts[1]
 			
-			// Validate token using session manager
-			session, exists := sessionManager.GetSession(token)
-			if !exists {
+			// Validate token using security manager (database-based sessions)
+			securityUser, err := securityManager.ValidateSession(token)
+			if err != nil {
 				RespondError(w, http.StatusUnauthorized, "Invalid or expired token")
 				return
 			}
 			
-			// Find user entity by user ID from session
-			user, err := entityRepo.GetByID(session.UserID)
-			if err != nil || user == nil {
-				RespondError(w, http.StatusUnauthorized, "User not found")
-				return
-			}
+			// SecurityUser already contains the entity, so we can use it directly
+			user := securityUser.Entity
 			
 			// Extract permissions from user tags
 			permissions := models.GetTagsByNamespace(user.Tags, "rbac")
@@ -105,17 +101,17 @@ func RBACMiddleware(entityRepo models.EntityRepository, sessionManager *models.S
 				// Track permission denied event
 				go func() {
 					permEvent := &models.Entity{
-						ID: fmt.Sprintf("perm_event_%s_%d", session.UserID, time.Now().UnixNano()),
+						ID: fmt.Sprintf("perm_event_%s_%d", securityUser.ID, time.Now().UnixNano()),
 						Tags: []string{
 							"type:permission_event",
 							"status:denied",
-							"user:" + session.UserID,
+							"user:" + securityUser.ID,
 							"permission:" + requiredPermTag,
 							"resource:" + requiredPerm.Resource,
 							"action:" + requiredPerm.Action,
 						},
 						Content: []byte(fmt.Sprintf(`{"user":"%s","permission":"%s","granted":false,"timestamp":"%s"}`, 
-							session.UserID, requiredPermTag, time.Now().Format(time.RFC3339))),
+							securityUser.ID, requiredPermTag, time.Now().Format(time.RFC3339))),
 					}
 					if err := entityRepo.Create(permEvent); err != nil {
 						logger.Error("Failed to track permission event: %v", err)
@@ -130,17 +126,17 @@ func RBACMiddleware(entityRepo models.EntityRepository, sessionManager *models.S
 			// Track permission granted event
 			go func() {
 				permEvent := &models.Entity{
-					ID: fmt.Sprintf("perm_event_%s_%d", session.UserID, time.Now().UnixNano()),
+					ID: fmt.Sprintf("perm_event_%s_%d", securityUser.ID, time.Now().UnixNano()),
 					Tags: []string{
 						"type:permission_event", 
 						"status:granted",
-						"user:" + session.UserID,
+						"user:" + securityUser.ID,
 						"permission:" + requiredPermTag,
 						"resource:" + requiredPerm.Resource,
 						"action:" + requiredPerm.Action,
 					},
 					Content: []byte(fmt.Sprintf(`{"user":"%s","permission":"%s","granted":true,"timestamp":"%s"}`, 
-						session.UserID, requiredPermTag, time.Now().Format(time.RFC3339))),
+						securityUser.ID, requiredPermTag, time.Now().Format(time.RFC3339))),
 				}
 				if err := entityRepo.Create(permEvent); err != nil {
 					logger.Error("Failed to track permission event: %v", err)

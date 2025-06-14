@@ -360,19 +360,19 @@ func main() {
 	apiRouter.HandleFunc("/auth/status", server.handleAuthStatus).Methods("GET")
 	
 	// User management routes with RBAC
-	userHandlerRBAC := api.NewUserHandlerRBAC(server.userHandler, server.entityRepo, server.sessionManager)
+	userHandlerRBAC := api.NewUserHandlerRBAC(server.userHandler, server.entityRepo, server.securityManager)
 	apiRouter.HandleFunc("/users/create", userHandlerRBAC.CreateUser()).Methods("POST")
 		apiRouter.HandleFunc("/users/change-password", userHandlerRBAC.ChangePassword()).Methods("POST")
 		apiRouter.HandleFunc("/users/reset-password", userHandlerRBAC.ResetPassword()).Methods("POST")
 	
 	// Dashboard routes with RBAC
 	dashboardHandler := api.NewDashboardHandler(server.entityRepo)
-	dashboardHandlerRBAC := api.NewDashboardHandlerRBAC(dashboardHandler, server.entityRepo, server.sessionManager)
+	dashboardHandlerRBAC := api.NewDashboardHandlerRBAC(dashboardHandler, server.entityRepo, server.securityManager)
 	apiRouter.HandleFunc("/dashboard/stats", dashboardHandlerRBAC.GetDashboardStats()).Methods("GET")
 	
 	// Configuration routes with RBAC
 	configHandler := api.NewEntityConfigHandler(server.entityRepo)
-	configHandlerRBAC := api.NewEntityConfigHandlerRBAC(configHandler, server.entityRepo, server.sessionManager)
+	configHandlerRBAC := api.NewEntityConfigHandlerRBAC(configHandler, server.entityRepo, server.securityManager)
 	apiRouter.HandleFunc("/config", configHandlerRBAC.GetConfig()).Methods("GET")
 	apiRouter.HandleFunc("/config/set", configHandlerRBAC.SetConfig()).Methods("POST")
 	apiRouter.HandleFunc("/feature-flags", configHandlerRBAC.GetFeatureFlags()).Methods("GET")
@@ -380,8 +380,8 @@ func main() {
 	
 	// Admin routes with RBAC (require admin permission)
 	adminHandler := api.NewAdminHandler(server.entityRepo)
-	apiRouter.HandleFunc("/admin/reindex", api.RBACMiddleware(server.entityRepo, server.sessionManager, api.RBACPermission{Resource: "admin", Action: "reindex"})(adminHandler.ReindexHandler)).Methods("POST")
-	apiRouter.HandleFunc("/admin/health", api.RBACMiddleware(server.entityRepo, server.sessionManager, api.RBACPermission{Resource: "admin", Action: "health"})(adminHandler.HealthCheckHandler)).Methods("GET")
+	apiRouter.HandleFunc("/admin/reindex", api.RBACMiddleware(server.entityRepo, server.securityManager, api.RBACPermission{Resource: "admin", Action: "reindex"})(adminHandler.ReindexHandler)).Methods("POST")
+	apiRouter.HandleFunc("/admin/health", api.RBACMiddleware(server.entityRepo, server.securityManager, api.RBACPermission{Resource: "admin", Action: "health"})(adminHandler.HealthCheckHandler)).Methods("GET")
 	
 	// Health endpoint (no authentication required)
 	healthHandler := api.NewHealthHandler(server.entityRepo)
@@ -393,9 +393,9 @@ func main() {
 	
 	// Temporal metrics collection endpoints
 	metricsCollector := api.NewMetricsCollector(server.entityRepo)
-	apiRouter.HandleFunc("/metrics/collect", api.RBACMiddleware(server.entityRepo, server.sessionManager, api.RBACPermission{Resource: "metrics", Action: "write"})(metricsCollector.CollectMetric)).Methods("POST")
-	// apiRouter.HandleFunc("/metrics/history", api.RBACMiddleware(server.entityRepo, server.sessionManager, api.RBACPermission{Resource: "metrics", Action: "read"})(metricsCollector.GetMetricHistory)).Methods("GET") // Disabled - using public endpoint below
-	apiRouter.HandleFunc("/metrics/current", api.RBACMiddleware(server.entityRepo, server.sessionManager, api.RBACPermission{Resource: "metrics", Action: "read"})(metricsCollector.GetCurrentMetrics)).Methods("GET")
+	apiRouter.HandleFunc("/metrics/collect", api.RBACMiddleware(server.entityRepo, server.securityManager, api.RBACPermission{Resource: "metrics", Action: "write"})(metricsCollector.CollectMetric)).Methods("POST")
+	// apiRouter.HandleFunc("/metrics/history", api.RBACMiddleware(server.entityRepo, server.securityManager, api.RBACPermission{Resource: "metrics", Action: "read"})(metricsCollector.GetMetricHistory)).Methods("GET") // Disabled - using public endpoint below
+	apiRouter.HandleFunc("/metrics/current", api.RBACMiddleware(server.entityRepo, server.securityManager, api.RBACPermission{Resource: "metrics", Action: "read"})(metricsCollector.GetCurrentMetrics)).Methods("GET")
 	
 	// New metrics history handler for real-time chart data (no authentication required)
 	metricsHistoryHandler := api.NewMetricsHistoryHandler(server.entityRepo)
@@ -452,7 +452,7 @@ func main() {
 	
 	// Generic application metrics endpoint - applications can filter by namespace
 	applicationMetricsHandler := api.NewApplicationMetricsHandler(server.entityRepo)
-	apiRouter.HandleFunc("/application/metrics", api.RBACMiddleware(server.entityRepo, server.sessionManager, api.RBACPermission{Resource: "metrics", Action: "read"})(applicationMetricsHandler.GetApplicationMetrics)).Methods("GET")
+	apiRouter.HandleFunc("/application/metrics", api.RBACMiddleware(server.entityRepo, server.securityManager, api.RBACPermission{Resource: "metrics", Action: "read"})(applicationMetricsHandler.GetApplicationMetrics)).Methods("GET")
 	
 	// System metrics endpoint (EntityDB-specific, no authentication required)
 	systemMetricsHandler := api.NewSystemMetricsHandler(server.entityRepo)
@@ -461,20 +461,20 @@ func main() {
 	// RBAC metrics endpoints
 	rbacMetricsHandler := api.NewTemporalRBACMetricsHandler(server.entityRepo, server.sessionManager)
 	// Admin-only detailed metrics
-	apiRouter.HandleFunc("/rbac/metrics", api.RBACMiddleware(server.entityRepo, server.sessionManager, api.RBACPermission{Resource: "admin", Action: "view"})(rbacMetricsHandler.GetRBACMetricsFromTemporal)).Methods("GET")
+	apiRouter.HandleFunc("/rbac/metrics", api.RBACMiddleware(server.entityRepo, server.securityManager, api.RBACPermission{Resource: "admin", Action: "view"})(rbacMetricsHandler.GetRBACMetricsFromTemporal)).Methods("GET")
 	// Public basic metrics (no auth required)
 	apiRouter.HandleFunc("/rbac/metrics/public", rbacMetricsHandler.GetPublicRBACMetrics).Methods("GET")
 	
 	// Log control endpoints (admin only)
 	logControlHandler := api.NewLogControlHandler()
-	apiRouter.HandleFunc("/admin/log-level", api.RBACMiddleware(server.entityRepo, server.sessionManager, api.RBACPermission{Resource: "admin", Action: "update"})(logControlHandler.SetLogLevel)).Methods("POST")
-	apiRouter.HandleFunc("/admin/log-level", api.RBACMiddleware(server.entityRepo, server.sessionManager, api.RBACPermission{Resource: "admin", Action: "view"})(logControlHandler.GetLogLevel)).Methods("GET")
-	apiRouter.HandleFunc("/admin/trace-subsystems", api.RBACMiddleware(server.entityRepo, server.sessionManager, api.RBACPermission{Resource: "admin", Action: "update"})(logControlHandler.SetTraceSubsystems)).Methods("POST")
-	apiRouter.HandleFunc("/admin/trace-subsystems", api.RBACMiddleware(server.entityRepo, server.sessionManager, api.RBACPermission{Resource: "admin", Action: "view"})(logControlHandler.GetTraceSubsystems)).Methods("GET")
+	apiRouter.HandleFunc("/admin/log-level", api.RBACMiddleware(server.entityRepo, server.securityManager, api.RBACPermission{Resource: "admin", Action: "update"})(logControlHandler.SetLogLevel)).Methods("POST")
+	apiRouter.HandleFunc("/admin/log-level", api.RBACMiddleware(server.entityRepo, server.securityManager, api.RBACPermission{Resource: "admin", Action: "view"})(logControlHandler.GetLogLevel)).Methods("GET")
+	apiRouter.HandleFunc("/admin/trace-subsystems", api.RBACMiddleware(server.entityRepo, server.securityManager, api.RBACPermission{Resource: "admin", Action: "update"})(logControlHandler.SetTraceSubsystems)).Methods("POST")
+	apiRouter.HandleFunc("/admin/trace-subsystems", api.RBACMiddleware(server.entityRepo, server.securityManager, api.RBACPermission{Resource: "admin", Action: "view"})(logControlHandler.GetTraceSubsystems)).Methods("GET")
 	
 	// Dataset management routes with RBAC
 	datasetHandler := api.NewDatasetHandler(server.entityRepo)
-	datasetHandlerRBAC := api.NewDatasetHandlerRBAC(datasetHandler, server.entityRepo, server.sessionManager)
+	datasetHandlerRBAC := api.NewDatasetHandlerRBAC(datasetHandler, server.entityRepo, server.securityManager)
 	
 	// Dataset CRUD operations
 	apiRouter.HandleFunc("/datasets", datasetHandlerRBAC.ListDatasets).Methods("GET")
@@ -486,7 +486,7 @@ func main() {
 	// Dataset management operations - removed grant/revoke until implemented
 	
 	// Dataset-scoped entity operations with RBAC
-	datasetEntityHandlerRBAC := api.NewDatasetEntityHandlerRBAC(server.entityHandler, server.entityRepo, server.sessionManager)
+	datasetEntityHandlerRBAC := api.NewDatasetEntityHandlerRBAC(server.entityHandler, server.entityRepo, server.securityManager)
 	
 	// Basic dataset entity operations  
 	apiRouter.HandleFunc("/datasets/{dataset}/entities/create", datasetEntityHandlerRBAC.CreateDatasetEntity()).Methods("POST")

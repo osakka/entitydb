@@ -21,49 +21,22 @@ func NewSecurityInitializer(securityManager *SecurityManager, entityRepo EntityR
 	}
 }
 
-// InitializeDefaultSecurityEntities creates the default roles, permissions, and admin user
+// InitializeDefaultSecurityEntities creates the default admin user with pure tag-based RBAC
 func (si *SecurityInitializer) InitializeDefaultSecurityEntities() error {
-	// Create default datasets first (system infrastructure)
-	if err := si.createDefaultDatasets(); err != nil {
-		return fmt.Errorf("failed to create default datasets: %v", err)
-	}
-	
-	// Force sync after creating datasets
-	if err := si.forceSync(); err != nil {
-		return fmt.Errorf("failed to sync after creating datasets: %v", err)
-	}
+	// Skip creating dataset entities - using pure tag-based namespacing
+	// Datasets are just tags: dataset:system, dataset:default, etc.
+	logger.Info("Using pure tag-based datasets - no dataset entities needed")
 
-	// Create default permissions
-	if err := si.createDefaultPermissions(); err != nil {
-		return fmt.Errorf("failed to create default permissions: %v", err)
-	}
-	
-	// Force sync after creating permissions
-	if err := si.forceSync(); err != nil {
-		return fmt.Errorf("failed to sync after creating permissions: %v", err)
-	}
+	// Skip creating permission and role entities - using pure tag-based RBAC
+	// Permissions are stored as tags on users: rbac:perm:resource:action
+	// Roles are stored as tags on users: rbac:role:admin
+	logger.Info("Using pure tag-based RBAC - no permission/role entities needed")
 
-	// Create default roles
-	if err := si.createDefaultRoles(); err != nil {
-		return fmt.Errorf("failed to create default roles: %v", err)
-	}
-	
-	// Force sync after creating roles
-	if err := si.forceSync(); err != nil {
-		return fmt.Errorf("failed to sync after creating roles: %v", err)
-	}
+	// Skip creating group entities - using pure tag-based groups
+	// Groups are just tags on users: group:admin, group:user, etc.
+	logger.Info("Using pure tag-based groups - no group entities needed")
 
-	// Create default groups
-	if err := si.createDefaultGroups(); err != nil {
-		return fmt.Errorf("failed to create default groups: %v", err)
-	}
-	
-	// Force sync after creating groups
-	if err := si.forceSync(); err != nil {
-		return fmt.Errorf("failed to sync after creating groups: %v", err)
-	}
-
-	// Create admin user if it doesn't exist
+	// Create admin user if it doesn't exist (this is the only entity we need)
 	if err := si.createDefaultAdminUser(); err != nil {
 		return fmt.Errorf("failed to create admin user: %v", err)
 	}

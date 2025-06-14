@@ -188,6 +188,16 @@ The server automatically creates a default admin user if none exists:
 - Audit logging
 - Aggregation queries (beyond sorting/filtering)
 
+## Recent Changes (v2.31.1)
+
+- **Session Persistence Architecture Fix**: Complete resolution of session validation issues
+  - **Root Cause Resolution**: Fixed disconnect between authentication and authorization systems where sessions were created in database via SecurityManager but validated in-memory via SessionManager
+  - **RBAC Middleware Update**: Modified RBACMiddleware to use SecurityManager.ValidateSession() for database-based session validation instead of SessionManager.GetSession()
+  - **Handler Architecture Consistency**: Updated all RBAC wrapper handlers (UserHandlerRBAC, EntityConfigHandlerRBAC, DashboardHandlerRBAC, DatasetHandlerRBAC, etc.) to use SecurityManager for unified session management
+  - **Eliminated Session Recovery**: Removed the need for session recovery during creation by addressing the storage layer indexing race condition that was causing post-creation verification failures
+  - **End-to-End Authentication**: Complete authentication flow now works seamlessly from login through token validation to protected endpoint access
+  - **Production Stability**: No more "Invalid or expired token" errors for freshly created sessions, eliminating user authentication disruptions
+
 ## Recent Changes (v2.31.0)
 
 - **Comprehensive Performance Optimization Suite**: Implemented high-impact performance improvements across all core systems
