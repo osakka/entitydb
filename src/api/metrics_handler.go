@@ -142,7 +142,7 @@ func (h *MetricsHandler) PrometheusMetrics(w http.ResponseWriter, r *http.Reques
 	// Version info
 	metrics.WriteString("# HELP entitydb_info Information about EntityDB server\n")
 	metrics.WriteString("# TYPE entitydb_info gauge\n")
-	metrics.WriteString("entitydb_info{version=\"2.14.0+\",go_version=\"" + runtime.Version() + "\"} 1\n")
+	metrics.WriteString("entitydb_info{version=\"2.32.0-dev\",go_version=\"" + runtime.Version() + "\"} 1\n")
 	metrics.WriteString("\n")
 	
 	w.Write([]byte(metrics.String()))
