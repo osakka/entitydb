@@ -21,16 +21,22 @@ else
     echo "✅ PASS"
 fi
 
-# Check for Vue conditional classes
+# Check for Vue conditional classes (only if tabs exist)
 echo -n "Checking for proper Vue conditional templates... "
-VUE_COUNT=$(grep -c ':class=.*active.*activeTab' "$HTML_FILE" 2>/dev/null || echo 0)
-VUE_COUNT=$(echo "$VUE_COUNT" | tr -d '\n\r')
-if [ "$VUE_COUNT" -eq 0 ]; then
-    echo "❌ FAIL"
-    echo "  No Vue conditional classes found for tabs!"
-    ERRORS=$((ERRORS + 1))
+TAB_EXISTS=$(grep -c 'tab-content\|activeTab' "$HTML_FILE" 2>/dev/null || echo 0)
+TAB_EXISTS=$(echo "$TAB_EXISTS" | tr -d '\n\r')
+if [ "$TAB_EXISTS" -eq 0 ]; then
+    echo "✅ PASS (No tab structure found - using modern dashboard)"
 else
-    echo "✅ PASS ($VUE_COUNT tab templates found)"
+    VUE_COUNT=$(grep -c ':class=.*active.*activeTab' "$HTML_FILE" 2>/dev/null || echo 0)
+    VUE_COUNT=$(echo "$VUE_COUNT" | tr -d '\n\r')
+    if [ "$VUE_COUNT" -eq 0 ]; then
+        echo "❌ FAIL"
+        echo "  Tab structure found but no Vue conditional classes!"
+        ERRORS=$((ERRORS + 1))
+    else
+        echo "✅ PASS ($VUE_COUNT tab templates found)"
+    fi
 fi
 
 # Check for nested tab-content
