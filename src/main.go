@@ -844,33 +844,77 @@ func (s *EntityDBServer) serveStaticFile(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	
-	// Set proper MIME type based on file extension
+	// Set proper MIME type and cache control headers based on file extension
 	ext := strings.ToLower(filepath.Ext(fullPath))
 	switch ext {
 	case ".js":
 		w.Header().Set("Content-Type", "application/javascript; charset=utf-8")
+		// Short cache for JS files to allow updates
+		w.Header().Set("Cache-Control", "public, max-age=300, must-revalidate")
 	case ".css":
 		w.Header().Set("Content-Type", "text/css; charset=utf-8")
+		// Short cache for CSS files to allow updates
+		w.Header().Set("Cache-Control", "public, max-age=300, must-revalidate")
 	case ".html":
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		// No cache for HTML files to ensure fresh content
+		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+		w.Header().Set("Pragma", "no-cache")
+		w.Header().Set("Expires", "0")
 	case ".json":
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		// No cache for JSON files to ensure fresh content
+		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 	case ".svg":
 		w.Header().Set("Content-Type", "image/svg+xml; charset=utf-8")
+		// Longer cache for SVG files as they change less frequently
+		w.Header().Set("Cache-Control", "public, max-age=3600")
 	case ".png":
 		w.Header().Set("Content-Type", "image/png")
+		// Longer cache for images as they change less frequently
+		w.Header().Set("Cache-Control", "public, max-age=3600")
 	case ".jpg", ".jpeg":
 		w.Header().Set("Content-Type", "image/jpeg")
+		// Longer cache for images as they change less frequently
+		w.Header().Set("Cache-Control", "public, max-age=3600")
 	case ".ico":
 		w.Header().Set("Content-Type", "image/x-icon")
+		// Very long cache for favicon as it rarely changes
+		w.Header().Set("Cache-Control", "public, max-age=86400")
 	case ".woff":
 		w.Header().Set("Content-Type", "font/woff")
+		// Long cache for fonts as they rarely change
+		w.Header().Set("Cache-Control", "public, max-age=86400")
 	case ".woff2":
 		w.Header().Set("Content-Type", "font/woff2")
+		// Long cache for fonts as they rarely change
+		w.Header().Set("Cache-Control", "public, max-age=86400")
 	case ".ttf":
 		w.Header().Set("Content-Type", "font/ttf")
+		// Long cache for fonts as they rarely change
+		w.Header().Set("Cache-Control", "public, max-age=86400")
 	case ".eot":
 		w.Header().Set("Content-Type", "application/vnd.ms-fontobject")
+		// Long cache for fonts as they rarely change
+		w.Header().Set("Cache-Control", "public, max-age=86400")
+	default:
+		// Default no-cache for unknown file types
+		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+	}
+	
+	// Add ETag for proper cache validation
+	fileInfo, err := os.Stat(fullPath)
+	if err == nil {
+		etag := fmt.Sprintf(`"%x-%x"`, fileInfo.ModTime().Unix(), fileInfo.Size())
+		w.Header().Set("ETag", etag)
+		
+		// Check if client has current version
+		if match := r.Header.Get("If-None-Match"); match != "" {
+			if match == etag {
+				w.WriteHeader(http.StatusNotModified)
+				return
+			}
+		}
 	}
 	
 	http.ServeFile(w, r, fullPath)
