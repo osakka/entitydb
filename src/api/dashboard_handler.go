@@ -4,6 +4,8 @@ import (
 	"entitydb/models"
 	"entitydb/logger"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -70,7 +72,13 @@ func (h *DashboardHandler) DashboardStats(w http.ResponseWriter, r *http.Request
 	activeAgents := 0
 	for _, agent := range agents {
 		for _, tag := range agent.Tags {
-			if tag == "status:active" {
+			// Handle temporal tags with format TIMESTAMP|tag
+			actualTag := tag
+			if pipePos := strings.Index(tag, "|"); pipePos != -1 {
+				actualTag = tag[pipePos+1:]
+			}
+			
+			if actualTag == "status:active" {
 				activeAgents++
 				break
 			}
@@ -93,12 +101,18 @@ func (h *DashboardHandler) DashboardStats(w http.ResponseWriter, r *http.Request
 	
 	for _, issue := range issues {
 		for _, tag := range issue.Tags {
-			if len(tag) > 7 && tag[:7] == "status:" {
-				status := tag[7:]
+			// Handle temporal tags with format TIMESTAMP|tag
+			actualTag := tag
+			if pipePos := strings.Index(tag, "|"); pipePos != -1 {
+				actualTag = tag[pipePos+1:]
+			}
+			
+			if len(actualTag) > 7 && actualTag[:7] == "status:" {
+				status := actualTag[7:]
 				issueByStatus[status]++
 			}
-			if len(tag) > 9 && tag[:9] == "priority:" {
-				priority := tag[9:]
+			if len(actualTag) > 9 && actualTag[:9] == "priority:" {
+				priority := actualTag[9:]
 				issueByPriority[priority]++
 			}
 		}
@@ -132,14 +146,32 @@ func (h *DashboardHandler) DashboardStats(w http.ResponseWriter, r *http.Request
 	if err == nil {
 		for _, entity := range recentEntities {
 			entityType := "unknown"
+			var createdAt time.Time
+			
 			for _, tag := range entity.Tags {
-				if len(tag) > 5 && tag[:5] == "type:" {
-					entityType = tag[5:]
-					break
+				// Handle temporal tags with format TIMESTAMP|tag
+				actualTag := tag
+				if pipePos := strings.Index(tag, "|"); pipePos != -1 {
+					actualTag = tag[pipePos+1:]
+				}
+				
+				if len(actualTag) > 5 && actualTag[:5] == "type:" {
+					entityType = actualTag[5:]
+				}
+				if len(actualTag) > 8 && actualTag[:8] == "created:" {
+					// Extract the nanosecond timestamp from the created: tag
+					createdNs := actualTag[8:]
+					if ns, err := strconv.ParseInt(createdNs, 10, 64); err == nil {
+						createdAt = time.Unix(0, ns)
+					}
 				}
 			}
 			
-			createdAt := time.Unix(0, entity.CreatedAt)
+			// Use current time if no created timestamp found
+			if createdAt.IsZero() {
+				createdAt = time.Now()
+			}
+			
 			activity := ActivityItem{
 				Timestamp:   createdAt,
 				Type:        entityType,
