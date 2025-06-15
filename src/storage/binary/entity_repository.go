@@ -1904,22 +1904,17 @@ func (r *EntityRepository) ListByTag(tag string) ([]*models.Entity, error) {
 	// NOTE: Removed bulk lock acquisition here to prevent deadlocks
 	// Locks are properly acquired one-at-a-time in fetchEntitiesWithReader
 	
-	// Get a reader from the pool
-	readerInterface := r.readerPool.Get()
-	if readerInterface == nil {
-		logger.Trace("Creating new reader")
-		reader, err := NewReader(r.getDataFile())
-		if err != nil {
-			logger.Error("Failed to create reader: %v", err)
-			return nil, err
-		}
-		defer reader.Close()
-		return r.fetchEntitiesWithReader(reader, matchingEntityIDs)
+	// CRITICAL FIX: Always create a fresh reader to avoid stale reader pool issues
+	// The reader pool can contain readers created before recent WAL checkpoints,
+	// causing them to miss newly persisted entities even though the sharded index
+	// correctly finds them. This ensures we always have a current view of the data.
+	logger.Trace("Creating fresh reader for ListByTag to avoid stale pool readers")
+	reader, err := NewReader(r.getDataFile())
+	if err != nil {
+		logger.Error("Failed to create reader: %v", err)
+		return nil, err
 	}
-	
-	logger.Trace("Using pooled reader")
-	reader := readerInterface.(*Reader)
-	defer r.readerPool.Put(reader)
+	defer reader.Close()
 	
 	entities, err := r.fetchEntitiesWithReader(reader, matchingEntityIDs)
 	if err != nil {
@@ -1952,33 +1947,58 @@ func (r *EntityRepository) fetchEntitiesWithReader(reader *Reader, entityIDs []s
 		return []*models.Entity{}, nil
 	}
 	
+	// CRITICAL FIX: Check memory first before reading from disk
+	// This fixes the race condition where newly created entities are indexed 
+	// but not yet persisted to disk
+	entities := make([]*models.Entity, 0, len(entityIDs))
+	remainingIDs := make([]string, 0, len(entityIDs))
+	
+	// First pass: check memory cache for all entities
+	r.mu.RLock()
+	for _, id := range entityIDs {
+		if entity, exists := r.entities[id]; exists {
+			entities = append(entities, entity)
+			logger.Debug("fetchEntitiesWithReader: Found in memory cache: %s", id)
+		} else {
+			remainingIDs = append(remainingIDs, id)
+		}
+	}
+	r.mu.RUnlock()
+	
+	// If all entities found in memory, return immediately
+	if len(remainingIDs) == 0 {
+		return entities, nil
+	}
+	
+	// For remaining entities not in memory, read from disk
 	// For small sets, use sequential processing
-	if len(entityIDs) <= 5 {
-		entities := make([]*models.Entity, 0, len(entityIDs))
-		for _, id := range entityIDs {
+	if len(remainingIDs) <= 5 {
+		for _, id := range remainingIDs {
 			entity, err := reader.GetEntity(id)
 			if err == nil {
 				entities = append(entities, entity)
+			} else {
+				logger.Debug("fetchEntitiesWithReader: Entity %s not found on disk: %v", id, err)
 			}
 		}
 		return entities, nil
 	}
 	
-	// For larger sets, use concurrent processing
-	entities := make([]*models.Entity, 0, len(entityIDs))
-	results := make(chan *models.Entity, len(entityIDs))
-	errors := make(chan error, len(entityIDs))
+	// For larger sets of remaining entities, use concurrent processing
+	diskEntities := make([]*models.Entity, 0, len(remainingIDs))
+	results := make(chan *models.Entity, len(remainingIDs))
+	errors := make(chan error, len(remainingIDs))
 	
 	// Use a worker pool to limit concurrency
 	const maxWorkers = 10
 	numWorkers := maxWorkers
-	if len(entityIDs) < maxWorkers {
-		numWorkers = len(entityIDs)
+	if len(remainingIDs) < maxWorkers {
+		numWorkers = len(remainingIDs)
 	}
 	
-	// Create work queue
-	workQueue := make(chan string, len(entityIDs))
-	for _, id := range entityIDs {
+	// Create work queue for remaining entities
+	workQueue := make(chan string, len(remainingIDs))
+	for _, id := range remainingIDs {
 		workQueue <- id
 	}
 	close(workQueue)
@@ -2025,12 +2045,15 @@ func (r *EntityRepository) fetchEntitiesWithReader(reader *Reader, entityIDs []s
 		close(errors)
 	}()
 	
-	// Collect results
+	// Collect results from disk
 	for entity := range results {
 		if entity != nil {
-			entities = append(entities, entity)
+			diskEntities = append(diskEntities, entity)
 		}
 	}
+	
+	// Combine memory entities with disk entities
+	entities = append(entities, diskEntities...)
 	
 	// Check for any errors
 	var firstError error
