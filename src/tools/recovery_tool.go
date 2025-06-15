@@ -31,7 +31,9 @@ func main() {
 	// Initialize logger (logger is already initialized)
 	
 	// Create recovery manager
-	recovery := binary.NewRecoveryManager(dataPath)
+	cfg := config.NewConfig()
+	cfg.SetDataPath(dataPath)
+	recovery := binary.NewRecoveryManagerWithConfig(cfg)
 	
 	switch *operation {
 	case "check":

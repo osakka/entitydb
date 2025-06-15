@@ -20,8 +20,6 @@ type Router struct {
 // MiddlewareFunc defines a middleware function
 type MiddlewareFunc func(http.HandlerFunc) http.HandlerFunc
 
-// RouterMiddleware alias for backward compatibility
-type RouterMiddleware = MiddlewareFunc
 
 // NewRouter creates a new router
 func NewRouter() *Router {

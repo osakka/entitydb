@@ -324,10 +324,12 @@ func (m *RequestMetricsMiddleware) storeMetric(name string, value float64, unit 
 		}
 	}
 	
-	// Add temporal value tag
-	valueTag := "value:" + strconv.FormatFloat(value, 'f', 2, 64)
-	if err := m.repo.AddTag(metricID, valueTag); err != nil {
-		logger.Error("Failed to update request metric %s: %v", metricID, err)
+	// CRITICAL FIX: Only add temporal value tag if not skipping storage due to change detection
+	if !skipStorage {
+		valueTag := "value:" + strconv.FormatFloat(value, 'f', 2, 64)
+		if err := m.repo.AddTag(metricID, valueTag); err != nil {
+			logger.Error("Failed to update request metric %s: %v", metricID, err)
+		}
 	}
 }
 // Shutdown gracefully stops the metrics worker pool

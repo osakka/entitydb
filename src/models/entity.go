@@ -81,9 +81,6 @@ type EntityRepository interface {
 	// Returns entities where content contains the query string.
 	SearchContent(query string) ([]*Entity, error)
 	
-	// SearchContentByType returns entities with specific content type.
-	// Deprecated: Content type is no longer tracked separately.
-	SearchContentByType(contentType string) ([]*Entity, error)
 	
 	// Advanced Query
 	
@@ -201,14 +198,6 @@ type Entity struct {
 	cleanCacheValid bool    `json:"-"`
 }
 
-// ContentItem represents legacy content storage format.
-// Deprecated: Use Entity.Content []byte directly.
-// This type is maintained only for backward compatibility during migration.
-type ContentItem struct {
-	Timestamp int64  `json:"timestamp"` // Nanosecond epoch
-	Type      string `json:"type"`      // Content MIME type
-	Value     string `json:"value"`     // Base64-encoded content
-}
 
 // EntityChange represents a single change event in an entity's history.
 // Used for audit trails, history queries, and change tracking.

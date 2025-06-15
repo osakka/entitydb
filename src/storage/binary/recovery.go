@@ -25,14 +25,6 @@ type RecoveryManager struct {
 	cacheMu       sync.RWMutex         // Protect the cache
 }
 
-// NewRecoveryManager creates a new recovery manager (legacy constructor)
-func NewRecoveryManager(dataPath string) *RecoveryManager {
-	return &RecoveryManager{
-		dataPath:     dataPath,
-		backupPath:   filepath.Join(dataPath, "backups"),
-		attemptCache: make(map[string]time.Time),
-	}
-}
 
 // NewRecoveryManagerWithConfig creates a new recovery manager using configuration
 func NewRecoveryManagerWithConfig(cfg *config.Config) *RecoveryManager {
@@ -76,13 +68,7 @@ func (rm *RecoveryManager) RecoverCorruptedEntity(repo *EntityRepository, entity
 	logger.Info("attempting to recover corrupted entity: %s", entityID)
 	
 	// Try to read from WAL first
-	var walPath string
-	if rm.config != nil {
-		walPath = rm.config.WALPath()
-	} else {
-		// Fallback for legacy compatibility
-		walPath = filepath.Join(rm.dataPath, "entitydb.wal")
-	}
+	walPath := rm.config.WALPath()
 	if entity, err := rm.recoverFromWAL(walPath, entityID); err == nil {
 		logger.Info("successfully recovered entity %s from wal", entityID)
 		op.SetMetadata("recovery_source", "wal")
@@ -171,13 +157,7 @@ func (rm *RecoveryManager) recoverFromBackup(entityID string) (*models.Entity, e
 // partialRecovery attempts to recover whatever data is available
 func (rm *RecoveryManager) partialRecovery(repo *EntityRepository, entityID string) (*models.Entity, error) {
 	// Try to read from the data file directly
-	var dataFile string
-	if rm.config != nil {
-		dataFile = filepath.Join(rm.dataPath, rm.config.DatabaseFilename)
-	} else {
-		// Fallback for legacy compatibility
-		dataFile = filepath.Join(rm.dataPath, "entities.ebf")
-	}
+	dataFile := filepath.Join(rm.dataPath, rm.config.DatabaseFilename)
 	file, err := os.Open(dataFile)
 	if err != nil {
 		return nil, err
@@ -319,13 +299,7 @@ func (rm *RecoveryManager) RepairWAL() error {
 	
 	logger.Info("starting wal repair")
 	
-	var walPath string
-	if rm.config != nil {
-		walPath = rm.config.WALPath()
-	} else {
-		// Fallback for legacy compatibility
-		walPath = filepath.Join(rm.dataPath, "entitydb.wal")
-	}
+	walPath := rm.config.WALPath()
 	backupPath := walPath + ".backup"
 	
 	// Create backup of current WAL

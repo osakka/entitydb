@@ -13,12 +13,9 @@ SERVER_SRC := .
 LDFLAGS := -ldflags "-X main.Version=$(VERSION) -X main.BuildDate=$(shell date -u +%Y-%m-%d)"
 GOFLAGS := -v
 
-# Build tags to exclude deprecated code
-BUILD_TAGS := -tags "!deprecated"
-
-# Exclude deprecated packages, scripts, backup directories, and utility test files from testing
+# Exclude packages, scripts, backup directories, and utility test files from testing
 # Also exclude the root package since it contains multiple main files
-PACKAGES_FOR_TESTING := $(shell go list ./... | grep -v "^entitydb$$" | grep -v "/deprecated" | grep -v "/scripts" | grep -v "/tests" | grep -v "/tools" | grep -v "/security_components_backup" | grep -v "/backup")
+PACKAGES_FOR_TESTING := $(shell go list ./... | grep -v "^entitydb$$" | grep -v "/scripts" | grep -v "/tests" | grep -v "/tools" | grep -v "/security_components_backup" | grep -v "/backup")
 
 # Colors for output - check if terminal supports colors
 ifneq ($(shell tput colors 2>/dev/null),)
@@ -54,11 +51,8 @@ docs:
 server: docs validate-tabs
 	@$(ECHO) "$(YELLOW)Building server binary: $(NAME)...$(NC)\n"
 	@mkdir -p $(BUILD_DIR)
-	@$(ECHO) "$(YELLOW)Excluding deprecated code from build...$(NC)\n"
-	# Create a temporary file to hide any deprecated code compilation warnings
-	@touch .build.log
 	@$(ECHO) "$(YELLOW)Building consolidated server with pure tag-based architecture...$(NC)\n"
-	go build $(GOFLAGS) $(LDFLAGS) $(BUILD_TAGS) -o $(BUILD_DIR)/$(NAME) main.go 2>.build.log || (cat .build.log && rm .build.log && exit 1)
+	go build $(GOFLAGS) $(LDFLAGS) -o $(BUILD_DIR)/$(NAME) main.go 2>.build.log || (cat .build.log && rm .build.log && exit 1)
 	@rm .build.log
 	@$(ECHO) "$(GREEN)Server binary built: $(BUILD_DIR)/$(NAME)$(NC)\n"
 	@$(ECHO) "$(GREEN)Run the server with: $(BUILD_DIR)/$(NAME) or use ../bin/entitydbd.sh start$(NC)\n"
@@ -82,9 +76,9 @@ dev:
 test: unit-tests simple-tests
 
 unit-tests:
-	@$(ECHO) "$(YELLOW)Running Go unit tests (excluding deprecated code, scripts, and utility test files)...$(NC)\n"
+	@$(ECHO) "$(YELLOW)Running Go unit tests (excluding scripts and utility test files)...$(NC)\n"
 	@$(ECHO) "$(YELLOW)Testing packages: $(PACKAGES_FOR_TESTING)$(NC)\n"
-	go test $(BUILD_TAGS) $(PACKAGES_FOR_TESTING) -v
+	go test $(PACKAGES_FOR_TESTING) -v
 
 api-tests: simple-tests
 
@@ -99,7 +93,7 @@ simple-tests:
 		exit 1; \
 	fi
 
-# Legacy test targets - deprecated but kept for backward compatibility
+# Additional test targets
 
 entity-tests:
 	@$(ECHO) "$(YELLOW)Running Entity API tests...$(NC)\n"
@@ -257,7 +251,7 @@ help:
 	@echo "  test              : Run all tests (unit tests and API tests)"
 	@echo "  unit-tests        : Run Go unit tests"
 	@echo "  api-tests         : Run API tests with the test framework"
-	@echo "  entity-tests      : Run legacy entity-model API tests (deprecated)"
+	@echo "  entity-tests      : Run entity API tests"
 	@echo "  security-tests    : Run security implementation tests"
 	@echo "  master-tests      : Run all tests with consolidated reporting"
 	@echo "  test-utils        : Show available tools and usage examples"

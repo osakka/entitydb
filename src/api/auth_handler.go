@@ -150,21 +150,6 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		// Track error asynchronously - no longer causes hangs
 		TrackHTTPError("auth_handler.Login", http.StatusUnauthorized, err)
 		
-		// Track failed authentication event
-		// TODO: Fix deadlock issue - auth event creation blocks response
-		// authEvent := &models.Entity{
-		// 	ID: "auth_event_" + loginReq.Username + "_" + time.Now().Format("20060102150405"),
-		// 	Tags: []string{
-		// 		"type:auth_event",
-		// 		"status:failed",
-		// 		"user:" + loginReq.Username,
-		// 		"event:failed_login",
-		// 	},
-		// 	Content: []byte(`{"username":"` + loginReq.Username + `","success":false,"details":"Invalid credentials","timestamp":"` + time.Now().Format(time.RFC3339) + `"}`),
-		// }
-		// if err := h.securityManager.GetEntityRepo().Create(authEvent); err != nil {
-		// 	logger.Error("Failed to track auth event: %v", err)
-		// }
 		
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnauthorized)
@@ -210,21 +195,6 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 
-	// Track successful authentication event
-	// TODO: Fix deadlock issue - auth event creation blocks response
-	// authEvent := &models.Entity{
-	// 	ID: "auth_event_" + loginReq.Username + "_" + time.Now().Format("20060102150405"),
-	// 	Tags: []string{
-	// 		"type:auth_event",
-	// 		"status:success",
-	// 		"user:" + loginReq.Username,
-	// 		"event:login",
-	// 	},
-	// 	Content: []byte(`{"username":"` + loginReq.Username + `","success":true,"details":"Login successful","timestamp":"` + time.Now().Format(time.RFC3339) + `"}`),
-	// }
-	// if err := h.securityManager.GetEntityRepo().Create(authEvent); err != nil {
-	// 	logger.Error("Failed to track auth event: %v", err)
-	// }
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
@@ -313,6 +283,8 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 // @Failure 500 {object} ErrorResponse
 // @Router /api/v1/auth/refresh [post]
 func (h *AuthHandler) RefreshToken(w http.ResponseWriter, r *http.Request) {
+	logger.Info("RefreshToken: Method called from IP %s", r.RemoteAddr)
+	
 	// Get current session token from header
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" {

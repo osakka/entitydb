@@ -2,6 +2,7 @@ package binary
 
 import (
 	"entitydb/models"
+	"entitydb/config"
 	"fmt"
 	"sync"
 	"testing"
@@ -12,8 +13,10 @@ func TestConcurrentAccess(t *testing.T) {
 	// Create temporary directory for test
 	tempDir := t.TempDir()
 	
-	// Create repository
-	repo, err := NewEntityRepository(tempDir)
+	// Create repository with config
+	cfg := config.Load()
+	cfg.DataPath = tempDir
+	repo, err := NewEntityRepositoryWithConfig(cfg)
 	if err != nil {
 		t.Fatalf("Failed to create repository: %v", err)
 	}
@@ -99,7 +102,9 @@ func TestConcurrentAccess(t *testing.T) {
 func BenchmarkConcurrentWrites(b *testing.B) {
 	tempDir := b.TempDir()
 	
-	repo, err := NewEntityRepository(tempDir)
+	cfg := config.Load()
+	cfg.DataPath = tempDir
+	repo, err := NewEntityRepositoryWithConfig(cfg)
 	if err != nil {
 		b.Fatalf("Failed to create repository: %v", err)
 	}
@@ -123,7 +128,9 @@ func BenchmarkConcurrentWrites(b *testing.B) {
 func BenchmarkConcurrentReads(b *testing.B) {
 	tempDir := b.TempDir()
 	
-	repo, err := NewEntityRepository(tempDir)
+	cfg := config.Load()
+	cfg.DataPath = tempDir
+	repo, err := NewEntityRepositoryWithConfig(cfg)
 	if err != nil {
 		b.Fatalf("Failed to create repository: %v", err)
 	}

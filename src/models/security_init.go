@@ -175,14 +175,6 @@ func (si *SecurityInitializer) createDefaultRoles() error {
 	return nil
 }
 
-// createRolePermissionRelationships is deprecated in v2.29.0+
-// RBAC is now handled via direct tags on user entities
-func (si *SecurityInitializer) createRolePermissionRelationships() error {
-	// This function is no longer used in v2.29.0+
-	// All role permissions are handled via direct RBAC tags on entities
-	logger.Debug("Role-permission relationships are handled via tags in v2.29.0+")
-	return nil
-}
 
 // createDefaultGroups creates the basic groups needed for the system
 func (si *SecurityInitializer) createDefaultGroups() error {
@@ -225,14 +217,6 @@ func (si *SecurityInitializer) createDefaultGroups() error {
 	return nil
 }
 
-// createGroupRoleRelationships is deprecated in v2.29.0+
-// RBAC is now handled via direct tags on user entities
-func (si *SecurityInitializer) createGroupRoleRelationships() error {
-	// This function is no longer used in v2.29.0+
-	// Group-role associations are handled via direct RBAC tags on entities
-	logger.Debug("Group-role relationships are handled via tags in v2.29.0+")
-	return nil
-}
 
 // createDefaultAdminUser creates the default admin user if it doesn't exist
 func (si *SecurityInitializer) createDefaultAdminUser() error {
@@ -281,21 +265,6 @@ func (si *SecurityInitializer) getOrCreateAdminUser() (*SecurityUser, error) {
 	return adminUser, nil
 }
 
-// ensureAdminUserRelationships is deprecated in v2.29.0+
-// Admin users now have embedded credentials and direct RBAC tags
-func (si *SecurityInitializer) ensureAdminUserRelationships(adminUserID string) error {
-	// This function is no longer used in v2.29.0+
-	// Admin users are created with embedded credentials and direct RBAC tags
-	logger.Debug("Admin user relationships are handled via embedded credentials and RBAC tags in v2.29.0+")
-	
-	// Ensure admin user has direct RBAC tags (this is still needed)
-	rbacTagManager := NewRBACTagManager(si.entityRepo)
-	if err := rbacTagManager.AssignRoleToUser(adminUserID, "admin"); err != nil {
-		return fmt.Errorf("failed to assign admin role tag: %v", err)
-	}
-
-	return nil
-}
 
 // MigrateExistingUsers migrates existing users to the new security model
 func (si *SecurityInitializer) MigrateExistingUsers() error {

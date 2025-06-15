@@ -125,19 +125,12 @@ var (
 // Type Definitions
 // =============================================================================
 
-// User represents a legacy user structure (deprecated - for backward compatibility only)
-type User struct {
-	ID       string `json:"id"`
-	Username string `json:"username"`
-	Password string `json:"password"` // Bcrypt hashed
-}
 
 // EntityDBServer represents the main server instance with all its dependencies
 type EntityDBServer struct {
 	entityRepo       models.EntityRepository
 	securityManager  *models.SecurityManager
 	securityInit     *models.SecurityInitializer
-	users            map[string]*User // Legacy - will be removed
 	mu               sync.RWMutex
 	server           *http.Server
 	entityHandler    *api.EntityHandler
@@ -150,8 +143,7 @@ type EntityDBServer struct {
 // NewEntityDBServer creates a new server instance
 func NewEntityDBServer(cfg *config.Config) *EntityDBServer {
 	server := &EntityDBServer{
-		users:          make(map[string]*User), // Legacy - will be removed
-		config:         cfg,
+		config: cfg,
 	}
 	return server
 }
@@ -348,8 +340,6 @@ func main() {
 	apiRouter.HandleFunc("/auth/whoami", server.securityMiddleware.RequireAuthentication(server.authHandler.WhoAmI)).Methods("GET")
 	apiRouter.HandleFunc("/auth/refresh", server.authHandler.RefreshToken).Methods("POST")
 	
-	// Legacy auth routes (backward compatibility) - TODO: Remove these after migration
-	apiRouter.HandleFunc("/auth/status", server.handleAuthStatus).Methods("GET")
 	
 	// User management routes with RBAC
 	userHandlerRBAC := api.NewUserHandlerRBAC(server.userHandler, server.entityRepo, server.securityManager)
@@ -700,34 +690,6 @@ func (s *EntityDBServer) testCreateEntity(w http.ResponseWriter, r *http.Request
 // Relationship system removed - use pure tag-based relationships instead
 // Example: To relate entity A to entity B, add tag "relates_to:entity_B_id" to entity A
 
-// handleAuthStatus checks authentication status
-func (s *EntityDBServer) handleAuthStatus(w http.ResponseWriter, r *http.Request) {
-	token := r.Header.Get("Authorization")
-	if token == "" || !strings.HasPrefix(token, "Bearer ") {
-		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(map[string]string{"error": "No token provided"})
-		return
-	}
-
-	token = strings.TrimPrefix(token, "Bearer ")
-	
-	user, err := s.securityManager.ValidateSession(token)
-	if err != nil {
-		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid or expired token"})
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"authenticated": true,
-		"user": map[string]interface{}{
-			"id":       user.ID,
-			"username": user.Username,
-			"roles":    models.GetTagsByNamespace(user.Entity.Tags, "rbac"),
-		},
-	})
-}
 
 // serveStaticFile serves static files from the configured directory
 func (s *EntityDBServer) serveStaticFile(w http.ResponseWriter, r *http.Request) {

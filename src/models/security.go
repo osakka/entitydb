@@ -307,11 +307,12 @@ func (sm *SecurityManager) CreateSession(user *SecurityUser, ipAddress, userAgen
 	}
 	
 	// Create session entity with relationship tags
+	logger.Info("About to create session entity: %s with tags: %v", sessionID, sessionEntity.Tags)
 	if err := sm.entityRepo.Create(sessionEntity); err != nil {
 		logger.Error("Failed to create session entity: %v", err)
 		return nil, fmt.Errorf("failed to create session entity: %v", err)
 	}
-	logger.Debug("Created session entity with user relationship: %s -> %s", sessionID, user.ID)
+	logger.Info("Created session entity with user relationship: %s -> %s", sessionID, user.ID)
 	
 	// Session is now created without triggering immediate verification
 	// This prevents the indexing race condition that caused recovery attempts
@@ -337,22 +338,24 @@ func (sm *SecurityManager) ValidateSession(token string) (*SecurityUser, error) 
 	var sessionEntities []*Entity
 	var err error
 	
-	for i := 0; i < 3; i++ {
+	for i := 0; i < 5; i++ {
+		logger.Info("ValidateSession: Attempt %d to find session with token: %s", i+1, token)
 		sessionEntities, err = sm.entityRepo.ListByTag("token:" + token)
 		if err != nil {
 			logger.Error("ValidateSession: Error finding session (attempt %d): %v", i+1, err)
-			if i < 2 {
-				time.Sleep(10 * time.Millisecond) // Short delay before retry
+			if i < 4 {
+				time.Sleep(50 * time.Millisecond) // Increased delay for indexing
 				continue
 			}
 			return nil, fmt.Errorf("session lookup failed: %v", err)
 		}
+		logger.Info("ValidateSession: Found %d session entities on attempt %d", len(sessionEntities), i+1)
 		if len(sessionEntities) > 0 {
 			break // Found session
 		}
-		if i < 2 {
-			logger.Debug("ValidateSession: Session not found, retrying (attempt %d)", i+1)
-			time.Sleep(10 * time.Millisecond) // Short delay before retry
+		if i < 4 {
+			logger.Info("ValidateSession: Session not found, retrying (attempt %d) after 50ms", i+1)
+			time.Sleep(50 * time.Millisecond) // Increased delay for indexing
 		}
 	}
 	
@@ -367,18 +370,26 @@ func (sm *SecurityManager) ValidateSession(token string) (*SecurityUser, error) 
 	// Check if session is expired
 	sessionTags := sessionEntity.GetTagsWithoutTimestamp()
 	var expiresAt time.Time
+	var expirationStr string
 	for _, tag := range sessionTags {
 		if strings.HasPrefix(tag, "expires:") {
-			expirationStr := strings.TrimPrefix(tag, "expires:")
+			expirationStr = strings.TrimPrefix(tag, "expires:")
 			expiresAt, err = time.Parse(time.RFC3339, expirationStr)
 			if err != nil {
+				logger.Error("ValidateSession: Failed to parse expiration time '%s': %v", expirationStr, err)
 				return nil, fmt.Errorf("invalid session expiration format")
 			}
 			break
 		}
 	}
 	
-	if time.Now().After(expiresAt) {
+	currentTime := time.Now()
+	logger.Info("ValidateSession: Current time: %s, Session expires: %s (raw: %s)", 
+		currentTime.Format(time.RFC3339), expiresAt.Format(time.RFC3339), expirationStr)
+	
+	if currentTime.After(expiresAt) {
+		logger.Error("ValidateSession: Session expired - current: %s, expires: %s", 
+			currentTime.Format(time.RFC3339), expiresAt.Format(time.RFC3339))
 		return nil, fmt.Errorf("session expired")
 	}
 	
@@ -567,16 +578,18 @@ func (sm *SecurityManager) InvalidateSession(token string) error {
 
 // RefreshSession extends the expiration time of an existing session
 func (sm *SecurityManager) RefreshSession(token string) (*SecuritySession, error) {
-	logger.Debug("RefreshSession: Looking for session with token: %s", token)
+	logger.Info("RefreshSession: Looking for session with token: %s", token[:8])
 	
 	// Find session by token tag
+	logger.Info("RefreshSession: Calling ListByTag for token: %s", token[:8])
 	sessionEntities, err := sm.entityRepo.ListByTag("token:" + token)
 	if err != nil {
 		logger.Error("RefreshSession: Error finding session: %v", err)
 		return nil, fmt.Errorf("failed to find session: %v", err)
 	}
+	logger.Info("RefreshSession: ListByTag returned %d entities", len(sessionEntities))
 	if len(sessionEntities) == 0 {
-		logger.Debug("RefreshSession: No session found with token: %s", token)
+		logger.Info("RefreshSession: No session found with token: %s", token[:8])
 		return nil, fmt.Errorf("session not found")
 	}
 	
@@ -586,15 +599,24 @@ func (sm *SecurityManager) RefreshSession(token string) (*SecuritySession, error
 	// Check if session is still valid (not already expired)
 	currentTime := time.Now()
 	var expiresAt time.Time
-	for _, tag := range sessionEntity.Tags {
+	var expiryStr string
+	
+	// Since we're in temporal-only mode, all tags have timestamps
+	// We need to look at the clean tags (without timestamps)
+	cleanTags := sessionEntity.GetTagsWithoutTimestamp()
+	
+	for _, tag := range cleanTags {
 		if strings.HasPrefix(tag, "expires:") {
-			expiryStr := strings.TrimPrefix(tag, "expires:")
+			expiryStr = strings.TrimPrefix(tag, "expires:")
 			if parsedTime, err := time.Parse(time.RFC3339, expiryStr); err == nil {
 				expiresAt = parsedTime
 				break
 			}
 		}
 	}
+	
+	logger.Debug("RefreshSession: Current time: %s, Session expires: %s (raw: %s)", 
+		currentTime.Format(time.RFC3339), expiresAt.Format(time.RFC3339), expiryStr)
 	
 	if currentTime.After(expiresAt) {
 		logger.Debug("RefreshSession: Session already expired: %s", sessionEntity.ID)

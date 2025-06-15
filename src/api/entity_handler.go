@@ -620,9 +620,6 @@ func (h *EntityHandler) ListEntities(w http.ResponseWriter, r *http.Request) {
 	case wildcard != "":
 		// Query with wildcard pattern
 		entities, err = h.repo.ListByTagWildcard(wildcard)
-	case search != "" && contentType != "":
-		// Search content by type
-		entities, err = h.repo.SearchContentByType(contentType)
 	case search != "":
 		// General content search
 		entities, err = h.repo.SearchContent(search)

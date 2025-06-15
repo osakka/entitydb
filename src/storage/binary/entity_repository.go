@@ -32,7 +32,7 @@ import (
 type EntityRepository struct {
 	dataPath string
 	config   *config.Config // Configuration reference for path resolution
-	mu       sync.RWMutex  // Still keep this for backward compatibility
+	mu       sync.RWMutex  // Protects entity operations
 	
 	// In-memory indexes for queries
 	contentIndex map[string][]string  // content -> entity IDs
@@ -1857,10 +1857,11 @@ func (r *EntityRepository) ListByTag(tag string) ([]*models.Entity, error) {
 	var matchingEntityIDs []string
 	
 	// Use sharded index for better concurrency
-	logger.Trace("Using sharded index for tag: %s", tag)
+	logger.Trace("ListByTag: Using sharded index for tag: %s", tag)
 		
 		// Direct lookup first
 		directMatches := r.shardedTagIndex.GetEntitiesForTag(tag)
+		logger.Trace("ListByTag: Direct matches from sharded index: %d", len(directMatches))
 		
 		var temporalMatches []string
 		if r.useVariantCache {
@@ -2735,33 +2736,6 @@ func (r *EntityRepository) ListByMetadata(key, value string) ([]*models.Entity, 
 	return nil, fmt.Errorf("not implemented")
 }
 
-func (r *EntityRepository) ListContentByType(contentType string) ([]models.ContentItem, error) {
-	entities, err := r.List()
-	if err != nil {
-		return nil, err
-	}
-	
-	var content []models.ContentItem
-	// In the new model, we need to check tags for content type
-	for _, entity := range entities {
-		hasType := false
-		for _, tag := range entity.Tags {
-			if tag == "content:type:" + contentType {
-				hasType = true
-				break
-			}
-		}
-		if hasType && len(entity.Content) > 0 {
-			// Create a ContentItem for backward compatibility
-			content = append(content, models.ContentItem{
-				Type:  contentType,
-				Value: string(entity.Content),
-			})
-		}
-	}
-	
-	return content, nil
-}
 
 // Relationship operations removed - use pure tag-based relationships instead
 // Example: To relate entity A to entity B, add tag "relates_to:entity_B_id" to entity A

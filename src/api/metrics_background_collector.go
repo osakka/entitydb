@@ -6,7 +6,6 @@ import (
 	"entitydb/logger"
 	"fmt"
 	"runtime"
-	"strings"
 	"sync"
 	"time"
 	"os"
@@ -218,78 +217,42 @@ func (b *BackgroundMetricsCollector) storeMetric(name string, value float64, uni
 	
 	logger.Debug("Metric %s changed from %.2f to %.2f, storing", name, lastValue, value)
 	
-	// NEW APPROACH: Create separate entities per measurement to avoid temporal tag accumulation
-	// This prevents the exponential performance degradation from hundreds of temporal tags
-	timestamp := time.Now().UnixNano()
-	measurementID := fmt.Sprintf("measurement_%s_%d", name, timestamp)
+	// CRITICAL FIX: Use single metric entity instead of creating thousands of measurement entities
+	// This prevents database bloat and follows the proper metrics pattern
+	metricID := fmt.Sprintf("metric_%s", name)
 	
-	// Create measurement entity with single point data
-	measurementEntity := &models.Entity{
-		ID: measurementID,
-		Tags: []string{
-			"type:measurement",
-			"dataset:system",
-			fmt.Sprintf("metric_name:%s", name),
-			fmt.Sprintf("value:%.2f", value),
-			fmt.Sprintf("unit:%s", unit),
-			fmt.Sprintf("timestamp:%d", timestamp),
-			// Retention for cleanup - measurement entities expire after 1 hour
-			"retention:period:3600",
-		},
-		Content: []byte{}, // Empty content - all data in tags
-	}
-	
-	if err := b.repo.Create(measurementEntity); err != nil {
-		logger.Error("Failed to create measurement entity %s: %v", measurementID, err)
-		return
-	}
-	
-	// Also maintain a metric definition entity (created once, never accumulates temporal tags)
-	metricDefinitionID := fmt.Sprintf("metric_definition_%s", name)
-	_, err := b.repo.GetByID(metricDefinitionID)
-	
-	if err != nil { // Metric definition doesn't exist, create it
-		definitionEntity := &models.Entity{
-			ID: metricDefinitionID,
+	// Get or create the metric entity
+	metricEntity, err := b.repo.GetByID(metricID)
+	if err != nil {
+		// Create metric entity if it doesn't exist
+		metricEntity = &models.Entity{
+			ID: metricID,
 			Tags: []string{
-				"type:metric_definition",
+				"type:metric",
 				"dataset:system",
 				fmt.Sprintf("name:%s", name),
 				fmt.Sprintf("unit:%s", unit),
 				fmt.Sprintf("description:%s", description),
-				fmt.Sprintf("latest_value:%.2f", value),
-				fmt.Sprintf("last_updated:%d", timestamp),
+				"retention:count:100", // Keep last 100 values
+				"retention:period:3600", // Keep for 1 hour
 			},
-			Content: []byte{},
+			Content: []byte{}, // Empty content - all data in tags
 		}
 		
-		if err := b.repo.Create(definitionEntity); err != nil {
-			logger.Error("Failed to create metric definition %s: %v", metricDefinitionID, err)
-		} else {
-			logger.Info("Created metric definition: %s", metricDefinitionID)
+		if err := b.repo.Create(metricEntity); err != nil {
+			logger.Error("Failed to create metric entity %s: %v", metricID, err)
+			return
 		}
-	} else {
-		// Update latest value on existing definition (replace tag, don't accumulate)
-		// First remove old tags, then add new ones
-		entity, _ := b.repo.GetByID(metricDefinitionID)
-		
-		// Filter out old latest_value and last_updated tags
-		newTags := []string{}
-		for _, tag := range entity.Tags {
-			if !strings.HasPrefix(tag, "latest_value:") && !strings.HasPrefix(tag, "last_updated:") {
-				newTags = append(newTags, tag)
-			}
-		}
-		
-		// Add new values
-		newTags = append(newTags, fmt.Sprintf("latest_value:%.2f", value))
-		newTags = append(newTags, fmt.Sprintf("last_updated:%d", timestamp))
-		
-		entity.Tags = newTags
-		if err := b.repo.Update(entity); err != nil {
-			logger.Error("Failed to update metric definition %s: %v", metricDefinitionID, err)
-		}
+		logger.Debug("Created metric entity: %s", metricID)
 	}
 	
-	logger.Trace("Stored measurement %s with value: %.2f %s", measurementID, value, unit)
+	// Add temporal value tag (similar to request metrics middleware)
+	valueTag := fmt.Sprintf("value:%.2f", value)
+	if err := b.repo.AddTag(metricID, valueTag); err != nil {
+		logger.Error("Failed to add value tag to metric %s: %v", metricID, err)
+		return
+	}
+	
+	// No need for separate metric definition entities - the main metric entity serves this purpose
+	logger.Trace("Stored metric %s with value: %.2f %s", metricID, value, unit)
 }
