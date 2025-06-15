@@ -131,7 +131,7 @@ type HazardPointer struct {
 func NewLockFreeStringIntern() *LockFreeStringIntern {
 	intern := &LockFreeStringIntern{
 		compressionEnabled: true,
-		cleanupEnabled:     true,
+		cleanupEnabled:     false, // Disabled by default to prevent unwanted background goroutines
 	}
 	
 	// Initialize shards
