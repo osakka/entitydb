@@ -13,14 +13,12 @@ import (
 // UnauthenticatedHandlers provides endpoints that bypass authentication for testing
 type UnauthenticatedHandlers struct {
 	entityRepo     models.EntityRepository
-	relationshipRepo models.EntityRelationshipRepository
 }
 
 // NewUnauthenticatedHandlers creates handlers for unauthenticated endpoints
-func NewUnauthenticatedHandlers(entityRepo models.EntityRepository, relationshipRepo models.EntityRelationshipRepository) *UnauthenticatedHandlers {
+func NewUnauthenticatedHandlers(entityRepo models.EntityRepository) *UnauthenticatedHandlers {
 	return &UnauthenticatedHandlers{
 		entityRepo:     entityRepo,
-		relationshipRepo: relationshipRepo,
 	}
 }
 
@@ -216,8 +214,9 @@ func (h *UnauthenticatedHandlers) TestCreateEntity(w http.ResponseWriter, r *htt
 	json.NewEncoder(w).Encode(entity)
 }
 
-// TestCreateRelationship creates a relationship without authentication
-func (h *UnauthenticatedHandlers) TestCreateRelationship(w http.ResponseWriter, r *http.Request) {
+// TestCreateTagBasedRelationship creates a tag-based relationship without authentication
+// Example: To relate entity A to entity B, add tag "relates_to:entity_B_id" to entity A
+func (h *UnauthenticatedHandlers) TestCreateTagBasedRelationship(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		SourceID         string `json:"source_id"`
 		RelationshipType string `json:"relationship_type"`
@@ -229,41 +228,100 @@ func (h *UnauthenticatedHandlers) TestCreateRelationship(w http.ResponseWriter, 
 		return
 	}
 	
-	rel := models.NewEntityRelationship(req.SourceID, req.RelationshipType, req.TargetID)
-	
-	if err := h.relationshipRepo.Create(rel); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	// Verify source entity exists
+	_, err := h.entityRepo.GetByID(req.SourceID)
+	if err != nil {
+		http.Error(w, "Source entity not found: " + err.Error(), http.StatusNotFound)
 		return
 	}
 	
+	// Add relationship as a tag
+	relationshipTag := req.RelationshipType + ":" + req.TargetID
+	err = h.entityRepo.AddTag(req.SourceID, relationshipTag)
+	if err != nil {
+		http.Error(w, "Failed to add relationship tag: " + err.Error(), http.StatusInternalServerError)
+		return
+	}
+	
+	// Return the updated entity
+	updatedEntity, err := h.entityRepo.GetByID(req.SourceID)
+	if err != nil {
+		http.Error(w, "Failed to retrieve updated entity: " + err.Error(), http.StatusInternalServerError)
+		return
+	}
+	
+	response := map[string]interface{}{
+		"message": "Tag-based relationship created successfully",
+		"relationship": map[string]string{
+			"source": req.SourceID,
+			"type":   req.RelationshipType,
+			"target": req.TargetID,
+			"tag":    relationshipTag,
+		},
+		"updated_entity": updatedEntity,
+	}
+	
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(rel)
+	json.NewEncoder(w).Encode(response)
 }
 
-// TestListRelationships lists relationships without authentication
-func (h *UnauthenticatedHandlers) TestListRelationships(w http.ResponseWriter, r *http.Request) {
+// TestListTagBasedRelationships lists tag-based relationships without authentication
+func (h *UnauthenticatedHandlers) TestListTagBasedRelationships(w http.ResponseWriter, r *http.Request) {
 	sourceID := r.URL.Query().Get("source")
-	targetID := r.URL.Query().Get("target")
+	relationshipType := r.URL.Query().Get("type")
 	
-	var relationships []*models.EntityRelationship
-	var err error
-	
-	if sourceID != "" {
-		relationships, err = h.relationshipRepo.GetBySource(sourceID)
-	} else if targetID != "" {
-		relationships, err = h.relationshipRepo.GetByTarget(targetID)
-	} else {
-		http.Error(w, "source or target parameter required", http.StatusBadRequest)
+	if sourceID == "" {
+		http.Error(w, "source parameter required", http.StatusBadRequest)
 		return
 	}
 	
+	// Get entity
+	entity, err := h.entityRepo.GetByID(sourceID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, "Entity not found: " + err.Error(), http.StatusNotFound)
 		return
+	}
+	
+	// Extract relationships from tags
+	relationships := []map[string]string{}
+	cleanTags := entity.GetTagsWithoutTimestamp()
+	
+	for _, tag := range cleanTags {
+		// Check if this is a relationship tag
+		if relationshipType != "" {
+			// Filter by specific relationship type
+			if strings.HasPrefix(tag, relationshipType+":") {
+				targetID := strings.TrimPrefix(tag, relationshipType+":")
+				relationships = append(relationships, map[string]string{
+					"source": sourceID,
+					"type":   relationshipType,
+					"target": targetID,
+					"tag":    tag,
+				})
+			}
+		} else {
+			// Find all relationship-like tags (namespace:value format)
+			parts := strings.SplitN(tag, ":", 2)
+			if len(parts) == 2 && parts[0] != "type" && parts[0] != "status" && parts[0] != "rbac" && parts[0] != "content" {
+				// This might be a relationship tag
+				relationships = append(relationships, map[string]string{
+					"source": sourceID,
+					"type":   parts[0],
+					"target": parts[1],
+					"tag":    tag,
+				})
+			}
+		}
+	}
+	
+	response := map[string]interface{}{
+		"source_entity": sourceID,
+		"relationships": relationships,
+		"count":         len(relationships),
 	}
 	
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(relationships)
+	json.NewEncoder(w).Encode(response)
 }
 
 // TestGetEntity gets an entity by ID without authentication

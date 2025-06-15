@@ -133,23 +133,8 @@ type EntityRepository interface {
 	// Returns (before, after) snapshots for the specified time range.
 	GetEntityDiff(id string, startTime, endTime time.Time) (*Entity, *Entity, error)
 	
-	// Relationship Operations
-	
-	// CreateRelationship creates a new relationship between entities.
-	// The relationship is stored as a special entity with relationship tags.
-	CreateRelationship(rel interface{}) error
-	
-	// GetRelationshipByID retrieves a relationship by its ID.
-	GetRelationshipByID(id string) (interface{}, error)
-	
-	// GetRelationshipsBySource returns all relationships from a source entity.
-	GetRelationshipsBySource(sourceID string) ([]interface{}, error)
-	
-	// GetRelationshipsByTarget returns all relationships to a target entity.
-	GetRelationshipsByTarget(targetID string) ([]interface{}, error)
-	
-	// DeleteRelationship removes a relationship.
-	DeleteRelationship(id string) error
+	// Relationship operations removed - use pure tag-based relationships instead
+	// Example: To relate entity A to entity B, add tag "relates_to:entity_B_id" to entity A
 	
 	// Query Builder
 	

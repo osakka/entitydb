@@ -135,14 +135,12 @@ type User struct {
 // EntityDBServer represents the main server instance with all its dependencies
 type EntityDBServer struct {
 	entityRepo       models.EntityRepository
-	relationRepo     models.EntityRelationshipRepository
 	securityManager  *models.SecurityManager
 	securityInit     *models.SecurityInitializer
 	users            map[string]*User // Legacy - will be removed
 	mu               sync.RWMutex
 	server           *http.Server
 	entityHandler    *api.EntityHandler
-	relationHandler  *api.EntityRelationshipHandler
 	userHandler      *api.UserHandler
 	authHandler      *api.AuthHandler
 	securityMiddleware *api.SecurityMiddleware
@@ -169,7 +167,7 @@ func init() {
 func main() {
 	// Initialize repositories as nil first for configuration manager
 	var entityRepo models.EntityRepository
-	var relationRepo models.EntityRelationshipRepository
+	// Relationship system removed - use pure tag-based relationships
 	
 	// Create configuration manager
 	configManager = config.NewConfigManager(entityRepo)
@@ -252,8 +250,7 @@ func main() {
 		logger.Fatalf("Failed to create entity repository: %v", err)
 	}
 	
-	// Create relationship repository
-	relationRepo = binary.NewRelationshipRepository(entityRepo)
+	// Relationship repository removed - use pure tag-based relationships
 	
 	// Update storage metrics with initialized repository (conditionally)
 	if cfg.MetricsEnableStorageTracking {
@@ -273,7 +270,6 @@ func main() {
 	// Create server
 	server := NewEntityDBServer(cfg)
 	server.entityRepo = entityRepo
-	server.relationRepo = relationRepo
 	
 	// Initialize security system
 	server.securityManager = models.NewSecurityManager(entityRepo)
@@ -281,7 +277,6 @@ func main() {
 	
 	// Create handlers
 	server.entityHandler = api.NewEntityHandler(entityRepo)
-	server.relationHandler = api.NewEntityRelationshipHandler(relationRepo)
 	server.userHandler = api.NewUserHandler(entityRepo)
 	server.authHandler = api.NewAuthHandler(server.securityManager)
 	server.securityMiddleware = api.NewSecurityMiddleware(server.securityManager)
@@ -344,8 +339,8 @@ func main() {
 		w.Write([]byte(`{"status":"success","message":"Temporal tag index has been fixed"}`))
 	}).Methods("POST")
 	
-	// Entity relationship routes
-	apiRouter.HandleFunc("/entity-relationships", server.handleEntityRelationships).Methods("GET", "POST")
+	// Entity relationships are now pure tag-based (e.g., "relates_to:entity_id" tags)
+	// No separate relationship endpoints needed - use entity tag operations instead
 	
 	// Auth routes - New relationship-based security
 	apiRouter.HandleFunc("/auth/login", server.authHandler.Login).Methods("POST")
@@ -403,16 +398,14 @@ func main() {
 	comprehensiveMetricsHandler := api.NewComprehensiveMetricsHandler(server.entityRepo)
 	apiRouter.HandleFunc("/metrics/comprehensive", comprehensiveMetricsHandler.ServeHTTP).Methods("GET")
 	
-	// DISABLED: Background metrics collector - old entities have too many temporal tags
-	// Even with sharded indexing, the old metric entities with 1000+ tags cause hangs
-	// Need to clean up existing bloated entities before re-enabling
-	/*
+	// Background metrics collector - designed to handle entities with many temporal tags
+	// The v2.32.0 system with sharded indexing, tag caching, and memory-mapped files
+	// should efficiently handle entities with 100s or 1000s of tags (this is normal for temporal data)
 	logger.Info("Metrics collection interval set to %v", cfg.MetricsInterval)
 	
 	backgroundCollector := api.NewBackgroundMetricsCollector(server.entityRepo, cfg.MetricsInterval)
 	backgroundCollector.Start()
 	defer backgroundCollector.Stop()
-	*/
 	
 	// DISABLED: Metrics retention manager - part of metrics feedback loop
 	/*
@@ -704,72 +697,8 @@ func (s *EntityDBServer) testCreateEntity(w http.ResponseWriter, r *http.Request
 	json.NewEncoder(w).Encode(entity)
 }
 
-// handleEntityRelationships handles entity relationship operations
-func (s *EntityDBServer) handleEntityRelationships(w http.ResponseWriter, r *http.Request) {
-	// Create the handler method dynamically
-	switch r.Method {
-	case "GET":
-		// Get relationships
-		source := r.URL.Query().Get("source")
-		target := r.URL.Query().Get("target")
-		
-		var relationships []*models.EntityRelationship
-		var err error
-		
-		if source != "" {
-			relationships, err = s.relationRepo.GetBySource(source)
-		} else if target != "" {
-			relationships, err = s.relationRepo.GetByTarget(target)
-		} else {
-			relationships, err = nil, nil // No GetAll method
-		}
-		
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			json.NewEncoder(w).Encode(map[string]string{"error": "Failed to get relationships"})
-			return
-		}
-		
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(relationships)
-		
-	case "POST":
-		// Create relationship
-		var req struct {
-			SourceID         string `json:"source_id"`
-			RelationshipType string `json:"relationship_type"`
-			TargetID         string `json:"target_id"`
-		}
-		
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			json.NewEncoder(w).Encode(map[string]string{"error": "Invalid request body"})
-			return
-		}
-		
-		rel := &models.EntityRelationship{
-			SourceID:         req.SourceID,
-			RelationshipType: req.RelationshipType,
-			TargetID:         req.TargetID,
-		}
-		
-		err := s.relationRepo.Create(rel)
-		created := rel
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			json.NewEncoder(w).Encode(map[string]string{"error": "Failed to create relationship"})
-			return
-		}
-		
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(created)
-		
-	default:
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Method not allowed"})
-	}
-}
+// Relationship system removed - use pure tag-based relationships instead
+// Example: To relate entity A to entity B, add tag "relates_to:entity_B_id" to entity A
 
 // handleAuthStatus checks authentication status
 func (s *EntityDBServer) handleAuthStatus(w http.ResponseWriter, r *http.Request) {

@@ -3,6 +3,7 @@ package api
 import (
 	"entitydb/models"
 	"entitydb/logger"
+	"fmt"
 	"net/http"
 	"os"
 	"runtime"
@@ -225,15 +226,13 @@ func (h *SystemMetricsHandler) SystemMetrics(w http.ResponseWriter, r *http.Requ
 	var memStats runtime.MemStats
 	runtime.ReadMemStats(&memStats)
 	
+	// Performance metrics from collected data
 	httpDuration := h.getLatestMetricValue("metric_http_request_duration_ms")
 	httpTotal := h.getLatestMetricValue("metric_http_requests_total")
 	storageRead := h.getLatestMetricValue("metric_storage_read_duration_ms")
 	storageWrite := h.getLatestMetricValue("metric_storage_write_duration_ms")
 	queryTime := h.getLatestMetricValue("metric_query_execution_time_ms")
 	errorCount := h.getLatestMetricValue("metric_error_count")
-	
-	logger.Info("Performance metrics values: httpDuration=%.2f, httpTotal=%.2f, storageRead=%.2f, storageWrite=%.2f", 
-		httpDuration, httpTotal, storageRead, storageWrite)
 	
 	perfMetrics := PerformanceMetrics{
 		GCRuns:              memStats.NumGC,
@@ -657,11 +656,18 @@ func (h *SystemMetricsHandler) calculateEntityStats(entities []*models.Entity) E
 }
 
 // getLatestMetricValue retrieves the latest value tag from an aggregated metric entity
-func (h *SystemMetricsHandler) getLatestMetricValue(metricID string) float64 {
-	entity, err := h.entityRepo.GetByID(metricID)
+func (h *SystemMetricsHandler) getLatestMetricValue(metricName string) float64 {
+	// Try to get metric definition entity first
+	metricDefinitionID := fmt.Sprintf("metric_definition_%s", metricName)
+	entity, err := h.entityRepo.GetByID(metricDefinitionID)
 	if err != nil {
-		logger.Debug("Failed to get metric %s: %v", metricID, err)
-		return 0.0
+		// If metric definition doesn't exist, try the original ID format
+		entity, err = h.entityRepo.GetByID(metricName)
+		if err != nil {
+			// Return 0.0 silently if metric doesn't exist (don't spam logs)
+			// Metrics might not be available if collection is disabled
+			return 0.0
+		}
 	}
 	
 	// Find the most recent value tag
@@ -669,8 +675,6 @@ func (h *SystemMetricsHandler) getLatestMetricValue(metricID string) float64 {
 	var latestTime time.Time
 	foundValue := false
 	valueCount := 0
-	
-	logger.Debug("Searching for value tags in metric %s with %d total tags", metricID, len(entity.Tags))
 	
 	for _, tag := range entity.Tags {
 		// Handle temporal tags
@@ -690,16 +694,18 @@ func (h *SystemMetricsHandler) getLatestMetricValue(metricID string) float64 {
 			}
 		}
 		
-		// Look for value tags
-		if strings.HasPrefix(actualTag, "value:") {
-			valueStr := strings.TrimPrefix(actualTag, "value:")
+		// Look for value tags (from temporal metrics) or latest_value tags (from metric definitions)
+		if strings.HasPrefix(actualTag, "value:") || strings.HasPrefix(actualTag, "latest_value:") {
+			var valueStr string
+			if strings.HasPrefix(actualTag, "value:") {
+				valueStr = strings.TrimPrefix(actualTag, "value:")
+			} else {
+				valueStr = strings.TrimPrefix(actualTag, "latest_value:")
+			}
+			
 			if value, err := strconv.ParseFloat(valueStr, 64); err == nil {
 				valueCount++
-				if valueCount <= 5 {
-					logger.Debug("Found value tag #%d: value=%.2f, time=%s", valueCount, value, tagTime.Format(time.RFC3339))
-				}
 				if !foundValue || tagTime.After(latestTime) {
-					logger.Debug("Updating latest value from %.2f to %.2f (time: %s -> %s)", latestValue, value, latestTime.Format(time.RFC3339), tagTime.Format(time.RFC3339))
 					latestValue = value
 					latestTime = tagTime
 					foundValue = true
@@ -708,13 +714,8 @@ func (h *SystemMetricsHandler) getLatestMetricValue(metricID string) float64 {
 		}
 	}
 	
-	logger.Debug("Total value tags found: %d, latest value: %.2f at %s", valueCount, latestValue, latestTime.Format(time.RFC3339))
-	
 	if !foundValue {
-		logger.Debug("No value tags found for metric %s", metricID)
 		return 0.0
 	}
-	
-	logger.Trace("Found latest value %.2f for metric %s at time %s", latestValue, metricID, latestTime.Format(time.RFC3339))
 	return latestValue
 }
