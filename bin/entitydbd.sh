@@ -4,7 +4,7 @@
 
 # Determine EntityDB directory
 # EntityDB_DIR="$(dirname "$0")/.."
-EntityDB_DIR="$(dirname "$(realpath "$0")")"
+EntityDB_DIR="$(dirname "$(realpath "../$0")")"
 
 # Colors for output
 GREEN='\033[0;32m'
