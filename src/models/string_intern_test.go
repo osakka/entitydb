@@ -1,8 +1,6 @@
 package models
 
 import (
-	"fmt"
-	"runtime"
 	"sync"
 	"testing"
 	"unsafe"
@@ -90,83 +88,4 @@ func TestConcurrentInterning(t *testing.T) {
 	}
 }
 
-func BenchmarkStringInterning(b *testing.B) {
-	Clear()
-	
-	// Common tags that would be repeated in a real system
-	tags := []string{
-		"type:document",
-		"status:active",
-		"priority:high",
-		"rbac:role:admin",
-		"rbac:perm:entity:view",
-	}
-	
-	b.Run("WithInterning", func(b *testing.B) {
-		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
-			tag := tags[i%len(tags)]
-			_ = Intern(tag)
-		}
-	})
-	
-	b.Run("WithoutInterning", func(b *testing.B) {
-		b.ResetTimer()
-		result := make([]string, 0, b.N)
-		for i := 0; i < b.N; i++ {
-			tag := tags[i%len(tags)]
-			result = append(result, tag)
-		}
-		_ = result
-	})
-}
-
-func BenchmarkMemoryUsage(b *testing.B) {
-	b.Run("WithInterning", func(b *testing.B) {
-		Clear()
-		runtime.GC()
-		
-		var m1 runtime.MemStats
-		runtime.ReadMemStats(&m1)
-		
-		// Create many duplicate strings
-		for i := 0; i < 10000; i++ {
-			for j := 0; j < 10; j++ {
-				tag := fmt.Sprintf("tag:type:%d", j)
-				_ = Intern(tag)
-			}
-		}
-		
-		runtime.GC()
-		var m2 runtime.MemStats
-		runtime.ReadMemStats(&m2)
-		
-		alloced := m2.Alloc - m1.Alloc
-		b.ReportMetric(float64(alloced), "bytes")
-		b.ReportMetric(float64(Size()), "unique_strings")
-	})
-	
-	b.Run("WithoutInterning", func(b *testing.B) {
-		runtime.GC()
-		
-		var m1 runtime.MemStats
-		runtime.ReadMemStats(&m1)
-		
-		tags := make([]string, 0, 100000)
-		// Create many duplicate strings
-		for i := 0; i < 10000; i++ {
-			for j := 0; j < 10; j++ {
-				tag := fmt.Sprintf("tag:type:%d", j)
-				tags = append(tags, tag)
-			}
-		}
-		
-		runtime.GC()
-		var m2 runtime.MemStats
-		runtime.ReadMemStats(&m2)
-		
-		alloced := m2.Alloc - m1.Alloc
-		b.ReportMetric(float64(alloced), "bytes")
-		b.ReportMetric(float64(len(tags)), "total_strings")
-	})
-}
+// Benchmark functions moved to memory_optimization_test.go to avoid duplicates
