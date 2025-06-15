@@ -313,15 +313,6 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 // @Failure 500 {object} ErrorResponse
 // @Router /api/v1/auth/refresh [post]
 func (h *AuthHandler) RefreshToken(w http.ResponseWriter, r *http.Request) {
-	// Get security context
-	securityCtx, ok := GetSecurityContext(r)
-	if !ok {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(AuthErrorResponse{Error: "Authentication required"})
-		return
-	}
-
 	// Get current session token from header
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" {
@@ -340,38 +331,57 @@ func (h *AuthHandler) RefreshToken(w http.ResponseWriter, r *http.Request) {
 	}
 	currentToken := parts[1]
 
-	// Refresh the session in the database
-	logger.TraceIf("auth", "refreshing session for user %s", securityCtx.User.Username)
+	// Refresh the session in the database (this validates the token internally)
+	logger.TraceIf("auth", "refreshing session with token")
 	newSession, err := h.securityManager.RefreshSession(currentToken)
 	if err != nil {
-		logger.Error("failed to refresh session for user %s: %v", securityCtx.User.Username, err)
+		logger.Error("failed to refresh session: %v", err)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnauthorized)
 		json.NewEncoder(w).Encode(AuthErrorResponse{Error: "Failed to refresh session"})
 		return
 	}
 
-	// Get user roles
-	roles, err := h.getUserRoles(securityCtx.User)
+	// Get user information from the session
+	userEntity, err := h.securityManager.GetEntityRepo().GetByID(newSession.UserID)
 	if err != nil {
-		logger.Error("Failed to get user roles for %s: %v", securityCtx.User.Username, err)
-		roles = []string{}
+		logger.Error("failed to get user entity for session: %v", err)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(AuthErrorResponse{Error: "Failed to get user information"})
+		return
+	}
+
+	// Extract user information from entity
+	username := ""
+	email := ""
+	var roles []string
+	
+	for _, tag := range userEntity.GetTagsWithoutTimestamp() {
+		if strings.HasPrefix(tag, "username:") {
+			username = strings.TrimPrefix(tag, "username:")
+		} else if strings.HasPrefix(tag, "email:") {
+			email = strings.TrimPrefix(tag, "email:")
+		} else if strings.HasPrefix(tag, "rbac:role:") {
+			role := strings.TrimPrefix(tag, "rbac:role:")
+			roles = append(roles, role)
+		}
 	}
 
 	// Create response with refreshed session
 	response := AuthLoginResponse{
 		Token:     newSession.Token,
-		UserID:    securityCtx.User.ID,
+		UserID:    newSession.UserID,
 		ExpiresAt: newSession.ExpiresAt.Format(time.RFC3339),
 		User: AuthUserInfo{
-			ID:       securityCtx.User.ID,
-			Username: securityCtx.User.Username,
-			Email:    securityCtx.User.Email,
+			ID:       newSession.UserID,
+			Username: username,
+			Email:    email,
 			Roles:    roles,
 		},
 	}
 
-	logger.Info("Session refreshed for user %s", securityCtx.User.Username)
+	logger.Info("Session refreshed for user %s", username)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
 }

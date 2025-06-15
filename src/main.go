@@ -346,7 +346,7 @@ func main() {
 	apiRouter.HandleFunc("/auth/login", server.authHandler.Login).Methods("POST")
 	apiRouter.HandleFunc("/auth/logout", server.authHandler.Logout).Methods("POST")
 	apiRouter.HandleFunc("/auth/whoami", server.securityMiddleware.RequireAuthentication(server.authHandler.WhoAmI)).Methods("GET")
-	apiRouter.HandleFunc("/auth/refresh", server.securityMiddleware.RequireAuthentication(server.authHandler.RefreshToken)).Methods("POST")
+	apiRouter.HandleFunc("/auth/refresh", server.authHandler.RefreshToken).Methods("POST")
 	
 	// Legacy auth routes (backward compatibility) - TODO: Remove these after migration
 	apiRouter.HandleFunc("/auth/status", server.handleAuthStatus).Methods("GET")
