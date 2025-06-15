@@ -33,12 +33,10 @@ type EntityRepository struct {
 	mu       sync.RWMutex  // Still keep this for backward compatibility
 	
 	// In-memory indexes for queries
-	tagIndex     map[string][]string  // tag -> entity IDs (legacy)
 	contentIndex map[string][]string  // content -> entity IDs
 	
 	// Sharded tag index for improved concurrency
 	shardedTagIndex *ShardedTagIndex
-	useShardedIndex bool // Feature flag for gradual rollout
 	
 	// Tag variant cache for optimized temporal tag lookups
 	tagVariantCache *TagVariantCache
@@ -460,9 +458,7 @@ func NewEntityRepository(dataPath string) (*EntityRepository, error) {
 		return nil, fmt.Errorf("failed to create data directory: %w", err)
 	}
 	
-	// Check environment variable for sharded index feature flag
-	// Default to true for better performance, can be disabled by setting to "false"
-	useSharded := os.Getenv("ENTITYDB_USE_SHARDED_INDEX") != "false"
+	// Always use sharded index for improved concurrency
 	
 	// Check environment variable for tag variant cache feature flag
 	// Default to true for optimized temporal tag lookups
@@ -474,7 +470,6 @@ func NewEntityRepository(dataPath string) (*EntityRepository, error) {
 	
 	repo := &EntityRepository{
 		dataPath:        dataPath,
-		tagIndex:        make(map[string][]string),
 		contentIndex:    make(map[string][]string),
 		entities:        make(map[string]*models.Entity),
 		lockManager:     NewLockManager(),
@@ -484,15 +479,12 @@ func NewEntityRepository(dataPath string) (*EntityRepository, error) {
 		namespaceIndex:  NewNamespaceIndex(),
 		lastCheckpoint:  time.Now(),  // Initialize checkpoint time
 		shardedTagIndex: NewShardedTagIndex(),
-		useShardedIndex: useSharded,
 		tagVariantCache: NewTagVariantCache(),
 		useVariantCache: useVariants,
 		useBatchWrites:  useBatchWrites,
 	}
 	
-	if useSharded {
-		logger.Info("Using sharded tag index for improved concurrency")
-	}
+	logger.Info("Using sharded tag index for improved concurrency")
 	
 	if useVariants {
 		logger.Info("Using tag variant cache for optimized temporal tag lookups")
@@ -559,14 +551,14 @@ func NewEntityRepository(dataPath string) (*EntityRepository, error) {
 	
 	// Log entity count after building indexes
 	logger.Info("Initialized: %d entities, %d tag index entries", 
-		len(repo.entities), len(repo.tagIndex))
+		len(repo.entities), repo.shardedTagIndex.GetEntryCount())
 	
 	// WAL replay is already handled during WAL initialization
 	// No need for additional replay here as entities already include WAL data
 	
 	// Log entity count after WAL replay
 	logger.Info("WAL replay complete: %d entities, %d tag entries", 
-		len(repo.entities), len(repo.tagIndex))
+		len(repo.entities), repo.shardedTagIndex.GetEntryCount())
 	
 	// Verify index health
 	if err := repo.VerifyIndexHealth(); err != nil {
@@ -648,7 +640,7 @@ func (r *EntityRepository) buildIndexes() error {
 	// This preserves indexes populated during WAL replay
 	if !entitiesAlreadyLoaded {
 		logger.Debug("Clearing indexes - no entities loaded yet")
-		r.tagIndex = make(map[string][]string)
+		r.shardedTagIndex = NewShardedTagIndex()
 		r.contentIndex = make(map[string][]string)
 		r.temporalIndex = NewTemporalIndex()
 		r.namespaceIndex = NewNamespaceIndex()
@@ -661,14 +653,14 @@ func (r *EntityRepository) buildIndexes() error {
 	if _, err := os.Stat(indexFile); err == nil {
 		logger.Debug("Loading persisted tag index from %s", indexFile)
 		if loadedIndex, err := LoadTagIndex(r.getDataFile()); err == nil {
-			r.tagIndex = loadedIndex
+			// Always populate sharded index from loaded data in parallel
+			logger.Debug("Populating sharded index from loaded data with parallel processing")
+			r.populateShardedIndexParallel(loadedIndex)
 			r.persistentIndexLoaded = true
 			
-			// If using sharded index, populate it from loaded index in parallel
-			if r.useShardedIndex {
-				logger.Debug("Populating sharded index from loaded data with parallel processing")
-				r.populateShardedIndexParallel(loadedIndex)
-			}
+			// Populate sharded index from loaded index in parallel
+			logger.Debug("Populating sharded index from loaded data with parallel processing")
+			r.populateShardedIndexParallel(loadedIndex)
 			
 			logger.Info("Loaded persisted tag index with %d tags", len(loadedIndex))
 			// Still need to load entities into memory
@@ -878,11 +870,7 @@ func (r *EntityRepository) buildIndexesParallel(entities []*models.Entity, entit
 	for result := range resultChan {
 		// Update tag indexes and tag variant cache
 		for tag := range result.tagMappings {
-			if r.useShardedIndex {
-				r.shardedTagIndex.AddTag(tag, result.entityID)
-			} else {
-				r.tagIndex[tag] = append(r.tagIndex[tag], result.entityID)
-			}
+			r.shardedTagIndex.AddTag(tag, result.entityID)
 			
 			// Update tag variant cache for temporal tags
 			if r.useVariantCache && strings.Contains(tag, "|") {
@@ -928,54 +916,33 @@ func (r *EntityRepository) buildIndexesSequential(entities []*models.Entity, ent
 		
 		// Only update indexes if we didn't load from persistent index AND entities weren't already loaded from WAL
 		if !r.persistentIndexLoaded && !entitiesAlreadyLoaded {
-			logger.Debug("Indexing entity %s - persistentIndexLoaded=false, useShardedIndex=%v", entity.ID, r.useShardedIndex)
+			logger.Debug("Indexing entity %s - persistentIndexLoaded=false", entity.ID)
 			// Update tag index
 			for _, tag := range entity.Tags {
-				if r.useShardedIndex {
-					// Add to sharded index
-					logger.Trace("Adding to sharded index: %s -> %s", tag, entity.ID)
-					r.shardedTagIndex.AddTag(tag, entity.ID)
-					
-					// Also index the non-timestamped version for temporal tags
-					if strings.Contains(tag, "|") {
-						parts := strings.SplitN(tag, "|", 2)
-						if len(parts) == 2 {
-							cleanTag := parts[1]
-							r.shardedTagIndex.AddTag(cleanTag, entity.ID)
-							
-							// Update tag variant cache
-							if r.useVariantCache {
-								r.tagVariantCache.AddTagVariant(tag, cleanTag, entity.ID)
-							}
+				// Add to sharded index
+				logger.Trace("Adding to sharded index: %s -> %s", tag, entity.ID)
+				r.shardedTagIndex.AddTag(tag, entity.ID)
+				
+				// Also index the non-timestamped version for temporal tags
+				if strings.Contains(tag, "|") {
+					parts := strings.SplitN(tag, "|", 2)
+					if len(parts) == 2 {
+						cleanTag := parts[1]
+						r.shardedTagIndex.AddTag(cleanTag, entity.ID)
+						
+						// Update tag variant cache
+						if r.useVariantCache {
+							r.tagVariantCache.AddTagVariant(tag, cleanTag, entity.ID)
 						}
-					}
-				} else {
-					// Legacy indexing
-					r.tagIndex[tag] = append(r.tagIndex[tag], entity.ID)
-					
-					// Add to temporal index if it's a temporal tag
-					if strings.Contains(tag, "|") {
-						parts := strings.SplitN(tag, "|", 2)
-						if len(parts) == 2 {
-							// ALSO index the non-timestamped version for easier searching
-							// This is critical for authentication and tag lookups
-							actualTag := parts[1]
-							r.tagIndex[actualTag] = append(r.tagIndex[actualTag], entity.ID)
-							
-							// Update tag variant cache
-							if r.useVariantCache {
-								r.tagVariantCache.AddTagVariant(tag, actualTag, entity.ID)
-							}
-							
-							// Log relationship tag indexing
-							if strings.HasPrefix(actualTag, "_source:") || strings.HasPrefix(actualTag, "_target:") || strings.HasPrefix(actualTag, "_relationship:") {
-								logger.Trace("Indexed relationship tag: %s for %s", actualTag, entity.ID)
-							}
+						
+						// Log relationship tag indexing
+						if strings.HasPrefix(cleanTag, "_source:") || strings.HasPrefix(cleanTag, "_target:") || strings.HasPrefix(cleanTag, "_relationship:") {
+							logger.Trace("Indexed relationship tag: %s for %s", cleanTag, entity.ID)
 						}
 					}
 				}
 				
-				// Add to temporal index if it's a temporal tag (regardless of sharding)
+				// Add to temporal index if it's a temporal tag
 				if strings.Contains(tag, "|") {
 					parts := strings.SplitN(tag, "|", 2)
 					if len(parts) == 2 {
@@ -1013,25 +980,8 @@ func (r *EntityRepository) updateIndexes(entity *models.Entity) {
 	
 	// Helper function to remove entity ID from tag index
 	removeEntityFromTag := func(tag, entityID string) {
-		if r.useShardedIndex {
-			// Use sharded index for better concurrency
-			r.shardedTagIndex.RemoveTag(tag, entityID)
-		} else {
-			// Legacy path: manual removal from slice
-			if ids, ok := r.tagIndex[tag]; ok {
-				newIDs := make([]string, 0, len(ids))
-				for _, id := range ids {
-					if id != entityID {
-						newIDs = append(newIDs, id)
-					}
-				}
-				if len(newIDs) > 0 {
-					r.tagIndex[tag] = newIDs
-				} else {
-					delete(r.tagIndex, tag)
-				}
-			}
-		}
+		// Use sharded index for better concurrency
+		r.shardedTagIndex.RemoveTag(tag, entityID)
 	}
 
 	// CRITICAL: First remove all existing index entries for this entity
@@ -1059,19 +1009,8 @@ func (r *EntityRepository) updateIndexes(entity *models.Entity) {
 	
 	// Helper function to add entity ID to tag if not already present
 	addEntityToTag := func(tag, entityID string) {
-		if r.useShardedIndex {
-			// Use sharded index for better concurrency and performance
-			r.shardedTagIndex.AddTag(tag, entityID)
-		} else {
-			// Legacy path: check if entity is already indexed for this tag
-			existing := r.tagIndex[tag]
-			for _, id := range existing {
-				if id == entityID {
-					return // Already indexed
-				}
-			}
-			r.tagIndex[tag] = append(r.tagIndex[tag], entityID)
-		}
+		// Use sharded index for better concurrency and performance
+		r.shardedTagIndex.AddTag(tag, entityID)
 	}
 	
 	// Update tag index
@@ -1282,18 +1221,7 @@ func (r *EntityRepository) GetByID(id string) (*models.Entity, error) {
 	
 	// First check if entity exists in indexes
 	r.mu.RLock()
-	found := false
-	for _, ids := range r.tagIndex {
-		for _, entityID := range ids {
-			if entityID == id {
-				found = true
-				break
-			}
-		}
-		if found {
-			break
-		}
-	}
+	found := r.shardedTagIndex.HasEntity(id)
 	r.mu.RUnlock()
 	
 	if !found {
@@ -1825,9 +1753,8 @@ func (r *EntityRepository) ListByTag(tag string) ([]*models.Entity, error) {
 	
 	var matchingEntityIDs []string
 	
-	if r.useShardedIndex {
-		// Use sharded index for better concurrency
-		logger.Trace("Using sharded index for tag: %s", tag)
+	// Use sharded index for better concurrency
+	logger.Trace("Using sharded index for tag: %s", tag)
 		
 		// Direct lookup first
 		directMatches := r.shardedTagIndex.GetEntitiesForTag(tag)
@@ -1863,72 +1790,6 @@ func (r *EntityRepository) ListByTag(tag string) ([]*models.Entity, error) {
 		
 		logger.Trace("Sharded index found %d matches (%d direct, %d temporal)", 
 			len(matchingEntityIDs), len(directMatches), len(temporalMatches))
-		
-	} else {
-		// Legacy path with global lock
-		r.mu.RLock()
-		
-		// For non-temporal searches, we need to find tags that match the requested tag
-		// regardless of the timestamp prefix
-		matchingEntityIDs = make([]string, 0)
-		uniqueEntityIDs := make(map[string]bool)
-		
-		// Remove verbose debug output
-		
-		// First check for exact tag match
-		if entityIDs, exists := r.tagIndex[tag]; exists {
-			logger.Trace("Found exact match: %d entities", len(entityIDs))
-			for _, entityID := range entityIDs {
-				if !uniqueEntityIDs[entityID] {
-					uniqueEntityIDs[entityID] = true
-					matchingEntityIDs = append(matchingEntityIDs, entityID)
-				}
-			}
-		}
-		
-		// Optimized temporal tag lookup using pre-computed variant cache
-		var temporalEntityIDs []string
-		if r.useVariantCache {
-			// OPTIMIZED: O(1) lookup using pre-computed tag variants
-			logger.Trace("Using tag variant cache for optimized temporal lookup (legacy path)")
-			temporalEntityIDs = r.tagVariantCache.GetEntitiesForVariant(tag)
-			if temporalEntityIDs == nil {
-				temporalEntityIDs = []string{}
-			}
-		} else {
-			// FALLBACK: O(n) scan through all temporal tags
-			logger.Trace("Using legacy temporal tag scanning (variant cache disabled)")
-			for indexedTag, entityIDs := range r.tagIndex {
-				// Skip if this is exactly the tag we already processed
-				if indexedTag == tag {
-					continue
-				}
-				
-				// Extract the actual tag part (after the timestamp)
-				tagParts := strings.SplitN(indexedTag, "|", 2)
-				if len(tagParts) == 2 {
-					actualTag := tagParts[1]
-					
-					// Check if the actual tag matches our search tag
-					if actualTag == tag {
-						temporalEntityIDs = append(temporalEntityIDs, entityIDs...)
-					}
-				}
-			}
-		}
-		
-		// Add temporal matches to result set
-		for _, entityID := range temporalEntityIDs {
-			if !uniqueEntityIDs[entityID] {
-				uniqueEntityIDs[entityID] = true
-				matchingEntityIDs = append(matchingEntityIDs, entityID)
-			}
-		}
-		
-		logger.Trace("Found %d temporal matches", len(temporalEntityIDs))
-		
-		r.mu.RUnlock()
-	}
 	
 	logger.Debug("ListByTag: %s found %d entities", 
 		tag, len(matchingEntityIDs))
@@ -2101,7 +1962,7 @@ func (r *EntityRepository) ListByTags(tags []string, matchAll bool) ([]*models.E
 			entitySet := make(map[string]bool)
 			
 			// First check for exact tag match
-			if ids, exists := r.tagIndex[searchTag]; exists {
+			if ids := r.shardedTagIndex.GetEntitiesForTag(searchTag); len(ids) > 0 {
 				logger.Trace("Found exact match: %d entities", len(ids))
 				for _, id := range ids {
 					entitySet[id] = true
@@ -2109,7 +1970,7 @@ func (r *EntityRepository) ListByTags(tags []string, matchAll bool) ([]*models.E
 			}
 			
 			// Then check for temporal tags with timestamp prefix
-			for indexedTag, ids := range r.tagIndex {
+			for indexedTag, ids := range r.shardedTagIndex.GetAllTags() {
 				if indexedTag == searchTag {
 					continue // Skip if already processed
 				}
@@ -2164,14 +2025,14 @@ func (r *EntityRepository) ListByTags(tags []string, matchAll bool) ([]*models.E
 		entitySet := make(map[string]bool)
 		for _, tag := range tags {
 			// First check for exact tag match
-			if tagIDs, exists := r.tagIndex[tag]; exists {
+			if tagIDs := r.shardedTagIndex.GetEntitiesForTag(tag); len(tagIDs) > 0 {
 				for _, id := range tagIDs {
 					entitySet[id] = true
 				}
 			}
 			
 			// Then check for temporal tags with timestamp prefix
-			for indexedTag, ids := range r.tagIndex {
+			for indexedTag, ids := range r.shardedTagIndex.GetAllTags() {
 				if indexedTag == tag {
 					continue // Skip if already processed
 				}
@@ -2231,7 +2092,7 @@ func (r *EntityRepository) ListByTagWildcard(pattern string) ([]*models.Entity, 
 	prefix := strings.TrimSuffix(pattern, "*")
 	
 	var matchingIDs []string
-	for tag, ids := range r.tagIndex {
+	for tag, ids := range r.shardedTagIndex.GetAllTags() {
 		// For temporal tags, check the part after the pipe
 		actualTag := tag
 		if parts := strings.SplitN(tag, "|", 2); len(parts) == 2 {
@@ -2466,30 +2327,20 @@ func (r *EntityRepository) AddTag(entityID, tag string) error {
 	r.mu.Unlock()
 	
 	// Update indexes efficiently without database rewrite
-	if r.useShardedIndex {
-		// Use sharded index for better concurrency
-		r.shardedTagIndex.AddTag(timestampedTag, entityID)
-		// Also index the non-timestamped version for easier searching
-		if strings.Contains(timestampedTag, "|") {
-			parts := strings.SplitN(timestampedTag, "|", 2)
-			if len(parts) == 2 {
-				r.shardedTagIndex.AddTag(parts[1], entityID)
-			}
+	// Use sharded index for better concurrency
+	r.shardedTagIndex.AddTag(timestampedTag, entityID)
+	// Also index the non-timestamped version for easier searching
+	if strings.Contains(timestampedTag, "|") {
+		parts := strings.SplitN(timestampedTag, "|", 2)
+		if len(parts) == 2 {
+			r.shardedTagIndex.AddTag(parts[1], entityID)
 		}
-	} else {
-		// Legacy path with global lock
-		r.mu.Lock()
-		r.addToTagIndex(timestampedTag, entityID)
-		// Also index the non-timestamped version for easier searching
-		if strings.Contains(timestampedTag, "|") {
-			parts := strings.SplitN(timestampedTag, "|", 2)
-			if len(parts) == 2 {
-				r.addToTagIndex(parts[1], entityID)
-			}
-		}
-		r.tagIndexDirty = true
-		r.mu.Unlock()
 	}
+	
+	// Mark index as dirty
+	r.mu.Lock()
+	r.tagIndexDirty = true
+	r.mu.Unlock()
 	
 	// Add to temporal index if applicable
 	if strings.Contains(timestampedTag, "|") {
@@ -3219,7 +3070,7 @@ func (r *EntityRepository) ReindexTags() error {
 	defer r.mu.Unlock()
 	
 	// Clear existing indexes
-	r.tagIndex = make(map[string][]string)
+	r.shardedTagIndex = NewShardedTagIndex()
 	r.contentIndex = make(map[string][]string)
 	r.temporalIndex = NewTemporalIndex()
 	r.namespaceIndex = NewNamespaceIndex()
@@ -3252,7 +3103,7 @@ func (r *EntityRepository) ReindexTags() error {
 		// Update tag index
 		for _, tag := range entity.Tags {
 			// Always index the full tag (with timestamp)
-			r.tagIndex[tag] = append(r.tagIndex[tag], entity.ID)
+			r.shardedTagIndex.AddTag(tag, entity.ID)
 			
 			// Handle temporal tags
 			if strings.Contains(tag, "|") {
@@ -3266,7 +3117,7 @@ func (r *EntityRepository) ReindexTags() error {
 					
 					// Index the actual tag part too (without timestamp)
 					actualTag := parts[1]
-					r.tagIndex[actualTag] = append(r.tagIndex[actualTag], entity.ID)
+					r.shardedTagIndex.AddTag(actualTag, entity.ID)
 				}
 			}
 			
@@ -3321,19 +3172,7 @@ func (r *EntityRepository) replayWAL() error {
 			if entity, exists := r.entities[entry.EntityID]; exists {
 				// Remove from tag index
 				for _, tag := range entity.Tags {
-					if ids, ok := r.tagIndex[tag]; ok {
-						newIDs := make([]string, 0, len(ids))
-						for _, id := range ids {
-							if id != entry.EntityID {
-								newIDs = append(newIDs, id)
-							}
-						}
-						if len(newIDs) > 0 {
-							r.tagIndex[tag] = newIDs
-						} else {
-							delete(r.tagIndex, tag)
-						}
-					}
+					r.shardedTagIndex.RemoveTag(tag, entry.EntityID)
 				}
 				
 				// Remove from cache
@@ -3445,25 +3284,14 @@ func (r *EntityRepository) VerifyIndexHealth() error {
 	indexedEntities := make(map[string]int) // entity -> tag count
 	totalTagEntries := 0
 	
-	if r.useShardedIndex && r.shardedTagIndex != nil {
-		// Use sharded index
-		allTags := r.shardedTagIndex.GetAllTags()
-		for tag, entityIDs := range allTags {
-			for _, id := range entityIDs {
-				indexedEntities[id]++
-				totalTagEntries++
-			}
-			logger.Trace("Tag %s: %d entities", tag, len(entityIDs))
+	// Use sharded index
+	allTags := r.shardedTagIndex.GetAllTags()
+	for tag, entityIDs := range allTags {
+		for _, id := range entityIDs {
+			indexedEntities[id]++
+			totalTagEntries++
 		}
-	} else {
-		// Use regular index
-		for tag, entityIDs := range r.tagIndex {
-			for _, id := range entityIDs {
-				indexedEntities[id]++
-				totalTagEntries++
-			}
-			logger.Trace("Tag %s: %d entities", tag, len(entityIDs))
-		}
+		logger.Trace("Tag %s: %d entities", tag, len(entityIDs))
 	}
 	
 	// Count entities in repository
@@ -3521,15 +3349,10 @@ func (r *EntityRepository) RepairIndexes() error {
 	logger.Info("Starting index repair")
 	
 	// Clear existing indexes
-	r.tagIndex = make(map[string][]string)
+	r.shardedTagIndex = NewShardedTagIndex()
 	r.contentIndex = make(map[string][]string)
 	r.temporalIndex = NewTemporalIndex()
 	r.namespaceIndex = NewNamespaceIndex()
-	
-	// Clear sharded index if enabled
-	if r.useShardedIndex {
-		r.shardedTagIndex = NewShardedTagIndex()
-	}
 	
 	// Rebuild from entities in memory
 	for entityID, entity := range r.entities {
@@ -3537,33 +3360,19 @@ func (r *EntityRepository) RepairIndexes() error {
 		
 		// Re-index all tags
 		for _, tag := range entity.Tags {
-			if r.useShardedIndex {
-				// Add to sharded index
-				r.shardedTagIndex.AddTag(tag, entity.ID)
-				
-				// Also index the non-timestamped version for temporal tags
-				if strings.Contains(tag, "|") {
-					parts := strings.SplitN(tag, "|", 2)
-					if len(parts) == 2 {
-						r.shardedTagIndex.AddTag(parts[1], entity.ID)
-					}
-				}
-			} else {
-				// Legacy indexing
-				r.tagIndex[tag] = append(r.tagIndex[tag], entity.ID)
-				
-				// CRITICAL: Also index the non-timestamped version for temporal tags
-				if strings.Contains(tag, "|") {
-					parts := strings.SplitN(tag, "|", 2)
-					if len(parts) == 2 {
-						actualTag := parts[1]
-						r.tagIndex[actualTag] = append(r.tagIndex[actualTag], entity.ID)
-						
-						// Add to temporal index
-						if timestampNanos, err := strconv.ParseInt(parts[0], 10, 64); err == nil {
-							timestamp := time.Unix(0, timestampNanos)
-							r.temporalIndex.AddEntry(entity.ID, tag, timestamp)
-						}
+			// Add to sharded index
+			r.shardedTagIndex.AddTag(tag, entity.ID)
+			
+			// Also index the non-timestamped version for temporal tags
+			if strings.Contains(tag, "|") {
+				parts := strings.SplitN(tag, "|", 2)
+				if len(parts) == 2 {
+					r.shardedTagIndex.AddTag(parts[1], entity.ID)
+					
+					// Add to temporal index
+					if timestampNanos, err := strconv.ParseInt(parts[0], 10, 64); err == nil {
+						timestamp := time.Unix(0, timestampNanos)
+						r.temporalIndex.AddEntry(entity.ID, tag, timestamp)
 					}
 				}
 			}
@@ -3621,23 +3430,13 @@ func (r *EntityRepository) detectAndFixIndexCorruption(entityID string) error {
 	// Re-index the entity
 	for _, tag := range entity.Tags {
 		// Add to tag index
-		if r.useShardedIndex {
-			r.shardedTagIndex.AddTag(tag, entity.ID)
-			// Also index the non-timestamped version for temporal tags
-			if strings.Contains(tag, "|") {
-				parts := strings.SplitN(tag, "|", 2)
-				if len(parts) == 2 {
-					r.shardedTagIndex.AddTag(parts[1], entity.ID)
-				}
-			}
-		} else {
-			r.addToTagIndex(tag, entity.ID)
-			// Also index the non-timestamped version for temporal tags
-			if strings.Contains(tag, "|") {
-				parts := strings.SplitN(tag, "|", 2)
-				if len(parts) == 2 {
-					r.addToTagIndex(parts[1], entity.ID)
-				}
+		r.shardedTagIndex.AddTag(tag, entity.ID)
+		
+		// Also index the non-timestamped version for temporal tags
+		if strings.Contains(tag, "|") {
+			parts := strings.SplitN(tag, "|", 2)
+			if len(parts) == 2 {
+				r.shardedTagIndex.AddTag(parts[1], entity.ID)
 			}
 		}
 		
@@ -3682,12 +3481,8 @@ func (r *EntityRepository) SaveTagIndex() error {
 	startTime := time.Now()
 	logger.Debug("Saving tag index")
 	
-	// If using sharded index, convert it to regular index for persistence
-	indexToSave := r.tagIndex
-	if r.useShardedIndex && r.shardedTagIndex != nil {
-		logger.Debug("Converting sharded index to regular index for persistence")
-		indexToSave = r.shardedTagIndex.ToMap()
-	}
+	// Convert sharded index to regular index for persistence
+	indexToSave := r.shardedTagIndex.GetAllTags()
 	
 	if err := SaveTagIndex(r.getDataFile(), indexToSave); err != nil {
 		return fmt.Errorf("failed to save tag index: %w", err)
@@ -3743,36 +3538,14 @@ func (r *EntityRepository) saveEntities() error {
 	return nil
 }
 
-// addToTagIndex adds an entity ID to a tag's index
+// addToTagIndex adds an entity ID to a tag's index (legacy helper - now uses sharded index)
 func (r *EntityRepository) addToTagIndex(tag, entityID string) {
-	if ids, exists := r.tagIndex[tag]; exists {
-		// Check if already present
-		for _, id := range ids {
-			if id == entityID {
-				return
-			}
-		}
-		r.tagIndex[tag] = append(ids, entityID)
-	} else {
-		r.tagIndex[tag] = []string{entityID}
-	}
+	r.shardedTagIndex.AddTag(tag, entityID)
 }
 
-// removeFromTagIndex removes an entity ID from a tag's index  
+// removeFromTagIndex removes an entity ID from a tag's index (legacy helper - now uses sharded index)
 func (r *EntityRepository) removeFromTagIndex(tag, entityID string) {
-	if ids, exists := r.tagIndex[tag]; exists {
-		newIDs := make([]string, 0, len(ids))
-		for _, id := range ids {
-			if id != entityID {
-				newIDs = append(newIDs, id)
-			}
-		}
-		if len(newIDs) > 0 {
-			r.tagIndex[tag] = newIDs
-		} else {
-			delete(r.tagIndex, tag)
-		}
-	}
+	r.shardedTagIndex.RemoveTag(tag, entityID)
 }
 
 // RepairWAL repairs the WAL using the recovery manager

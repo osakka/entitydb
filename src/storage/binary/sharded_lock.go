@@ -449,6 +449,38 @@ func (idx *ShardedTagIndex) ToMap() map[string][]string {
 	return result
 }
 
+// GetEntryCount returns the total number of tag entries across all shards
+func (idx *ShardedTagIndex) GetEntryCount() int {
+	count := 0
+	for i := 0; i < NumShards; i++ {
+		shard := idx.shards[i]
+		shard.mu.RLock()
+		for _, entityIDs := range shard.tags {
+			count += len(entityIDs)
+		}
+		shard.mu.RUnlock()
+	}
+	return count
+}
+
+// HasEntity checks if an entity exists in any tag index
+func (idx *ShardedTagIndex) HasEntity(entityID string) bool {
+	for i := 0; i < NumShards; i++ {
+		shard := idx.shards[i]
+		shard.mu.RLock()
+		for _, entityIDs := range shard.tags {
+			for _, id := range entityIDs {
+				if id == entityID {
+					shard.mu.RUnlock()
+					return true
+				}
+			}
+		}
+		shard.mu.RUnlock()
+	}
+	return false
+}
+
 // ShardedLock provides fine-grained locking by distributing locks across
 // multiple shards. This reduces contention when locking different keys,
 // as operations on different shards can proceed concurrently.

@@ -9,9 +9,9 @@
 > This eliminates separate credential entities and relationships. Users with credentials have the `has:credentials` tag.
 > NO BACKWARD COMPATIBILITY - all users must be recreated.
 
-## Current State (v2.31.0)
+## Current State (v2.32.0-dev)
 
-EntityDB now features a unified Entity model with autochunking:
+EntityDB now features a unified Entity model with unified sharded indexing:
 - **Unified Entity Model**: Single content field ([]byte) per entity
 - **Autochunking**: Automatic chunking of large files (>4MB default)
 - **No RAM Limits**: Stream large files without loading fully into memory  
@@ -35,6 +35,7 @@ EntityDB now features a unified Entity model with autochunking:
 - **Authentication Stability**: Resolved recurring timeout issues with optimized HTTP timeout configuration for production-grade reliability
 - **Complete UI/UX Suite**: Professional web interface with PWA support, advanced search, data export, temporal queries, and relationship visualization
 - **High-Performance Optimizations**: Comprehensive performance optimizations including O(1) tag value caching, parallel index building, JSON encoder pooling, batch write operations, and temporal tag variant caching for significant memory, CPU, and storage improvements
+- **Unified Sharded Indexing (v2.32.0)**: Complete elimination of legacy indexing code with single source of truth using 256-shard concurrent indexing for improved performance and consistency
 
 ## What's Implemented
 
@@ -197,6 +198,22 @@ The server automatically creates a default admin user if none exists:
   - **Eliminated Session Recovery**: Removed the need for session recovery during creation by addressing the storage layer indexing race condition that was causing post-creation verification failures
   - **End-to-End Authentication**: Complete authentication flow now works seamlessly from login through token validation to protected endpoint access
   - **Production Stability**: No more "Invalid or expired token" errors for freshly created sessions, eliminating user authentication disruptions
+
+## Recent Changes (v2.32.0-dev)
+
+- **Unified Sharded Indexing Implementation**: Complete elimination of legacy indexing systems maintaining single source of truth
+  - **Removed Legacy Code**: Eliminated all `useShardedIndex` conditional logic and `tagIndex` map-based indexing
+  - **Pure Sharded Implementation**: All tag operations now consistently use `ShardedTagIndex` with 256 shards for optimal concurrency
+  - **Index Consistency**: Single indexing implementation prevents inconsistencies and reduces codebase complexity
+  - **Performance Improvements**: Better concurrent access patterns with reduced lock contention
+  - **Code Simplification**: Removed ~30 conditional code blocks and duplicate indexing logic
+  - **Enhanced Recovery**: WAL replay system properly reconstructs sharded indexes maintaining data integrity
+  - **Authentication Stability**: Session lookup and validation now fully compatible with unified sharded indexing
+- **Documentation Restructuring**: Professional documentation organization with industry-standard taxonomy
+  - **Archive System**: Moved legacy documentation to `/docs/archive/` preserving historical context
+  - **Modern Structure**: Organized documentation into user-guide, developer-guide, admin-guide, architecture, api-reference, and reference categories
+  - **Cross-Reference Integrity**: Maintained all cross-references while improving navigational structure
+  - **Professional Standards**: Applied technical writing best practices for clarity and maintainability
 
 ## Recent Changes (v2.31.0)
 

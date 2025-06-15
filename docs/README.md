@@ -29,62 +29,62 @@ Welcome to the EntityDB documentation library. This is your comprehensive guide 
 ### 🚀 Getting Started
 | Document | Description | Audience |
 |----------|-------------|----------|
-| [Installation](./getting-started/installation.md) | Get EntityDB running in minutes | Everyone |
-| [Quick Start](./getting-started/quick-start.md) | Your first EntityDB experience | New Users |
-| [Core Concepts](./getting-started/core-concepts.md) | Understand entities, tags, temporal data | Everyone |
-| [Dashboard Guide](./user-guide/dashboard.md) | Navigate the web interface | End Users |
+| [Introduction](./getting-started/01-introduction.md) | EntityDB overview and value proposition | Everyone |
+| [Installation](./getting-started/01-installation.md) | Get EntityDB running in minutes | Everyone |
+| [Quick Start](./getting-started/02-quick-start.md) | Your first EntityDB experience | New Users |
+| [Core Concepts](./getting-started/03-core-concepts.md) | Understand entities, tags, temporal data | Everyone |
 
 ### 🏗️ Architecture & Design
 | Document | Description | Audience |
 |----------|-------------|----------|
-| [System Overview](./architecture/system-overview.md) | High-level architecture and design principles | Technical |
-| [Temporal Storage](./architecture/temporal-storage.md) | How time-series data is stored and queried | Technical |
-| [RBAC System](./architecture/rbac-system.md) | Role-based access control implementation | Admin/Dev |
-| [Binary Format](./architecture/binary-format.md) | EBF storage format specification | Developers |
+| [System Overview](./architecture/01-system-overview.md) | High-level architecture and design principles | Technical |
+| [Temporal Architecture](./architecture/02-temporal-architecture.md) | How time-series data is stored and queried | Technical |
+| [RBAC Architecture](./architecture/03-rbac-architecture.md) | Role-based access control implementation | Admin/Dev |
+| [Entity Model](./architecture/04-entity-model.md) | Core entity data model | Developers |
 
 ### 📚 User Guides
 | Document | Description | Audience |
 |----------|-------------|----------|
-| [Entity Management](./user-guide/entities.md) | Creating, updating, querying entities | End Users |
-| [Temporal Queries](./user-guide/temporal-queries.md) | Time-travel and history queries | End Users |
-| [Search & Filtering](./user-guide/search.md) | Finding data efficiently | End Users |
+| [Temporal Queries](./user-guide/01-temporal-queries.md) | Time-travel and history queries | End Users |
+| [Dashboard Guide](./user-guide/02-dashboard-guide.md) | Navigate the web interface | End Users |
+| [Advanced Queries](./user-guide/04-advanced-queries.md) | Complex search and filtering | Power Users |
 
 ### 🔧 Administrator Guides
 | Document | Description | Audience |
 |----------|-------------|----------|
-| [Production Deployment](./admin-guide/deployment.md) | Deploy EntityDB in production | DevOps/Admin |
-| [User Management](./admin-guide/user-management.md) | Create and manage users with RBAC | Administrators |
-| [Security Configuration](./admin-guide/security.md) | SSL, authentication, authorization | Administrators |
-| [Monitoring & Maintenance](./admin-guide/monitoring.md) | Health checks, metrics, troubleshooting | Administrators |
+| [User Management](./admin-guide/01-user-management.md) | Create and manage users with RBAC | Administrators |
+| [Security Configuration](./admin-guide/01-security-configuration.md) | SSL, authentication, authorization | Administrators |
+| [Production Deployment](./admin-guide/01-production-deployment.md) | Deploy EntityDB in production | DevOps/Admin |
+| [Monitoring Guide](./admin-guide/02-monitoring-guide.md) | Health checks, metrics, troubleshooting | Administrators |
 
 ### 🔌 API Reference
 | Document | Description | Audience |
 |----------|-------------|----------|
-| [API Overview](./api-reference/overview.md) | REST API introduction and concepts | Developers |
-| [Authentication](./api-reference/authentication.md) | Login, sessions, tokens | Developers |
-| [Entities](./api-reference/entities.md) | CRUD operations and queries | Developers |
-| [Temporal Operations](./api-reference/temporal.md) | Time-travel and history APIs | Developers |
-| [Code Examples](./api-reference/examples.md) | Working examples in multiple languages | Developers |
+| [API Overview](./api-reference/01-overview.md) | REST API introduction and concepts | Developers |
+| [Authentication](./api-reference/02-authentication.md) | Login, sessions, tokens | Developers |
+| [Entities](./api-reference/03-entities.md) | CRUD operations and queries | Developers |
+| [Queries](./api-reference/04-queries.md) | Advanced search and temporal queries | Developers |
+| [Code Examples](./api-reference/05-examples.md) | Working examples in multiple languages | Developers |
 
 ### 👩‍💻 Developer Guide
 | Document | Description | Audience |
 |----------|-------------|----------|
-| [Contributing](./developer-guide/contributing.md) | How to contribute to EntityDB | Contributors |
-| [Development Setup](./developer-guide/development-setup.md) | Local development environment | Contributors |
-| [Git Workflow](./developer-guide/git-workflow.md) | Branching, commits, pull requests | Contributors |
-| [Testing Guide](./developer-guide/testing.md) | Running and writing tests | Contributors |
-| [Code Standards](./developer-guide/code-standards.md) | Coding conventions and best practices | Contributors |
+| [Contributing](./developer-guide/01-contributing.md) | How to contribute to EntityDB | Contributors |
+| [Git Workflow](./developer-guide/02-git-workflow.md) | Branching, commits, pull requests | Contributors |
+| [Logging Standards](./developer-guide/03-logging-standards.md) | Logging conventions and best practices | Contributors |
+| [Configuration](./developer-guide/04-configuration.md) | Configuration management patterns | Contributors |
+| [Maintenance Guidelines](./developer-guide/maintenance-guidelines.md) | Project maintenance procedures | Contributors |
 
 ### 📖 Reference
 | Document | Description | Audience |
 |----------|-------------|----------|
-| [Configuration Reference](./reference/configuration.md) | All configuration options | Admin/Dev |
-| [API Complete Reference](./reference/api-complete.md) | Comprehensive API documentation | Developers |
-| [Binary Format Specification](./reference/binary-format.md) | Technical storage format details | Advanced Devs |
-| [RBAC Reference](./reference/rbac-reference.md) | Complete permission and role system | Admin |
-| [Troubleshooting](./reference/troubleshooting.md) | Common issues and solutions | Everyone |
+| [Configuration Reference](./reference/01-configuration-reference.md) | All configuration options | Admin/Dev |
+| [API Complete Reference](./reference/02-api-complete.md) | Comprehensive API documentation | Developers |
+| [Binary Format Specification](./reference/03-binary-format-spec.md) | Technical storage format details | Advanced Devs |
+| [RBAC Reference](./reference/04-rbac-reference.md) | Complete permission and role system | Admin |
+| [Troubleshooting](./reference/troubleshooting/) | Common issues and solutions | Everyone |
 
-## 🏛️ Current Documentation Structure
+## 🏛️ Documentation Structure
 
 The documentation follows industry-standard patterns with clear separation of concerns:
 
@@ -93,12 +93,42 @@ docs/
 ├── README.md                    # This master index
 ├── CHANGELOG.md                 # Version history and changes
 ├── getting-started/             # New user onboarding
+│   ├── 01-introduction.md       # EntityDB overview  
+│   ├── 01-installation.md       # Installation guide
+│   ├── 02-quick-start.md        # Quick start tutorial
+│   └── 03-core-concepts.md      # Core concepts
 ├── architecture/                # System design and technical architecture
+│   ├── 01-system-overview.md    # High-level architecture
+│   ├── 02-temporal-architecture.md # Temporal storage design
+│   ├── 03-rbac-architecture.md  # Security and permissions
+│   └── 04-entity-model.md       # Data model specification
 ├── user-guide/                  # End-user documentation
+│   ├── 01-temporal-queries.md   # Time-travel queries
+│   ├── 02-dashboard-guide.md    # Web interface guide
+│   └── 04-advanced-queries.md   # Advanced search features
 ├── admin-guide/                 # Administrative documentation
+│   ├── 01-user-management.md    # User and RBAC management
+│   ├── 01-security-configuration.md # Security setup
+│   ├── 01-production-deployment.md # Production deployment
+│   └── 02-monitoring-guide.md   # Monitoring and maintenance
 ├── api-reference/               # Developer API documentation
+│   ├── 01-overview.md           # API introduction
+│   ├── 02-authentication.md     # Auth endpoints
+│   ├── 03-entities.md           # Entity CRUD operations
+│   ├── 04-queries.md            # Advanced query endpoints
+│   └── 05-examples.md           # Code examples
 ├── developer-guide/             # Contributor and development documentation
+│   ├── 01-contributing.md       # Contribution guidelines
+│   ├── 02-git-workflow.md       # Git procedures
+│   ├── 03-logging-standards.md  # Logging conventions
+│   ├── 04-configuration.md      # Configuration patterns
+│   └── maintenance-guidelines.md # Maintenance procedures
 ├── reference/                   # Technical specifications and troubleshooting
+│   ├── 01-configuration-reference.md # Complete config reference
+│   ├── 02-api-complete.md       # Complete API specification
+│   ├── 03-binary-format-spec.md # Binary format technical details
+│   ├── 04-rbac-reference.md     # RBAC system reference
+│   └── troubleshooting/         # Troubleshooting guides
 └── archive/                     # Historical and deprecated content
 ```
 
