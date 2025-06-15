@@ -565,6 +565,90 @@ func (sm *SecurityManager) InvalidateSession(token string) error {
 	return nil
 }
 
+// RefreshSession extends the expiration time of an existing session
+func (sm *SecurityManager) RefreshSession(token string) (*SecuritySession, error) {
+	logger.Debug("RefreshSession: Looking for session with token: %s", token)
+	
+	// Find session by token tag
+	sessionEntities, err := sm.entityRepo.ListByTag("token:" + token)
+	if err != nil {
+		logger.Error("RefreshSession: Error finding session: %v", err)
+		return nil, fmt.Errorf("failed to find session: %v", err)
+	}
+	if len(sessionEntities) == 0 {
+		logger.Debug("RefreshSession: No session found with token: %s", token)
+		return nil, fmt.Errorf("session not found")
+	}
+	
+	sessionEntity := sessionEntities[0]
+	logger.Debug("RefreshSession: Found session entity: %s", sessionEntity.ID)
+	
+	// Check if session is still valid (not already expired)
+	currentTime := time.Now()
+	var expiresAt time.Time
+	for _, tag := range sessionEntity.Tags {
+		if strings.HasPrefix(tag, "expires:") {
+			expiryStr := strings.TrimPrefix(tag, "expires:")
+			if parsedTime, err := time.Parse(time.RFC3339, expiryStr); err == nil {
+				expiresAt = parsedTime
+				break
+			}
+		}
+	}
+	
+	if currentTime.After(expiresAt) {
+		logger.Debug("RefreshSession: Session already expired: %s", sessionEntity.ID)
+		return nil, fmt.Errorf("session expired")
+	}
+	
+	// Generate new expiration time (2 hours from now)
+	newExpiresAt := time.Now().Add(2 * time.Hour)
+	
+	// Update session tags with new expiration
+	updatedTags := []string{}
+	for _, tag := range sessionEntity.Tags {
+		// Skip old expires tag - we'll add a new one
+		if !strings.HasPrefix(tag, "expires:") {
+			updatedTags = append(updatedTags, tag)
+		}
+	}
+	
+	// Add new expiration tag
+	updatedTags = append(updatedTags, "expires:"+newExpiresAt.Format(time.RFC3339))
+	
+	sessionEntity.Tags = updatedTags
+	sessionEntity.UpdatedAt = Now()
+	
+	// Update the session entity
+	if err := sm.entityRepo.Update(sessionEntity); err != nil {
+		logger.Error("RefreshSession: Failed to update session entity: %v", err)
+		return nil, fmt.Errorf("failed to refresh session: %v", err)
+	}
+	
+	// Create SecuritySession struct to return
+	securitySession := &SecuritySession{
+		Token:     token,
+		ExpiresAt: newExpiresAt,
+		UserID:    "",
+		IPAddress: "",
+		UserAgent: "",
+	}
+	
+	// Extract session details from tags
+	for _, tag := range sessionEntity.Tags {
+		if strings.HasPrefix(tag, "authenticated_as:") {
+			securitySession.UserID = strings.TrimPrefix(tag, "authenticated_as:")
+		} else if strings.HasPrefix(tag, "ip:") {
+			securitySession.IPAddress = strings.TrimPrefix(tag, "ip:")
+		} else if strings.HasPrefix(tag, "user_agent:") {
+			securitySession.UserAgent = strings.TrimPrefix(tag, "user_agent:")
+		}
+	}
+	
+	logger.Info("RefreshSession: Successfully refreshed session: %s", sessionEntity.ID)
+	return securitySession, nil
+}
+
 // Utility functions
 
 func generateSecureUUID() string {

@@ -322,9 +322,34 @@ func (h *AuthHandler) RefreshToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Create new session token and expiration (simplified for now)
-	newToken := "new_session_token_" + securityCtx.User.ID
-	expiresAt := time.Now().Add(24 * time.Hour).Format(time.RFC3339)
+	// Get current session token from header
+	authHeader := r.Header.Get("Authorization")
+	if authHeader == "" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(AuthErrorResponse{Error: "No token provided"})
+		return
+	}
+	
+	parts := strings.Split(authHeader, " ")
+	if len(parts) != 2 || parts[0] != "Bearer" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(AuthErrorResponse{Error: "Invalid token format"})
+		return
+	}
+	currentToken := parts[1]
+
+	// Refresh the session in the database
+	logger.TraceIf("auth", "refreshing session for user %s", securityCtx.User.Username)
+	newSession, err := h.securityManager.RefreshSession(currentToken)
+	if err != nil {
+		logger.Error("failed to refresh session for user %s: %v", securityCtx.User.Username, err)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(AuthErrorResponse{Error: "Failed to refresh session"})
+		return
+	}
 
 	// Get user roles
 	roles, err := h.getUserRoles(securityCtx.User)
@@ -333,11 +358,11 @@ func (h *AuthHandler) RefreshToken(w http.ResponseWriter, r *http.Request) {
 		roles = []string{}
 	}
 
-	// Create response with unified string timestamp
+	// Create response with refreshed session
 	response := AuthLoginResponse{
-		Token:     newToken,
+		Token:     newSession.Token,
 		UserID:    securityCtx.User.ID,
-		ExpiresAt: expiresAt,
+		ExpiresAt: newSession.ExpiresAt.Format(time.RFC3339),
 		User: AuthUserInfo{
 			ID:       securityCtx.User.ID,
 			Username: securityCtx.User.Username,
