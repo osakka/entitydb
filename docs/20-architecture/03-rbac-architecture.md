@@ -22,12 +22,12 @@ In EntityDB, all security objects are entities with tags:
 EntityDB uses a hierarchical permission format:
 
 ```
-rbac:perm:resource:action:scope
+rbac:perm:resource:action
 ```
 
 **Examples**:
 - `rbac:perm:entity:view` - View entities
-- `rbac:perm:entity:create:dataset:worca` - Create entities in worca dataset
+- `rbac:perm:entity:create` - Create entities
 - `rbac:perm:system:admin` - System administration
 - `rbac:perm:*` - All permissions (global admin)
 
@@ -75,7 +75,6 @@ EntityDB supports hierarchical permissions with inheritance:
 1. **Global Permissions**: `rbac:perm:*` (admin access)
 2. **Resource Permissions**: `rbac:perm:entity:*` (all entity operations)
 3. **Action Permissions**: `rbac:perm:entity:view` (specific operations)
-4. **Scoped Permissions**: `rbac:perm:entity:view:dataset:worca` (dataset-specific)
 
 ### Default Roles
 
@@ -234,20 +233,20 @@ var endpointPermissions = map[string]string{
 }
 ```
 
-### Dataset Security
+### Entity Security
 
-Dataset-scoped permissions provide multi-tenant security:
+EntityDB enforces permissions at the entity level:
 
 ```go
-// Dataset permission check
-func checkDatasetPermission(user *User, dataset, action string) bool {
+// Entity permission check
+func checkEntityPermission(user *User, action string) bool {
     // Global admin override
     if user.HasPermission("rbac:perm:*") {
         return true
     }
     
-    // Dataset-specific permission
-    perm := fmt.Sprintf("rbac:perm:entity:%s:dataset:%s", action, dataset)
+    // Entity-specific permission
+    perm := fmt.Sprintf("rbac:perm:entity:%s", action)
     return user.HasPermission(perm)
 }
 ```
@@ -299,7 +298,7 @@ curl -X POST https://localhost:8085/api/v1/users/create \
     "tags": [
       "rbac:role:user",
       "rbac:perm:entity:view",
-      "rbac:perm:entity:create:dataset:development"
+      "rbac:perm:entity:create"
     ]
   }'
 ```
@@ -312,7 +311,7 @@ curl -X PUT https://localhost:8085/api/v1/users/update \
   -H "Authorization: Bearer $ADMIN_TOKEN" \
   -d '{
     "user_id": "user_developer_456",
-    "add_tags": ["rbac:perm:entity:update:dataset:development"]
+    "add_tags": ["rbac:perm:entity:update"]
   }'
 ```
 

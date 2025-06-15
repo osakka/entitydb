@@ -2,7 +2,7 @@
 
 > A high-performance temporal database where every tag is timestamped with nanosecond precision
 
-[![Version](https://img.shields.io/badge/version-v2.31.0-blue)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-v2.32.0--dev-blue)](./CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
 [![Documentation](https://img.shields.io/badge/docs-comprehensive-brightgreen)](./docs)
 
@@ -10,7 +10,7 @@
 
 EntityDB is a revolutionary temporal database platform that stores all data as entities with timestamped tags. Built with a custom binary format (EBF) and Write-Ahead Logging, it provides ACID compliance, time-travel queries, and enterprise-grade RBAC.
 
-> **🚀 NEW in v2.31.0**: Comprehensive performance optimization suite delivering significant improvements across memory, CPU, and storage systems. Features O(1) tag value caching, parallel index building, JSON pooling, batch write operations, and temporal tag variant caching for enterprise-scale performance.
+> **🆕 NEW in v2.32.0-dev**: Clean vanilla dashboard implementation replacing complex Vue.js framework. Zero external dependencies, 3-core focus areas (Performance, Entities, Users), and fixed RBAC permission validation for maximum reliability and browser compatibility.
 
 > **⚠️ BREAKING CHANGE in v2.29.0**: Authentication architecture has changed. User credentials are now stored directly in the user entity's content field. This change has **NO BACKWARD COMPATIBILITY** - all users must be recreated. See [Authentication Guide](./docs/30-api-reference/02-authentication.md) for details.
 

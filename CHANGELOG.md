@@ -5,6 +5,30 @@ All notable changes to the EntityDB Platform will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] - v2.32.0-dev
+
+### Added
+- **Vanilla Dashboard Implementation**: Self-contained HTML/CSS/JavaScript dashboard replacing complex Vue.js framework
+- **Zero-Dependency Operation**: Dashboard operates without external libraries for maximum browser compatibility
+- **Admin Permission Fix Tool**: `fix_admin_perms.go` utility for correcting existing RBAC permission formats
+- **Professional Documentation Structure**: Industry-standard taxonomy and comprehensive master index
+
+### Changed
+- **UI Architecture**: Replaced Vue.js dashboard with clean vanilla implementation focusing on 3 core areas
+- **Web Root Cleanup**: Removed 60+ complex framework files, keeping only essential components
+- **RBAC Permission Format**: Corrected wildcard format from `rbac:perm:*:*` to `rbac:perm:*` for HasPermission compatibility
+- **Documentation Organization**: Restructured documentation following professional technical writing standards
+
+### Fixed
+- **RBAC Authentication**: Resolved permission validation issues preventing admin access to entity endpoints
+- **Dashboard Reliability**: Eliminated dependency-related UI rendering issues and browser compatibility problems
+- **Permission System**: Fixed wildcard permission matching in tag-based RBAC system
+
+### Removed
+- **Vue.js Framework**: Eliminated Vue.js and associated complex UI framework dependencies
+- **Legacy UI Components**: Removed 60+ obsolete files including widgets, CSS frameworks, and debug interfaces
+- **External Dependencies**: Achieved complete independence from external JavaScript libraries
+
 ## [2.31.0] - 2025-06-13
 
 ### Added

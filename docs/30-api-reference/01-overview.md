@@ -1,7 +1,7 @@
 # EntityDB API Reference
 
-> **Current Version**: 2.29.0  
-> **Base URL**: `https://localhost:8443` (HTTPS) or `http://localhost:8085` (HTTP)  
+> **Current Version**: v2.32.0-dev  
+> **Base URL**: `https://localhost:8085` (HTTPS enabled by default)  
 > **Content-Type**: `application/json`
 
 ## ⚠️ Breaking Change in v2.29.0
