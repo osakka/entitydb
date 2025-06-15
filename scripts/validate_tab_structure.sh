@@ -24,6 +24,7 @@ fi
 # Check for Vue conditional classes
 echo -n "Checking for proper Vue conditional templates... "
 VUE_COUNT=$(grep -c ':class=.*active.*activeTab' "$HTML_FILE" 2>/dev/null || echo 0)
+VUE_COUNT=$(echo "$VUE_COUNT" | tr -d '\n\r')
 if [ "$VUE_COUNT" -eq 0 ]; then
     echo "❌ FAIL"
     echo "  No Vue conditional classes found for tabs!"
