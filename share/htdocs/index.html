@@ -907,9 +907,10 @@
                         localStorage.setItem('entitydb_token', this.token);
                         document.getElementById('currentUser').textContent = data.user.username;
                         
-                        this.showAlert('Login successful!', 'success');
+                        this.showAlert('Login successful! Session will expire in 2 hours.', 'success');
                         this.showDashboard();
                         this.startRefresh();
+                        this.scheduleSessionWarning();
                     } else {
                         const error = await response.json();
                         errorDiv.textContent = error.error || 'Login failed';
@@ -942,8 +943,8 @@
                 const response = await fetch(url, config);
                 
                 if (response.status === 401) {
-                    this.showAlert('Session expired. Please login again.', 'warning');
-                    setTimeout(() => this.logout(), 2000);
+                    // Don't show immediate logout, let refreshSession handle it gracefully
+                    console.log('401 detected, session may be expired');
                     throw new Error('Authentication required');
                 }
                 
@@ -963,12 +964,55 @@
 
             async refreshSession() {
                 try {
-                    // Ping the server to keep session alive
-                    await this.apiCall('/api/v1/auth/refresh', { method: 'POST' });
+                    // Try to refresh the session
+                    const result = await this.apiCall('/api/v1/auth/refresh', { method: 'POST' });
+                    if (result.token) {
+                        // Update token if server provides a new one
+                        this.token = result.token;
+                        localStorage.setItem('entitydb_token', this.token);
+                        console.log('Session refreshed successfully');
+                    }
                 } catch (error) {
-                    console.log('Session refresh failed:', error.message);
-                    // Don't logout automatically, let user try again
+                    if (error.message.includes('401') || error.message.includes('expired') || error.message.includes('Invalid')) {
+                        // Session is definitely expired, handle gracefully
+                        this.handleSessionExpiry();
+                    } else {
+                        console.log('Session refresh failed (will retry):', error.message);
+                    }
                 }
+            }
+
+            handleSessionExpiry() {
+                this.showAlert('Your session has expired after 2 hours. You will be redirected to login in 10 seconds.', 'warning');
+                
+                // Give user a chance to save any work
+                let countdown = 10;
+                const countdownInterval = setInterval(() => {
+                    countdown--;
+                    if (countdown <= 0) {
+                        clearInterval(countdownInterval);
+                        this.logout();
+                    } else {
+                        // Update existing alert with countdown
+                        const alerts = document.querySelectorAll('.alert-warning');
+                        if (alerts.length > 0) {
+                            alerts[alerts.length - 1].textContent = 
+                                `Your session has expired after 2 hours. Redirecting to login in ${countdown} seconds...`;
+                        }
+                    }
+                }, 1000);
+            }
+
+            scheduleSessionWarning() {
+                // Warn user 10 minutes before session expires (110 minutes after login)
+                setTimeout(() => {
+                    this.showAlert('Your session will expire in 10 minutes. Activity will automatically refresh it.', 'info');
+                }, 110 * 60 * 1000); // 110 minutes
+
+                // Final warning 2 minutes before expiry
+                setTimeout(() => {
+                    this.showAlert('Session expires in 2 minutes! Please save any work.', 'warning');
+                }, 118 * 60 * 1000); // 118 minutes
             }
 
             stopRefresh() {
