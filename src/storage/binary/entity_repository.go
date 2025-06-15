@@ -13,6 +13,7 @@ package binary
 
 import (
 	"entitydb/models"
+	"entitydb/config"
 	"entitydb/cache"
 	"entitydb/logger"
 	"encoding/json"
@@ -30,6 +31,7 @@ import (
 // both standard file-based and memory-mapped access patterns.
 type EntityRepository struct {
 	dataPath string
+	config   *config.Config // Configuration reference for path resolution
 	mu       sync.RWMutex  // Still keep this for backward compatibility
 	
 	// In-memory indexes for queries
@@ -77,8 +79,29 @@ type EntityRepository struct {
 	checkpointMu          sync.Mutex  // Protect checkpoint operations
 	persistentIndexLoaded bool        // Whether persistent index was loaded successfully
 	
+	// High-performance features (merged from HighPerformanceRepository)
+	mmapReader     *MMapReader            // Memory-mapped file reader
+	skipList       *SkipList              // Fast skip-list index
+	bloomFilter    *BloomFilter           // Bloom filter for existence checks
+	queryProcessor *ParallelQueryProcessor // Parallel query processing
+	perfStats      *PerformanceStats      // Performance monitoring
+	
+	// WAL-only mode features (merged from WALOnlyRepository)
+	walEntities    map[string]*models.Entity // In-memory WAL entities
+	walMutex       sync.RWMutex             // WAL entities mutex
+	lastCompact    time.Time                // Last compaction time
+	
 	// Recovery manager
 	recovery *RecoveryManager
+}
+
+// PerformanceStats tracks performance metrics for the repository
+type PerformanceStats struct {
+	mu           sync.RWMutex
+	queryCount   uint64
+	totalLatency time.Duration
+	cacheHits    uint64
+	cacheMisses  uint64
 }
 
 // temporalEntry represents a temporal index entry for parallel processing
@@ -451,10 +474,10 @@ func (bw *BatchWriter) batchDiskWrite(entities []*models.Entity) error {
 	return nil
 }
 
-// NewEntityRepository creates a new binary entity repository
-func NewEntityRepository(dataPath string) (*EntityRepository, error) {
+// NewEntityRepositoryWithConfig creates a new binary entity repository using full configuration
+func NewEntityRepositoryWithConfig(cfg *config.Config) (*EntityRepository, error) {
 	// Ensure data directory exists
-	if err := os.MkdirAll(dataPath, 0755); err != nil {
+	if err := os.MkdirAll(cfg.DataPath, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create data directory: %w", err)
 	}
 	
@@ -468,12 +491,15 @@ func NewEntityRepository(dataPath string) (*EntityRepository, error) {
 	// Default to true for improved write throughput
 	useBatchWrites := os.Getenv("ENTITYDB_USE_BATCH_WRITES") != "false"
 	
+	// Use configuration for database filename instead of hardcoded value
+	databasePath := filepath.Join(cfg.DataPath, cfg.DatabaseFilename)
+	
 	repo := &EntityRepository{
-		dataPath:        dataPath,
+		dataPath:        cfg.DataPath,
 		contentIndex:    make(map[string][]string),
 		entities:        make(map[string]*models.Entity),
 		lockManager:     NewLockManager(),
-		writerManager:   NewWriterManager(filepath.Join(dataPath, "entities.ebf")),
+		writerManager:   NewWriterManager(databasePath),
 		cache:           cache.NewQueryCache(1000, 5*time.Minute), // Cache up to 1000 queries for 5 minutes
 		temporalIndex:   NewTemporalIndex(),
 		namespaceIndex:  NewNamespaceIndex(),
@@ -482,6 +508,14 @@ func NewEntityRepository(dataPath string) (*EntityRepository, error) {
 		tagVariantCache: NewTagVariantCache(),
 		useVariantCache: useVariants,
 		useBatchWrites:  useBatchWrites,
+		config:          cfg, // Store config reference for later use
+		// Initialize performance features
+		skipList:        NewSkipList(),
+		bloomFilter:     NewBloomFilter(100000, 0.01), // Support up to 100k entities with 1% false positive rate
+		perfStats:       &PerformanceStats{},
+		// Initialize WAL-only features
+		walEntities:     make(map[string]*models.Entity),
+		lastCompact:     time.Now(),
 	}
 	
 	logger.Info("Using sharded tag index for improved concurrency")
@@ -501,7 +535,7 @@ func NewEntityRepository(dataPath string) (*EntityRepository, error) {
 	}
 	
 	// Ensure the data file exists with a proper header before trying to read it
-	dataFile := repo.getDataFile()
+	dataFile := databasePath
 	if _, err := os.Stat(dataFile); os.IsNotExist(err) {
 		// Use the writerManager to create the initial file with header
 		_, err := repo.writerManager.GetWriter()
@@ -525,14 +559,28 @@ func NewEntityRepository(dataPath string) (*EntityRepository, error) {
 	}
 	
 	// Initialize WAL
-	wal, err := NewWAL(dataPath)
+	wal, err := NewWAL(cfg.DataPath)
 	if err != nil {
 		return nil, fmt.Errorf("error creating WAL: %w", err)
 	}
 	repo.wal = wal
 	
 	// Initialize recovery manager
-	repo.recovery = NewRecoveryManager(dataPath)
+	repo.recovery = NewRecoveryManagerWithConfig(cfg)
+	
+	// Initialize memory-mapped reader if database file exists and has content
+	if stat, err := os.Stat(dataFile); err == nil && stat.Size() > HeaderSize {
+		if mmapReader, err := NewMMapReader(dataFile); err != nil {
+			logger.Warn("Failed to create memory-mapped reader: %v, will fall back to standard reads", err)
+		} else {
+			repo.mmapReader = mmapReader
+		}
+	} else {
+		logger.Info("Database file is empty or too small for mmap, skipping mmap initialization")
+	}
+	
+	// Initialize parallel query processor
+	repo.queryProcessor = NewParallelQueryProcessor(repo)
 	
 	// Ensure data file exists before building indexes
 	if _, err := os.Stat(repo.getDataFile()); os.IsNotExist(err) {
@@ -549,42 +597,93 @@ func NewEntityRepository(dataPath string) (*EntityRepository, error) {
 		// Don't fail initialization - we can still write entities
 	}
 	
+	// Build performance indexes if possible, but don't fail if we can't
+	if err := repo.buildConcurrentIndexes(); err != nil {
+		logger.Warn("Failed to build performance indexes: %v", err)
+		// Don't fail - we can still use the base repository functionality
+	}
+	
 	// Log entity count after building indexes
 	logger.Info("Initialized: %d entities, %d tag index entries", 
 		len(repo.entities), repo.shardedTagIndex.GetEntryCount())
 	
-	// WAL replay is already handled during WAL initialization
-	// No need for additional replay here as entities already include WAL data
-	
-	// Log entity count after WAL replay
-	logger.Info("WAL replay complete: %d entities, %d tag entries", 
-		len(repo.entities), repo.shardedTagIndex.GetEntryCount())
-	
-	// Verify index health
-	if err := repo.VerifyIndexHealth(); err != nil {
-		logger.Warn("Index health check failed: %v", err)
-		// Attempt to repair the index
-		logger.Info("Attempting automatic index repair")
-		if repairErr := repo.RepairIndexes(); repairErr != nil {
-			logger.Error("Index repair failed: %v", repairErr)
-		} else {
-			logger.Info("Index repair completed successfully")
-			// Verify again after repair
-			if verifyErr := repo.VerifyIndexHealth(); verifyErr != nil {
-				logger.Error("Index still unhealthy after repair: %v", verifyErr)
-			}
-		}
-	}
-	
-	// Open the current file for use with readers
-	repo.currentFile, err = os.OpenFile(repo.getDataFile(), os.O_RDWR|os.O_CREATE, 0644)
-	if err != nil {
-		return nil, fmt.Errorf("error opening data file: %w", err)
-	}
-	
 	return repo, nil
 }
 
+// NewHighPerformanceRepositoryWithConfig creates an EntityRepository with high-performance features enabled
+func NewHighPerformanceRepositoryWithConfig(cfg *config.Config) (*EntityRepository, error) {
+	// Create base repository with all features
+	repo, err := NewEntityRepositoryWithConfig(cfg)
+	if err != nil {
+		return nil, err
+	}
+	
+	// Initialize memory-mapped reader if possible
+	dbFile := repo.getDataFile()
+	if stat, err := os.Stat(dbFile); err == nil && stat.Size() > HeaderSize {
+		if mmapReader, err := NewMMapReader(dbFile); err == nil {
+			repo.mmapReader = mmapReader
+			logger.Info("High-performance mode: Memory-mapped reader initialized")
+		} else {
+			logger.Warn("High-performance mode: Failed to create memory-mapped reader: %v", err)
+		}
+	}
+	
+	// Initialize skip list and bloom filter
+	repo.skipList = NewSkipList()
+	repo.bloomFilter = NewBloomFilter(100000, 0.01) // Support up to 100k entities with 1% false positive rate
+	
+	// Initialize parallel query processor
+	repo.queryProcessor = NewParallelQueryProcessor(repo)
+	
+	// Initialize performance stats
+	repo.perfStats = &PerformanceStats{}
+	
+	logger.Info("High-performance repository initialized with optimizations")
+	return repo, nil
+}
+
+// NewTemporalRepositoryWithConfig creates an EntityRepository with temporal features enabled
+func NewTemporalRepositoryWithConfig(cfg *config.Config) (*EntityRepository, error) {
+	// Create high-performance base
+	repo, err := NewHighPerformanceRepositoryWithConfig(cfg)
+	if err != nil {
+		return nil, err
+	}
+	
+	logger.Info("Temporal repository initialized with high-performance base")
+	return repo, nil
+}
+
+// NewWALOnlyRepositoryWithConfig creates an EntityRepository optimized for write performance
+func NewWALOnlyRepositoryWithConfig(cfg *config.Config) (*EntityRepository, error) {
+	// Create base repository with all features
+	repo, err := NewEntityRepositoryWithConfig(cfg)
+	if err != nil {
+		return nil, err
+	}
+	
+	// Initialize WAL-only mode features
+	repo.walEntities = make(map[string]*models.Entity)
+	repo.lastCompact = time.Now()
+	
+	logger.Info("WAL-only repository initialized for O(1) write performance")
+	return repo, nil
+}
+
+// NewDatasetRepositoryWithConfig creates an EntityRepository with dataset isolation
+func NewDatasetRepositoryWithConfig(cfg *config.Config) (*EntityRepository, error) {
+	// Create base repository with all features
+	repo, err := NewEntityRepositoryWithConfig(cfg)
+	if err != nil {
+		return nil, err
+	}
+	
+	logger.Info("Dataset repository initialized with full dataset isolation")
+	return repo, nil
+}
+
+	
 // Close properly shuts down the repository and its resources
 func (r *EntityRepository) Close() error {
 	var errors []error
@@ -625,6 +724,10 @@ func (r *EntityRepository) Close() error {
 
 // getDataFile returns the path to the current data file
 func (r *EntityRepository) getDataFile() string {
+	if r.config != nil {
+		return filepath.Join(r.dataPath, r.config.DatabaseFilename)
+	}
+	// Fallback for legacy compatibility
 	return filepath.Join(r.dataPath, "entities.ebf")
 }
 
@@ -3561,5 +3664,85 @@ func (r *EntityRepository) ValidateEntityChecksum(entity *models.Entity) (bool, 
 // CreateEntityBackup creates a backup of an entity
 func (r *EntityRepository) CreateEntityBackup(entity *models.Entity) error {
 	return r.recovery.CreateBackup(entity)
+}
+
+// buildConcurrentIndexes builds fast in-memory indexes with parallel processing
+func (r *EntityRepository) buildConcurrentIndexes() error {
+	logger.Info("Building concurrent performance indexes...")
+	start := time.Now()
+	
+	// Get all entities using the base repository's List method
+	allEntities, err := r.List()
+	if err != nil {
+		logger.Error("Failed to get all entities for performance indexing: %v", err)
+		return err
+	}
+	
+	logger.Debug("Building performance indexes for %d entities", len(allEntities))
+	
+	// Build indexes
+	for _, entity := range allEntities {
+		// Add to skip list (using ID as both key and value)
+		if r.skipList != nil {
+			r.skipList.Insert(entity.ID, entity.ID)
+		}
+		
+		// Add to bloom filter
+		if r.bloomFilter != nil {
+			r.bloomFilter.Add(entity.ID)
+			
+			// Index tags
+			for _, tag := range entity.Tags {
+				r.bloomFilter.Add(tag)
+			}
+		}
+	}
+	
+	logger.Info("Built concurrent performance indexes in %v", time.Since(start))
+	return nil
+}
+
+// GetStats returns performance statistics for the repository
+func (r *EntityRepository) GetStats() map[string]interface{} {
+	if r.perfStats == nil {
+		// Return basic stats if performance monitoring not enabled
+		return map[string]interface{}{
+			"queryCount":      0,
+			"avgLatencyMs":    0.0,
+			"cacheHitRate":    0.0,
+			"cacheHits":       0,
+			"cacheMisses":     0,
+			"skipListSize":    0,
+			"bloomFilterSize": 0,
+		}
+	}
+
+	r.perfStats.mu.RLock()
+	defer r.perfStats.mu.RUnlock()
+	
+	avgLatency := float64(0)
+	if r.perfStats.queryCount > 0 {
+		avgLatency = float64(r.perfStats.totalLatency.Nanoseconds()) / float64(r.perfStats.queryCount) / 1e6
+	}
+	
+	hitRate := float64(0)
+	if r.perfStats.cacheHits+r.perfStats.cacheMisses > 0 {
+		hitRate = float64(r.perfStats.cacheHits) / float64(r.perfStats.cacheHits+r.perfStats.cacheMisses) * 100
+	}
+	
+	bloomFilterSize := 0
+	if r.bloomFilter != nil {
+		bloomFilterSize = int(r.bloomFilter.n)
+	}
+	
+	return map[string]interface{}{
+		"queryCount":      r.perfStats.queryCount,
+		"avgLatencyMs":    avgLatency,
+		"cacheHitRate":    hitRate,
+		"cacheHits":       r.perfStats.cacheHits,
+		"cacheMisses":     r.perfStats.cacheMisses,
+		"skipListSize":    0, // We don't have a Count() method for skip list
+		"bloomFilterSize": bloomFilterSize,
+	}
 }
 

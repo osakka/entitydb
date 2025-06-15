@@ -250,7 +250,7 @@ func main() {
 	}
 	
 	// Create entity repository based on configuration
-	entityRepo, err = factory.CreateRepository(cfg.DataPath)
+	entityRepo, err = factory.CreateRepository(cfg)
 	if err != nil {
 		logger.Fatalf("Failed to create entity repository: %v", err)
 	}
@@ -650,23 +650,15 @@ func (s *EntityDBServer) Close() {
 	// Try different repository types
 	switch repo := s.entityRepo.(type) {
 	case *binary.EntityRepository:
+		// All repository variants now merged into EntityRepository
 		if err := repo.Close(); err != nil {
 			logger.Error("Failed to close entity repository: %v", err)
 		}
-	case *binary.TemporalRepository:
-		// TemporalRepository embeds HighPerformanceRepository which embeds EntityRepository
-		if baseRepo := repo.HighPerformanceRepository; baseRepo != nil {
-			if entityRepo := baseRepo.EntityRepository; entityRepo != nil {
-				if err := entityRepo.Close(); err != nil {
-					logger.Error("Failed to close entity repository: %v", err)
-				}
-			}
-		}
-	case *binary.HighPerformanceRepository:
-		// HighPerformanceRepository embeds EntityRepository
-		if entityRepo := repo.EntityRepository; entityRepo != nil {
+	case *binary.CachedRepository:
+		// CachedRepository wraps another repository
+		if entityRepo, ok := repo.EntityRepository.(*binary.EntityRepository); ok {
 			if err := entityRepo.Close(); err != nil {
-				logger.Error("Failed to close entity repository: %v", err)
+				logger.Error("Failed to close wrapped entity repository: %v", err)
 			}
 		}
 	default:

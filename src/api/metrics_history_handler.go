@@ -97,25 +97,26 @@ func (h *MetricsHistoryHandler) GetMetricHistory(w http.ResponseWriter, r *http.
 		return
 	}
 	
-	// Get temporal repository - handle wrapped repositories
-	var temporalRepo *binary.TemporalRepository
+	// Get entity repository - handle wrapped repositories
+	// All temporal functionality is now merged into the base EntityRepository
+	var entityRepo *binary.EntityRepository
 	switch repo := h.repo.(type) {
-	case *binary.TemporalRepository:
-		temporalRepo = repo
+	case *binary.EntityRepository:
+		entityRepo = repo
 	case *binary.CachedRepository:
 		// CachedRepository wraps another repository
-		if tr, ok := repo.EntityRepository.(*binary.TemporalRepository); ok {
-			temporalRepo = tr
+		if er, ok := repo.EntityRepository.(*binary.EntityRepository); ok {
+			entityRepo = er
 		}
 	}
 	
-	if temporalRepo == nil {
+	if entityRepo == nil {
 		RespondError(w, http.StatusInternalServerError, "Temporal features not available")
 		return
 	}
 	
 	// Get entity history
-	history, err := temporalRepo.GetEntityHistory(metricID, limit*2) // Get more to filter by time
+	history, err := entityRepo.GetEntityHistory(metricID, limit*2) // Get more to filter by time
 	if err != nil {
 		logger.Error("Failed to get metric history for %s: %v", metricID, err)
 		RespondError(w, http.StatusInternalServerError, "Failed to retrieve metric history")

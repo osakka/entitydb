@@ -84,13 +84,11 @@ func IntegrityMetricsHandler(repository models.EntityRepository) http.HandlerFun
 		// Get the repository
 		repo, ok := repository.(*binary.EntityRepository)
 		if !ok {
-			// Try to get base repository if using high performance wrapper
-			if hpRepo, ok := repository.(*binary.HighPerformanceRepository); ok {
-				repo = hpRepo.GetBaseRepository()
-			} else if tempRepo, ok := repository.(*binary.TemporalRepository); ok {
-				// TemporalRepository embeds HighPerformanceRepository
-				if hpRepo := tempRepo.HighPerformanceRepository; hpRepo != nil {
-					repo = hpRepo.GetBaseRepository()
+			// All repository variants now merged into EntityRepository
+			// Check if it's a cached repository wrapping an EntityRepository
+			if cachedRepo, ok := repository.(*binary.CachedRepository); ok {
+				if entityRepo, ok := cachedRepo.EntityRepository.(*binary.EntityRepository); ok {
+					repo = entityRepo
 				} else {
 					http.Error(w, "Integrity metrics not available for this repository type", http.StatusNotImplemented)
 					return
