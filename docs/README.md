@@ -79,7 +79,7 @@ Welcome to the EntityDB documentation library. This is your comprehensive guide 
 | Document | Description | Audience |
 |----------|-------------|----------|
 | [Configuration Reference](./reference/01-configuration-reference.md) | All configuration options | Admin/Dev |
-| [API Complete Reference](./reference/02-api-complete.md) | Comprehensive API documentation | Developers |
+| [API Complete Reference](./reference/02-api_reference.md) | Comprehensive API documentation | Developers |
 | [Binary Format Specification](./reference/03-binary-format-spec.md) | Technical storage format details | Advanced Devs |
 | [RBAC Reference](./reference/04-rbac-reference.md) | Complete permission and role system | Admin |
 | [Troubleshooting](./reference/troubleshooting/) | Common issues and solutions | Everyone |
@@ -125,7 +125,7 @@ docs/
 │   └── maintenance-guidelines.md # Maintenance procedures
 ├── reference/                   # Technical specifications and troubleshooting
 │   ├── 01-configuration-reference.md # Complete config reference
-│   ├── 02-api-complete.md       # Complete API specification
+│   ├── 02-api_reference.md      # Complete API specification
 │   ├── 03-binary-format-spec.md # Binary format technical details
 │   ├── 04-rbac-reference.md     # RBAC system reference
 │   └── troubleshooting/         # Troubleshooting guides

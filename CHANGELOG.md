@@ -28,10 +28,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Duplicate Documentation**: Removed 200+ redundant files from archive sections saving 50MB+ disk space
 - **Outdated Content**: Eliminated all SQLite references and updated to reflect binary format (EBF) architecture
 - **Debug and Test Artifacts**: Cleaned up root directory and organized all debug tools in trash directory
+- **Legacy Test Infrastructure**: Moved obsolete dataspace test files and debug utilities to trash
+- **Temporary Files**: Cleaned up backup and temporary files from var directory
 
 ### Fixed
 - **RBAC Authentication**: Resolved permission validation issues preventing admin access to entity endpoints
 - **Dashboard Reliability**: Eliminated dependency-related UI rendering issues and browser compatibility problems
+- **Version Consistency**: Updated all remaining version references to v2.32.0-dev across metrics, swagger, and documentation
+- **Workspace Cleanliness**: Achieved absolute compliance with single source of truth principles
 - **Permission System**: Fixed wildcard permission matching in tag-based RBAC system
 
 ### Removed

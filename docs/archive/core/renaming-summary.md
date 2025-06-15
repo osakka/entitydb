@@ -11,7 +11,7 @@ This major update replaces all "turbo" and buzzword terminology with professiona
 - `TemporalTurboRepository` → `TemporalRepository`
 - All method signatures and references updated
 - File renames:
-  - `turbo_repository.go` → `high_performance_repository.go`
+  - `turbo_repository.go` → `high_performance_repository.go` → `concurrent_repository.go`
   - `temporal_turbo_repository.go` → `temporal_repository.go`
   - `test_turbo.go` → `test_high_performance.go`
 

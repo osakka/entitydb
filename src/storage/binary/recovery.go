@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"entitydb/logger"
 	"entitydb/models"
+	"entitydb/config"
 	"fmt"
 	"io"
 	"os"
@@ -19,15 +20,26 @@ import (
 type RecoveryManager struct {
 	dataPath      string
 	backupPath    string
+	config        *config.Config       // Configuration reference for path resolution
 	attemptCache  map[string]time.Time // Track recent recovery attempts
 	cacheMu       sync.RWMutex         // Protect the cache
 }
 
-// NewRecoveryManager creates a new recovery manager
+// NewRecoveryManager creates a new recovery manager (legacy constructor)
 func NewRecoveryManager(dataPath string) *RecoveryManager {
 	return &RecoveryManager{
 		dataPath:     dataPath,
 		backupPath:   filepath.Join(dataPath, "backups"),
+		attemptCache: make(map[string]time.Time),
+	}
+}
+
+// NewRecoveryManagerWithConfig creates a new recovery manager using configuration
+func NewRecoveryManagerWithConfig(cfg *config.Config) *RecoveryManager {
+	return &RecoveryManager{
+		dataPath:     cfg.DataPath,
+		backupPath:   cfg.BackupFullPath(),
+		config:       cfg,
 		attemptCache: make(map[string]time.Time),
 	}
 }
@@ -64,7 +76,13 @@ func (rm *RecoveryManager) RecoverCorruptedEntity(repo *EntityRepository, entity
 	logger.Info("attempting to recover corrupted entity: %s", entityID)
 	
 	// Try to read from WAL first
-	walPath := filepath.Join(rm.dataPath, "entitydb.wal")
+	var walPath string
+	if rm.config != nil {
+		walPath = rm.config.WALPath()
+	} else {
+		// Fallback for legacy compatibility
+		walPath = filepath.Join(rm.dataPath, "entitydb.wal")
+	}
 	if entity, err := rm.recoverFromWAL(walPath, entityID); err == nil {
 		logger.Info("successfully recovered entity %s from wal", entityID)
 		op.SetMetadata("recovery_source", "wal")
@@ -153,7 +171,13 @@ func (rm *RecoveryManager) recoverFromBackup(entityID string) (*models.Entity, e
 // partialRecovery attempts to recover whatever data is available
 func (rm *RecoveryManager) partialRecovery(repo *EntityRepository, entityID string) (*models.Entity, error) {
 	// Try to read from the data file directly
-	dataFile := filepath.Join(rm.dataPath, "entities.ebf")
+	var dataFile string
+	if rm.config != nil {
+		dataFile = filepath.Join(rm.dataPath, rm.config.DatabaseFilename)
+	} else {
+		// Fallback for legacy compatibility
+		dataFile = filepath.Join(rm.dataPath, "entities.ebf")
+	}
 	file, err := os.Open(dataFile)
 	if err != nil {
 		return nil, err
@@ -295,8 +319,14 @@ func (rm *RecoveryManager) RepairWAL() error {
 	
 	logger.Info("starting wal repair")
 	
-	walPath := filepath.Join(rm.dataPath, "entitydb.wal")
-	backupPath := filepath.Join(rm.dataPath, "entitydb.wal.backup")
+	var walPath string
+	if rm.config != nil {
+		walPath = rm.config.WALPath()
+	} else {
+		// Fallback for legacy compatibility
+		walPath = filepath.Join(rm.dataPath, "entitydb.wal")
+	}
+	backupPath := walPath + ".backup"
 	
 	// Create backup of current WAL
 	if err := rm.copyFile(walPath, backupPath); err != nil {
@@ -312,7 +342,7 @@ func (rm *RecoveryManager) RepairWAL() error {
 	defer file.Close()
 	
 	// Create new WAL
-	newWalPath := filepath.Join(rm.dataPath, "entitydb.wal.new")
+	newWalPath := walPath + ".new"
 	newFile, err := os.Create(newWalPath)
 	if err != nil {
 		op.Fail(err)

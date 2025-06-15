@@ -10,7 +10,7 @@
 
 EntityDB is a revolutionary temporal database platform that stores all data as entities with timestamped tags. Built with a custom binary format (EBF) and Write-Ahead Logging, it provides ACID compliance, time-travel queries, and enterprise-grade RBAC.
 
-> **🆕 NEW in v2.32.0-dev**: Clean vanilla dashboard implementation replacing complex Vue.js framework. Zero external dependencies, 3-core focus areas (Performance, Entities, Users), and fixed RBAC permission validation for maximum reliability and browser compatibility.
+> **🆕 NEW in v2.32.0-dev**: Unified sharded indexing architecture with complete legacy code elimination. Professional documentation restructuring, comprehensive code audit achieving single source of truth compliance, and enhanced version consistency across all components.
 
 > **⚠️ BREAKING CHANGE in v2.29.0**: Authentication architecture has changed. User credentials are now stored directly in the user entity's content field. This change has **NO BACKWARD COMPATIBILITY** - all users must be recreated. See [Authentication Guide](./docs/30-api-reference/02-authentication.md) for details.
 

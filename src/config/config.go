@@ -408,10 +408,10 @@ func Load() *Config {
 		
 		// Application Info
 		AppName:          getEnv("ENTITYDB_APP_NAME", "EntityDB Server"),
-		AppVersion:       getEnv("ENTITYDB_APP_VERSION", "2.31.0"),
+		AppVersion:       getEnv("ENTITYDB_APP_VERSION", "2.32.0-dev"),
 		
 		// File and Path Configuration
-		DatabaseFilename: getEnv("ENTITYDB_DATABASE_FILENAME", "entities.db"),
+		DatabaseFilename: getEnv("ENTITYDB_DATABASE_FILENAME", "entities.ebf"),
 		WALSuffix:        getEnv("ENTITYDB_WAL_SUFFIX", ".wal"),
 		IndexSuffix:      getEnv("ENTITYDB_INDEX_SUFFIX", ".idx"),
 		BackupPath:       getEnv("ENTITYDB_BACKUP_PATH", "./backup"),
