@@ -12,15 +12,15 @@ import (
 
 // TemporalRBACMetricsHandler handles RBAC metrics using temporal data
 type TemporalRBACMetricsHandler struct {
-	entityRepo     models.EntityRepository
-	sessionManager *models.SessionManager
+	entityRepo      models.EntityRepository
+	securityManager *models.SecurityManager
 }
 
 // NewTemporalRBACMetricsHandler creates a new temporal RBAC metrics handler
-func NewTemporalRBACMetricsHandler(entityRepo models.EntityRepository, sessionManager *models.SessionManager) *TemporalRBACMetricsHandler {
+func NewTemporalRBACMetricsHandler(entityRepo models.EntityRepository, securityManager *models.SecurityManager) *TemporalRBACMetricsHandler {
 	return &TemporalRBACMetricsHandler{
-		entityRepo:     entityRepo,
-		sessionManager: sessionManager,
+		entityRepo:      entityRepo,
+		securityManager: securityManager,
 	}
 }
 
@@ -69,8 +69,30 @@ func (h *TemporalRBACMetricsHandler) GetRBACMetricsFromTemporal(w http.ResponseW
 		}
 	}
 	
-	// Get active sessions from session manager
-	activeSessions := h.sessionManager.GetActiveSessions()
+	// Get active sessions from entity repository (tag-based)
+	activeSessionEntities, err := h.entityRepo.ListByTag("type:session")
+	if err != nil {
+		logger.Error("Failed to get session entities: %v", err)
+		activeSessionEntities = []*models.Entity{} // Default to empty list
+	}
+	
+	// Count non-expired sessions
+	activeSessions := 0
+	now := time.Now()
+	for _, sessionEntity := range activeSessionEntities {
+		// Check if session is expired by looking for expires tag
+		for _, tag := range sessionEntity.Tags {
+			if strings.HasPrefix(tag, "expires:") {
+				expiresStr := strings.TrimPrefix(tag, "expires:")
+				if expiresTime, err := time.Parse(time.RFC3339, expiresStr); err == nil {
+					if now.Before(expiresTime) {
+						activeSessions++
+					}
+				}
+				break
+			}
+		}
+	}
 	
 	// Try to get authentication metrics from temporal storage
 	authSuccess := 0

@@ -6,6 +6,7 @@ import (
 	"entitydb/models"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -58,7 +59,7 @@ func (h *DatasetManagementHandler) CreateDataset(w http.ResponseWriter, r *http.
 	}
 
 	// Check hub creation permission
-	if !CheckHubManagementPermission(rbacCtx, "create", "") {
+	if !CheckHubManagementPermission(rbacCtx) {
 		RespondError(w, http.StatusForbidden, "No hub creation permission")
 		return
 	}
@@ -208,7 +209,7 @@ func (h *DatasetManagementHandler) DeleteDataset(w http.ResponseWriter, r *http.
 	}
 
 	// Check hub deletion permission
-	if !CheckHubManagementPermission(rbacCtx, "delete", datasetName) {
+	if !CheckHubManagementPermission(rbacCtx) {
 		RespondError(w, http.StatusForbidden, fmt.Sprintf("No delete permission for hub: %s", datasetName))
 		return
 	}
@@ -326,4 +327,52 @@ func (h *DatasetManagementHandler) entityToDatasetInfo(entity *models.Entity) Da
 	}
 
 	return info
+}
+
+// CheckDatasetPermission checks if a user has permission for a specific dataset
+func CheckDatasetPermission(rbacCtx *RBACContext, datasetName, action string) bool {
+	// Check if user has global dataset permissions or specific dataset permissions
+	requiredPerm := "dataset:" + action
+	globalPerm := "dataset:*"
+	
+	for _, perm := range rbacCtx.Permissions {
+		if perm == requiredPerm || perm == globalPerm || perm == "*" {
+			return true
+		}
+		// Check dataset-specific permissions
+		if perm == "dataset:"+datasetName+":"+action || perm == "dataset:"+datasetName+":*" {
+			return true
+		}
+	}
+	return false
+}
+
+// ParseDatasetTag parses a dataset tag and returns the dataset name
+func ParseDatasetTag(tag string) (string, bool) {
+	if strings.HasPrefix(tag, "dataset:") {
+		datasetName := strings.TrimPrefix(tag, "dataset:")
+		if datasetName != "" && datasetName != "system" {
+			return datasetName, true
+		}
+	}
+	return "", false
+}
+
+// FormatDatasetTag creates a properly formatted dataset tag
+func FormatDatasetTag(datasetName string) string {
+	return "dataset:" + datasetName
+}
+
+// CheckHubManagementPermission checks if user can manage datasets/hubs
+func CheckHubManagementPermission(rbacCtx *RBACContext) bool {
+	requiredPerms := []string{"dataset:manage", "dataset:*", "admin:*", "*"}
+	
+	for _, perm := range rbacCtx.Permissions {
+		for _, required := range requiredPerms {
+			if perm == required {
+				return true
+			}
+		}
+	}
+	return rbacCtx.IsAdmin
 }

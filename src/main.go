@@ -22,7 +22,6 @@ import (
 	"strings"
 	"sync"
 	"syscall"
-	"time"
 	
 	"entitydb/models"
 	"entitydb/storage/binary"
@@ -138,7 +137,6 @@ type EntityDBServer struct {
 	entityRepo       models.EntityRepository
 	relationRepo     models.EntityRelationshipRepository
 	securityManager  *models.SecurityManager
-	sessionManager   *models.SessionManager
 	securityInit     *models.SecurityInitializer
 	users            map[string]*User // Legacy - will be removed
 	mu               sync.RWMutex
@@ -155,7 +153,6 @@ type EntityDBServer struct {
 func NewEntityDBServer(cfg *config.Config) *EntityDBServer {
 	server := &EntityDBServer{
 		users:          make(map[string]*User), // Legacy - will be removed
-		sessionManager: models.NewSessionManager(time.Duration(cfg.SessionTTLHours) * time.Hour),
 		config:         cfg,
 	}
 	return server
@@ -459,7 +456,7 @@ func main() {
 	apiRouter.HandleFunc("/system/metrics", systemMetricsHandler.SystemMetrics).Methods("GET")
 	
 	// RBAC metrics endpoints
-	rbacMetricsHandler := api.NewTemporalRBACMetricsHandler(server.entityRepo, server.sessionManager)
+	rbacMetricsHandler := api.NewTemporalRBACMetricsHandler(server.entityRepo, server.securityManager)
 	// Admin-only detailed metrics
 	apiRouter.HandleFunc("/rbac/metrics", api.RBACMiddleware(server.entityRepo, server.securityManager, api.RBACPermission{Resource: "admin", Action: "view"})(rbacMetricsHandler.GetRBACMetricsFromTemporal)).Methods("GET")
 	// Public basic metrics (no auth required)
@@ -785,8 +782,8 @@ func (s *EntityDBServer) handleAuthStatus(w http.ResponseWriter, r *http.Request
 
 	token = strings.TrimPrefix(token, "Bearer ")
 	
-	session, exists := s.sessionManager.GetSession(token)
-	if !exists {
+	user, err := s.securityManager.ValidateSession(token)
+	if err != nil {
 		w.WriteHeader(http.StatusUnauthorized)
 		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid or expired token"})
 		return
@@ -795,11 +792,10 @@ func (s *EntityDBServer) handleAuthStatus(w http.ResponseWriter, r *http.Request
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"authenticated": true,
-		"expires_at": session.ExpiresAt.Format(time.RFC3339),
 		"user": map[string]interface{}{
-			"id":       session.UserID,
-			"username": session.Username,
-			"roles":    session.Roles,
+			"id":       user.ID,
+			"username": user.Username,
+			"roles":    models.GetTagsByNamespace(user.Entity.Tags, "rbac"),
 		},
 	})
 }

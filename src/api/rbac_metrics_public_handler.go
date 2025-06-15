@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+	"entitydb/logger"
+	"entitydb/models"
 )
 
 // getStringFromContent safely converts byte content to string
@@ -31,8 +33,30 @@ func getStringFromContent(content []byte) string {
 // @Success 200 {object} PublicRBACMetricsResponse
 // @Router /api/v1/rbac/metrics/public [get]
 func (h *TemporalRBACMetricsHandler) GetPublicRBACMetrics(w http.ResponseWriter, r *http.Request) {
-	// Get basic session count
-	activeSessions := h.sessionManager.GetActiveSessions()
+	// Get basic session count (tag-based)
+	activeSessionEntities, err := h.entityRepo.ListByTag("type:session")
+	if err != nil {
+		logger.Error("Failed to get session entities: %v", err)
+		activeSessionEntities = []*models.Entity{} // Default to empty list
+	}
+	
+	// Count non-expired sessions
+	activeSessions := 0
+	now := time.Now()
+	for _, sessionEntity := range activeSessionEntities {
+		// Check if session is expired by looking for expires tag
+		for _, tag := range sessionEntity.Tags {
+			if strings.HasPrefix(tag, "expires:") {
+				expiresStr := strings.TrimPrefix(tag, "expires:")
+				if expiresTime, err := time.Parse(time.RFC3339, expiresStr); err == nil {
+					if now.Before(expiresTime) {
+						activeSessions++
+					}
+				}
+				break
+			}
+		}
+	}
 	
 	// Get authentication events from temporal storage
 	authEventEntities, _ := h.entityRepo.ListByTag("type:auth_event")
