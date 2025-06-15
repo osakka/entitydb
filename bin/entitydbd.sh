@@ -98,7 +98,17 @@ start_server() {
     
     # Load environment
     load_environment
-    
+
+    ###
+    ### TEMPORARY FOR TESTING.
+    ###
+    local -A dbfiles="entities.db  entities.db.idx  entities.db.tmp  entities.ebf  entitydb.wal";
+    local dbf;
+    for dbf in ${dbfiles}; do
+      [ -r "${ENTITYDB_DATA_PATH}/${dbf}" ] && rm -f ${ENTITYDB_DATA_PATH}/${dbf};
+    done;
+    ### END OF TEMPORARY.
+
     # Get configuration values
     PID_FILE=$(get_pid_file)
     LOG_FILE=$(get_log_file)
