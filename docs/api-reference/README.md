@@ -38,15 +38,15 @@ Complete reference documentation for EntityDB's REST API. This section provides 
 - Sorting and pagination options
 - Performance optimization guidelines
 
-### [Dataset and Metrics APIs](./04-datasets-metrics.md)
-**Dataset management and metrics collection**
-- Dataset configuration and multi-tenancy support
-- Comprehensive metrics endpoints documentation
-- Prometheus integration and custom metrics
-- Performance monitoring with v2.31.0 optimizations
-- Application metrics storage and retrieval
+### [Datasets](./05-datasets.md)
+**Dataset management and multi-tenancy**
+- Dataset CRUD operations and lifecycle management
+- Scoped entity operations within datasets  
+- Dataset-level access control and permissions
+- Multi-tenant data organization patterns
+- Dataset migration and archival workflows
 
-### [Examples](./05-examples.md)
+### [Examples](./06-examples.md)
 **Comprehensive code examples**
 - Common use case implementations
 - Language-specific client examples (curl, Python, JavaScript)

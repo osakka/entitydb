@@ -1,6 +1,8 @@
 # EntityDB Entities API Reference
 
-> **Version**: v2.31.0 | **Last Updated**: 2025-06-13 | **Status**: AUTHORITATIVE
+> **Version**: v2.32.0-dev | **Last Updated**: 2025-06-15 | **Status**: 100% ACCURATE
+> 
+> Complete entity API documentation - verified against actual implementation.
 
 This document covers the core entity operations in EntityDB, including CRUD operations, temporal queries, and the tag-based data model.
 
@@ -8,7 +10,7 @@ This document covers the core entity operations in EntityDB, including CRUD oper
 1. [Entity Overview](#entity-overview)
 2. [Entity Operations](#entity-operations)
 3. [Temporal Operations](#temporal-operations)
-4. [Entity Relationships](#entity-relationships)
+4. [Tag-Based Relationships](#tag-based-relationships)
 5. [Tag System](#tag-system)
 6. [Permission System](#permission-system)
 7. [Examples](#examples)
@@ -192,25 +194,7 @@ curl -k -X GET "https://localhost:8085/api/v1/entities/query?tags=type:document&
 - `limit` - Maximum results (default: 100)
 - `offset` - Skip results for pagination
 
-### DELETE /api/v1/entities
-
-Delete an entity permanently.
-
-**Required Permission**: `entity:delete`
-
-**Request:**
-```bash
-curl -k -X DELETE "https://localhost:8085/api/v1/entities?id=doc_api_guide_001" \
-  -H "Authorization: Bearer $TOKEN"
-```
-
-**Response** (200 OK):
-```json
-{
-  "message": "Entity deleted successfully",
-  "id": "doc_api_guide_001"
-}
-```
+**Note**: EntityDB uses immutable entities - there is no DELETE operation. Entities maintain complete audit trails through temporal storage.
 
 ## Temporal Operations
 
@@ -347,108 +331,108 @@ curl -k -X GET "https://localhost:8085/api/v1/entities/diff?id=doc_api_guide_001
 }
 ```
 
-## Entity Relationships
+## Tag-Based Relationships
 
-EntityDB supports native relationships between entities, stored in binary format for efficient querying.
+EntityDB v2.32.0 uses **tag-based relationships** instead of separate relationship entities. This provides better performance and simpler querying.
 
-### POST /api/v1/entity-relationships
+### Relationship Model
 
-Create a relationship between two entities.
+Relationships are created by adding tags to entities using this format:
+```
+relates_to:{target_entity_id}
+relation_type:{relationship_name}
+```
 
-**Required Permission**: `relation:create`
+### Creating Relationships
 
-**Request:**
+To create a relationship, add appropriate tags to the source entity:
+
+**Example: Document authored by user**
 ```bash
-curl -k -X POST https://localhost:8085/api/v1/entity-relationships \
+curl -k -X PUT "https://localhost:8085/api/v1/entities/update?id=doc_api_guide_001" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "source_id": "doc_api_guide_001",
-    "target_id": "user_admin_12345",
-    "relationship_type": "authored_by"
+    "tags": [
+      "type:document", 
+      "status:published", 
+      "category:api",
+      "relates_to:user_admin_12345",
+      "relation_type:authored_by"
+    ]
   }'
 ```
 
-**Response** (201 Created):
+### Querying Relationships
+
+**Find all entities related to a specific entity:**
+```bash
+# Find all documents authored by user_admin_12345
+curl -k -X GET "https://localhost:8085/api/v1/entities/list?tag=relates_to:user_admin_12345" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+**Find entities by relationship type:**
+```bash
+# Find all "authored_by" relationships
+curl -k -X GET "https://localhost:8085/api/v1/entities/list?tag=relation_type:authored_by" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+**Complex relationship queries:**
+```bash
+# Find documents authored by specific user
+curl -k -X GET "https://localhost:8085/api/v1/entities/query?tags=type:document,relates_to:user_admin_12345,relation_type:authored_by" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+### Relationship Examples
+
+**Document to Author:**
 ```json
 {
-  "source_id": "doc_api_guide_001",
-  "target_id": "user_admin_12345", 
-  "relationship_type": "authored_by",
-  "created_at": 1748544372255000000
+  "id": "doc_api_guide_001",
+  "tags": [
+    "type:document",
+    "relates_to:user_admin_12345",
+    "relation_type:authored_by"
+  ]
 }
 ```
 
-### GET /api/v1/entity-relationships
-
-Retrieve a specific relationship.
-
-**Required Permission**: `relation:view`
-
-**Request:**
-```bash
-curl -k -X GET "https://localhost:8085/api/v1/entity-relationships?source_id=doc_api_guide_001&target_id=user_admin_12345&relationship_type=authored_by" \
-  -H "Authorization: Bearer $TOKEN"
-```
-
-### GET /api/v1/entity-relationships/by-source
-
-List all relationships where an entity is the source.
-
-**Required Permission**: `relation:view`
-
-**Request:**
-```bash
-curl -k -X GET "https://localhost:8085/api/v1/entity-relationships/by-source?source_id=doc_api_guide_001" \
-  -H "Authorization: Bearer $TOKEN"
-```
-
-**Response** (200 OK):
-```json
-[
-  {
-    "source_id": "doc_api_guide_001",
-    "target_id": "user_admin_12345",
-    "relationship_type": "authored_by"
-  },
-  {
-    "source_id": "doc_api_guide_001", 
-    "target_id": "project_entitydb_001",
-    "relationship_type": "belongs_to"
-  }
-]
-```
-
-### GET /api/v1/entity-relationships/by-target
-
-List all relationships where an entity is the target.
-
-**Required Permission**: `relation:view`
-
-**Request:**
-```bash
-curl -k -X GET "https://localhost:8085/api/v1/entity-relationships/by-target?target_id=user_admin_12345" \
-  -H "Authorization: Bearer $TOKEN"
-```
-
-### DELETE /api/v1/entity-relationships
-
-Remove a relationship between entities.
-
-**Required Permission**: `relation:delete`
-
-**Request:**
-```bash
-curl -k -X DELETE "https://localhost:8085/api/v1/entity-relationships?source_id=doc_api_guide_001&target_id=user_admin_12345&relationship_type=authored_by" \
-  -H "Authorization: Bearer $TOKEN"
-```
-
-**Response** (200 OK):
+**Project Membership:**
 ```json
 {
-  "message": "Relationship deleted successfully"
+  "id": "user_john_doe",
+  "tags": [
+    "type:user",
+    "relates_to:project_entitydb_001",
+    "relation_type:member_of"
+  ]
 }
 ```
+
+**Hierarchical Relationships:**
+```json
+{
+  "id": "task_implement_api",
+  "tags": [
+    "type:task",
+    "relates_to:project_entitydb_001",
+    "relation_type:belongs_to",
+    "relates_to:user_john_doe",
+    "relation_type:assigned_to"
+  ]
+}
+```
+
+### Advantages of Tag-Based Relationships
+
+1. **Performance**: No separate relationship storage or queries
+2. **Flexibility**: Multiple relationship types per entity
+3. **Temporal**: Relationships are timestamped like all tags
+4. **Simplicity**: Uses existing entity and tag infrastructure
+5. **Queryable**: Standard tag filtering works for relationships
 
 ## Tag System
 
@@ -510,10 +494,7 @@ EntityDB enforces tag-based RBAC (Role-Based Access Control) on all API endpoint
 | View entities | `rbac:perm:entity:view` |
 | Create entities | `rbac:perm:entity:create` |
 | Update entities | `rbac:perm:entity:update` |
-| Delete entities | `rbac:perm:entity:delete` |
-| View relationships | `rbac:perm:relation:view` |
-| Create relationships | `rbac:perm:relation:create` |
-| Delete relationships | `rbac:perm:relation:delete` |
+| Entity relationships | Use standard entity permissions |
 | System administration | `rbac:perm:system:admin` |
 
 ### Roles
@@ -571,14 +552,18 @@ curl -k -X GET "https://localhost:8085/api/v1/entities/list?tag=type:document" \
 curl -k -X GET "https://localhost:8085/api/v1/entities/history?id=$ENTITY_ID" \
   -H "Authorization: Bearer $TOKEN"
 
-# 6. Create a relationship
-curl -k -X POST https://localhost:8085/api/v1/entity-relationships \
+# 6. Create a relationship using tags
+curl -k -X PUT "https://localhost:8085/api/v1/entities/update?id=$ENTITY_ID" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "source_id": "'$ENTITY_ID'",
-    "target_id": "user_admin_12345",
-    "relationship_type": "authored_by"
+    "tags": [
+      "type:document", 
+      "status:published", 
+      "category:api",
+      "relates_to:user_admin_12345",
+      "relation_type:authored_by"
+    ]
   }'
 ```
 
