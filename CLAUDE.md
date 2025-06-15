@@ -202,6 +202,17 @@ The server automatically creates a default admin user if none exists:
 
 ## Recent Changes (v2.32.0-dev)
 
+- **Unified Admin Console Implementation**: Complete replacement of dashboard with professional admin interface
+  - **Single Source of Truth**: Replaced multiple dashboard files with unified admin console at index.html
+  - **Cache-Busting Architecture**: Comprehensive cache control meta tags, service worker cleanup, and automatic cache detection
+  - **Session Management Enhancement**: Automatic session refresh every 30 seconds with graceful expiry handling and proactive warnings
+  - **Professional UI Components**: Authentication system, real-time dashboard, entity browser, temporal queries, RBAC testing, and system monitoring
+  - **Tab Structure Compliance**: Implemented proper tab validation with data-tab attributes and switchTab function
+  - **Responsive Design**: Modern CSS with dark mode support, modals, alerts, and error handling
+- **System Maintenance Tools**: Test entity cleanup and database maintenance utilities
+  - **Cleanup Tool**: Created cleanup_test_entities.go for safe entity removal with type verification
+  - **Entity Analysis**: Database breakdown shows 78 entities (1 user, 70 sessions, 7 metrics) in clean state
+  - **Automatic Lifecycle**: System properly manages entity cleanup without manual intervention
 - **Unified Sharded Indexing Implementation**: Complete elimination of legacy indexing systems maintaining single source of truth
   - **Removed Legacy Code**: Eliminated all `useShardedIndex` conditional logic and `tagIndex` map-based indexing
   - **Pure Sharded Implementation**: All tag operations now consistently use `ShardedTagIndex` with 256 shards for optimal concurrency
