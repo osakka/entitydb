@@ -5,6 +5,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 	
 	"entitydb/logger"
@@ -15,6 +16,8 @@ import (
 type RequestMetricsMiddleware struct {
 	repo       models.EntityRepository
 	workerPool *MetricsWorkerPool
+	lastValues map[string]float64 // Track last values for change detection
+	mu         sync.RWMutex       // Protect lastValues map
 }
 
 // NewRequestMetricsMiddleware creates a new request metrics middleware
@@ -24,6 +27,7 @@ func NewRequestMetricsMiddleware(repo models.EntityRepository) *RequestMetricsMi
 	return &RequestMetricsMiddleware{
 		repo:       repo,
 		workerPool: workerPool,
+		lastValues: make(map[string]float64),
 	}
 }
 
@@ -242,6 +246,30 @@ func (m *RequestMetricsMiddleware) storeMetric(name string, value float64, unit 
 	
 	for _, k := range keys {
 		metricID += "_" + k + "_" + labels[k]
+	}
+	
+	// Check if value has changed using change detection (CRITICAL FIX)
+	m.mu.RLock()
+	lastValue, exists := m.lastValues[metricID]
+	m.mu.RUnlock()
+	
+	// For counters, always increment, but for gauges only store if changed
+	skipStorage := false
+	if unit != "count" && exists && lastValue == value {
+		logger.Trace("Request metric %s unchanged (%.2f), skipping storage", metricID, value)
+		skipStorage = true
+	}
+	
+	if !skipStorage {
+		// Update last value
+		m.mu.Lock()
+		m.lastValues[metricID] = value
+		m.mu.Unlock()
+		
+		logger.Debug("Request metric %s changed from %.2f to %.2f, storing", metricID, lastValue, value)
+	} else {
+		logger.Debug("Skipping unchanged metric: id=%s, value=%.2f", metricID, value)
+		return
 	}
 	
 	logger.Debug("Storing metric: id=%s, value=%.2f", metricID, value)
