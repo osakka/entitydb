@@ -4,20 +4,28 @@ package main
 import (
 	"entitydb/logger"
 	"entitydb/storage/binary"
+	"entitydb/config"
+	"flag"
 	"fmt"
+	"log"
 	"os"
 	"strings"
 )
 
 func main() {
-	logger.Info("=== Analyzing Entity ID Lengths ===")
+	// Initialize configuration system
+	configManager := config.NewConfigManager(nil)
+	configManager.RegisterFlags()
+	flag.Parse()
 	
-	dataDir := "var/"
-	if len(os.Args) > 1 {
-		dataDir = os.Args[1]
+	cfg, err := configManager.Initialize()
+	if err != nil {
+		log.Fatalf("Configuration error: %v", err)
 	}
 	
-	repo, err := binary.NewEntityRepository(dataDir)
+	logger.Info("=== Analyzing Entity ID Lengths ===")
+	
+	repo, err := binary.NewEntityRepositoryWithConfig(cfg)
 	if err != nil {
 		logger.Error("Failed to create repository: %v", err)
 		os.Exit(1)

@@ -35,7 +35,7 @@ func main() {
 
 	// Open repository - this will trigger a complete index rebuild
 	logger.Info("[main] Opening repository to trigger reindex...")
-	repo, err := binary.NewEntityRepository(cfg.DataPath)
+	repo, err := binary.NewEntityRepositoryWithConfig(cfg)
 	if err != nil {
 		log.Fatalf("Failed to open repository: %v", err)
 	}

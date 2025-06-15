@@ -22,7 +22,7 @@ func main() {
 	}
 	
 	// Open repository using configured path
-	repo, err := binary.NewEntityRepository(cfg.DataPath)
+	repo, err := binary.NewEntityRepositoryWithConfig(cfg)
 	if err != nil {
 		log.Fatalf("Failed to open repository: %v", err)
 	}

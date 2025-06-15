@@ -49,7 +49,7 @@ func main() {
 	}
 
 	// Initialize the repository using configured path
-	repo, err := binary.NewEntityRepository(cfg.DataPath)
+	repo, err := binary.NewEntityRepositoryWithConfig(cfg)
 	if err != nil {
 		log.Fatalf("Failed to initialize repository: %v", err)
 	}

@@ -26,7 +26,7 @@ func main() {
 	logger.SetLogLevel("info")
 	
 	// Create repository using configured path
-	repo, err := binary.NewEntityRepository(cfg.DataPath)
+	repo, err := binary.NewEntityRepositoryWithConfig(cfg)
 	if err != nil {
 		logger.Fatalf("Failed to create repository: %v", err)
 	}

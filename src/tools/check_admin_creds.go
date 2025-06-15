@@ -22,7 +22,7 @@ func main() {
 	}
 	
 	// Create a high performance repository using configured path
-	baseRepo, err := binary.NewEntityRepository(cfg.DataPath)
+	baseRepo, err := binary.NewEntityRepositoryWithConfig(cfg)
 	if err != nil {
 		log.Fatalf("Failed to create base repository: %v", err)
 	}

@@ -5,8 +5,10 @@ import (
 	"bufio"
 	"entitydb/logger"
 	"entitydb/storage/binary"
+	"entitydb/config"
 	"flag"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -16,7 +18,7 @@ import (
 
 // CorruptionScanner scans for corrupted entities
 type CorruptionScanner struct {
-	dataPath           string
+	config             *config.Config
 	outputDir          string
 	concurrency        int
 	deepScan           bool
@@ -36,7 +38,7 @@ type CorruptionScanner struct {
 }
 
 // NewCorruptionScanner creates a new corruption scanner
-func NewCorruptionScanner(dataPath, outputDir string, options map[string]bool, concurrency int) (*CorruptionScanner, error) {
+func NewCorruptionScanner(cfg *config.Config, outputDir string, options map[string]bool, concurrency int) (*CorruptionScanner, error) {
 	// Create output directory if needed
 	if err := os.MkdirAll(outputDir, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create output directory: %v", err)
@@ -61,7 +63,7 @@ func NewCorruptionScanner(dataPath, outputDir string, options map[string]bool, c
 	})
 	
 	scanner := &CorruptionScanner{
-		dataPath:          dataPath,
+		config:            cfg,
 		outputDir:         outputDir,
 		concurrency:       concurrency,
 		deepScan:          options["deepScan"],
@@ -84,7 +86,7 @@ func (cs *CorruptionScanner) ScanForCorruption() error {
 	startTime := time.Now()
 	
 	// Create entity repository
-	repo, err := binary.NewEntityRepository(cs.dataPath)
+	repo, err := binary.NewEntityRepositoryWithConfig(cs.config)
 	if err != nil {
 		return fmt.Errorf("failed to create repository: %v", err)
 	}
@@ -120,7 +122,7 @@ func (cs *CorruptionScanner) ScanForCorruption() error {
 	// Write header to report file
 	fmt.Fprintf(reportFile, "EntityDB Corruption Scan Report\n")
 	fmt.Fprintf(reportFile, "Scan Time: %s\n", time.Now().Format(time.RFC3339))
-	fmt.Fprintf(reportFile, "Data Path: %s\n", cs.dataPath)
+	fmt.Fprintf(reportFile, "Data Path: %s\n", cs.config.DataPath)
 	fmt.Fprintf(reportFile, "Options: deepScan=%v, validateAll=%v, repairMode=%v\n\n", 
 		cs.deepScan, cs.validateAll, cs.repairMode)
 	
@@ -358,8 +360,11 @@ func (cs *CorruptionScanner) Close() error {
 }
 
 func main() {
-	// Parse command-line flags
-	dataPath := flag.String("data", "/opt/entitydb/var", "Path to the data directory")
+	// Initialize configuration system
+	configManager := config.NewConfigManager(nil)
+	configManager.RegisterFlags()
+	
+	// Additional tool-specific flags
 	outputDir := flag.String("output", "./corruption_scan", "Directory for scan reports and logs")
 	concurrency := flag.Int("concurrency", 4, "Number of concurrent scan workers")
 	deepScan := flag.Bool("deep", false, "Perform deep scan (more thorough but slower)")
@@ -368,6 +373,11 @@ func main() {
 	verbose := flag.Bool("verbose", false, "Enable verbose output")
 	
 	flag.Parse()
+	
+	cfg, err := configManager.Initialize()
+	if err != nil {
+		log.Fatalf("Configuration error: %v", err)
+	}
 	
 	// Configure logging
 	if *verbose {
@@ -384,7 +394,7 @@ func main() {
 	}
 	
 	// Create scanner
-	scanner, err := NewCorruptionScanner(*dataPath, *outputDir, options, *concurrency)
+	scanner, err := NewCorruptionScanner(cfg, *outputDir, options, *concurrency)
 	if err != nil {
 		fmt.Printf("Error creating scanner: %v\n", err)
 		os.Exit(1)
@@ -392,7 +402,7 @@ func main() {
 	defer scanner.Close()
 	
 	// Perform scan
-	fmt.Printf("Starting corruption scan in %s...\n", *dataPath)
+	fmt.Printf("Starting corruption scan in %s...\n", cfg.DataPath)
 	if err := scanner.ScanForCorruption(); err != nil {
 		fmt.Printf("Scan failed: %v\n", err)
 		os.Exit(1)

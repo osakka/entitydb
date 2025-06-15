@@ -4,20 +4,28 @@ package main
 import (
 	"entitydb/logger"
 	"entitydb/storage/binary"
+	"entitydb/config"
+	"flag"
 	"fmt"
+	"log"
 	"os"
 	"strings"
 )
 
 func main() {
-	logger.Info("=== Analyzing has_credential Relationships ===")
+	// Initialize configuration system
+	configManager := config.NewConfigManager(nil)
+	configManager.RegisterFlags()
+	flag.Parse()
 	
-	dataDir := "var/"
-	if len(os.Args) > 1 {
-		dataDir = os.Args[1]
+	cfg, err := configManager.Initialize()
+	if err != nil {
+		log.Fatalf("Configuration error: %v", err)
 	}
 	
-	repo, err := binary.NewEntityRepository(dataDir)
+	logger.Info("=== Analyzing has_credential Relationships ===")
+	
+	repo, err := binary.NewEntityRepositoryWithConfig(cfg)
 	if err != nil {
 		logger.Error("Failed to create repository: %v", err)
 		os.Exit(1)
