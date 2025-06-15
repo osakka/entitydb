@@ -21,21 +21,29 @@ else
     echo "✅ PASS"
 fi
 
-# Check for Vue conditional classes (only if tabs exist)
-echo -n "Checking for proper Vue conditional templates... "
+# Check for tab implementation (Vue/Alpine or vanilla JS)
+echo -n "Checking for proper tab implementation... "
 TAB_EXISTS=$(grep -c 'tab-content\|activeTab' "$HTML_FILE" 2>/dev/null || echo 0)
 TAB_EXISTS=$(echo "$TAB_EXISTS" | tr -d '\n\r')
 if [ "$TAB_EXISTS" -eq 0 ]; then
-    echo "✅ PASS (No tab structure found - using modern dashboard)"
+    echo "✅ PASS (No tab structure found)"
 else
+    # Check for Vue/Alpine conditional classes
     VUE_COUNT=$(grep -c ':class=.*active.*activeTab' "$HTML_FILE" 2>/dev/null || echo 0)
     VUE_COUNT=$(echo "$VUE_COUNT" | tr -d '\n\r')
-    if [ "$VUE_COUNT" -eq 0 ]; then
-        echo "❌ FAIL"
-        echo "  Tab structure found but no Vue conditional classes!"
-        ERRORS=$((ERRORS + 1))
+    
+    # Check for vanilla JS tab implementation
+    VANILLA_COUNT=$(grep -c 'switchTab\|data-tab=' "$HTML_FILE" 2>/dev/null || echo 0)
+    VANILLA_COUNT=$(echo "$VANILLA_COUNT" | tr -d '\n\r')
+    
+    if [ "$VUE_COUNT" -gt 0 ]; then
+        echo "✅ PASS (Vue/Alpine tab implementation found)"
+    elif [ "$VANILLA_COUNT" -gt 0 ]; then
+        echo "✅ PASS (Vanilla JS tab implementation found)"
     else
-        echo "✅ PASS ($VUE_COUNT tab templates found)"
+        echo "❌ FAIL"
+        echo "  Tab structure found but no proper implementation!"
+        ERRORS=$((ERRORS + 1))
     fi
 fi
 
