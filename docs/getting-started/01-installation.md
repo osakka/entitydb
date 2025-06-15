@@ -110,7 +110,7 @@ curl -X POST http://localhost:8085/api/v1/auth/login \
 
 - [Quick Start Tutorial](./02-quick-start.md) - Learn basic operations
 - [Core Concepts](./03-core-concepts.md) - Understand EntityDB fundamentals
-- [Security Configuration](../50-admin-guides/01-security-configuration.md) - Secure your installation
+- [Security Configuration](../admin-guide/01-security-configuration.md) - Secure your installation
 
 ## Troubleshooting
 
@@ -131,6 +131,6 @@ sudo chown -R $USER:$USER /opt/entitydb/var
 **SSL certificate errors:**
 - Verify certificate paths in configuration
 - Ensure certificates are valid and readable
-- Check [SSL Setup Guide](../70-deployment/03-ssl-setup.md)
+- Check [SSL Setup Guide](../admin-guide/03-ssl-setup.md)
 
-For more issues, see [Troubleshooting Guide](../80-troubleshooting/).
+For more issues, see [Troubleshooting Guide](../reference/troubleshooting/).

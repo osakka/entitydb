@@ -1,4 +1,7 @@
-# EntityDB Architecture Documentation
+# EntityDB Introduction
+
+> **Category**: Getting Started | **Target Audience**: All Users | **Technical Level**: Beginner
+> **Version**: v2.32.0-dev | **Last Updated**: 2025-06-15 | **Status**: AUTHORITATIVE
 
 ## System Overview
 
@@ -306,3 +309,10 @@ EntityDB uses a custom binary format with the following structure:
    - Kubernetes deployment
    - Horizontal pod autoscaling
    - Service mesh integration
+
+## See Also
+
+- [System Specifications](./02-specifications.md) - Technical capabilities and performance characteristics
+- [Requirements](./03-requirements.md) - Hardware and software prerequisites
+- [Architecture Overview](../architecture/01-system-overview.md) - Detailed technical architecture
+- [Quick Start Guide](./02-quick-start.md) - Get started with EntityDB

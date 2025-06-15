@@ -140,10 +140,10 @@ All API responses follow this consistent structure:
 
 ## 🔗 Quick Navigation
 
-- **Getting Started**: [Getting Started](../10-getting-started/) - Basic setup and first API calls
-- **Architecture**: [Architecture](../20-architecture/) - System design and internal workings
-- **User Guides**: [User Guides](../40-user-guides/) - Task-oriented API usage
-- **Troubleshooting**: [Troubleshooting](../80-troubleshooting/) - Common API issues
+- **Getting Started**: [Getting Started](../getting-started/) - Basic setup and first API calls
+- **Architecture**: [Architecture](../architecture/) - System design and internal workings
+- **User Guides**: [User Guides](../user-guide/) - Task-oriented API usage
+- **Troubleshooting**: [Troubleshooting](../reference/troubleshooting/) - Common API issues
 
 ## 📝 API Documentation Tools
 

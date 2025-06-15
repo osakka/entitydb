@@ -103,7 +103,7 @@ EntityDB_BCRYPT_COST=12
 ## Security Notes
 
 1. **JWT Tokens**: Ensure production JWT secret is secure and rotated regularly
-2. **Database**: SQLite database should have proper file permissions (600)
+2. **Database**: Binary storage files should have proper file permissions (600)
 3. **API Access**: All API endpoints require authentication except /health
 4. **Passwords**: All passwords are hashed with bcrypt (cost factor 12)
 

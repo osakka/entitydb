@@ -735,7 +735,7 @@ info:
     url: https://github.com/osakka/entitydb/blob/main/LICENSE
   termsOfService: https://github.com/osakka/entitydb
   title: EntityDB API
-  version: 2.31.0
+  version: 2.32.0-dev
 paths:
   /api/v1/admin/log-level:
     get:

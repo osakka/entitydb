@@ -604,4 +604,4 @@ curl http://localhost:8085/health
 
 ---
 
-*This production deployment guide ensures secure, performant, and maintainable EntityDB installations. For additional security configuration, see [Security Configuration](../50-admin-guides/01-security-configuration.md).*
+*This production deployment guide ensures secure, performant, and maintainable EntityDB installations. For additional security configuration, see [Security Configuration](../admin-guide/01-security-configuration.md).*

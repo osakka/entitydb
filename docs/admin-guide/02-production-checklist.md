@@ -14,7 +14,7 @@
 1. **Entity API**: Fully functional for create, read, list operations
 2. **Authentication**: JWT-based auth with bcrypt password hashing
 3. **Legacy Support**: Old endpoints redirect with deprecation warnings
-4. **Database**: SQLite persistence with entity relationships
+4. **Database**: Custom binary format (EBF) persistence with entity relationships
 5. **CLI Tools**: Modern command-line interface working
 
 ## Recent Test Results

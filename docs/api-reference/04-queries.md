@@ -82,13 +82,13 @@ GET /api/v1/entities/list?namespace=rbac
 | `limit` | Number of results | `20` |
 | `offset` | Pagination offset | `0` |
 
-## SQL Implementation
+## Binary Format Implementation
 
-The queries use SQLite's JSON functions for efficient searching:
+The queries use the custom binary format (EBF) with sharded indexing for efficient searching:
 
-- Tag filtering: JSON extraction and pattern matching
-- Content search: JSON path queries on content arrays
-- Namespace filtering: Prefix pattern matching
+- Tag filtering: Sharded index lookups with O(1) performance within shards
+- Content search: Direct binary format scanning with temporal tag support
+- Namespace filtering: Efficient prefix pattern matching with bloom filters
 
 ## Examples
 
@@ -125,10 +125,10 @@ entities = client.list_entities(wildcard="type:*", search="login")
 
 ## Performance Considerations
 
-1. **SQL-based queries**: All queries now use SQL for better performance
-2. **Index usage**: Tag columns are indexed for faster queries
+1. **Binary format queries**: All queries use the custom binary format with sharded indexing
+2. **Index usage**: Sharded tag indexes provide O(1) lookups within shards  
 3. **Wildcard patterns**: Use specific patterns when possible (e.g., `type:issue` instead of `*:issue`)
-4. **Content search**: Full-text search is performed on JSON values
+4. **Content search**: Direct binary scanning with bloom filter optimization
 
 ## Advanced Query API (Future)
 

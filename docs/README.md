@@ -160,9 +160,13 @@ docs/
 - **Documentation Issues**: [Report documentation problems](https://git.home.arpa/itdlabs/entitydb/issues?labels=documentation)
 
 ### 🤝 Contributing
-- Read the [Contributing Guide](./developer-guide/contributing.md)
-- Follow the [Git Workflow](./developer-guide/git-workflow.md)
-- Review [Code Standards](./developer-guide/code-standards.md)
+- Read the [Contributing Guide](./developer-guide/01-contributing.md)
+- Follow the [Git Workflow](./developer-guide/02-git-workflow.md)
+- Review [Configuration Standards](./developer-guide/05-configuration-alignment-action-plan.md)
+
+### 🔧 Documentation Maintenance
+- [Maintenance Guidelines](./DOCUMENTATION_MAINTENANCE.md) - Complete maintenance standards and processes
+- [Quick Maintenance Checklist](./QUICK_MAINTENANCE_CHECKLIST.md) - Fast reference for common tasks
 
 ### 🔗 External Resources
 - **Source Code**: [EntityDB Repository](https://git.home.arpa/itdlabs/entitydb)

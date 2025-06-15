@@ -252,9 +252,9 @@ To migrate from role-based to tag-based RBAC:
 
 ## Future Enhancements
 
-1. **Persistent Storage**
-   - Move from in-memory to database storage
-   - Support for SQLite/PostgreSQL
+1. **Enhanced Storage**
+   - Advanced entity relationship queries
+   - Optimized temporal permission caching
 
 2. **Advanced Permissions**
    - Conditional permissions

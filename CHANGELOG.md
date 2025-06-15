@@ -10,14 +10,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **Vanilla Dashboard Implementation**: Self-contained HTML/CSS/JavaScript dashboard replacing complex Vue.js framework
 - **Zero-Dependency Operation**: Dashboard operates without external libraries for maximum browser compatibility
-- **Admin Permission Fix Tool**: `fix_admin_perms.go` utility for correcting existing RBAC permission formats
 - **Professional Documentation Structure**: Industry-standard taxonomy and comprehensive master index
+- **Documentation Maintenance Framework**: Complete maintenance guidelines and quick reference checklist
+- **Unified Sharded Indexing**: Single source of truth with 256-shard concurrent indexing architecture
+- **Comprehensive Test Suite**: End-to-end testing framework for all major functionality
 
 ### Changed
 - **UI Architecture**: Replaced Vue.js dashboard with clean vanilla implementation focusing on 3 core areas
 - **Web Root Cleanup**: Removed 60+ complex framework files, keeping only essential components
 - **RBAC Permission Format**: Corrected wildcard format from `rbac:perm:*:*` to `rbac:perm:*` for HasPermission compatibility
 - **Documentation Organization**: Restructured documentation following professional technical writing standards
+- **Legacy Code Elimination**: Removed all conditional legacy indexing code achieving single source of truth
+- **Cross-Reference Standardization**: Fixed 20+ broken internal links and standardized document formats
+
+### Removed
+- **Legacy Indexing System**: Eliminated all `useShardedIndex` conditional logic and legacy `tagIndex` maps
+- **Duplicate Documentation**: Removed 200+ redundant files from archive sections saving 50MB+ disk space
+- **Outdated Content**: Eliminated all SQLite references and updated to reflect binary format (EBF) architecture
+- **Debug and Test Artifacts**: Cleaned up root directory and organized all debug tools in trash directory
 
 ### Fixed
 - **RBAC Authentication**: Resolved permission validation issues preventing admin access to entity endpoints

@@ -270,10 +270,10 @@ EntityDB provides comprehensive metrics:
 
 Now that you understand the core concepts:
 
-1. **[API Reference](../30-api-reference/)** - Learn the complete API
-2. **[User Guides](../40-user-guides/)** - Common tasks and workflows
-3. **[Architecture](../20-architecture/)** - Deep dive into system design
-4. **[Security](../50-admin-guides/01-security-configuration.md)** - Secure your installation
+1. **[API Reference](../api-reference/)** - Learn the complete API
+2. **[User Guides](../user-guide/)** - Common tasks and workflows
+3. **[Architecture](../architecture/)** - Deep dive into system design
+4. **[Security](../admin-guide/01-security-configuration.md)** - Secure your installation
 
 ## Common Patterns
 

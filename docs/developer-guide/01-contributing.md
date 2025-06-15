@@ -6,7 +6,6 @@ Thank you for your interest in contributing to the EntityDB (EntityDB) platform.
 
 ### Prerequisites
 - Go 1.18 or higher
-- SQLite 3
 - Git
 
 ### Setting Up the Development Environment
@@ -52,11 +51,6 @@ Thank you for your interest in contributing to the EntityDB (EntityDB) platform.
 - Use meaningful variable names
 - Add error handling where appropriate
 
-### SQL
-- Use uppercase for SQL keywords
-- Use snake_case for table and column names
-- Include comments for complex queries
-- Organize SQL files in the src/models/sqlite directory
 
 ## Git Workflow
 

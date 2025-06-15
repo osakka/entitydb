@@ -1,6 +1,8 @@
 # EntityDB API Reference
 
-> **Current Version**: v2.32.0-dev  
+> **Category**: API Reference | **Target Audience**: Developers | **Technical Level**: Intermediate
+> **Version**: v2.32.0-dev | **Last Updated**: 2025-06-15 | **Status**: AUTHORITATIVE
+
 > **Base URL**: `https://localhost:8085` (HTTPS enabled by default)  
 > **Content-Type**: `application/json`
 

@@ -156,23 +156,23 @@ All tags are timestamped with nanosecond precision, enabling:
 
 ### Essential Reading
 - [Core Concepts](./03-core-concepts.md) - Understand EntityDB fundamentals
-- [Authentication](../30-api-reference/02-authentication.md) - Session management
-- [Entity API](../30-api-reference/03-entities.md) - Complete API reference
+- [Authentication](../api-reference/02-authentication.md) - Session management
+- [Entity API](../api-reference/03-entities.md) - Complete API reference
 
 ### Architecture Deep-Dive
-- [System Overview](../20-architecture/01-system-overview.md) - High-level architecture
-- [Temporal Storage](../20-architecture/02-temporal-architecture.md) - Time-based features
-- [RBAC System](../20-architecture/03-rbac-architecture.md) - Access control
+- [System Overview](../architecture/01-system-overview.md) - High-level architecture
+- [Temporal Storage](../architecture/02-temporal-architecture.md) - Time-based features
+- [RBAC System](../architecture/03-rbac-architecture.md) - Access control
 
 ### Advanced Features
-- [Temporal Queries](../40-user-guides/01-temporal-queries.md) - Time-travel operations
-- [Advanced Queries](../40-user-guides/04-advanced-queries.md) - Connect entities
+- [Temporal Queries](../user-guide/01-temporal-queries.md) - Time-travel operations
+- [Advanced Queries](../user-guide/04-advanced-queries.md) - Connect entities
 - [Performance Tuning](../performance/performance-optimization-results.md) - Optimize for scale
 
 ### Administration
-- [Production Deployment](../70-deployment/02-production-checklist.md) - Deploy to production
-- [Security Configuration](../50-admin-guides/01-security-configuration.md) - Secure your installation
-- [Deployment Guide](../50-admin-guides/02-deployment-guide.md) - Set up monitoring
+- [Production Deployment](../admin-guide/02-production-checklist.md) - Deploy to production
+- [Security Configuration](../admin-guide/01-security-configuration.md) - Secure your installation
+- [Deployment Guide](../admin-guide/02-deployment-guide.md) - Set up monitoring
 
 ## Troubleshooting
 
@@ -192,7 +192,7 @@ All tags are timestamped with nanosecond precision, enabling:
 
 - **Documentation**: [EntityDB Docs](../README.md)
 - **Issues**: https://git.home.arpa/itdlabs/entitydb/issues
-- **Troubleshooting**: [Common Issues](../80-troubleshooting/README.md)
+- **Troubleshooting**: [Common Issues](../reference/troubleshooting/README.md)
 
 ---
 

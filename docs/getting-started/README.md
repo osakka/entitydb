@@ -36,20 +36,20 @@ Welcome to EntityDB's high-level documentation. This section provides essential 
 1. Start with [Introduction](./01-introduction.md) to understand EntityDB's philosophy
 2. Review [Requirements](./03-requirements.md) to ensure compatibility
 3. Check [Specifications](./02-specifications.md) for performance expectations
-4. Continue to [Getting Started](../10-getting-started/) for hands-on tutorials
+4. Continue to [User Guide](../user-guide/) for hands-on tutorials
 
 ### For Decision Makers
 1. Review [Specifications](./02-specifications.md) for technical capabilities
 2. Assess [Requirements](./03-requirements.md) for infrastructure planning
 3. Read [Introduction](./01-introduction.md) for architectural understanding
-4. Explore [Architecture](../20-architecture/) for deep technical details
+4. Explore [Architecture](../architecture/) for deep technical details
 
 ## 🔗 Quick Navigation
 
-- **Next Steps**: [Getting Started](../10-getting-started/) - Begin using EntityDB
-- **Technical Details**: [Architecture](../20-architecture/) - System design and internals
-- **API Reference**: [API Documentation](../30-api-reference/) - Complete endpoint reference
-- **Installation**: [Getting Started > Installation](../10-getting-started/01-installation.md)
+- **Next Steps**: [User Guide](../user-guide/) - Begin using EntityDB
+- **Technical Details**: [Architecture](../architecture/) - System design and internals
+- **API Reference**: [API Documentation](../api-reference/) - Complete endpoint reference
+- **Installation**: [User Guide > Installation](../user-guide/01-installation.md)
 
 ## 💡 Key Concepts Introduced
 

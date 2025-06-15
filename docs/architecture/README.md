@@ -124,10 +124,10 @@ This section provides comprehensive technical documentation of EntityDB's archit
 
 ## 🔗 Quick Navigation
 
-- **Implementation Guides**: [Developer Guides](../60-developer-guides/) - How to extend EntityDB
-- **API Details**: [API Reference](../30-api-reference/) - Technical API specifications
-- **Deployment**: [Deployment](../70-deployment/) - Production architecture patterns
-- **Performance**: [Admin Guides](../50-admin-guides/) - Operational optimization
+- **Implementation Guides**: [Developer Guides](../developer-guide/) - How to extend EntityDB
+- **API Details**: [API Reference](../api-reference/) - Technical API specifications
+- **Deployment**: [Deployment](../admin-guide/) - Production architecture patterns
+- **Performance**: [Admin Guides](../admin-guide/) - Operational optimization
 
 ## 📊 Architecture Metrics
 

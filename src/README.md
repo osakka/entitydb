@@ -2,17 +2,21 @@
 
 This directory contains the source code for the EntityDB platform. This document provides an overview of the source code structure and development guidelines.
 
-## Latest Changes (v2.31.0)
+## Latest Changes (v2.32.0-dev)
 
-- **Performance Optimization Suite**: Comprehensive improvements across all core systems
-  - Implemented O(1) tag value caching with lazy loading for GetTagValue() operations
-  - Added parallel index building using 4-worker concurrent processing for faster startup
-  - Created JSON encoder/decoder pooling to reduce API response allocations
-  - Built batch write operations with configurable batch sizes for improved throughput
-  - Optimized temporal tag lookups with pre-computed variant caching
-  - Enhanced memory allocation patterns in GetTagsWithoutTimestamp() using strings.LastIndex()
-- **Code Quality Improvements**: Complete build system cleanup and warning elimination
-  - Fixed all go vet warnings including lock copying issues and unused variables
+- **Unified Sharded Indexing**: Single source of truth with complete legacy code elimination
+  - Removed all conditional `useShardedIndex` logic and legacy `tagIndex` map implementations
+  - Achieved pure 256-shard concurrent indexing architecture for optimal performance
+  - Eliminated environment variable dependencies for indexing configuration
+  - Fixed authentication system integration with sharded index session lookups
+- **Documentation Excellence**: Professional restructuring and maintenance framework
+  - Applied industry-standard taxonomy and comprehensive cross-reference standardization
+  - Eliminated 200+ duplicate files and fixed all SQLite references to binary format (EBF)
+  - Created maintenance guidelines and quick reference checklist for sustainable documentation
+- **Codebase Audit and Cleanup**: Comprehensive project organization and single source of truth validation
+  - Moved all debug tools and test artifacts to appropriate locations following clean workspace principles
+  - Updated version consistency across all components (swagger.json, Makefile, documentation)
+  - Verified clean build with zero warnings and proper integration of all fixes
   - Added build tags to tool files to exclude from normal builds
   - Achieved clean build with zero compilation warnings
   - Validated single source of truth with redundant code moved to trash
