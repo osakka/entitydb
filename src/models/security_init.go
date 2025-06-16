@@ -21,8 +21,8 @@ func NewSecurityInitializer(securityManager *SecurityManager, entityRepo EntityR
 	}
 }
 
-// InitializeDefaultSecurityEntities creates the default admin user with pure tag-based RBAC
-func (si *SecurityInitializer) InitializeDefaultSecurityEntities() error {
+// InitializeDefaultSecurityEntities creates the system user and admin user with new UUID-based architecture
+func (si *SecurityInitializer) InitializeDefaultSecurityEntities(adminUsername, adminPassword, adminEmail string) error {
 	// Skip creating dataset entities - using pure tag-based namespacing
 	// Datasets are just tags: dataset:system, dataset:default, etc.
 	logger.Info("Using pure tag-based datasets - no dataset entities needed")
@@ -36,11 +36,23 @@ func (si *SecurityInitializer) InitializeDefaultSecurityEntities() error {
 	// Groups are just tags on users: group:admin, group:user, etc.
 	logger.Info("Using pure tag-based groups - no group entities needed")
 
-	// Create admin user if it doesn't exist (this is the only entity we need)
-	if err := si.createDefaultAdminUser(); err != nil {
+	// Create system user first (root of ownership chain)
+	systemUserManager := NewSystemUserManager(si.entityRepo)
+	if _, err := systemUserManager.InitializeSystemUser(); err != nil {
+		return fmt.Errorf("failed to create system user: %v", err)
+	}
+
+	// Create admin user owned by system user with configurable credentials
+	if _, err := systemUserManager.CreateAdminUser(adminUsername, adminPassword, adminEmail); err != nil {
 		return fmt.Errorf("failed to create admin user: %v", err)
 	}
 
+	// Verify system user integrity
+	if err := systemUserManager.VerifySystemUser(); err != nil {
+		return fmt.Errorf("system user verification failed: %v", err)
+	}
+
+	logger.Info("Successfully initialized UUID-based security system with system user ownership")
 	return nil
 }
 
@@ -245,10 +257,22 @@ func (si *SecurityInitializer) getOrCreateAdminUser() (*SecurityUser, error) {
 	if len(adminEntities) > 0 {
 		// User exists, return the first one
 		logger.Debug("Found existing admin user: %s", adminEntities[0].ID)
+		// Extract username from tags
+		cleanTags := adminEntities[0].GetTagsWithoutTimestamp()
+		var username, email string
+		for _, tag := range cleanTags {
+			if len(tag) > len("identity:username:") && tag[:len("identity:username:")] == "identity:username:" {
+				username = tag[len("identity:username:"):]
+			}
+			if len(tag) > len("profile:email:") && tag[:len("profile:email:")] == "profile:email:" {
+				email = tag[len("profile:email:"):]
+			}
+		}
+		
 		return &SecurityUser{
 			ID:       adminEntities[0].ID,
-			Username: "admin",
-			Email:    "admin@entitydb.local",
+			Username: username,
+			Email:    email,
 			Status:   "active",
 			Entity:   adminEntities[0],
 		}, nil

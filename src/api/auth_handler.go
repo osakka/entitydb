@@ -287,6 +287,7 @@ func (h *AuthHandler) RefreshToken(w http.ResponseWriter, r *http.Request) {
 	
 	// Get current session token from header
 	authHeader := r.Header.Get("Authorization")
+	logger.Info("RefreshToken: Auth header received: '%s'", authHeader)
 	if authHeader == "" {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnauthorized)
@@ -315,30 +316,53 @@ func (h *AuthHandler) RefreshToken(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get user information from the session
+	logger.Info("RefreshToken: Attempting to get user entity for UserID: %s", newSession.UserID)
+	if newSession.UserID == "" {
+		logger.Error("RefreshToken: UserID is empty in refreshed session")
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(AuthErrorResponse{Error: "Session missing user information"})
+		return
+	}
+	
 	userEntity, err := h.securityManager.GetEntityRepo().GetByID(newSession.UserID)
 	if err != nil {
-		logger.Error("failed to get user entity for session: %v", err)
+		logger.Error("failed to get user entity for session (UserID: %s): %v", newSession.UserID, err)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(AuthErrorResponse{Error: "Failed to get user information"})
 		return
 	}
+	logger.Info("RefreshToken: Successfully got user entity with %d tags", len(userEntity.Tags))
 
 	// Extract user information from entity
 	username := ""
 	email := ""
 	var roles []string
 	
-	for _, tag := range userEntity.GetTagsWithoutTimestamp() {
-		if strings.HasPrefix(tag, "username:") {
-			username = strings.TrimPrefix(tag, "username:")
-		} else if strings.HasPrefix(tag, "email:") {
-			email = strings.TrimPrefix(tag, "email:")
+	cleanTags := userEntity.GetTagsWithoutTimestamp()
+	logger.Info("RefreshToken: Clean user entity tags: %v", cleanTags)
+	
+	for _, tag := range cleanTags {
+		if strings.HasPrefix(tag, "identity:username:") {
+			username = strings.TrimPrefix(tag, "identity:username:")
+			logger.Info("RefreshToken: Extracted username: %s", username)
+		} else if strings.HasPrefix(tag, "profile:email:") {
+			email = strings.TrimPrefix(tag, "profile:email:")
+			logger.Info("RefreshToken: Extracted email: %s", email)
 		} else if strings.HasPrefix(tag, "rbac:role:") {
 			role := strings.TrimPrefix(tag, "rbac:role:")
 			roles = append(roles, role)
+			logger.Info("RefreshToken: Extracted role: %s", role)
 		}
 	}
+	
+	// If we didn't extract any user data, there might be an issue with tag format
+	if username == "" && email == "" {
+		logger.Warn("RefreshToken: No user data extracted from %d clean tags. Raw tags: %v", len(cleanTags), cleanTags)
+	}
+	
+	logger.Info("RefreshToken: Final extracted data - Username: %s, Email: %s, Roles: %v", username, email, roles)
 
 	// Create response with refreshed session
 	response := AuthLoginResponse{

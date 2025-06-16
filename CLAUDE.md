@@ -9,7 +9,7 @@
 > This eliminates separate credential entities and relationships. Users with credentials have the `has:credentials` tag.
 > NO BACKWARD COMPATIBILITY - all users must be recreated.
 
-## Current State (v2.32.0-dev)
+## Current State (v2.32.0)
 
 EntityDB now features a unified Entity model with unified sharded indexing:
 - **Unified Entity Model**: Single content field ([]byte) per entity
@@ -38,7 +38,7 @@ EntityDB now features a unified Entity model with unified sharded indexing:
 - **Unified Sharded Indexing (v2.32.0)**: Complete elimination of legacy indexing code with single source of truth using 256-shard concurrent indexing for improved performance and consistency
 - **Professional Documentation Architecture (v2.32.0)**: Complete documentation system overhaul with industry-standard taxonomy, 100% API accuracy verification, and comprehensive maintenance frameworks
 - **Comprehensive Code Audit (v2.32.0)**: Meticulous examination and cleanup achieving absolute compliance with single source of truth and clean workspace principles
-- **Exotic Memory Optimization (v2.32.0)**: Advanced memory management algorithms including zero-copy tag processing, lock-free string interning, adaptive buffer pools with Fibonacci sizing, and ARC caching for 99.5% memory reduction and dramatic performance improvements
+- **Configuration Management Overhaul (v2.32.0)**: Complete three-tier configuration system (Database > CLI flags > Environment variables) eliminating all hardcoded values, configurable admin credentials and system parameters, comprehensive CLI flag coverage with proper naming conventions
 
 ## What's Implemented
 
@@ -168,8 +168,11 @@ make install        # Install scripts
 
 ### Default Admin User
 The server automatically creates a default admin user if none exists:
-- Username: `admin`
-- Password: `admin`
+- Username: configurable via `ENTITYDB_DEFAULT_ADMIN_USERNAME` (default: `admin`)
+- Password: configurable via `ENTITYDB_DEFAULT_ADMIN_PASSWORD` (default: `admin`)
+- Email: configurable via `ENTITYDB_DEFAULT_ADMIN_EMAIL` (default: `admin@entitydb.local`)
+
+⚠️ **Security**: Change these defaults in production environments using environment variables or CLI flags.
 
 ## Tag Namespaces
 
@@ -202,7 +205,7 @@ The server automatically creates a default admin user if none exists:
   - **End-to-End Authentication**: Complete authentication flow now works seamlessly from login through token validation to protected endpoint access
   - **Production Stability**: No more "Invalid or expired token" errors for freshly created sessions, eliminating user authentication disruptions
 
-## Recent Changes (v2.32.0-dev)
+## Recent Changes (v2.32.0)
 
 - **Unified Admin Console Implementation**: Complete replacement of dashboard with professional admin interface
   - **Single Source of Truth**: Replaced multiple dashboard files with unified admin console at index.html
@@ -228,6 +231,13 @@ The server automatically creates a default admin user if none exists:
   - **Modern Structure**: Organized documentation into user-guide, developer-guide, admin-guide, architecture, api-reference, and reference categories
   - **Cross-Reference Integrity**: Maintained all cross-references while improving navigational structure
   - **Professional Standards**: Applied technical writing best practices for clarity and maintainability
+- **Complete Configuration Management Overhaul**: Comprehensive three-tier configuration system eliminating all hardcoded values
+  - **Three-Tier Hierarchy**: Database configuration (highest) > CLI flags (medium) > Environment variables (lowest priority)
+  - **Hardcoded Value Elimination**: All previously hardcoded admin credentials, system user parameters, and bcrypt cost now configurable
+  - **CLI Flag Standardization**: All flags use `--entitydb-*` format with short flags reserved for `-h/--help` and `-v/--version` only
+  - **Security Enhancements**: Configurable admin username, password, email, system user ID, username, and bcrypt cost
+  - **Backward Compatibility**: All defaults maintain existing behavior while allowing production customization
+  - **Production Ready**: Environment variables and CLI flags for secure deployment with proper security warnings
 
 ## Recent Changes (v2.31.0)
 
@@ -560,7 +570,7 @@ All development follows the standardized Git workflow described in [docs/develop
 
 - URL: https://git.home.arpa/itdlabs/entitydb.git
 - Branch: main
-- Latest tag: v2.28.0
+- Latest tag: v2.32.0
 
 ## Development Principles
 

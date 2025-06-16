@@ -1289,7 +1289,7 @@ func (r *EntityRepository) Create(entity *models.Entity) error {
 	r.checkAndPerformCheckpoint()
 	
 	// Track write metrics (skip metric entities to avoid recursion)
-	if storageMetrics != nil && !strings.HasPrefix(entity.ID, "metric_") {
+	if !storageMetricsDisabled && storageMetrics != nil && !strings.HasPrefix(entity.ID, "metric_") {
 		duration := time.Since(startTime)
 		size := int64(len(entity.Content))
 		storageMetrics.TrackWrite("create_entity", size, duration, nil)
@@ -1311,14 +1311,14 @@ func (r *EntityRepository) GetByID(id string) (*models.Entity, error) {
 	if exists {
 		logger.Trace("Found in memory cache: %s", id)
 		// Skip metrics for metric entities to avoid recursion
-		if storageMetrics != nil && !strings.HasPrefix(id, "metric_") {
+		if !storageMetricsDisabled && storageMetrics != nil && !strings.HasPrefix(id, "metric_") {
 			storageMetrics.TrackCacheOperation("entity", true)
 		}
 		return entity, nil
 	}
 	
 	// Cache miss - skip metrics for metric entities to avoid recursion
-	if storageMetrics != nil && !strings.HasPrefix(id, "metric_") {
+	if !storageMetricsDisabled && storageMetrics != nil && !strings.HasPrefix(id, "metric_") {
 		storageMetrics.TrackCacheOperation("entity", false)
 	}
 	
@@ -1372,7 +1372,7 @@ func (r *EntityRepository) GetByID(id string) (*models.Entity, error) {
 		readDuration := time.Since(readStart)
 		
 		// Track read metrics (skip metric entities to avoid recursion)
-		if storageMetrics != nil && !strings.HasPrefix(id, "metric_") {
+		if !storageMetricsDisabled && storageMetrics != nil && !strings.HasPrefix(id, "metric_") {
 			size := int64(0)
 			if entity != nil {
 				size = int64(len(entity.Content))
@@ -1393,7 +1393,7 @@ func (r *EntityRepository) GetByID(id string) (*models.Entity, error) {
 				r.mu.Unlock()
 				
 				// Track overall operation time including recovery
-				if storageMetrics != nil {
+				if !storageMetricsDisabled && storageMetrics != nil {
 					totalDuration := time.Since(startTime)
 					storageMetrics.TrackRead("get_entity_with_recovery", int64(len(recoveredEntity.Content)), totalDuration, nil)
 				}
@@ -1562,7 +1562,7 @@ func (r *EntityRepository) Update(entity *models.Entity) error {
 	r.checkAndPerformCheckpoint()
 	
 	// Track write metrics (skip metric entities to avoid recursion)
-	if storageMetrics != nil && !strings.HasPrefix(entity.ID, "metric_") {
+	if !storageMetricsDisabled && storageMetrics != nil && !strings.HasPrefix(entity.ID, "metric_") {
 		duration := time.Since(startTime)
 		size := int64(len(entity.Content))
 		storageMetrics.TrackWrite("update_entity", size, duration, nil)
@@ -1801,7 +1801,7 @@ func (r *EntityRepository) List() ([]*models.Entity, error) {
 	entities, err := reader.GetAllEntities()
 	
 	// Track read metrics (skip if we're listing metric entities)
-	if storageMetrics != nil {
+	if !storageMetricsDisabled && storageMetrics != nil {
 		// Don't track metrics for metric operations to avoid recursion
 		hasMetricEntities := false
 		if entities != nil {
@@ -1839,7 +1839,7 @@ func (r *EntityRepository) ListByTag(tag string) ([]*models.Entity, error) {
 		entities := cached.([]*models.Entity)
 		
 		// Track cache hit (skip metric-related tags to avoid recursion)
-		if storageMetrics != nil && !strings.HasPrefix(tag, "name:") && !strings.HasPrefix(tag, "type:metric") {
+		if !storageMetricsDisabled && storageMetrics != nil && !strings.HasPrefix(tag, "name:") && !strings.HasPrefix(tag, "type:metric") {
 			storageMetrics.TrackCacheOperation("tag_query", true)
 			// Still track the read with 0 duration since it was from cache
 			totalSize := int64(0)
@@ -1926,7 +1926,7 @@ func (r *EntityRepository) ListByTag(tag string) ([]*models.Entity, error) {
 	logger.Trace("Fetched %d entities", len(entities))
 	
 	// Track metrics (skip metric-related tags to avoid recursion)
-	if storageMetrics != nil && !strings.HasPrefix(tag, "name:") && !strings.HasPrefix(tag, "type:metric") {
+	if !storageMetricsDisabled && storageMetrics != nil && !strings.HasPrefix(tag, "name:") && !strings.HasPrefix(tag, "type:metric") {
 		storageMetrics.TrackCacheOperation("tag_query", false) // Cache miss
 		totalSize := int64(0)
 		if entities != nil {
@@ -2590,10 +2590,54 @@ func (r *EntityRepository) checkAndPerformCheckpoint() {
 	}
 }
 
-// storeCheckpointMetric stores WAL checkpoint metrics
+// storeCheckpointMetric stores WAL checkpoint metrics using async collection
 func (r *EntityRepository) storeCheckpointMetric(status string, duration time.Duration, sizeBefore, sizeAfter int64, reason string) {
-	// Store multiple checkpoint-related metrics
+	// Use async metrics system to prevent deadlocks and use UUIDs
+	if globalAsyncCollector := GetGlobalAsyncCollector(); globalAsyncCollector != nil {
+		// 1. Checkpoint count metric
+		globalAsyncCollector.CollectMetric(
+			fmt.Sprintf("wal_checkpoint_%s_total", status),
+			1.0,
+			"count",
+			fmt.Sprintf("Total WAL checkpoints with status %s", status),
+			map[string]string{
+				"status": status,
+				"reason": reason,
+			},
+		)
+		
+		// 2. Checkpoint duration (only for successful checkpoints)
+		if status == "success" && duration > 0 {
+			globalAsyncCollector.CollectMetric(
+				"wal_checkpoint_duration_ms",
+				float64(duration.Milliseconds()),
+				"milliseconds",
+				"WAL checkpoint duration",
+				map[string]string{
+					"status": status,
+				},
+			)
+			
+			// 3. Size reduction metric
+			if sizeBefore > 0 && sizeAfter >= 0 {
+				reduction := float64(sizeBefore - sizeAfter)
+				globalAsyncCollector.CollectMetric(
+					"wal_checkpoint_size_reduction_bytes",
+					reduction,
+					"bytes",
+					"Bytes freed by WAL checkpoint",
+					map[string]string{
+						"status": status,
+					},
+				)
+			}
+		}
+		
+		logger.Debug("WAL checkpoint metrics queued via async collector: status=%s, duration=%v", status, duration)
+		return
+	}
 	
+	// Fallback: Legacy system (deprecated but maintained for zero regression)
 	// 1. Checkpoint count
 	metricID := fmt.Sprintf("metric_wal_checkpoint_%s_total", status)
 	if entity, err := r.GetByID(metricID); err != nil {

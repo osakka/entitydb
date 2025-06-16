@@ -241,6 +241,8 @@ func DefaultChunkConfig() ChunkConfig {
 // NewEntity creates a new entity with an auto-generated UUID and initialized timestamps.
 // The entity is ready for immediate use with pre-allocated tag storage.
 //
+// DEPRECATED: Use NewEntityWithMandatoryTags instead for new UUID-based architecture.
+//
 // Example:
 //
 //	entity := NewEntity()
@@ -254,6 +256,48 @@ func NewEntity() *Entity {
 		CreatedAt: timestamp,
 		UpdatedAt: timestamp,
 	}
+}
+
+// NewEntityWithMandatoryTags creates a new entity with enforced UUID and mandatory tags.
+// This is the preferred method for creating entities in the new architecture.
+//
+// Parameters:
+//   - entityType: The type of entity (user, session, metric, etc.)
+//   - dataset: The dataset namespace (system, default, etc.)
+//   - createdByUUID: UUID of the user/system creating this entity
+//   - additionalTags: Optional additional tags to include
+//
+// Returns a properly structured entity with:
+//   - Pure UUID as ID (no prefixes)
+//   - All mandatory tags (type, dataset, created_at, created_by, uuid)
+//   - Proper timestamps
+//
+// Example:
+//
+//	entity, err := NewEntityWithMandatoryTags("user", "system", SystemUserID, 
+//	    []string{"identity:username:john", "status:active"})
+func NewEntityWithMandatoryTags(entityType, dataset, createdByUUID string, additionalTags []string) (*Entity, error) {
+	// Generate mandatory tags and UUID
+	mandatoryTags, entityUUID, err := GenerateMandatoryTags(entityType, dataset, createdByUUID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate mandatory tags: %v", err)
+	}
+	
+	// Combine mandatory and additional tags
+	allTags := make([]string, 0, len(mandatoryTags)+len(additionalTags))
+	allTags = append(allTags, mandatoryTags...)
+	allTags = append(allTags, additionalTags...)
+	
+	// Create entity with pure UUID
+	timestamp := Now()
+	entity := &Entity{
+		ID:        entityUUID.Value, // Pure UUID, no prefix
+		Tags:      allTags,
+		CreatedAt: timestamp,
+		UpdatedAt: timestamp,
+	}
+	
+	return entity, nil
 }
 
 // GenerateUUID generates a unique identifier for entities.
@@ -608,5 +652,71 @@ func parseTag(tag string) []string {
 		}
 	}
 	return result
+}
+
+// ValidateEntity performs comprehensive validation on an entity
+// Returns error if the entity doesn't meet the new UUID-based architecture requirements
+func (e *Entity) ValidateEntity() error {
+	// Validate UUID
+	if err := ValidateEntityUUID(e.ID); err != nil {
+		return fmt.Errorf("invalid entity ID: %v", err)
+	}
+	
+	// Validate mandatory tags
+	_, err := ValidateMandatoryTags(e.Tags)
+	if err != nil {
+		return fmt.Errorf("mandatory tag validation failed: %v", err)
+	}
+	
+	return nil
+}
+
+// GetMandatoryTags extracts and validates mandatory tags from the entity
+func (e *Entity) GetMandatoryTags() (*MandatoryTags, error) {
+	return ValidateMandatoryTags(e.Tags)
+}
+
+// IsSystemEntity checks if this entity was created by the system user
+func (e *Entity) IsSystemEntity() bool {
+	mandatory, err := e.GetMandatoryTags()
+	if err != nil {
+		return false
+	}
+	return IsSystemUser(mandatory.CreatedBy)
+}
+
+// GetEntityUUID returns the entity's UUID (same as ID in new architecture)
+func (e *Entity) GetEntityUUID() string {
+	return e.ID
+}
+
+// GetEntityType extracts the entity type from mandatory tags
+func (e *Entity) GetEntityType() string {
+	mandatory, err := e.GetMandatoryTags()
+	if err != nil {
+		// Fallback to legacy method
+		return e.GetTagValue("type")
+	}
+	return mandatory.Type
+}
+
+// GetDataset extracts the dataset from mandatory tags
+func (e *Entity) GetDataset() string {
+	mandatory, err := e.GetMandatoryTags()
+	if err != nil {
+		// Fallback to legacy method
+		return e.GetTagValue("dataset")
+	}
+	return mandatory.Dataset
+}
+
+// GetCreatedBy returns the UUID of the user/system that created this entity
+func (e *Entity) GetCreatedBy() string {
+	mandatory, err := e.GetMandatoryTags()
+	if err != nil {
+		// Fallback to legacy method
+		return e.GetTagValue("created_by")
+	}
+	return mandatory.CreatedBy
 }
 

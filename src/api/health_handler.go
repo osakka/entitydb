@@ -93,10 +93,16 @@ func (h *HealthHandler) Health(w http.ResponseWriter, r *http.Request) {
 		userCount = len(users)
 	}
 	
-	// Get database file size
+	// Get database file size (including WAL and index files)
 	var dbSize int64
-	if stat, err := os.Stat("/opt/entitydb/var/entities.ebf"); err == nil {
-		dbSize = stat.Size()
+	if stat, err := os.Stat("/opt/entitydb/var/entities.db"); err == nil {
+		dbSize += stat.Size()
+	}
+	if stat, err := os.Stat("/opt/entitydb/var/entitydb.wal"); err == nil {
+		dbSize += stat.Size()
+	}
+	if stat, err := os.Stat("/opt/entitydb/var/entities.db.idx"); err == nil {
+		dbSize += stat.Size()
 	}
 	
 	// Get memory stats

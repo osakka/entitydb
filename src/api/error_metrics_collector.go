@@ -3,6 +3,7 @@ package api
 import (
 	"entitydb/logger"
 	"entitydb/models"
+	"entitydb/storage/binary"
 	"fmt"
 	"runtime/debug"
 	"strconv"
@@ -202,9 +203,16 @@ func (c *ErrorMetricsCollector) extractErrorPattern(errorMsg string) string {
 	return pattern
 }
 
-// storeMetric stores a metric value with labels
+// storeMetric stores a metric value with labels using async collection
 func (c *ErrorMetricsCollector) storeMetric(name string, value float64, unit string, description string, labels map[string]string) {
-	// Build metric ID with labels
+	// Route to async metrics system to prevent deadlocks and use UUIDs
+	if globalAsyncCollector := binary.GetGlobalAsyncCollector(); globalAsyncCollector != nil {
+		globalAsyncCollector.CollectMetric(name, value, unit, description, labels)
+		logger.Trace("ErrorMetrics.storeMetric: queued metric %s = %.2f via async collector", name, value)
+		return
+	}
+	
+	// Fallback: Legacy system (deprecated but maintained for zero regression)
 	metricID := "metric_" + name
 	for k, v := range labels {
 		metricID += "_" + k + "_" + v

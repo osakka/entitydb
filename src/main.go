@@ -22,6 +22,7 @@ import (
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 	
 	"entitydb/models"
 	"entitydb/storage/binary"
@@ -76,10 +77,10 @@ import (
 // to help with deployment tracking and support diagnostics.
 var (
 	// Version is the EntityDB version string, typically in semantic versioning format.
-	// Default: "2.31.0" (current development version)
+	// Default: "2.32.0" (current development version)
 	// Build override: -ldflags "-X main.Version=x.y.z"
 	// Used in: version command output, API responses, swagger documentation
-	Version = "2.31.0"
+	Version = "2.32.0"
 	
 	// BuildDate is the date when the binary was compiled.
 	// Default: "unknown" (for development builds)
@@ -217,11 +218,11 @@ func main() {
 	
 	logger.Info("starting entitydb with log level %s", strings.ToUpper(logger.GetLogLevel()))
 
-	// Initialize storage metrics early with nil repository (conditionally)
-	// This allows metrics tracking during repository initialization
+	// Async metrics system - eliminates authentication deadlocks
+	// Initialize early before repository creation for optimal performance
+	var asyncMetricsCollector *binary.AsyncMetricsCollector
 	if cfg.MetricsEnableStorageTracking {
-		binary.InitStorageMetrics(nil)
-		logger.Info("Storage metrics tracking enabled")
+		logger.Info("Initializing async metrics collection system")
 	} else {
 		logger.Info("Storage metrics tracking disabled")
 	}
@@ -244,9 +245,30 @@ func main() {
 	
 	// Relationship repository removed - use pure tag-based relationships
 	
-	// Update storage metrics with initialized repository (conditionally)
+	// Initialize async metrics system after repository is ready
 	if cfg.MetricsEnableStorageTracking {
-		binary.InitStorageMetrics(entityRepo)
+		asyncConfig := binary.DefaultAsyncMetricsConfig()
+		asyncConfig.BufferSize = 5000
+		asyncConfig.WorkerCount = 2
+		asyncConfig.FlushInterval = 30 * time.Second
+		
+		var err error
+		asyncMetricsCollector, err = binary.NewAsyncMetricsCollector(entityRepo, asyncConfig)
+		if err != nil {
+			logger.Warn("Failed to create async metrics collector: %v", err)
+		} else {
+			// Start the async metrics system
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			
+			if err := asyncMetricsCollector.Start(ctx); err != nil {
+				logger.Warn("Failed to start async metrics collector: %v", err)
+			} else {
+				// Initialize storage metrics with async collection
+				binary.InitAsyncStorageMetrics(entityRepo, asyncMetricsCollector)
+				logger.Info("Async metrics collection system started successfully")
+			}
+		}
 	}
 	
 	// Update configuration manager with repository
@@ -388,14 +410,16 @@ func main() {
 	comprehensiveMetricsHandler := api.NewComprehensiveMetricsHandler(server.entityRepo)
 	apiRouter.HandleFunc("/metrics/comprehensive", comprehensiveMetricsHandler.ServeHTTP).Methods("GET")
 	
+	// TEMPORARY FIX: Disable background metrics collector to prevent authentication deadlock
 	// Background metrics collector - designed to handle entities with many temporal tags
 	// The v2.32.0 system with sharded indexing, tag caching, and memory-mapped files
 	// should efficiently handle entities with 100s or 1000s of tags (this is normal for temporal data)
-	logger.Info("Metrics collection interval set to %v", cfg.MetricsInterval)
+	logger.Info("Metrics collection interval set to %v (DISABLED)", cfg.MetricsInterval)
 	
-	backgroundCollector := api.NewBackgroundMetricsCollector(server.entityRepo, cfg.MetricsInterval)
-	backgroundCollector.Start()
-	defer backgroundCollector.Stop()
+	// DISABLED: Background metrics collection temporarily disabled to fix authentication hang
+	// backgroundCollector := api.NewBackgroundMetricsCollector(server.entityRepo, cfg.MetricsInterval)
+	// backgroundCollector.Start()
+	// defer backgroundCollector.Stop()
 	
 	// DISABLED: Metrics retention manager - part of metrics feedback loop
 	/*
@@ -491,11 +515,12 @@ func main() {
 	
 	// Add request metrics middleware (conditionally)
 	var requestMetrics *api.RequestMetricsMiddleware
-	if cfg.MetricsEnableRequestTracking {
+	// TEMPORARY FIX: Disable request metrics to prevent authentication deadlock
+	if false && cfg.MetricsEnableRequestTracking {
 		requestMetrics = api.NewRequestMetricsMiddleware(server.entityRepo)
 		logger.Info("Request metrics tracking enabled")
 	} else {
-		logger.Info("Request metrics tracking disabled")
+		logger.Info("Request metrics tracking disabled (FORCED)")
 	}
 	
 	// Chain middleware together
@@ -612,8 +637,18 @@ func main() {
 func (s *EntityDBServer) initializeEntities() {
 	logger.Info("initializing security system")
 	
-	// Initialize default security entities (roles, permissions, groups)
-	if err := s.securityInit.InitializeDefaultSecurityEntities(); err != nil {
+	// Initialize system user configuration from Config
+	models.InitializeSystemUserConfiguration(s.config.SystemUserID, s.config.SystemUsername)
+	
+	// Initialize bcrypt cost from Config
+	models.SetBcryptCost(s.config.BcryptCost)
+	
+	// Initialize default security entities with configurable admin credentials
+	if err := s.securityInit.InitializeDefaultSecurityEntities(
+		s.config.DefaultAdminUsername,
+		s.config.DefaultAdminPassword,
+		s.config.DefaultAdminEmail,
+	); err != nil {
 		logger.Error("failed to initialize security entities: %v", err)
 		return
 	}
@@ -669,12 +704,51 @@ func (s *EntityDBServer) testCreateEntity(w http.ResponseWriter, r *http.Request
 		return
 	}
 	
-	// Create entity
-	entity := &models.Entity{
-		Tags: req.Tags,
+	// Determine entity type from tags (look for type: tag)
+	entityType := "entity" // default type
+	additionalTags := []string{}
+	
+	for _, tag := range req.Tags {
+		if strings.HasPrefix(tag, "type:") {
+			entityType = strings.TrimPrefix(tag, "type:")
+		} else {
+			// Add non-type tags to additional tags
+			additionalTags = append(additionalTags, tag)
+		}
+	}
+
+	// Determine dataset - default to "default" unless specified in tags
+	dataset := "default"
+	for _, tag := range req.Tags {
+		if strings.HasPrefix(tag, "dataset:") {
+			dataset = strings.TrimPrefix(tag, "dataset:")
+			break
+		}
 	}
 	
-	// Handle content - removed, use standard entity creation endpoint
+	// Create entity using UUID architecture with system user as creator (since this is debugging/testing endpoint)
+	entity, err := models.NewEntityWithMandatoryTags(
+		entityType,                    // entityType
+		dataset,                       // dataset
+		models.SystemUserID,           // createdBy (system user for unauthenticated endpoints)
+		additionalTags,               // additional tags
+	)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to create entity: " + err.Error()})
+		return
+	}
+	
+	// Handle content if provided
+	if req.Content != nil {
+		switch content := req.Content.(type) {
+		case string:
+			entity.Content = []byte(content)
+		case map[string]interface{}, []interface{}:
+			jsonBytes, _ := json.Marshal(content)
+			entity.Content = jsonBytes
+		}
+	}
 	
 	// Create in repository
 	if err := s.entityRepo.Create(entity); err != nil {

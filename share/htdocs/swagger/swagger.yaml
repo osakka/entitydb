@@ -407,6 +407,9 @@ definitions:
       total_gc_pause_ns:
         example: 236206
         type: integer
+      wal_checkpoints:
+        example: 5
+        type: number
     type: object
   api.PublicRBACMetricsResponse:
     properties:
@@ -1386,7 +1389,8 @@ paths:
     post:
       consumes:
       - application/json
-      description: Create a new user entity with authentication credentials
+      description: Create a new user entity with authentication credentials using
+        UUID architecture
       parameters:
       - description: User data
         in: body

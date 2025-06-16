@@ -38,34 +38,67 @@ func (c *MetricsCollector) CollectMetric(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// Generate metric entity ID based on metric name and instance
-	metricID := c.generateMetricID(update.MetricName, update.Instance)
+	// Try to find existing metric entity by searching for name and instance tags
+	var entity *models.Entity
+	var metricID string
 	
-	// Try to get existing metric entity
-	entity, err := c.repo.GetByID(metricID)
-	if err != nil {
-		// Create new metric entity if it doesn't exist
-		entity = &models.Entity{
-			ID: metricID,
-			Tags: []string{
-				"type:metric",
-				fmt.Sprintf("metric:name:%s", update.MetricName),
-				fmt.Sprintf("metric:instance:%s", update.Instance),
-			},
-			Content: c.createMetricContent(update),
+	// Search for existing entity by metric name and instance
+	nameTagEntities, err := c.repo.ListByTag(fmt.Sprintf("metric:name:%s", update.MetricName))
+	var found bool
+	
+	if err == nil {
+		// Look for entity with matching instance
+		for _, e := range nameTagEntities {
+			cleanTags := e.GetTagsWithoutTimestamp()
+			instanceTag := fmt.Sprintf("metric:instance:%s", update.Instance)
+			
+			for _, tag := range cleanTags {
+				if tag == instanceTag {
+					entity = e
+					metricID = e.ID
+					found = true
+					break
+				}
+			}
+			if found {
+				break
+			}
+		}
+	}
+	
+	if !found {
+		// Create new metric entity using UUID architecture
+		additionalTags := []string{
+			fmt.Sprintf("metric:name:%s", update.MetricName),
+			fmt.Sprintf("metric:instance:%s", update.Instance),
 		}
 		
 		// Add label tags
 		for k, v := range update.Labels {
-			entity.Tags = append(entity.Tags, fmt.Sprintf("metric:label:%s:%s", k, v))
+			additionalTags = append(additionalTags, fmt.Sprintf("metric:label:%s:%s", k, v))
 		}
 		
-		if err := c.repo.Create(entity); err != nil {
+		newEntity, err := models.NewEntityWithMandatoryTags(
+			"metric",                    // entityType
+			"system",                    // dataset
+			models.SystemUserID,         // createdBy (system user)
+			additionalTags,             // additional tags
+		)
+		if err != nil {
 			RespondError(w, http.StatusInternalServerError, "Failed to create metric entity: " + err.Error())
 			return
 		}
 		
-		logger.Info("Created new metric entity: %s", metricID)
+		newEntity.Content = c.createMetricContent(update)
+		
+		if err := c.repo.Create(newEntity); err != nil {
+			RespondError(w, http.StatusInternalServerError, "Failed to store metric entity: " + err.Error())
+			return
+		}
+		
+		entity = newEntity
+		metricID = newEntity.ID
+		logger.Info("Created new metric entity with UUID: %s", metricID)
 	}
 	
 	// Add new temporal value tag
@@ -124,11 +157,38 @@ func (c *MetricsCollector) GetMetricHistory(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	
-	metricID := c.generateMetricID(metricName, instance)
-	
-	// Get the metric entity
-	entity, err := c.repo.GetByID(metricID)
+	// Find metric entity by searching for name and instance tags
+	nameTagEntities, err := c.repo.ListByTag(fmt.Sprintf("metric:name:%s", metricName))
 	if err != nil {
+		RespondError(w, http.StatusInternalServerError, "Failed to search for metric")
+		return
+	}
+	
+	var entity *models.Entity
+	var found bool
+	
+	if instance == "" {
+		instance = "default"
+	}
+	
+	// Look for entity with matching instance
+	for _, e := range nameTagEntities {
+		cleanTags := e.GetTagsWithoutTimestamp()
+		instanceTag := fmt.Sprintf("metric:instance:%s", instance)
+		
+		for _, tag := range cleanTags {
+			if tag == instanceTag {
+				entity = e
+				found = true
+				break
+			}
+		}
+		if found {
+			break
+		}
+	}
+	
+	if !found {
 		RespondError(w, http.StatusNotFound, "Metric not found")
 		return
 	}
@@ -205,13 +265,6 @@ func (c *MetricsCollector) GetCurrentMetrics(w http.ResponseWriter, r *http.Requ
 }
 
 // Helper functions
-
-func (c *MetricsCollector) generateMetricID(metricName, instance string) string {
-	if instance == "" {
-		instance = "default"
-	}
-	return fmt.Sprintf("metric_%s_%s", metricName, instance)
-}
 
 func (c *MetricsCollector) createMetricContent(update MetricUpdate) []byte {
 	content := map[string]interface{}{

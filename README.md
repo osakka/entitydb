@@ -2,7 +2,7 @@
 
 > A high-performance temporal database where every tag is timestamped with nanosecond precision
 
-[![Version](https://img.shields.io/badge/version-v2.32.0--dev-blue)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-v2.32.0-blue)](./CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
 [![Documentation](https://img.shields.io/badge/docs-comprehensive-brightgreen)](./docs)
 [![API Coverage](https://img.shields.io/badge/API%20docs-100%25%20accurate-success)](./docs/api-reference)
@@ -11,7 +11,7 @@
 
 EntityDB is a revolutionary temporal database platform that stores all data as entities with timestamped tags. Built with a custom binary format (EBF) and Write-Ahead Logging, it provides ACID compliance, time-travel queries, and enterprise-grade RBAC.
 
-> **🆕 NEW in v2.32.0-dev**: Unified sharded indexing architecture with complete legacy code elimination, professional documentation overhaul with 100% API accuracy verification, comprehensive code audit achieving single source of truth compliance, and pristine workspace management.
+> **🆕 NEW in v2.32.0**: Complete configuration management overhaul with three-tier hierarchy (Database > CLI flags > Environment), elimination of all hardcoded values, configurable admin credentials and system parameters, comprehensive CLI flag coverage, unified sharded indexing architecture, and professional documentation system with 100% API accuracy verification.
 
 > **⚠️ BREAKING CHANGE in v2.29.0**: Authentication architecture has changed. User credentials are now stored directly in the user entity's content field. This change has **NO BACKWARD COMPATIBILITY** - all users must be recreated. See [Authentication Guide](./docs/30-api-reference/02-authentication.md) for details.
 

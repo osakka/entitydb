@@ -176,17 +176,53 @@ func (h *EntityHandler) CreateEntity(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Create entity with the new model
-	entity := &models.Entity{
-		ID:        req.ID,
-		Tags:      []string{},
-		CreatedAt: models.Now(),
-		UpdatedAt: models.Now(),
+	// Get RBAC context to determine creator
+	rbacCtx, ok := GetRBACContext(r)
+	if !ok {
+		RespondError(w, http.StatusUnauthorized, "Authentication required")
+		return
 	}
 
-	// Add tags with timestamps 
+	// Determine entity type from tags (look for type: tag)
+	entityType := "entity" // default type
+	additionalTags := []string{}
+	
 	for _, tag := range req.Tags {
-		entity.AddTag(tag)
+		if strings.HasPrefix(tag, "type:") {
+			entityType = strings.TrimPrefix(tag, "type:")
+		} else {
+			// Add non-type tags to additional tags
+			additionalTags = append(additionalTags, tag)
+		}
+	}
+
+	// Determine dataset - default to "default" unless specified in tags
+	dataset := "default"
+	for _, tag := range req.Tags {
+		if strings.HasPrefix(tag, "dataset:") {
+			dataset = strings.TrimPrefix(tag, "dataset:")
+			break
+		}
+	}
+
+	// Create entity using UUID architecture with mandatory tags
+	entity, err := models.NewEntityWithMandatoryTags(
+		entityType,                // entityType
+		dataset,                   // dataset
+		rbacCtx.User.ID,          // createdBy (current authenticated user)
+		additionalTags,           // additional tags (excluding type: and dataset: which are handled automatically)
+	)
+	if err != nil {
+		logger.Error("Failed to create entity with UUID architecture: %v", err)
+		RespondError(w, http.StatusInternalServerError, "Failed to create entity")
+		return
+	}
+
+	// If a specific ID was requested, use it (but preserve UUID generation for system integrity)
+	if req.ID != "" {
+		// Note: In UUID architecture, IDs are auto-generated for integrity
+		// We log the requested ID but use the generated UUID
+		logger.Info("Requested entity ID '%s' overridden with generated UUID: %s", req.ID, entity.ID)
 	}
 
 	// Handle content if provided
@@ -267,7 +303,7 @@ func (h *EntityHandler) CreateEntity(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Save entity
-	err := h.repo.Create(entity)
+	err = h.repo.Create(entity)
 	if err != nil {
 		logger.Error("failed to create entity %s: %v", entity.ID, err)
 		TrackHTTPError("entity_handler.CreateEntity", http.StatusInternalServerError, err)
@@ -787,12 +823,34 @@ func (h *EntityHandler) TestCreateEntity(w http.ResponseWriter, r *http.Request)
 	description, hasDesc := reqData["description"].(string)
 	tagsInterface, hasTags := reqData["tags"].([]interface{})
 
-	// Create entity
-	entity := &models.Entity{
-		ID:        models.GenerateUUID(),
-		Tags:      []string{},
-		CreatedAt: models.Now(),
-		UpdatedAt: models.Now(),
+	// Determine entity type from tags (look for type: tag)
+	entityType := "entity" // default type
+	additionalTags := []string{}
+	
+	// Process tags to find type and other tags
+	if hasTags {
+		for _, tagInterface := range tagsInterface {
+			if tagStr, ok := tagInterface.(string); ok {
+				if strings.HasPrefix(tagStr, "type:") {
+					entityType = strings.TrimPrefix(tagStr, "type:")
+				} else {
+					additionalTags = append(additionalTags, tagStr)
+				}
+			}
+		}
+	}
+
+	// Create entity using UUID architecture with system user as creator (since this is unauthenticated test endpoint)
+	entity, err := models.NewEntityWithMandatoryTags(
+		entityType,                    // entityType
+		"default",                     // dataset (default for test entities)
+		models.SystemUserID,           // createdBy (system user for unauthenticated endpoints)
+		additionalTags,               // additional tags
+	)
+	if err != nil {
+		logger.Error("Failed to create test entity with UUID architecture: %v", err)
+		RespondError(w, http.StatusInternalServerError, "Failed to create entity")
+		return
 	}
 
 	// Handle title/description format
@@ -806,32 +864,39 @@ func (h *EntityHandler) TestCreateEntity(w http.ResponseWriter, r *http.Request)
 		entity.Content = jsonData
 		entity.AddTag("content:type:json")
 		
-		// Process tags
+		// Add any additional tags that weren't processed during entity creation
 		if hasTags {
 			for _, tagInterface := range tagsInterface {
 				if tagStr, ok := tagInterface.(string); ok {
-					parts := strings.SplitN(tagStr, ":", 2)
-					if len(parts) == 2 {
-						entity.AddTagWithValue(parts[0], parts[1])
-					} else {
-						entity.AddTagWithValue("tag", tagStr)
+					// Skip type: tags since they were already processed
+					if !strings.HasPrefix(tagStr, "type:") {
+						parts := strings.SplitN(tagStr, ":", 2)
+						if len(parts) == 2 {
+							entity.AddTagWithValue(parts[0], parts[1])
+						} else {
+							entity.AddTagWithValue("tag", tagStr)
+						}
 					}
 				}
 			}
 		}
 	} else {
 		// Handle CreateEntityRequest format
+		// Note: In UUID architecture, IDs are auto-generated for integrity
 		if reqID, ok := reqData["id"].(string); ok && reqID != "" {
-			entity.ID = reqID
+			logger.Info("Requested entity ID '%s' overridden with generated UUID: %s", reqID, entity.ID)
 		}
 
-		// Process tags
+		// Add any additional tags that weren't processed during entity creation
 		if hasTags {
 			for _, tagInterface := range tagsInterface {
 				if tagStr, ok := tagInterface.(string); ok {
-					parts := strings.SplitN(tagStr, "=", 2)
-					if len(parts) == 2 {
-						entity.AddTagWithValue(parts[0], parts[1])
+					// Skip type: tags since they were already processed
+					if !strings.HasPrefix(tagStr, "type:") {
+						parts := strings.SplitN(tagStr, "=", 2)
+						if len(parts) == 2 {
+							entity.AddTagWithValue(parts[0], parts[1])
+						}
 					}
 				}
 			}
@@ -857,13 +922,8 @@ func (h *EntityHandler) TestCreateEntity(w http.ResponseWriter, r *http.Request)
 			}
 		}
 	}
-
-	// If we have no tags or content, add some defaults
-	if len(entity.Tags) == 0 {
-		entity.AddTagWithValue("type", "default")
-		entity.AddTagWithValue("status", "new")
-	}
 	
+	// If no content was provided, add default content
 	if len(entity.Content) == 0 {
 		defaultContent := map[string]string{"text": "Default content"}
 		jsonData, _ := json.Marshal(defaultContent)
@@ -872,7 +932,7 @@ func (h *EntityHandler) TestCreateEntity(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Actually save to database
-	err := h.repo.Create(entity)
+	err = h.repo.Create(entity)
 	if err != nil {
 		logger.Warn("failed to save entity to database: %v", err)
 		// Continue execution to support tests
@@ -906,15 +966,35 @@ func (h *EntityHandler) SimpleCreateEntity(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// Create the entity ID with timestamp
-	entityID := "entity_" + strings.ReplaceAll(strings.ReplaceAll(time.Now().Format(time.RFC3339Nano), ":", ""), ".", "")
+	// Determine entity type from tags (look for type: tag)
+	entityType := "issue" // default type for simple entities
+	additionalTags := []string{}
+	
+	// Process tags to find type and other tags
+	if len(req.Tags) > 0 {
+		for _, tag := range req.Tags {
+			if strings.HasPrefix(tag, "type:") {
+				entityType = strings.TrimPrefix(tag, "type:")
+			} else {
+				additionalTags = append(additionalTags, tag)
+			}
+		}
+	} else {
+		// Add default tags if none provided
+		additionalTags = []string{"status:pending", "area:backend"}
+	}
 
-	// Create entity
-	entity := &models.Entity{
-		ID:        entityID,
-		Tags:      []string{},
-		CreatedAt: models.Now(),
-		UpdatedAt: models.Now(),
+	// Create entity using UUID architecture with system user as creator (since this is unauthenticated simple endpoint)
+	entity, err := models.NewEntityWithMandatoryTags(
+		entityType,                    // entityType (default: issue)
+		"default",                     // dataset (default for simple entities)
+		models.SystemUserID,           // createdBy (system user for unauthenticated endpoints)
+		additionalTags,               // additional tags
+	)
+	if err != nil {
+		logger.Error("Failed to create simple entity with UUID architecture: %v", err)
+		RespondError(w, http.StatusInternalServerError, "Failed to create entity")
+		return
 	}
 
 	// Add title and description as content
@@ -926,25 +1006,8 @@ func (h *EntityHandler) SimpleCreateEntity(w http.ResponseWriter, r *http.Reques
 	entity.Content = jsonData
 	entity.AddTag("content:type:json")
 
-	// Add tags
-	if len(req.Tags) > 0 {
-		for _, tag := range req.Tags {
-			parts := strings.SplitN(tag, ":", 2)
-			if len(parts) == 2 {
-				entity.AddTagWithValue(parts[0], parts[1])
-			} else {
-				entity.AddTagWithValue("tag", tag)
-			}
-		}
-	} else {
-		// Add default tags
-		entity.AddTagWithValue("type", "issue")
-		entity.AddTagWithValue("status", "pending")
-		entity.AddTagWithValue("area", "backend")
-	}
-
 	// Actually save to database
-	err := h.repo.Create(entity)
+	err = h.repo.Create(entity)
 	if err != nil {
 		logger.Warn("failed to save simple entity to database: %v", err)
 		// Continue execution to support tests

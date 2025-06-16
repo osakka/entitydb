@@ -76,6 +76,7 @@ type PerformanceMetrics struct {
 	StorageWriteDuration float64 `json:"storage_write_duration_ms" example:"5.8"`
 	QueryExecutionTime  float64 `json:"query_execution_time_ms" example:"2.1"`
 	ErrorCount          float64 `json:"error_count" example:"0"`
+	WALCheckpoints      float64 `json:"wal_checkpoints" example:"5"`
 }
 
 // DetailedMemoryMetrics contains comprehensive memory usage information
@@ -226,13 +227,15 @@ func (h *SystemMetricsHandler) SystemMetrics(w http.ResponseWriter, r *http.Requ
 	var memStats runtime.MemStats
 	runtime.ReadMemStats(&memStats)
 	
-	// Performance metrics from collected data
-	httpDuration := h.getLatestMetricValue("metric_http_request_duration_ms")
-	httpTotal := h.getLatestMetricValue("metric_http_requests_total")
-	storageRead := h.getLatestMetricValue("metric_storage_read_duration_ms")
-	storageWrite := h.getLatestMetricValue("metric_storage_write_duration_ms")
-	queryTime := h.getLatestMetricValue("metric_query_execution_time_ms")
-	errorCount := h.getLatestMetricValue("metric_error_count")
+	// Performance metrics from async metrics system
+	asyncReader := NewAsyncMetricsReader(h.entityRepo)
+	httpDuration := asyncReader.GetMetricValue("http_request_duration_ms")
+	httpTotal := asyncReader.GetMetricValue("http_requests_total")
+	storageRead := asyncReader.GetMetricValue("storage_read_duration_ms")
+	storageWrite := asyncReader.GetMetricValue("storage_write_duration_ms")
+	queryTime := asyncReader.GetMetricValue("query_execution_time_ms")
+	errorCount := asyncReader.GetMetricValue("error_count")
+	walCheckpoints := asyncReader.GetMetricValue("wal_checkpoint_success_total")
 	
 	perfMetrics := PerformanceMetrics{
 		GCRuns:              memStats.NumGC,
@@ -247,6 +250,7 @@ func (h *SystemMetricsHandler) SystemMetrics(w http.ResponseWriter, r *http.Requ
 		StorageWriteDuration: storageWrite,
 		QueryExecutionTime:  queryTime,
 		ErrorCount:          errorCount,
+		WALCheckpoints:      walCheckpoints,
 	}
 	
 	// Memory metrics

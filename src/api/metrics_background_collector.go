@@ -217,33 +217,46 @@ func (b *BackgroundMetricsCollector) storeMetric(name string, value float64, uni
 	
 	logger.Debug("Metric %s changed from %.2f to %.2f, storing", name, lastValue, value)
 	
-	// CRITICAL FIX: Use single metric entity instead of creating thousands of measurement entities
-	// This prevents database bloat and follows the proper metrics pattern
-	metricID := fmt.Sprintf("metric_%s", name)
+	// Create metric entity using UUID architecture with system user ownership
+	additionalTags := []string{
+		fmt.Sprintf("name:%s", name),
+		fmt.Sprintf("unit:%s", unit),
+		fmt.Sprintf("description:%s", description),
+		"retention:count:100", // Keep last 100 values
+		"retention:period:3600", // Keep for 1 hour
+	}
 	
-	// Get or create the metric entity
-	metricEntity, err := b.repo.GetByID(metricID)
-	if err != nil {
-		// Create metric entity if it doesn't exist
-		metricEntity = &models.Entity{
-			ID: metricID,
-			Tags: []string{
-				"type:metric",
-				"dataset:system",
-				fmt.Sprintf("name:%s", name),
-				fmt.Sprintf("unit:%s", unit),
-				fmt.Sprintf("description:%s", description),
-				"retention:count:100", // Keep last 100 values
-				"retention:period:3600", // Keep for 1 hour
-			},
-			Content: []byte{}, // Empty content - all data in tags
-		}
-		
-		if err := b.repo.Create(metricEntity); err != nil {
-			logger.Error("Failed to create metric entity %s: %v", metricID, err)
+	// Try to find existing metric entity first by searching for name tag
+	existingEntities, err := b.repo.ListByTag(fmt.Sprintf("name:%s", name))
+	var metricEntity *models.Entity
+	var metricID string
+	
+	if err == nil && len(existingEntities) > 0 {
+		// Use existing metric entity
+		metricEntity = existingEntities[0]
+		metricID = metricEntity.ID
+		logger.Trace("Found existing metric entity: %s for metric %s", metricID, name)
+	} else {
+		// Create new metric entity using UUID architecture
+		newEntity, err := models.NewEntityWithMandatoryTags(
+			"metric",                    // entityType
+			"system",                    // dataset
+			models.SystemUserID,         // createdBy (system user)
+			additionalTags,             // additional tags
+		)
+		if err != nil {
+			logger.Error("Failed to create metric entity for %s: %v", name, err)
 			return
 		}
-		logger.Debug("Created metric entity: %s", metricID)
+		
+		if err := b.repo.Create(newEntity); err != nil {
+			logger.Error("Failed to store metric entity %s: %v", newEntity.ID, err)
+			return
+		}
+		
+		metricEntity = newEntity
+		metricID = newEntity.ID
+		logger.Debug("Created metric entity with UUID: %s for metric %s", metricID, name)
 	}
 	
 	// Add temporal value tag (similar to request metrics middleware)
@@ -253,6 +266,5 @@ func (b *BackgroundMetricsCollector) storeMetric(name string, value float64, uni
 		return
 	}
 	
-	// No need for separate metric definition entities - the main metric entity serves this purpose
-	logger.Trace("Stored metric %s with value: %.2f %s", metricID, value, unit)
+	logger.Trace("Stored metric %s with value: %.2f %s (entity: %s)", name, value, unit, metricID)
 }

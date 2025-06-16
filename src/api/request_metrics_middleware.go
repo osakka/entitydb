@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
 	"sort"
 	"strconv"
@@ -234,10 +235,10 @@ func (m *RequestMetricsMiddleware) storeRequestMetrics(method, path string, stat
 
 // storeMetric stores a metric value with labels
 func (m *RequestMetricsMiddleware) storeMetric(name string, value float64, unit string, description string, labels map[string]string) {
-	// Build metric ID with labels in sorted order for consistency
-	metricID := "metric_" + name
+	// Build metric identifier with labels in sorted order for consistent lookup
+	metricKey := name
 	
-	// Sort label keys for consistent ID generation
+	// Sort label keys for consistent key generation
 	var keys []string
 	for k := range labels {
 		keys = append(keys, k)
@@ -245,74 +246,117 @@ func (m *RequestMetricsMiddleware) storeMetric(name string, value float64, unit 
 	sort.Strings(keys)
 	
 	for _, k := range keys {
-		metricID += "_" + k + "_" + labels[k]
+		metricKey += "_" + k + "_" + labels[k]
 	}
 	
 	// Check if value has changed using change detection (CRITICAL FIX)
 	m.mu.RLock()
-	lastValue, exists := m.lastValues[metricID]
+	lastValue, exists := m.lastValues[metricKey]
 	m.mu.RUnlock()
 	
 	// For counters, always increment, but for gauges only store if changed
 	skipStorage := false
 	if unit != "count" && exists && lastValue == value {
-		logger.Trace("Request metric %s unchanged (%.2f), skipping storage", metricID, value)
+		logger.Trace("Request metric %s unchanged (%.2f), skipping storage", metricKey, value)
 		skipStorage = true
 	}
 	
 	if !skipStorage {
 		// Update last value
 		m.mu.Lock()
-		m.lastValues[metricID] = value
+		m.lastValues[metricKey] = value
 		m.mu.Unlock()
 		
-		logger.Debug("Request metric %s changed from %.2f to %.2f, storing", metricID, lastValue, value)
+		logger.Debug("Request metric %s changed from %.2f to %.2f, storing", metricKey, lastValue, value)
 	} else {
-		logger.Debug("Skipping unchanged metric: id=%s, value=%.2f", metricID, value)
+		logger.Debug("Skipping unchanged metric: key=%s, value=%.2f", metricKey, value)
 		return
 	}
 	
-	logger.Debug("Storing metric: id=%s, value=%.2f", metricID, value)
+	// Try to find existing metric entity by searching for name and label tags
+	searchTags := []string{
+		"name:" + name,
+		"type:metric",
+	}
+	for k, v := range labels {
+		searchTags = append(searchTags, "label:"+k+":"+v)
+	}
 	
-	// Check if metric exists
-	entity, err := m.repo.GetByID(metricID)
-	if err != nil {
-		// Create new metric entity
-		tags := []string{
-			"type:metric",
-			"dataset:system",
+	var metricEntity *models.Entity
+	var metricID string
+	
+	// Search for existing entity by name tag (simplified approach)
+	nameTagEntities, err := m.repo.ListByTag(fmt.Sprintf("name:%s", name))
+	var found bool
+	
+	if err == nil {
+		// Look for entity with matching labels
+		for _, entity := range nameTagEntities {
+			cleanTags := entity.GetTagsWithoutTimestamp()
+			matches := 0
+			required := len(labels) + 1 // +1 for type:metric
+			
+			for _, tag := range cleanTags {
+				if tag == "type:metric" {
+					matches++
+				}
+				for k, v := range labels {
+					if tag == "label:"+k+":"+v {
+						matches++
+					}
+				}
+			}
+			
+			if matches == required {
+				metricEntity = entity
+				metricID = entity.ID
+				found = true
+				logger.Trace("Found existing metric entity: %s for metric %s", metricID, metricKey)
+				break
+			}
+		}
+	}
+	
+	if !found {
+		// Create new metric entity using UUID architecture
+		additionalTags := []string{
 			"name:" + name,
 			"unit:" + unit,
 			"description:" + description,
+			"retention:count:1000", // Keep request metrics for high volume
+			"retention:period:3600", // Keep for 1 hour
 		}
 		
 		// Add label tags
 		for k, v := range labels {
-			tags = append(tags, "label:"+k+":"+v)
+			additionalTags = append(additionalTags, "label:"+k+":"+v)
 		}
 		
-		// Don't add static value tag - we'll use AddTag for temporal values
-		// tags = append(tags, "value:"+strconv.FormatFloat(value, 'f', 2, 64))
-		
-		// Retention: keep request metrics for 1 hour with 1000 data points max
-		tags = append(tags, "retention:count:1000", "retention:period:3600")
-		
-		newEntity := &models.Entity{
-			ID:      metricID,
-			Tags:    tags,
-			Content: []byte{},
+		newEntity, err := models.NewEntityWithMandatoryTags(
+			"metric",                    // entityType
+			"system",                    // dataset
+			models.SystemUserID,         // createdBy (system user)
+			additionalTags,             // additional tags
+		)
+		if err != nil {
+			logger.Error("Failed to create request metric entity for %s: %v", metricKey, err)
+			return
 		}
 		
 		if err := m.repo.Create(newEntity); err != nil {
-			logger.Error("Failed to create request metric %s: %v", metricID, err)
+			logger.Error("Failed to store request metric entity %s: %v", newEntity.ID, err)
 			// Don't return - entity might already exist, continue to add temporal value
 		}
+		
+		metricEntity = newEntity
+		metricID = newEntity.ID
+		logger.Debug("Created request metric entity with UUID: %s for metric %s", metricID, metricKey)
 	} else {
 		// Entity exists - for counters, we need to increment the current value
 		if unit == "count" {
-			// Get current value
+			// Get current value from most recent value tag
 			currentValue := 0.0
-			for _, tag := range entity.GetTagsWithoutTimestamp() {
+			for _, tag := range metricEntity.GetTagsWithoutTimestamp() {
 				if strings.HasPrefix(tag, "value:") {
 					if val, err := strconv.ParseFloat(strings.TrimPrefix(tag, "value:"), 64); err == nil {
 						currentValue = val
@@ -324,13 +368,13 @@ func (m *RequestMetricsMiddleware) storeMetric(name string, value float64, unit 
 		}
 	}
 	
-	// CRITICAL FIX: Only add temporal value tag if not skipping storage due to change detection
-	if !skipStorage {
-		valueTag := "value:" + strconv.FormatFloat(value, 'f', 2, 64)
-		if err := m.repo.AddTag(metricID, valueTag); err != nil {
-			logger.Error("Failed to update request metric %s: %v", metricID, err)
-		}
+	// Add temporal value tag
+	valueTag := "value:" + strconv.FormatFloat(value, 'f', 2, 64)
+	if err := m.repo.AddTag(metricID, valueTag); err != nil {
+		logger.Error("Failed to update request metric %s: %v", metricID, err)
 	}
+	
+	logger.Trace("Stored request metric %s with value: %.2f %s (entity: %s)", metricKey, value, unit, metricID)
 }
 // Shutdown gracefully stops the metrics worker pool
 func (m *RequestMetricsMiddleware) Shutdown() {

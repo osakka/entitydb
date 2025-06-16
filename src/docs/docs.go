@@ -1097,7 +1097,7 @@ const docTemplate = `{
         },
         "/api/v1/users/create": {
             "post": {
-                "description": "Create a new user entity with authentication credentials",
+                "description": "Create a new user entity with authentication credentials using UUID architecture",
                 "consumes": [
                     "application/json"
                 ],
@@ -1805,6 +1805,10 @@ const docTemplate = `{
                 "total_gc_pause_ns": {
                     "type": "integer",
                     "example": 236206
+                },
+                "wal_checkpoints": {
+                    "type": "number",
+                    "example": 5
                 }
             }
         },

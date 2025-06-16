@@ -48,7 +48,7 @@ type CreateUserRequest struct {
 
 // CreateUser handles user creation as an entity
 // @Summary Create a new user
-// @Description Create a new user entity with authentication credentials
+// @Description Create a new user entity with authentication credentials using UUID architecture
 // @Tags users
 // @Accept json
 // @Produce json
@@ -75,72 +75,37 @@ func (h *UserHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Hash password with bcrypt
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	// Set default email if not provided
+	email := req.Email
+	if email == "" {
+		email = req.Username + "@entitydb.local"
+	}
+
+	// Use SecurityManager to create user with proper UUID architecture
+	securityManager := models.NewSecurityManager(h.entityRepo)
+	securityUser, err := securityManager.CreateUser(req.Username, req.Password, email)
 	if err != nil {
-		RespondError(w, http.StatusInternalServerError, "Failed to hash password")
-		return
-	}
-	passwordHash := string(hashedPassword)
-
-	// Create user as entity
-	tags := []string{
-		"type:user",
-		"dataset:system",
-		"id:username:" + req.Username,
-		"status:active",
-		"rbac:role:" + getRole(req.Role),
-	}
-	
-	// Add default permissions based on role
-	if getRole(req.Role) == "admin" {
-		tags = append(tags, "rbac:perm:*")
-	} else if getRole(req.Role) == "user" {
-		// Regular users get basic permissions
-		tags = append(tags, 
-			"rbac:perm:entity:view",
-			"rbac:perm:entity:create",
-			"rbac:perm:entity:update",
-			"rbac:perm:entity:delete",
-		)
-	}
-
-	// Create content
-	contentData := map[string]string{
-		"username":     req.Username,
-		"email":        req.Email,
-		"full_name":    req.FullName,
-		"password_hash": passwordHash,
-		"created_at":   models.NowString(),
-	}
-	jsonData, _ := json.Marshal(contentData)
-
-	// Create entity
-	entity := &models.Entity{
-		ID:        "user_" + req.Username,
-		Tags:      append(tags, "content:type:json"),
-		Content:   jsonData,
-		CreatedAt: models.Now(),
-		UpdatedAt: models.Now(),
-	}
-
-	// Save to repository
-	if err := h.entityRepo.Create(entity); err != nil {
+		// Check for specific error types
+		if strings.Contains(err.Error(), "already exists") {
+			RespondError(w, http.StatusConflict, fmt.Sprintf("User '%s' already exists", req.Username))
+			return
+		}
+		logger.Error("Failed to create user via SecurityManager: %v", err)
 		RespondError(w, http.StatusInternalServerError, "Failed to create user")
 		return
 	}
 
-	// Return created entity (without password hash)
-	// For the new model, we need to redact the password hash in the JSON content
+	// Return the created user entity (make a copy to avoid modifying the stored entity)
+	entity := *securityUser.Entity // Create a copy
+	
+	// Redact password hash from content for security (only in the response, not in storage)
 	if len(entity.Content) > 0 {
-		var contentData map[string]string
-		if err := json.Unmarshal(entity.Content, &contentData); err == nil {
-			contentData["password_hash"] = "[REDACTED]"
-			jsonData, _ := json.Marshal(contentData)
-			entity.Content = jsonData
-		}
+		// For UUID architecture, credentials are stored as salt|hash in content
+		// We'll replace the content with a secure placeholder for the API response
+		entity.Content = []byte("[CREDENTIALS_REDACTED]")
 	}
 
+	logger.Info("Successfully created user via API: %s (UUID: %s)", req.Username, securityUser.ID)
 	RespondJSON(w, http.StatusCreated, entity)
 }
 

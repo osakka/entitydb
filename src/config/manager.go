@@ -224,6 +224,24 @@ func (cm *ConfigManager) RegisterFlags() {
 	flag.StringVar(&cm.config.TraceSubsystems, "entitydb-trace-subsystems", cm.config.TraceSubsystems,
 		"Comma-separated list of trace subsystems to enable")
 
+	// Default Admin User Configuration - all long flags
+	flag.StringVar(&cm.config.DefaultAdminUsername, "entitydb-default-admin-username", cm.config.DefaultAdminUsername,
+		"Default admin username")
+	flag.StringVar(&cm.config.DefaultAdminPassword, "entitydb-default-admin-password", cm.config.DefaultAdminPassword,
+		"Default admin password")
+	flag.StringVar(&cm.config.DefaultAdminEmail, "entitydb-default-admin-email", cm.config.DefaultAdminEmail,
+		"Default admin email address")
+	
+	// System User Configuration - all long flags
+	flag.StringVar(&cm.config.SystemUserID, "entitydb-system-user-id", cm.config.SystemUserID,
+		"System user UUID (immutable)")
+	flag.StringVar(&cm.config.SystemUsername, "entitydb-system-username", cm.config.SystemUsername,
+		"System username")
+	
+	// Advanced Security Configuration - all long flags
+	flag.IntVar(&cm.config.BcryptCost, "entitydb-bcrypt-cost", cm.config.BcryptCost,
+		"Bcrypt cost for password hashing (4-31)")
+
 	// Essential short flags only
 	flag.Bool("v", false, "Show version information")
 	flag.Bool("version", false, "Show version information")
@@ -312,6 +330,26 @@ func (cm *ConfigManager) applyFlags() {
 		// Trace Configuration
 		case "entitydb-trace-subsystems":
 			cm.config.TraceSubsystems = f.Value.String()
+		
+		// Default Admin User Configuration
+		case "entitydb-default-admin-username":
+			cm.config.DefaultAdminUsername = f.Value.String()
+		case "entitydb-default-admin-password":
+			cm.config.DefaultAdminPassword = f.Value.String()
+		case "entitydb-default-admin-email":
+			cm.config.DefaultAdminEmail = f.Value.String()
+		
+		// System User Configuration
+		case "entitydb-system-user-id":
+			cm.config.SystemUserID = f.Value.String()
+		case "entitydb-system-username":
+			cm.config.SystemUsername = f.Value.String()
+		
+		// Advanced Security Configuration
+		case "entitydb-bcrypt-cost":
+			if v, err := strconv.Atoi(f.Value.String()); err == nil {
+				cm.config.BcryptCost = v
+			}
 		}
 	})
 }

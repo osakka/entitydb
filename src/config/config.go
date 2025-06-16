@@ -254,6 +254,52 @@ type Config struct {
 	// Should match build version for consistency
 	AppVersion string
 	
+	// Default Admin User Configuration
+	// ================================
+	
+	// DefaultAdminUsername is the username for the default admin user.
+	// Environment: ENTITYDB_DEFAULT_ADMIN_USERNAME
+	// Default: "admin"
+	// Security: Change in production environments
+	DefaultAdminUsername string
+	
+	// DefaultAdminPassword is the password for the default admin user.
+	// Environment: ENTITYDB_DEFAULT_ADMIN_PASSWORD
+	// Default: "admin"
+	// Security: MUST be changed in production environments
+	DefaultAdminPassword string
+	
+	// DefaultAdminEmail is the email address for the default admin user.
+	// Environment: ENTITYDB_DEFAULT_ADMIN_EMAIL
+	// Default: "admin@entitydb.local"
+	// Used for admin notifications and account identification
+	DefaultAdminEmail string
+	
+	// System User Configuration
+	// =========================
+	
+	// SystemUserID is the immutable UUID for the system user.
+	// Environment: ENTITYDB_SYSTEM_USER_ID
+	// Default: "00000000000000000000000000000001"
+	// Warning: Changing this in existing databases requires migration
+	SystemUserID string
+	
+	// SystemUsername is the username for the system user.
+	// Environment: ENTITYDB_SYSTEM_USERNAME
+	// Default: "system"
+	// Used in identity tags and system operations
+	SystemUsername string
+	
+	// Advanced Security Configuration
+	// ===============================
+	
+	// BcryptCost is the computational cost for bcrypt password hashing.
+	// Environment: ENTITYDB_BCRYPT_COST
+	// Default: 10 (bcrypt.DefaultCost)
+	// Valid range: 4-31 (higher = more secure but slower)
+	// Recommendation: 10-12 for most applications
+	BcryptCost int
+	
 	// File and Path Configuration
 	// ===========================
 	
@@ -408,7 +454,19 @@ func Load() *Config {
 		
 		// Application Info
 		AppName:          getEnv("ENTITYDB_APP_NAME", "EntityDB Server"),
-		AppVersion:       getEnv("ENTITYDB_APP_VERSION", "2.32.0-dev"),
+		AppVersion:       getEnv("ENTITYDB_APP_VERSION", "2.32.0"),
+		
+		// Default Admin User Configuration
+		DefaultAdminUsername: getEnv("ENTITYDB_DEFAULT_ADMIN_USERNAME", "admin"),
+		DefaultAdminPassword: getEnv("ENTITYDB_DEFAULT_ADMIN_PASSWORD", "admin"),
+		DefaultAdminEmail:    getEnv("ENTITYDB_DEFAULT_ADMIN_EMAIL", "admin@entitydb.local"),
+		
+		// System User Configuration
+		SystemUserID:    getEnv("ENTITYDB_SYSTEM_USER_ID", "00000000000000000000000000000001"),
+		SystemUsername:  getEnv("ENTITYDB_SYSTEM_USERNAME", "system"),
+		
+		// Advanced Security Configuration
+		BcryptCost:      getEnvInt("ENTITYDB_BCRYPT_COST", 10),
 		
 		// File and Path Configuration
 		DatabaseFilename: getEnv("ENTITYDB_DATABASE_FILENAME", "entities.ebf"),
