@@ -459,17 +459,29 @@ func (sm *SecurityManager) HasPermissionInDataset(user *SecurityUser, resource, 
 		}
 	}
 	
-	// Check for specific permissions via rbac:perm: tags
-	requiredPerm := fmt.Sprintf("rbac:perm:%s:%s", resource, action)
-	wildcardResource := fmt.Sprintf("rbac:perm:%s:*", resource)
-	wildcardAction := fmt.Sprintf("rbac:perm:*:%s", action)
-	wildcardAll := "rbac:perm:*:*"
-	
-	logger.Debug("HasPermissionInDataset: checking for permission tags: %s, %s, %s, %s", requiredPerm, wildcardResource, wildcardAction, wildcardAll)
-	
+	// Modern permission checking - v2.32.0+ format
+	// Check for admin wildcard permission (grants all access)
 	for _, tag := range userTags {
-		if tag == requiredPerm || tag == wildcardResource || tag == wildcardAction || tag == wildcardAll {
-			logger.Debug("HasPermissionInDataset: found matching permission tag: %s", tag)
+		if tag == "rbac:perm:*" {
+			logger.Debug("HasPermissionInDataset: user %s has wildcard permission, granting access", user.ID)
+			return true, nil
+		}
+	}
+	
+	// Check for specific permission
+	requiredPerm := fmt.Sprintf("rbac:perm:%s:%s", resource, action)
+	for _, tag := range userTags {
+		if tag == requiredPerm {
+			logger.Debug("HasPermissionInDataset: found specific permission tag: %s", tag)
+			return true, nil
+		}
+	}
+	
+	// Check for resource wildcard (e.g., rbac:perm:entity:*)
+	resourceWildcard := fmt.Sprintf("rbac:perm:%s:*", resource)
+	for _, tag := range userTags {
+		if tag == resourceWildcard {
+			logger.Debug("HasPermissionInDataset: found resource wildcard permission: %s", tag)
 			return true, nil
 		}
 	}

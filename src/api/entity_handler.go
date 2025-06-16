@@ -176,8 +176,8 @@ func (h *EntityHandler) CreateEntity(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get RBAC context to determine creator
-	rbacCtx, ok := GetRBACContext(r)
+	// Get security context to determine creator (v2.32.0+ modern RBAC)
+	securityCtx, ok := GetSecurityContext(r)
 	if !ok {
 		RespondError(w, http.StatusUnauthorized, "Authentication required")
 		return
@@ -209,7 +209,7 @@ func (h *EntityHandler) CreateEntity(w http.ResponseWriter, r *http.Request) {
 	entity, err := models.NewEntityWithMandatoryTags(
 		entityType,                // entityType
 		dataset,                   // dataset
-		rbacCtx.User.ID,          // createdBy (current authenticated user)
+		securityCtx.User.ID,      // createdBy (current authenticated user)
 		additionalTags,           // additional tags (excluding type: and dataset: which are handled automatically)
 	)
 	if err != nil {

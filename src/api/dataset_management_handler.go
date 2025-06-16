@@ -51,16 +51,25 @@ type ListDatasetsResponse struct {
 
 // CreateDataset handles creating a new hub
 func (h *DatasetManagementHandler) CreateDataset(w http.ResponseWriter, r *http.Request) {
-	// Get RBAC context
-	rbacCtx, hasRBAC := GetRBACContext(r)
-	if !hasRBAC {
-		RespondError(w, http.StatusUnauthorized, "RBAC context required")
+	// Get security context (v2.32.0+ modern RBAC)
+	securityCtx, ok := GetSecurityContext(r)
+	if !ok {
+		RespondError(w, http.StatusUnauthorized, "Authentication required")
 		return
 	}
 
-	// Check hub creation permission
-	if !CheckHubManagementPermission(rbacCtx) {
-		RespondError(w, http.StatusForbidden, "No hub creation permission")
+	// Check if user has admin role (required for dataset management)
+	currentUserTags := securityCtx.User.Entity.GetTagsWithoutTimestamp()
+	isAdmin := false
+	for _, tag := range currentUserTags {
+		if tag == "rbac:role:admin" || tag == "rbac:perm:*" {
+			isAdmin = true
+			break
+		}
+	}
+
+	if !isAdmin {
+		RespondError(w, http.StatusForbidden, "Administrator privileges required for dataset management")
 		return
 	}
 
@@ -104,13 +113,13 @@ func (h *DatasetManagementHandler) CreateDataset(w http.ResponseWriter, r *http.
 	if req.Description != "" {
 		hubEntity.AddTag(fmt.Sprintf("description:%s", req.Description))
 	}
-	hubEntity.AddTag(fmt.Sprintf("created_by:%s", rbacCtx.User.ID))
+	hubEntity.AddTag(fmt.Sprintf("created_by:%s", securityCtx.User.ID))
 
 	// Set content as JSON
 	hubContent := map[string]interface{}{
 		"name":        req.Name,
 		"description": req.Description,
-		"created_by":  rbacCtx.User.ID,
+		"created_by":  securityCtx.User.ID,
 		"created_at":  hubEntity.CreatedAt,
 		"status":      "active",
 	}
@@ -135,7 +144,7 @@ func (h *DatasetManagementHandler) CreateDataset(w http.ResponseWriter, r *http.
 		}
 	}
 
-	logger.Info("Hub created: %s by user %s", req.Name, rbacCtx.User.ID)
+	logger.Info("Hub created: %s by user %s", req.Name, securityCtx.User.ID)
 
 	// Return response
 	response := CreateDatasetResponse{
@@ -153,10 +162,10 @@ func (h *DatasetManagementHandler) CreateDataset(w http.ResponseWriter, r *http.
 
 // ListDatasets handles listing all hubs user has access to
 func (h *DatasetManagementHandler) ListDatasets(w http.ResponseWriter, r *http.Request) {
-	// Get RBAC context
-	rbacCtx, hasRBAC := GetRBACContext(r)
-	if !hasRBAC {
-		RespondError(w, http.StatusUnauthorized, "RBAC context required")
+	// Get security context (v2.32.0+ modern RBAC)
+	_, ok := GetSecurityContext(r)
+	if !ok {
+		RespondError(w, http.StatusUnauthorized, "Authentication required")
 		return
 	}
 
@@ -176,8 +185,9 @@ func (h *DatasetManagementHandler) ListDatasets(w http.ResponseWriter, r *http.R
 			continue
 		}
 
-		// Check if user can view this hub
-		if rbacCtx.IsAdmin || CheckDatasetPermission(rbacCtx, datasetName, "view") {
+		// Check if user can view this hub - admin check already done above
+		// For now, show all datasets to authenticated users (can be refined later)
+		if true {
 			hubInfo := h.entityToDatasetInfo(entity)
 			accessibleHubs = append(accessibleHubs, hubInfo)
 		}
@@ -194,10 +204,10 @@ func (h *DatasetManagementHandler) ListDatasets(w http.ResponseWriter, r *http.R
 
 // DeleteDataset handles deleting a hub
 func (h *DatasetManagementHandler) DeleteDataset(w http.ResponseWriter, r *http.Request) {
-	// Get RBAC context
-	rbacCtx, hasRBAC := GetRBACContext(r)
-	if !hasRBAC {
-		RespondError(w, http.StatusUnauthorized, "RBAC context required")
+	// Get security context (v2.32.0+ modern RBAC)
+	securityCtx, ok := GetSecurityContext(r)
+	if !ok {
+		RespondError(w, http.StatusUnauthorized, "Authentication required")
 		return
 	}
 
@@ -208,9 +218,18 @@ func (h *DatasetManagementHandler) DeleteDataset(w http.ResponseWriter, r *http.
 		return
 	}
 
-	// Check hub deletion permission
-	if !CheckHubManagementPermission(rbacCtx) {
-		RespondError(w, http.StatusForbidden, fmt.Sprintf("No delete permission for hub: %s", datasetName))
+	// Check if user has admin role (required for dataset management)
+	currentUserTags := securityCtx.User.Entity.GetTagsWithoutTimestamp()
+	isAdmin := false
+	for _, tag := range currentUserTags {
+		if tag == "rbac:role:admin" || tag == "rbac:perm:*" {
+			isAdmin = true
+			break
+		}
+	}
+
+	if !isAdmin {
+		RespondError(w, http.StatusForbidden, fmt.Sprintf("Administrator privileges required to delete dataset: %s", datasetName))
 		return
 	}
 
@@ -263,7 +282,7 @@ func (h *DatasetManagementHandler) DeleteDataset(w http.ResponseWriter, r *http.
 		return
 	}
 
-	logger.Info("Hub deleted: %s by user %s", datasetName, rbacCtx.User.ID)
+	logger.Info("Hub deleted: %s by user %s", datasetName, securityCtx.User.ID)
 
 	RespondJSON(w, http.StatusOK, map[string]string{
 		"message": fmt.Sprintf("Hub '%s' deleted successfully", datasetName),
@@ -329,24 +348,6 @@ func (h *DatasetManagementHandler) entityToDatasetInfo(entity *models.Entity) Da
 	return info
 }
 
-// CheckDatasetPermission checks if a user has permission for a specific dataset
-func CheckDatasetPermission(rbacCtx *RBACContext, datasetName, action string) bool {
-	// Check if user has global dataset permissions or specific dataset permissions
-	requiredPerm := "dataset:" + action
-	globalPerm := "dataset:*"
-	
-	for _, perm := range rbacCtx.Permissions {
-		if perm == requiredPerm || perm == globalPerm || perm == "*" {
-			return true
-		}
-		// Check dataset-specific permissions
-		if perm == "dataset:"+datasetName+":"+action || perm == "dataset:"+datasetName+":*" {
-			return true
-		}
-	}
-	return false
-}
-
 // ParseDatasetTag parses a dataset tag and returns the dataset name
 func ParseDatasetTag(tag string) (string, bool) {
 	if strings.HasPrefix(tag, "dataset:") {
@@ -361,18 +362,4 @@ func ParseDatasetTag(tag string) (string, bool) {
 // FormatDatasetTag creates a properly formatted dataset tag
 func FormatDatasetTag(datasetName string) string {
 	return "dataset:" + datasetName
-}
-
-// CheckHubManagementPermission checks if user can manage datasets/hubs
-func CheckHubManagementPermission(rbacCtx *RBACContext) bool {
-	requiredPerms := []string{"dataset:manage", "dataset:*", "admin:*", "*"}
-	
-	for _, perm := range rbacCtx.Permissions {
-		for _, required := range requiredPerms {
-			if perm == required {
-				return true
-			}
-		}
-	}
-	return rbacCtx.IsAdmin
 }

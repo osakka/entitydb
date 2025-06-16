@@ -137,32 +137,50 @@ func (h *UserHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
-	// Get RBAC context to verify identity
-	rbacCtx, ok := GetRBACContext(r)
+	// Get security context to verify identity (v2.32.0+ modern RBAC)
+	securityCtx, ok := GetSecurityContext(r)
 	if !ok {
 		RespondError(w, http.StatusUnauthorized, "Authentication required")
 		return
 	}
 	
 	// Extract username from current user
-	userID := rbacCtx.User.ID
-	userEntity := rbacCtx.User
+	userEntity := securityCtx.User.Entity
 	
 	// For normal users, verify they're changing their own password
-	requestUserEntityID := "user_" + req.Username
-	if !rbacCtx.IsAdmin && userID != requestUserEntityID {
+	// In v2.32.0+, we need to validate by username from the SecurityContext
+	currentUserTags := securityCtx.User.Entity.GetTagsWithoutTimestamp()
+	var currentUsername string
+	for _, tag := range currentUserTags {
+		if strings.HasPrefix(tag, "identity:username:") {
+			currentUsername = strings.TrimPrefix(tag, "identity:username:")
+			break
+		}
+	}
+	
+	// Check if user has admin role
+	isAdmin := false
+	for _, tag := range currentUserTags {
+		if tag == "rbac:role:admin" || tag == "rbac:perm:*" {
+			isAdmin = true
+			break
+		}
+	}
+	
+	if !isAdmin && currentUsername != req.Username {
 		RespondError(w, http.StatusForbidden, "You can only change your own password")
 		return
 	}
 	
 	// If admin is changing someone else's password, get that user's entity
-	if rbacCtx.IsAdmin && userID != requestUserEntityID {
-		fetchedEntity, err := h.entityRepo.GetByID(requestUserEntityID)
-		if err != nil {
+	if isAdmin && currentUsername != req.Username {
+		// Find user by username tag
+		userEntities, err := h.entityRepo.ListByTag("identity:username:" + req.Username)
+		if err != nil || len(userEntities) == 0 {
 			RespondError(w, http.StatusNotFound, "User not found")
 			return
 		}
-		userEntity = fetchedEntity
+		userEntity = userEntities[0]
 	}
 	
 	// Parse user data from content
@@ -246,15 +264,25 @@ func (h *UserHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
-	// Get RBAC context to verify admin rights
-	rbacCtx, ok := GetRBACContext(r)
+	// Get security context to verify admin rights (v2.32.0+ modern RBAC)
+	securityCtx, ok := GetSecurityContext(r)
 	if !ok {
 		RespondError(w, http.StatusUnauthorized, "Authentication required")
 		return
 	}
 	
+	// Check if user has admin role
+	currentUserTags := securityCtx.User.Entity.GetTagsWithoutTimestamp()
+	isAdmin := false
+	for _, tag := range currentUserTags {
+		if tag == "rbac:role:admin" || tag == "rbac:perm:*" {
+			isAdmin = true
+			break
+		}
+	}
+	
 	// Security check: Only admins can reset passwords
-	if !rbacCtx.IsAdmin {
+	if !isAdmin {
 		RespondError(w, http.StatusForbidden, "Administrator privileges required")
 		return
 	}
@@ -264,23 +292,16 @@ func (h *UserHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 	var err error
 	
 	if req.UserID != "" {
-		// Find by ID
+		// Find by UUID
 		userEntity, err = h.entityRepo.GetByID(req.UserID)
 	} else {
-		// Find by username
-		entityID := "user_" + req.Username
-		userEntity, err = h.entityRepo.GetByID(entityID)
-		
-		if err != nil {
-			// Try finding by tag
-			userTag := "id:username:" + req.Username
-			userEntities, err := h.entityRepo.ListByTag(userTag)
-			if err != nil || len(userEntities) == 0 {
-				RespondError(w, http.StatusNotFound, "User not found")
-				return
-			}
-			userEntity = userEntities[0]
+		// Find by username tag (v2.32.0+ UUID architecture)
+		userEntities, err := h.entityRepo.ListByTag("identity:username:" + req.Username)
+		if err != nil || len(userEntities) == 0 {
+			RespondError(w, http.StatusNotFound, "User not found")
+			return
 		}
+		userEntity = userEntities[0]
 	}
 	
 	if err != nil || userEntity == nil {

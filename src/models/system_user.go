@@ -74,7 +74,7 @@ func (sum *SystemUserManager) InitializeSystemUser() (*SecurityUser, error) {
 			"status:active",
 			"system:true",                    // Mark as system entity
 			"rbac:role:system",              // System role (higher than admin)
-			"rbac:perm:*:*",                 // All permissions
+			"rbac:perm:*",                   // All permissions wildcard
 			"bootstrap:root",                // Root of the ownership chain
 			"immutable:true",                // Cannot be deleted or modified
 		},
@@ -262,7 +262,7 @@ func (sum *SystemUserManager) CreateAdminUser(username, password, email string) 
 			"profile:email:" + email,
 			"has:credentials",               // Has embedded credentials
 			"rbac:role:admin",              // Admin role
-			"rbac:perm:*:*",                // All permissions (but not system level)
+			"rbac:perm:*",                  // All permissions wildcard
 			"created_by_system:true",       // Marked as system-created
 		},
 	)
