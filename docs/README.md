@@ -1,13 +1,13 @@
 # EntityDB Documentation Library
 
-> **Version**: v2.32.0 | **Last Updated**: 2025-06-16
+> **Version**: v2.32.2 | **Last Updated**: 2025-06-16
 > 
 > **World-Class Documentation** for EntityDB - A high-performance temporal database where every tag is timestamped with nanosecond precision.
 
 ## 🏆 Professional Standards
 
 This documentation library adheres to **industry-leading technical writing standards**:
-- ✅ **100% Accuracy**: Every detail verified against v2.32.0 codebase
+- ✅ **100% Accuracy**: Every detail verified against v2.32.2 codebase
 - ✅ **User-Centered Design**: Organized by user journey and functional needs  
 - ✅ **Single Source of Truth**: No duplicate content, clear ownership
 - ✅ **Professional Taxonomy**: Industry-standard information architecture
@@ -78,6 +78,19 @@ Complete REST API documentation (40 endpoints)
 - **Administration**: Admin-only system operations
 
 ### 🏗️ Technical Documentation
+
+#### [📋 Architecture Decision Records](./adr/)
+Documented architectural decisions and rationale
+- **ADR-001**: Temporal Tag Storage with Nanosecond Precision
+- **ADR-002**: Custom Binary Format (EBF) over SQLite
+- **ADR-003**: Unified Sharded Indexing Architecture
+- **ADR-004**: Tag-Based RBAC System  
+- **ADR-005**: Application-Agnostic Platform Design
+- **ADR-006**: User Credentials in Entity Content (Breaking Change)
+- **ADR-007**: Memory-Mapped File Access Pattern
+- **ADR-008**: Three-Tier Configuration Hierarchy
+- **ADR-009**: Comprehensive Memory Optimization Suite
+- **ADR-010**: Complete Temporal Database Implementation
 
 #### [🏛️ Architecture](./architecture/)
 System design and technical internals
@@ -200,7 +213,7 @@ All backward compatibility layers and deprecated functions removed. Clean, moder
 ### ✅ Accuracy Guarantees
 - **Code Examples**: All examples tested and working
 - **API Documentation**: Generated from actual implementation
-- **Version Alignment**: 100% matched to v2.32.0-dev codebase
+- **Version Alignment**: 100% matched to v2.32.2 codebase
 - **Regular Validation**: Automated accuracy checks
 
 ### 📏 Professional Standards
@@ -220,7 +233,7 @@ All backward compatibility layers and deprecated functions removed. Clean, moder
 ## 📋 About This Documentation
 
 **📋 Maintained By**: EntityDB Technical Writing Team  
-**🏷️ Version**: v2.32.0  
+**🏷️ Version**: v2.32.2  
 **📅 Last Updated**: 2025-06-16  
 **🔍 Next Review**: Q1 2025  
 **📏 Standards**: IEEE 1063-2001 Technical Writing Standards

@@ -17,6 +17,12 @@
 docs/
 ├── README.md                          # Master documentation index
 ├── CHANGELOG.md                       # Version history and breaking changes
+├── adr/                               # Architecture Decision Records
+│   ├── README.md                      # ADR index and template
+│   ├── 001-temporal-tag-storage.md    # Temporal data architecture
+│   ├── 002-binary-storage-format.md   # Storage layer decisions
+│   ├── 003-unified-sharded-indexing.md # Indexing architecture
+│   └── 005-application-agnostic-design.md # Platform design
 ├── CONTRIBUTING.md                    # Contribution guidelines (links to developer-guide/)
 │
 ├── getting-started/                   # New user onboarding
