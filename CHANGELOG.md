@@ -5,7 +5,7 @@ All notable changes to the EntityDB Platform will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] - v2.32.0
+## [2.32.0] - 2025-06-16
 
 ### Added
 - **Professional Documentation Architecture**: World-class technical documentation following IEEE 1063-2001 standards
@@ -18,7 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Fixed critical relationship model documentation (removed 5 non-existent endpoints)
   - Added comprehensive dataset management documentation (7 endpoints)
   - Updated entity API documentation to reflect tag-based relationships
-  - Verified all 48 API endpoints against actual implementation
+  - Verified all 40 API endpoints against actual implementation
   - Created professional dataset multi-tenancy documentation
 - **Complete Legacy Code Elimination**: Zero legacy dependencies modernization
   - Removed all backward compatibility layers and deprecated functions

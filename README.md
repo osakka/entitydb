@@ -13,7 +13,7 @@ EntityDB is a revolutionary temporal database platform that stores all data as e
 
 > **🆕 NEW in v2.32.0**: Complete configuration management overhaul with three-tier hierarchy (Database > CLI flags > Environment), elimination of all hardcoded values, configurable admin credentials and system parameters, comprehensive CLI flag coverage, unified sharded indexing architecture, and professional documentation system with 100% API accuracy verification.
 
-> **⚠️ BREAKING CHANGE in v2.29.0**: Authentication architecture has changed. User credentials are now stored directly in the user entity's content field. This change has **NO BACKWARD COMPATIBILITY** - all users must be recreated. See [Authentication Guide](./docs/30-api-reference/02-authentication.md) for details.
+> **⚠️ BREAKING CHANGE in v2.29.0**: Authentication architecture has changed. User credentials are now stored directly in the user entity's content field. This change has **NO BACKWARD COMPATIBILITY** - all users must be recreated. See [Authentication Guide](./docs/api-reference/02-authentication.md) for details.
 
 ### Key Features
 
@@ -137,12 +137,12 @@ EntityDB uses a layered architecture optimized for temporal operations:
 
 ## Documentation
 
-- [Quick Start Guide](./docs/10-getting-started/02-quick-start.md)
-- [API Reference](./docs/30-api-reference/01-entities.md)
-- [Architecture Overview](./docs/20-architecture/01-system-overview.md)
-- [RBAC & Security](./docs/50-admin-guides/01-security-configuration.md)
-- [Development Guide](./docs/60-developer-guides/01-contributing.md)
-- [Performance Tuning](./docs/performance/performance-optimization-results.md)
+- [Quick Start Guide](./docs/getting-started/02-quick-start.md)
+- [API Reference](./docs/api-reference/03-entities.md)
+- [Architecture Overview](./docs/architecture/01-system-overview.md)
+- [RBAC & Security](./docs/admin-guide/01-security-configuration.md)
+- [Development Guide](./docs/developer-guide/01-contributing.md)
+- [Performance Tuning](./docs/reference/performance/performance_optimization_report.md)
 
 ## Project Structure
 

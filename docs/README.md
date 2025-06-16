@@ -1,13 +1,13 @@
 # EntityDB Documentation Library
 
-> **Version**: v2.32.0-dev | **Last Updated**: 2025-06-15
+> **Version**: v2.32.0 | **Last Updated**: 2025-06-16
 > 
 > **World-Class Documentation** for EntityDB - A high-performance temporal database where every tag is timestamped with nanosecond precision.
 
 ## 🏆 Professional Standards
 
 This documentation library adheres to **industry-leading technical writing standards**:
-- ✅ **100% Accuracy**: Every detail verified against v2.32.0-dev codebase
+- ✅ **100% Accuracy**: Every detail verified against v2.32.0 codebase
 - ✅ **User-Centered Design**: Organized by user journey and functional needs  
 - ✅ **Single Source of Truth**: No duplicate content, clear ownership
 - ✅ **Professional Taxonomy**: Industry-standard information architecture
@@ -69,7 +69,7 @@ Day-to-day usage and common tasks
 - **Data Management**: Creating, updating, organizing data
 
 #### [🔌 API Reference](./api-reference/)
-Complete REST API documentation (53 endpoints)
+Complete REST API documentation (40 endpoints)
 - **Authentication**: Login, sessions, token management
 - **Entity Operations**: CRUD operations with full examples
 - **Temporal Operations**: as-of, history, changes, diff
@@ -124,7 +124,7 @@ Working code examples and sample applications
 - **Performance Optimization**: High-throughput examples
 - **Sample Applications**: Complete working applications
 
-## 🆕 Latest in v2.32.0-dev
+## 🆕 Latest in v2.32.0
 
 ### ⚡ Unified Sharded Indexing
 - **Complete Legacy Elimination**: Removed all backward compatibility code
@@ -220,8 +220,8 @@ All backward compatibility layers and deprecated functions removed. Clean, moder
 ## 📋 About This Documentation
 
 **📋 Maintained By**: EntityDB Technical Writing Team  
-**🏷️ Version**: v2.32.0-dev  
-**📅 Last Updated**: 2025-06-15  
+**🏷️ Version**: v2.32.0  
+**📅 Last Updated**: 2025-06-16  
 **🔍 Next Review**: Q1 2025  
 **📏 Standards**: IEEE 1063-2001 Technical Writing Standards
 
