@@ -7,7 +7,7 @@
 EntityDB_DIR="/opt/entitydb";
 
 # HACK Â#
-cd ${EntityDB_DIR};
+cd ${EntityDB_DIR}/bin/
 # HACK #
 
 # Colors for output
