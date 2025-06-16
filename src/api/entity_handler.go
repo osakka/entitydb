@@ -85,9 +85,18 @@ func (h *EntityHandler) stripTimestampsFromEntity(entity *models.Entity, include
 // This is used by temporal query handlers (as-of, history, changes, diff).
 // All temporal functionality is now merged into the base EntityRepository.
 func asTemporalRepository(repo models.EntityRepository) (*binary.EntityRepository, error) {
+	// Direct cast first
 	if entityRepo, ok := repo.(*binary.EntityRepository); ok {
 		return entityRepo, nil
 	}
+	
+	// Handle CachedRepository wrapper - unwrap to get underlying repository
+	if cachedRepo, ok := repo.(*binary.CachedRepository); ok {
+		if entityRepo, ok := cachedRepo.GetUnderlying().(*binary.EntityRepository); ok {
+			return entityRepo, nil
+		}
+	}
+	
 	return nil, fmt.Errorf("repository does not support temporal features")
 }
 
