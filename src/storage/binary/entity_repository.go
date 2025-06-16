@@ -1289,7 +1289,7 @@ func (r *EntityRepository) Create(entity *models.Entity) error {
 	r.checkAndPerformCheckpoint()
 	
 	// Track write metrics (skip metric entities to avoid recursion)
-	if !storageMetricsDisabled && storageMetrics != nil && !strings.HasPrefix(entity.ID, "metric_") {
+	if !storageMetricsDisabled && storageMetrics != nil && !isMetricEntity(entity) {
 		duration := time.Since(startTime)
 		size := int64(len(entity.Content))
 		storageMetrics.TrackWrite("create_entity", size, duration, nil)
@@ -1311,13 +1311,14 @@ func (r *EntityRepository) GetByID(id string) (*models.Entity, error) {
 	if exists {
 		logger.Trace("Found in memory cache: %s", id)
 		// Skip metrics for metric entities to avoid recursion
-		if !storageMetricsDisabled && storageMetrics != nil && !strings.HasPrefix(id, "metric_") {
+		if !storageMetricsDisabled && storageMetrics != nil && !isMetricEntity(entity) {
 			storageMetrics.TrackCacheOperation("entity", true)
 		}
 		return entity, nil
 	}
 	
-	// Cache miss - skip metrics for metric entities to avoid recursion
+	// Cache miss - we don't have the entity yet to check its type, so use ID-based heuristic
+	// Most metric entities won't pass this check anyway since they get created later
 	if !storageMetricsDisabled && storageMetrics != nil && !strings.HasPrefix(id, "metric_") {
 		storageMetrics.TrackCacheOperation("entity", false)
 	}
@@ -1392,8 +1393,8 @@ func (r *EntityRepository) GetByID(id string) (*models.Entity, error) {
 				r.entities[id] = recoveredEntity
 				r.mu.Unlock()
 				
-				// Track overall operation time including recovery
-				if !storageMetricsDisabled && storageMetrics != nil {
+				// Track overall operation time including recovery (skip metric entities to avoid recursion)
+				if !storageMetricsDisabled && storageMetrics != nil && !isMetricEntity(recoveredEntity) {
 					totalDuration := time.Since(startTime)
 					storageMetrics.TrackRead("get_entity_with_recovery", int64(len(recoveredEntity.Content)), totalDuration, nil)
 				}
@@ -1562,7 +1563,7 @@ func (r *EntityRepository) Update(entity *models.Entity) error {
 	r.checkAndPerformCheckpoint()
 	
 	// Track write metrics (skip metric entities to avoid recursion)
-	if !storageMetricsDisabled && storageMetrics != nil && !strings.HasPrefix(entity.ID, "metric_") {
+	if !storageMetricsDisabled && storageMetrics != nil && !isMetricEntity(entity) {
 		duration := time.Since(startTime)
 		size := int64(len(entity.Content))
 		storageMetrics.TrackWrite("update_entity", size, duration, nil)

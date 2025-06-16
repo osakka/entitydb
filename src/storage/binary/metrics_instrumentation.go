@@ -4,6 +4,7 @@ import (
 	"entitydb/logger"
 	"entitydb/models"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -199,6 +200,22 @@ func (m *StorageMetrics) getSizeBucket(size int64) string {
 	default:
 		return ">10MB"
 	}
+}
+
+// isMetricEntity checks if an entity is a metrics entity to avoid recursion
+func isMetricEntity(entity *models.Entity) bool {
+	if entity == nil || entity.Tags == nil {
+		return false
+	}
+	
+	// Check if entity has type:metric tag
+	for _, tag := range entity.Tags {
+		// Handle both timestamped and non-timestamped tags
+		if strings.Contains(tag, "type:metric") || strings.Contains(tag, "name:") {
+			return true
+		}
+	}
+	return false
 }
 
 // storeMetric stores a metric value with labels using async collection
