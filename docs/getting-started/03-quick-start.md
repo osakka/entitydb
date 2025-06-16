@@ -1,8 +1,8 @@
 # EntityDB Quick Start Guide
 
-> **Version**: v2.31.0 | **Last Updated**: 2025-06-13 | **Status**: GUIDANCE
+> **Version**: v2.32.2 | **Last Updated**: 2025-06-16 | **Status**: GUIDANCE
 
-Welcome to EntityDB! This guide will get you up and running with EntityDB v2.31.0 in just a few minutes.
+Welcome to EntityDB! This guide will get you up and running with EntityDB v2.32.2 in just a few minutes.
 
 > **⚠️ Critical**: v2.29.0+ includes major authentication changes. User credentials are now embedded in user entities. All users from previous versions must be recreated.
 
@@ -31,7 +31,7 @@ cd ..
 ### 3. Verify Installation
 ```bash
 ./bin/entitydb --version
-# Should output: EntityDB v2.30.0
+# Should output: EntityDB v2.32.2
 ```
 
 ## Starting EntityDB

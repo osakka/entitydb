@@ -14,34 +14,42 @@ Welcome to EntityDB's high-level documentation. This section provides essential 
 - Binary format (EBF) storage overview
 - Authentication and security model
 
-### [Specifications](./02-specifications.md)
-**Technical specifications and capabilities**
-- Performance characteristics and benchmarks
-- System requirements and compatibility
-- Supported data types and formats
-- Scalability limits and considerations
-- API versioning and stability guarantees
+### [Installation](./02-installation.md)
+**Step-by-step installation guide**
+- System requirements and dependencies
+- Building from source
+- Configuration setup
+- Verification and testing
+- Troubleshooting common issues
 
-### [Requirements](./03-requirements.md)
-**System and operational requirements**
-- Hardware requirements (CPU, memory, storage)
-- Software dependencies and compatibility
-- Network requirements and port usage
-- Security requirements and recommendations
-- Deployment environment considerations
+### [Quick Start](./03-quick-start.md)
+**Get running in 5 minutes**
+- First-time setup and admin access
+- Basic API authentication
+- Creating your first entities
+- Essential operations and commands
+- Next steps for development
+
+### [Core Concepts](./04-core-concepts.md)
+**Master the fundamentals**
+- Entity model and tag system
+- Temporal data and timestamping
+- Query patterns and best practices
+- RBAC and security concepts
+- Performance considerations
 
 ## 🎯 Learning Path
 
 ### For New Users
 1. Start with [Introduction](./01-introduction.md) to understand EntityDB's philosophy
-2. Review [Requirements](./03-requirements.md) to ensure compatibility
-3. Check [Specifications](./02-specifications.md) for performance expectations
-4. Continue to [User Guide](../user-guide/) for hands-on tutorials
+2. Follow [Installation](./02-installation.md) to set up your environment
+3. Complete [Quick Start](./03-quick-start.md) for hands-on experience
+4. Study [Core Concepts](./04-core-concepts.md) to master the fundamentals
 
 ### For Decision Makers
-1. Review [Specifications](./02-specifications.md) for technical capabilities
-2. Assess [Requirements](./03-requirements.md) for infrastructure planning
-3. Read [Introduction](./01-introduction.md) for architectural understanding
+1. Read [Introduction](./01-introduction.md) for architectural understanding
+2. Review [Technical Specifications](../reference/technical-specifications.md) for capabilities
+3. Assess [System Requirements](../admin-guide/system-requirements.md) for infrastructure planning
 4. Explore [Architecture](../architecture/) for deep technical details
 
 ## 🔗 Quick Navigation
@@ -49,7 +57,7 @@ Welcome to EntityDB's high-level documentation. This section provides essential 
 - **Next Steps**: [User Guide](../user-guide/) - Begin using EntityDB
 - **Technical Details**: [Architecture](../architecture/) - System design and internals
 - **API Reference**: [API Documentation](../api-reference/) - Complete endpoint reference
-- **Installation**: [User Guide > Installation](../user-guide/01-installation.md)
+- **Installation**: [Installation Guide](./02-installation.md)
 
 ## 💡 Key Concepts Introduced
 
