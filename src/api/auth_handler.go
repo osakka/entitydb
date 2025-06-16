@@ -236,24 +236,16 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 // @Failure 500 {object} ErrorResponse
 // @Router /api/v1/auth/logout [post]
 func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
-	// Get token from Authorization header directly
-	authHeader := r.Header.Get("Authorization")
-	if authHeader == "" {
+	// Get security context (v2.32.0+ modern RBAC - token already validated by SecurityMiddleware)
+	securityCtx, ok := GetSecurityContext(r)
+	if !ok {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(AuthErrorResponse{Error: "No token provided"})
+		json.NewEncoder(w).Encode(AuthErrorResponse{Error: "Authentication required"})
 		return
 	}
 	
-	// Extract token
-	parts := strings.Split(authHeader, " ")
-	if len(parts) != 2 || parts[0] != "Bearer" {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(AuthErrorResponse{Error: "Invalid token format"})
-		return
-	}
-	token := parts[1]
+	token := securityCtx.Token
 	
 	// Invalidate session in database
 	err := h.securityManager.InvalidateSession(token)
@@ -285,24 +277,16 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 func (h *AuthHandler) RefreshToken(w http.ResponseWriter, r *http.Request) {
 	logger.Info("RefreshToken: Method called from IP %s", r.RemoteAddr)
 	
-	// Get current session token from header
-	authHeader := r.Header.Get("Authorization")
-	logger.Info("RefreshToken: Auth header received: '%s'", authHeader)
-	if authHeader == "" {
+	// Get security context (v2.32.0+ modern RBAC - token already validated by SecurityMiddleware)
+	securityCtx, ok := GetSecurityContext(r)
+	if !ok {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(AuthErrorResponse{Error: "No token provided"})
+		json.NewEncoder(w).Encode(AuthErrorResponse{Error: "Authentication required"})
 		return
 	}
 	
-	parts := strings.Split(authHeader, " ")
-	if len(parts) != 2 || parts[0] != "Bearer" {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(AuthErrorResponse{Error: "Invalid token format"})
-		return
-	}
-	currentToken := parts[1]
+	currentToken := securityCtx.Token
 
 	// Refresh the session in the database (this validates the token internally)
 	logger.TraceIf("auth", "refreshing session with token")

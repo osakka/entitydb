@@ -358,9 +358,9 @@ func main() {
 	
 	// Auth routes - New relationship-based security
 	apiRouter.HandleFunc("/auth/login", server.authHandler.Login).Methods("POST")
-	apiRouter.HandleFunc("/auth/logout", server.authHandler.Logout).Methods("POST")
+	apiRouter.HandleFunc("/auth/logout", server.securityMiddleware.RequireAuthentication(server.authHandler.Logout)).Methods("POST")
 	apiRouter.HandleFunc("/auth/whoami", server.securityMiddleware.RequireAuthentication(server.authHandler.WhoAmI)).Methods("GET")
-	apiRouter.HandleFunc("/auth/refresh", server.authHandler.RefreshToken).Methods("POST")
+	apiRouter.HandleFunc("/auth/refresh", server.securityMiddleware.RequireAuthentication(server.authHandler.RefreshToken)).Methods("POST")
 	
 	
 	// User management routes with modern SecurityMiddleware (v2.32.0+)
@@ -486,9 +486,12 @@ func main() {
 	// Dataset management operations - removed grant/revoke until implemented
 	
 	// Dataset-scoped entity operations with modern SecurityMiddleware (v2.32.0+)
-	// Note: These routes are currently disabled pending proper dataset-scoped entity implementation
-	// apiRouter.HandleFunc("/datasets/{dataset}/entities/create", server.securityMiddleware.RequirePermissionInDataset("entity", "create")(server.entityHandler.CreateEntity)).Methods("POST")
-	// apiRouter.HandleFunc("/datasets/{dataset}/entities/query", server.securityMiddleware.RequirePermissionInDataset("entity", "view")(server.entityHandler.QueryEntities)).Methods("GET")
+	// These routes enforce proper dataset isolation and immutable foundational tags
+	apiRouter.HandleFunc("/datasets/{dataset}/entities/create", server.securityMiddleware.RequirePermissionInDataset("entity", "create")(server.entityHandler.CreateEntity)).Methods("POST")
+	apiRouter.HandleFunc("/datasets/{dataset}/entities/query", server.securityMiddleware.RequirePermissionInDataset("entity", "view")(server.entityHandler.QueryEntities)).Methods("GET")
+	apiRouter.HandleFunc("/datasets/{dataset}/entities/list", server.securityMiddleware.RequirePermissionInDataset("entity", "view")(server.entityHandler.ListEntities)).Methods("GET")
+	apiRouter.HandleFunc("/datasets/{dataset}/entities/get", server.securityMiddleware.RequirePermissionInDataset("entity", "view")(server.entityHandler.GetEntity)).Methods("GET")
+	apiRouter.HandleFunc("/datasets/{dataset}/entities/update", server.securityMiddleware.RequirePermissionInDataset("entity", "update")(server.entityHandler.UpdateEntity)).Methods("PUT")
 	
 	// Dataset relationship operations - removed until implemented
 	

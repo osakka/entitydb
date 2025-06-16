@@ -196,14 +196,31 @@ func (h *EntityHandler) CreateEntity(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Determine dataset - default to "default" unless specified in tags
+	// Determine dataset - extract from URL path for dataset-scoped routes, fallback to request or default
 	dataset := "default"
-	for _, tag := range req.Tags {
-		if strings.HasPrefix(tag, "dataset:") {
-			dataset = strings.TrimPrefix(tag, "dataset:")
-			break
+	
+	// First priority: Extract from URL path (e.g., /datasets/{dataset}/entities/create)
+	if pathDataset := extractDatasetFromPath(r.URL.Path); pathDataset != "" {
+		dataset = pathDataset
+	} else {
+		// Fallback: Check request body tags (for legacy global routes)
+		for _, tag := range req.Tags {
+			if strings.HasPrefix(tag, "dataset:") {
+				dataset = strings.TrimPrefix(tag, "dataset:")
+				break
+			}
 		}
 	}
+	
+	// SECURITY: Prevent dataset override in request body when using dataset-scoped routes
+	// Remove any dataset: tags from request to enforce URL path as single source of truth
+	filteredTags := []string{}
+	for _, tag := range additionalTags {
+		if !strings.HasPrefix(tag, "dataset:") {
+			filteredTags = append(filteredTags, tag)
+		}
+	}
+	additionalTags = filteredTags
 
 	// Create entity using UUID architecture with mandatory tags
 	entity, err := models.NewEntityWithMandatoryTags(
@@ -618,6 +635,9 @@ func (h *EntityHandler) ListEntities(w http.ResponseWriter, r *http.Request) {
 	// Check if timestamps should be included in response
 	includeTimestamps := r.URL.Query().Get("include_timestamps") == "true"
 	
+	// Extract dataset from URL path for dataset-scoped queries
+	datasetFromPath := extractDatasetFromPath(r.URL.Path)
+	
 	// Get query parameters
 	tag := r.URL.Query().Get("tag")
 	wildcard := r.URL.Query().Get("wildcard")
@@ -668,6 +688,25 @@ func (h *EntityHandler) ListEntities(w http.ResponseWriter, r *http.Request) {
 	default:
 		// List all entities
 		entities, err = h.repo.List()
+	}
+	
+	// Apply dataset filtering for dataset-scoped routes
+	if datasetFromPath != "" {
+		logger.Debug("Filtering entities for dataset: %s", datasetFromPath)
+		filteredEntities := []*models.Entity{}
+		datasetTag := "dataset:" + datasetFromPath
+		
+		for _, entity := range entities {
+			entityTags := entity.GetTagsWithoutTimestamp()
+			for _, entityTag := range entityTags {
+				if entityTag == datasetTag {
+					filteredEntities = append(filteredEntities, entity)
+					break
+				}
+			}
+		}
+		entities = filteredEntities
+		logger.Debug("Dataset filtering: %d entities remain after filtering for %s", len(entities), datasetFromPath)
 	}
 	
 	if err != nil {
@@ -1867,4 +1906,16 @@ func (h *EntityHandler) GetEntitySummary(w http.ResponseWriter, r *http.Request)
 		totalCount, len(typeCount), lastUpdated)
 	
 	RespondJSON(w, http.StatusOK, summary)
+}
+
+// extractDatasetFromPath extracts dataset from URL path for dataset-scoped routes
+// Handles paths like: /datasets/{dataset}/entities/create
+func extractDatasetFromPath(path string) string {
+	pathParts := strings.Split(path, "/")
+	for i, part := range pathParts {
+		if part == "datasets" && i+1 < len(pathParts) {
+			return pathParts[i+1]
+		}
+	}
+	return ""
 }
