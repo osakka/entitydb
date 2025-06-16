@@ -208,6 +208,13 @@ The server automatically creates a default admin user if none exists:
 
 ## Recent Changes (v2.32.0)
 
+- **Critical Storage Metrics Feedback Loop Fix**: Resolved 100% CPU usage from infinite metrics recursion
+  - **Root Cause**: Storage metrics tracking was monitoring its own metric entity operations, creating infinite feedback loop
+  - **Technical Solution**: Added `isMetricEntity()` function to identify metric entities by `type:metric` and `name:` tags
+  - **Implementation**: Updated all storage metrics calls in entity_repository.go to exclude metric entities using `!isMetricEntity(entity)`
+  - **Surgical Precision**: Maintained full storage monitoring for all non-metric entities while eliminating recursion
+  - **System Stability**: Eliminates CPU spike while preserving comprehensive storage performance monitoring capabilities
+  - **Build Verification**: Clean build with zero warnings confirmed after fix integration
 - **Critical Session Invalidation Cache Fix**: Complete resolution of session caching coherency issue
   - **Root Cause Identified**: Direct tag assignment in `InvalidateSession()` bypassed entity cache invalidation
   - **Architectural Fix**: Changed `sessionEntity.Tags = updatedTags` to `sessionEntity.SetTags(updatedTags)` for proper cache invalidation
