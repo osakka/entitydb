@@ -10,7 +10,7 @@ rm -rf var/debug_query
 mkdir -p var/debug_query
 
 export ENTITYDB_DATA_PATH=var/debug_query
-export ENTITYDB_DATASPACE=true
+export ENTITYDB_DATASET_ISOLATION=true
 export ENTITYDB_LOG_LEVEL=debug
 
 ./bin/entitydb server > /tmp/query_debug.log 2>&1 &
