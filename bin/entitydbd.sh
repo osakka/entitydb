@@ -3,9 +3,12 @@
 # Uses ConfigManager for all configuration logic - no duplication!
 
 # Determine EntityDB directory
-# EntityDB_DIR="$(dirname "$0")/.."
 # EntityDB_DIR="$(dirname "$(realpath "../$0")")"
 EntityDB_DIR="/opt/entitydb";
+
+# HACK Â#
+cd ${EntityDB_DIR};
+# HACK #
 
 # Colors for output
 GREEN='\033[0;32m'
