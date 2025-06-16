@@ -346,24 +346,24 @@ func (sm *SecurityManager) ValidateSession(token string) (*SecurityUser, error) 
 	var sessionEntities []*Entity
 	var err error
 	
-	for i := 0; i < 5; i++ {
-		logger.Info("ValidateSession: Attempt %d to find session with token: %s", i+1, token)
+	for i := 0; i < 2; i++ { // Reduced from 5 to 2 retries
+		logger.Debug("ValidateSession: Attempt %d to find session with token: %s", i+1, token)
 		sessionEntities, err = sm.entityRepo.ListByTag("token:" + token)
 		if err != nil {
 			logger.Error("ValidateSession: Error finding session (attempt %d): %v", i+1, err)
-			if i < 4 {
-				time.Sleep(50 * time.Millisecond) // Increased delay for indexing
+			if i < 1 {
+				time.Sleep(10 * time.Millisecond) // Reduced delay from 50ms to 10ms
 				continue
 			}
 			return nil, fmt.Errorf("session lookup failed: %v", err)
 		}
-		logger.Info("ValidateSession: Found %d session entities on attempt %d", len(sessionEntities), i+1)
+		logger.Debug("ValidateSession: Found %d session entities on attempt %d", len(sessionEntities), i+1)
 		if len(sessionEntities) > 0 {
 			break // Found session
 		}
-		if i < 4 {
-			logger.Info("ValidateSession: Session not found, retrying (attempt %d) after 50ms", i+1)
-			time.Sleep(50 * time.Millisecond) // Increased delay for indexing
+		if i < 1 {
+			logger.Debug("ValidateSession: Session not found, retrying (attempt %d) after 10ms", i+1)
+			time.Sleep(10 * time.Millisecond) // Reduced delay for faster failure
 		}
 	}
 	

@@ -991,6 +991,130 @@
                         }
                     });
                 }
+
+                // Initialize response time chart
+                const responseTimeCtx = document.getElementById('responseTimeChart');
+                if (responseTimeCtx) {
+                    this.charts.responseTime = new Chart(responseTimeCtx, {
+                        type: 'line',
+                        data: {
+                            labels: [],
+                            datasets: [{
+                                label: 'Response Time (ms)',
+                                data: [],
+                                borderColor: '#38a169',
+                                backgroundColor: 'rgba(56, 161, 105, 0.1)',
+                                tension: 0.4
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            scales: {
+                                y: { beginAtZero: true }
+                            }
+                        }
+                    });
+                }
+
+                // Initialize request volume chart
+                const requestVolumeCtx = document.getElementById('requestVolumeChart');
+                if (requestVolumeCtx) {
+                    this.charts.requestVolume = new Chart(requestVolumeCtx, {
+                        type: 'bar',
+                        data: {
+                            labels: [],
+                            datasets: [{
+                                label: 'Requests/min',
+                                data: [],
+                                backgroundColor: '#4299e1',
+                                borderColor: '#2b6cb0',
+                                borderWidth: 1
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            scales: {
+                                y: { beginAtZero: true }
+                            }
+                        }
+                    });
+                }
+
+                // Initialize storage read chart
+                const storageReadCtx = document.getElementById('storageReadChart');
+                if (storageReadCtx) {
+                    this.charts.storageRead = new Chart(storageReadCtx, {
+                        type: 'line',
+                        data: {
+                            labels: [],
+                            datasets: [{
+                                label: 'Read IOPS',
+                                data: [],
+                                borderColor: '#9f7aea',
+                                backgroundColor: 'rgba(159, 122, 234, 0.1)',
+                                tension: 0.4
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            scales: {
+                                y: { beginAtZero: true }
+                            }
+                        }
+                    });
+                }
+
+                // Initialize storage write chart
+                const storageWriteCtx = document.getElementById('storageWriteChart');
+                if (storageWriteCtx) {
+                    this.charts.storageWrite = new Chart(storageWriteCtx, {
+                        type: 'line',
+                        data: {
+                            labels: [],
+                            datasets: [{
+                                label: 'Write IOPS',
+                                data: [],
+                                borderColor: '#f56565',
+                                backgroundColor: 'rgba(245, 101, 101, 0.1)',
+                                tension: 0.4
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            scales: {
+                                y: { beginAtZero: true }
+                            }
+                        }
+                    });
+                }
+
+                // Initialize custom chart
+                const customCtx = document.getElementById('customChart');
+                if (customCtx) {
+                    this.charts.custom = new Chart(customCtx, {
+                        type: 'bar',
+                        data: {
+                            labels: ['Entities', 'Users', 'Sessions', 'Metrics'],
+                            datasets: [{
+                                label: 'Count',
+                                data: [0, 0, 0, 0],
+                                backgroundColor: ['#4299e1', '#38a169', '#ed8936', '#9f7aea'],
+                                borderWidth: 1
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            scales: {
+                                y: { beginAtZero: true }
+                            }
+                        }
+                    });
+                }
             }
 
             async viewEntity(entityId) {
