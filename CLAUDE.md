@@ -208,17 +208,20 @@ The server automatically creates a default admin user if none exists:
 
 ## Recent Changes (v2.32.0)
 
-- **Unified Admin Console Implementation**: Complete replacement of dashboard with professional admin interface
-  - **Single Source of Truth**: Replaced multiple dashboard files with unified admin console at index.html
-  - **Cache-Busting Architecture**: Comprehensive cache control meta tags, service worker cleanup, and automatic cache detection
-  - **Session Management Enhancement**: Automatic session refresh every 30 seconds with graceful expiry handling and proactive warnings
-  - **Professional UI Components**: Authentication system, real-time dashboard, entity browser, temporal queries, RBAC testing, and system monitoring
-  - **Tab Structure Compliance**: Implemented proper tab validation with data-tab attributes and switchTab function
-  - **Responsive Design**: Modern CSS with dark mode support, modals, alerts, and error handling
-- **System Maintenance Tools**: Test entity cleanup and database maintenance utilities
-  - **Cleanup Tool**: Created cleanup_test_entities.go for safe entity removal with type verification
-  - **Entity Analysis**: Database breakdown shows 78 entities (1 user, 70 sessions, 7 metrics) in clean state
-  - **Automatic Lifecycle**: System properly manages entity cleanup without manual intervention
+- **Critical Session Invalidation Cache Fix**: Complete resolution of session caching coherency issue
+  - **Root Cause Identified**: Direct tag assignment in `InvalidateSession()` bypassed entity cache invalidation
+  - **Architectural Fix**: Changed `sessionEntity.Tags = updatedTags` to `sessionEntity.SetTags(updatedTags)` for proper cache invalidation
+  - **End-to-End Testing**: Comprehensive multi-user collaboration scenarios, system administration workflows, and error recovery testing
+  - **Production Ready**: Session invalidation now works correctly with immediate token invalidation after logout
+  - **Technical Documentation**: Complete fix documentation in `docs/developer-guide/session-invalidation-fix-v2.32.0.md`
+  - **Testing Report**: Comprehensive test results in `docs/testing/e2e-test-report-v2.32.0.md`
+- **Comprehensive Code Audit and Final Cleanup**: Meticulous workspace compliance achieving absolute single source of truth
+  - **Git Status Verification**: Only runtime files remain uncommitted (entitydb.log, entitydb.pid)
+  - **Build Verification**: Clean build with zero warnings confirmed
+  - **Tool Organization**: Verified tools/config.go is legitimate wrapper extending main config system
+  - **Trash Folder Management**: All obsolete debug/fix tools properly archived
+  - **Documentation Consistency**: All READMEs updated to reflect v2.32.0 status
+  - **Version Alignment**: All components consistently reference v2.32.0
 - **Unified Sharded Indexing Implementation**: Complete elimination of legacy indexing systems maintaining single source of truth
   - **Removed Legacy Code**: Eliminated all `useShardedIndex` conditional logic and `tagIndex` map-based indexing
   - **Pure Sharded Implementation**: All tag operations now consistently use `ShardedTagIndex` with 256 shards for optimal concurrency
