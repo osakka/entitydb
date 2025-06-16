@@ -1,6 +1,6 @@
 # User Management Guide
 
-> **Version**: v2.31.0 | **Last Updated**: 2025-06-14 | **Status**: AUTHORITATIVE
+> **Version**: v2.32.20 | **Last Updated**: 2025-06-14 | **Status**: AUTHORITATIVE
 
 This guide covers comprehensive user management in EntityDB, including user creation, RBAC configuration, password management, and security best practices.
 
@@ -377,7 +377,7 @@ curl -X POST http://localhost:8085/api/v1/auth/login \
 
 ### Migration Process
 1. **Export user list** from v2.28.0 system
-2. **Upgrade to v2.31.0**
+2. **Upgrade to v2.32.20**
 3. **Recreate all users** using new authentication format
 4. **Notify users** of password reset requirement
 5. **Update integrations** to use new authentication flow
@@ -405,4 +405,4 @@ curl -X PUT http://localhost:8085/api/v1/entities/update \
 
 ---
 
-*This guide provides comprehensive user management capabilities for EntityDB v2.31.0. For additional security configuration, see [Security Configuration](./01-security-configuration.md).*
+*This guide provides comprehensive user management capabilities for EntityDB v2.32.20. For additional security configuration, see [Security Configuration](./01-security-configuration.md).*

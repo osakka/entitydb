@@ -668,6 +668,6 @@ All API endpoints return consistent error responses:
 
 ## Version History
 
-- **v2.31.0**: Current entity API with embedded credentials and temporal tag search fixes
+- **v2.32.20**: Current entity API with embedded credentials and temporal tag search fixes
 - **v2.29.0**: Major authentication architecture change, dataset terminology
 - **v2.28.0**: Enhanced entity model with temporal utilities and metrics integration

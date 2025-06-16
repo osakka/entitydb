@@ -1,12 +1,12 @@
 # Monitoring and Metrics Guide
 
-> **Version**: v2.31.0 | **Last Updated**: 2025-06-14 | **Status**: AUTHORITATIVE
+> **Version**: v2.32.2 | **Last Updated**: 2025-06-14 | **Status**: AUTHORITATIVE
 
 This guide covers comprehensive monitoring and metrics collection for EntityDB, including system health monitoring, performance metrics, alerting setup, and observability best practices.
 
 ## Overview
 
-EntityDB v2.31.0 provides extensive monitoring capabilities through multiple endpoints and metric collection systems designed for production observability and performance optimization.
+EntityDB v2.32.2 provides extensive monitoring capabilities through multiple endpoints and metric collection systems designed for production observability and performance optimization.
 
 ## Monitoring Endpoints
 
@@ -105,7 +105,7 @@ curl -s http://localhost:8085/api/v1/system/metrics | jq '.data.storage'
 - `chunks_count` - Content chunks count
 - `index_size_mb` - Index file sizes
 
-### 2. Performance Metrics (v2.31.0 Enhancements)
+### 2. Performance Metrics (v2.32.2 Enhancements)
 
 #### Tag Operations
 ```bash
@@ -481,7 +481,7 @@ function calculateHealthScore(metrics) {
 }
 ```
 
-## Performance Monitoring (v2.31.0)
+## Performance Monitoring (v2.32.2)
 
 ### 1. O(1) Tag Value Caching
 
@@ -601,4 +601,4 @@ curl -v -H "Upgrade: websocket" \
 
 ---
 
-*This monitoring guide provides comprehensive observability for EntityDB v2.31.0. For additional operational procedures, see [Production Deployment](../70-deployment/01-production-deployment.md).*
+*This monitoring guide provides comprehensive observability for EntityDB v2.32.2. For additional operational procedures, see [Production Deployment](../70-deployment/01-production-deployment.md).*

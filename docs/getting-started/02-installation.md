@@ -3,7 +3,7 @@ title: Installation Guide
 category: Getting Started
 tags: [installation, setup, quick-start]
 last_updated: 2025-06-13
-version: v2.31.0
+version: v2.32.2
 ---
 
 # EntityDB Installation Guide
@@ -23,10 +23,10 @@ This guide walks you through installing and running EntityDB on your system.
 
 ```bash
 # Download the latest release
-wget https://git.home.arpa/itdlabs/entitydb/releases/download/v2.31.0/entitydb-v2.31.0-linux-amd64.tar.gz
+wget https://git.home.arpa/itdlabs/entitydb/releases/download/v2.32.2/entitydb-v2.32.2-linux-amd64.tar.gz
 
 # Extract and install
-tar -xzf entitydb-v2.31.0-linux-amd64.tar.gz
+tar -xzf entitydb-v2.32.2-linux-amd64.tar.gz
 sudo cp entitydb /usr/local/bin/
 ```
 

@@ -155,7 +155,7 @@ All tags are timestamped with nanosecond precision, enabling:
 ## Next Steps
 
 ### Essential Reading
-- [Core Concepts](./03-core-concepts.md) - Understand EntityDB fundamentals
+- [Core Concepts](./04-core-concepts.md) - Understand EntityDB fundamentals
 - [Authentication](../api-reference/02-authentication.md) - Session management
 - [Entity API](../api-reference/03-entities.md) - Complete API reference
 
@@ -167,7 +167,7 @@ All tags are timestamped with nanosecond precision, enabling:
 ### Advanced Features
 - [Temporal Queries](../user-guide/01-temporal-queries.md) - Time-travel operations
 - [Advanced Queries](../user-guide/04-advanced-queries.md) - Connect entities
-- [Performance Tuning](../performance/performance-optimization-results.md) - Optimize for scale
+- [Performance Tuning](../reference/performance/performance.md) - Optimize for scale
 
 ### Administration
 - [Production Deployment](../admin-guide/02-production-checklist.md) - Deploy to production

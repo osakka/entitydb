@@ -117,7 +117,7 @@ For basic deployment, ensure the following:
 
 EntityDB uses a custom binary format (EBF) with the following characteristics:
 
-- **Format Version:** v2.31.0 (current)
+- **Format Version:** v2.32.2 (current)
 - **Backward Compatibility:** Compatible with v2.8.0+
 - **Upgrade Path:** In-place upgrades supported from v2.8.0+
 

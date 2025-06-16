@@ -1,6 +1,6 @@
 # EntityDB Authentication API
 
-> **Version**: v2.31.0 | **Last Updated**: 2025-06-13 | **Status**: AUTHORITATIVE
+> **Version**: v2.32.20 | **Last Updated**: 2025-06-13 | **Status**: AUTHORITATIVE
 
 ## Overview
 

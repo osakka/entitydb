@@ -1,7 +1,7 @@
 # EntityDB Introduction
 
 > **Category**: Getting Started | **Target Audience**: All Users | **Technical Level**: Beginner
-> **Version**: v2.32.0-dev | **Last Updated**: 2025-06-15 | **Status**: AUTHORITATIVE
+> **Version**: v2.32.2 | **Last Updated**: 2025-06-16 | **Status**: AUTHORITATIVE
 
 ## System Overview
 
@@ -312,7 +312,7 @@ EntityDB uses a custom binary format with the following structure:
 
 ## See Also
 
-- [System Specifications](./02-specifications.md) - Technical capabilities and performance characteristics
-- [Requirements](./03-requirements.md) - Hardware and software prerequisites
+- [Technical Specifications](../reference/technical-specifications.md) - Technical capabilities and performance characteristics
+- [System Requirements](../admin-guide/system-requirements.md) - Hardware and software prerequisites
 - [Architecture Overview](../architecture/01-system-overview.md) - Detailed technical architecture
-- [Quick Start Guide](./02-quick-start.md) - Get started with EntityDB
+- [Quick Start Guide](./03-quick-start.md) - Get started with EntityDB

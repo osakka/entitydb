@@ -1,6 +1,6 @@
 # Production Deployment Guide
 
-> **Version**: v2.31.0 | **Last Updated**: 2025-06-14 | **Status**: AUTHORITATIVE
+> **Version**: v2.32.2 | **Last Updated**: 2025-06-14 | **Status**: AUTHORITATIVE
 
 This guide provides comprehensive instructions for deploying EntityDB in production environments, covering security hardening, performance optimization, monitoring setup, and operational best practices.
 
@@ -79,11 +79,11 @@ sudo ufw enable
 ```bash
 # Download and extract EntityDB
 cd /tmp
-wget https://git.home.arpa/itdlabs/entitydb/releases/download/v2.31.0/entitydb-v2.31.0-linux-amd64.tar.gz
-tar -xzf entitydb-v2.31.0-linux-amd64.tar.gz
+wget https://git.home.arpa/itdlabs/entitydb/releases/download/v2.32.2/entitydb-v2.32.2-linux-amd64.tar.gz
+tar -xzf entitydb-v2.32.2-linux-amd64.tar.gz
 
 # Install to production directory
-sudo cp -r entitydb-v2.31.0/* /opt/entitydb/
+sudo cp -r entitydb-v2.32.2/* /opt/entitydb/
 sudo chown -R entitydb:entitydb /opt/entitydb
 sudo chmod +x /opt/entitydb/bin/entitydb
 sudo chmod +x /opt/entitydb/bin/entitydbd.sh
@@ -95,7 +95,7 @@ sudo chmod +x /opt/entitydb/bin/entitydbd.sh
 ```bash
 # Create production environment file
 sudo tee /opt/entitydb/var/entitydb.env << 'EOF'
-# EntityDB Production Configuration v2.31.0
+# EntityDB Production Configuration v2.32.2
 
 # Server Configuration
 ENTITYDB_BIND_ADDRESS="0.0.0.0"
@@ -330,7 +330,7 @@ sudo sysctl -p
 # Update production environment
 sudo tee -a /opt/entitydb/var/entitydb.env << 'EOF'
 
-# Performance Optimization (v2.31.0)
+# Performance Optimization (v2.32.2)
 ENTITYDB_TAG_CACHE_SIZE="10000"           # O(1) tag value caching
 ENTITYDB_PARALLEL_INDEX_WORKERS="4"       # Parallel index building
 ENTITYDB_JSON_ENCODER_POOL_SIZE="100"     # JSON encoder pooling
