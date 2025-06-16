@@ -375,10 +375,28 @@ func (sm *SecurityManager) ValidateSession(token string) (*SecurityUser, error) 
 	sessionEntity := sessionEntities[0]
 	logger.Debug("ValidateSession: Found session entity: %s", sessionEntity.ID)
 	
-	// Check if session is expired
+	// CRITICAL SESSION FIX: Always do a fresh fetch of the session entity to bypass cache
+	// This fixes the race condition where memory cache has stale data after invalidation
+	logger.Debug("ValidateSession: Performing fresh fetch of session entity %s to bypass cache", sessionEntity.ID)
+	freshSessionEntity, err := sm.entityRepo.GetByID(sessionEntity.ID)
+	if err != nil {
+		logger.Debug("ValidateSession: Failed to fresh fetch session entity: %v", err)
+		return nil, fmt.Errorf("session not found")
+	}
+	
+	// Use the fresh entity for validation instead of the potentially cached one
+	sessionEntity = freshSessionEntity
+	logger.Debug("ValidateSession: Using fresh session entity for validation")
+	
+	// Check if session is expired or invalidated
 	sessionTags := sessionEntity.GetTagsWithoutTimestamp()
 	var expiresAt time.Time
 	var expirationStr string
+	var isInvalidated bool
+	
+	// DEBUG: Log all session tags for diagnosis
+	logger.Debug("ValidateSession: Session tags for %s: %v", sessionEntity.ID, sessionTags)
+	
 	for _, tag := range sessionTags {
 		if strings.HasPrefix(tag, "expires:") {
 			expirationStr = strings.TrimPrefix(tag, "expires:")
@@ -387,10 +405,19 @@ func (sm *SecurityManager) ValidateSession(token string) (*SecurityUser, error) 
 				logger.Error("ValidateSession: Failed to parse expiration time '%s': %v", expirationStr, err)
 				return nil, fmt.Errorf("invalid session expiration format")
 			}
-			break
+		} else if tag == "status:invalidated" {
+			isInvalidated = true
+			logger.Error("ValidateSession: FOUND status:invalidated tag for session: %s", sessionEntity.ID)
 		}
 	}
 	
+	// Check for invalidated status first (logout)
+	if isInvalidated {
+		logger.Error("ValidateSession: Session invalidated via logout: %s", sessionEntity.ID)
+		return nil, fmt.Errorf("session invalidated")
+	}
+	
+	// Check for time-based expiration
 	currentTime := time.Now()
 	logger.Info("ValidateSession: Current time: %s, Session expires: %s (raw: %s)", 
 		currentTime.Format(time.RFC3339), expiresAt.Format(time.RFC3339), expirationStr)
@@ -583,7 +610,12 @@ func (sm *SecurityManager) InvalidateSession(token string) error {
 	updatedTags = append(updatedTags, "expires:"+expiredTime)
 	updatedTags = append(updatedTags, "status:invalidated")
 	
-	sessionEntity.Tags = updatedTags
+	logger.Debug("InvalidateSession: Original tags: %v", sessionEntity.Tags)
+	logger.Debug("InvalidateSession: Updated tags: %v", updatedTags)
+	
+	// CRITICAL FIX: Use SetTags to properly invalidate entity tag cache
+	// Direct assignment sessionEntity.Tags = updatedTags bypasses cache invalidation
+	sessionEntity.SetTags(updatedTags)
 	sessionEntity.UpdatedAt = Now()
 	
 	// Update the session entity
