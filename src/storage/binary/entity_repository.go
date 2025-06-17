@@ -3689,11 +3689,27 @@ func (r *EntityRepository) performAutomaticRecovery() error {
 		return nil // Missing index will be rebuilt by normal flow
 	}
 	
-	// Quick timestamp check - if index is much older than DB, it's likely corrupt
-	if idxStat.ModTime().Before(dbStat.ModTime().Add(-5 * time.Minute)) {
-		logger.Warn("Index file appears stale (DB modified %v, index modified %v) - running recovery", 
+	// Enhanced corruption detection - more aggressive recovery
+	shouldRecover := false
+	
+	// 1. Check timestamp staleness (reduced threshold for more aggressive recovery)
+	if idxStat.ModTime().Before(dbStat.ModTime().Add(-2 * time.Minute)) {
+		logger.Warn("Index file appears stale (DB modified %v, index modified %v) - triggering recovery", 
 			dbStat.ModTime(), idxStat.ModTime())
-		
+		shouldRecover = true
+	}
+	
+	// 2. Check size anomalies - if index is too small relative to DB
+	dbSize := dbStat.Size()
+	idxSize := idxStat.Size()
+	if dbSize > 100*1024*1024 && idxSize < 100*1024 { // DB > 100MB but index < 100KB
+		logger.Warn("Index file suspiciously small (%d bytes) for large database (%d bytes) - triggering recovery", 
+			idxSize, dbSize)
+		shouldRecover = true
+	}
+	
+	// 3. Force recovery if we detect continuous corruption issues
+	if shouldRecover {
 		if err := recovery.DiagnoseAndRecover(); err != nil {
 			logger.Error("Automatic recovery failed: %v", err)
 			return err

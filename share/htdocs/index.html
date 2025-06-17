@@ -2901,7 +2901,17 @@
             setChartTimeRange(range) {
                 this.currentTimeRange = range;
                 console.log('Chart time range set to:', range);
-                this.updateRefreshInterval();
+                
+                // Define time range settings for updateRefreshInterval
+                const timeRangeSettings = {
+                    '1h': { interval: 5000 },   // 5 second updates for 1 hour
+                    '6h': { interval: 15000 },  // 15 second updates for 6 hours
+                    '24h': { interval: 30000 }, // 30 second updates for 24 hours
+                    '7d': { interval: 60000 },  // 1 minute updates for 7 days
+                };
+                
+                const settings = timeRangeSettings[range] || { interval: 30000 };
+                this.updateRefreshInterval(settings);
                 this.showAlert(`Chart time range set to: ${range}`, 'info');
             }
 

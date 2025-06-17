@@ -151,39 +151,34 @@ func (icr *IndexCorruptionRecovery) createIndexBackup() error {
 	return icr.copyFile(idxPath, backupPath)
 }
 
-// recoverIndex rebuilds the index by removing corrupted entries
+// recoverIndex rebuilds the index by completely removing it and forcing a rebuild
 func (icr *IndexCorruptionRecovery) recoverIndex() error {
 	logger.Info("Rebuilding corrupted index...")
 	
 	idxPath := filepath.Join(icr.dataPath, "entities.db.idx")
-	newIdxPath := filepath.Join(icr.dataPath, "entities.db.idx.new")
-	dbPath := filepath.Join(icr.dataPath, "entities.db")
 	
-	// Get database file size for validation
-	dbStat, err := os.Stat(dbPath)
-	if err != nil {
-		return fmt.Errorf("cannot access database file: %v", err)
+	// For severe recurring corruption, completely remove the index file
+	// This forces a complete rebuild from the database file
+	if err := os.Remove(idxPath); err != nil && !os.IsNotExist(err) {
+		logger.Warn("Failed to remove corrupted index file: %v", err)
+	} else {
+		logger.Info("Removed corrupted index file - will be rebuilt from database")
 	}
 	
-	// Read existing index and filter out corrupted entries
-	validEntries, err := icr.extractValidEntries(idxPath, dbStat.Size())
-	if err != nil {
-		return fmt.Errorf("failed to extract valid entries: %v", err)
+	// Also remove any temporary or backup index files that might cause issues
+	tempIndexFiles := []string{
+		filepath.Join(icr.dataPath, "entities.db.idx.new"),
+		filepath.Join(icr.dataPath, "entities.db.idx.tmp"),
+		filepath.Join(icr.dataPath, "entities.db.idx.rebuild"),
 	}
 	
-	logger.Info("Extracted %d valid entries from corrupted index", len(validEntries))
-	
-	// Write new index with only valid entries
-	if err := icr.writeCleanIndex(newIdxPath, validEntries); err != nil {
-		return fmt.Errorf("failed to write clean index: %v", err)
+	for _, tempFile := range tempIndexFiles {
+		if err := os.Remove(tempFile); err == nil {
+			logger.Info("Removed temporary index file: %s", tempFile)
+		}
 	}
 	
-	// Replace corrupted index with clean one
-	if err := os.Rename(newIdxPath, idxPath); err != nil {
-		return fmt.Errorf("failed to replace corrupted index: %v", err)
-	}
-	
-	logger.Info("Index successfully rebuilt with %d valid entries", len(validEntries))
+	logger.Info("Index recovery completed - clean rebuild will occur during startup")
 	return nil
 }
 

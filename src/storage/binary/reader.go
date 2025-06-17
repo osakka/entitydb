@@ -45,11 +45,12 @@ var (
 //       log.Printf("Entity not found: %v", err)
 //   }
 type Reader struct {
-	file    *os.File                // Read-only file handle
-	header  *Header                 // File header with metadata
-	tagDict *TagDictionary          // Tag ID to string mapping
-	index   map[string]*IndexEntry  // Entity ID to file location mapping
-	indexMu sync.RWMutex            // SURGICAL FIX: Protects index from concurrent access corruption
+	file            *os.File                // Read-only file handle
+	header          *Header                 // File header with metadata
+	tagDict         *TagDictionary          // Tag ID to string mapping
+	index           map[string]*IndexEntry  // Entity ID to file location mapping
+	indexMu         sync.RWMutex            // SURGICAL FIX: Protects index from concurrent access corruption
+	corruptionCount int                     // Track corruption instances for recovery triggers
 }
 
 // NewReader creates a new Reader instance for the specified binary file.
@@ -227,6 +228,12 @@ func NewReader(filename string) (*Reader, error) {
 			if entry.Offset > uint64(stat.Size()) {
 				logger.Error("Corrupted index entry %d for %s: invalid offset %d exceeds file size %d", 
 					i, id, entry.Offset, stat.Size())
+				
+				// Track corruption for potential automatic recovery trigger
+				r.corruptionCount++
+				if r.corruptionCount > 10 { // More than 10 corrupted entries
+					logger.Warn("High corruption detected (%d corrupted entries) - index may need rebuilding", r.corruptionCount)
+				}
 				continue // Skip corrupted entry instead of crashing
 			}
 			if entry.Size == 0 {
