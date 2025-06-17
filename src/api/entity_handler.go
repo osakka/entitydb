@@ -206,7 +206,7 @@ func (h *EntityHandler) stripTimestampsFromEntity(entity *models.Entity, include
 		return entity
 	}
 	result := *entity
-	result.Tags = entity.GetTagsWithoutTimestamp()
+	result.Tags = entity.GetCurrentTags()
 	return &result
 }
 

@@ -18,8 +18,8 @@ EntityDB now features a unified Entity model with unified sharded indexing:
 - **Temporal Storage**: Up to 100x performance improvement
 - **Advanced Indexing**: B-tree timeline, skip-lists, bloom filters
 - **Memory-Mapped Files**: Zero-copy reads with OS-managed caching
-- **Temporal-Only Storage**: All tags stored with nanosecond timestamps (TIMESTAMP|tag format)
-- **Transparent API**: Tags returned without timestamps by default (use include_timestamps=true to see them)
+- **Temporal Storage**: All data stored with nanosecond timestamps internally
+- **Unified API**: Current state endpoints return clean deduplicated tags, temporal endpoints show full history
 - **Binary Storage**: Custom binary format (EBF) with WAL and concurrent access
 - **Pure Entity Model**: Everything is an entity with tags
 - **RBAC Enforcement**: Full permission system with tag-based access control
@@ -41,6 +41,7 @@ EntityDB now features a unified Entity model with unified sharded indexing:
 - **Configuration Management Overhaul (v2.32.0)**: Complete three-tier configuration system (Database > CLI flags > Environment variables) eliminating all hardcoded values, configurable admin credentials and system parameters, comprehensive CLI flag coverage with proper naming conventions
 - **Final Workspace Audit (v2.32.0)**: Comprehensive code audit ensuring absolute single source of truth compliance, elimination of obsolete tools, proper file organization, and pristine workspace condition
 - **🎉 TEMPORAL FEATURES IMPLEMENTATION COMPLETE (v2.32.0)**: All 4 temporal endpoints fully implemented and working: history, as-of, diff, changes. Fixed repository casting issue for CachedRepository wrapper. EntityDB now delivers 100% temporal functionality with nanosecond precision timestamps and complete RBAC integration.
+- **🚀 UNIFIED TAG ARCHITECTURE (v2.32.0)**: Implemented clean tag deduplication across all API endpoints. Current state queries (`/entities/list`, `/entities/get`) return deduplicated tags (e.g., `name:value`), while temporal endpoints provide full historical data. Single source of truth with bleeding-edge unified architecture.
 - **🚀 PRODUCTION BATTLE TESTED (v2.32.0)**: Comprehensive real-world e-commerce scenario testing with concurrent operations, complex workflows, and stress testing. Critical query filtering bug discovered and surgically fixed. EntityDB proven production-ready with excellent performance under load.
 - **🎯 COMPREHENSIVE BATTLE TESTING COMPLETE (v2.32.0)**: Extensively tested across 5 demanding real-world scenarios: e-commerce platform, IoT sensor monitoring, multi-tenant SaaS, document management, and high-frequency trading. Critical security vulnerability in multi-tag queries discovered and fixed (OR→AND logic). Performance optimizations achieved 60%+ improvement in complex queries.
 - **⚡ MULTI-TAG PERFORMANCE OPTIMIZATION (v2.32.0)**: Surgical optimization of multi-tag AND queries achieving 60%+ performance improvement. Smart ordering by result set size, early termination for empty intersections, and memory-efficient intersection algorithms. Complex queries now execute in 18-38ms (down from 101ms).
@@ -113,18 +114,18 @@ EntityDB now features a unified Entity model with unified sharded indexing:
 
 ### API Endpoints
 ```
-# Entity operations (RBAC enforced)
-GET    /api/v1/entities/list         # Requires entity:view
-GET    /api/v1/entities/get          # Requires entity:view
+# Current state operations (RBAC enforced) - Return deduplicated tags
+GET    /api/v1/entities/list         # Requires entity:view - clean tags (name:value)
+GET    /api/v1/entities/get          # Requires entity:view - clean tags (name:value)
 POST   /api/v1/entities/create       # Requires entity:create
 PUT    /api/v1/entities/update       # Requires entity:update
 GET    /api/v1/entities/query        # Advanced query with sorting/filtering
 
-# Temporal operations (RBAC enforced)
-GET    /api/v1/entities/as-of        # Requires entity:view
-GET    /api/v1/entities/history      # Requires entity:view
-GET    /api/v1/entities/changes      # Requires entity:view
-GET    /api/v1/entities/diff         # Requires entity:view
+# Temporal operations (RBAC enforced) - Full historical data
+GET    /api/v1/entities/as-of        # Requires entity:view - entity state at timestamp
+GET    /api/v1/entities/history      # Requires entity:view - complete change history
+GET    /api/v1/entities/changes      # Requires entity:view - changes since timestamp
+GET    /api/v1/entities/diff         # Requires entity:view - differences between timestamps
 
 # Relationship operations (RBAC enforced)
 POST   /api/v1/entity-relationships  # Requires relation:create

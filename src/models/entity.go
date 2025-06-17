@@ -16,6 +16,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -362,6 +363,67 @@ func (e *Entity) GetTagsWithoutTimestamp() []string {
 	result := make([]string, len(e.cleanTagsCache))
 	copy(result, e.cleanTagsCache)
 	return result
+}
+
+// GetCurrentTags returns only the most recent value for each tag namespace
+// This provides the current state of the entity by deduplicating tags
+func (e *Entity) GetCurrentTags() []string {
+	if len(e.Tags) == 0 {
+		return []string{}
+	}
+	
+	// Map to store the latest value for each tag namespace
+	latestTags := make(map[string]tagWithTimestamp)
+	
+	for _, tag := range e.Tags {
+		// Parse temporal tag format: "TIMESTAMP|tag:value"
+		lastPipe := strings.LastIndex(tag, "|")
+		if lastPipe >= 0 {
+			timestampStr := tag[:lastPipe]
+			actualTag := tag[lastPipe+1:]
+			
+			// Parse timestamp
+			timestamp, err := strconv.ParseInt(timestampStr, 10, 64)
+			if err != nil {
+				// If timestamp parsing fails, treat as non-temporal tag
+				latestTags[actualTag] = tagWithTimestamp{tag: actualTag, timestamp: 0}
+				continue
+			}
+			
+			// Extract tag namespace (everything before first colon)
+			colonIndex := strings.Index(actualTag, ":")
+			var namespace string
+			if colonIndex >= 0 {
+				namespace = actualTag[:colonIndex]
+			} else {
+				namespace = actualTag
+			}
+			
+			// Keep only the latest timestamp for each namespace
+			if existing, exists := latestTags[namespace]; !exists || timestamp > existing.timestamp {
+				latestTags[namespace] = tagWithTimestamp{tag: actualTag, timestamp: timestamp}
+			}
+		} else {
+			// Non-temporal tag - use as-is
+			latestTags[tag] = tagWithTimestamp{tag: tag, timestamp: 0}
+		}
+	}
+	
+	// Extract just the tag values, sorted for consistency
+	result := make([]string, 0, len(latestTags))
+	for _, tagInfo := range latestTags {
+		result = append(result, tagInfo.tag)
+	}
+	
+	// Sort for consistent output
+	sort.Strings(result)
+	return result
+}
+
+// tagWithTimestamp is a helper struct for tag deduplication
+type tagWithTimestamp struct {
+	tag       string
+	timestamp int64
 }
 
 // buildCleanTagsCache builds or rebuilds the clean tags cache

@@ -877,6 +877,13 @@
                 }
             }
 
+            // Helper function to convert time range to hours for temporal API
+            getRangeInHours(range) {
+                const settings = this.timeRangeSettings[range];
+                if (!settings) return 1; // Default to 1 hour
+                return Math.ceil(settings.minutes / 60);
+            }
+
             async init() {
                 console.log('Initializing Enhanced EntityDB Admin...');
                 await this.loadDatasetSelector();
@@ -1001,7 +1008,7 @@
 
                     document.getElementById('totalEntities').textContent = entities.length || 0;
                     document.getElementById('activeUsers').textContent = users.active_users || 0;
-                    document.getElementById('activeSessions').textContent = users.active_sessions || 0;
+                    document.getElementById('activeSessions').textContent = users.sessions?.active_count || 0;
                     document.getElementById('systemHealth').textContent = health.status === 'healthy' ? '100%' : '50%';
 
                     // Update current user
@@ -1078,8 +1085,8 @@
                                         <td>${user.id.substring(0, 12)}...</td>
                                         <td>${this.extractTagValue(user, 'identity:username')}</td>
                                         <td><span class="tag">${this.extractTagValue(user, 'status')}</span></td>
-                                        <td>${this.extractTagValue(user, 'rbac:role')}</td>
-                                        <td>${this.formatDate(user.created_at)}</td>
+                                        <td>${this.extractRoleValue(user)}</td>
+                                        <td>${this.formatDate(this.extractTagValue(user, 'created_at'))}</td>
                                         <td>
                                             <button class="btn btn-sm btn-primary" onclick="app.viewEntity('${user.id}')">View</button>
                                             <button class="btn btn-sm btn-secondary" onclick="app.showChangePasswordModal('${user.id}', '${this.extractTagValue(user, 'identity:username')}')">Change Password</button>
@@ -1216,12 +1223,18 @@
 
                     const timestamp = this.formatTimeLabel(new Date());
 
-                    // Update performance chart with REAL API response time
+                    // Update dashboard performance chart with REAL-TIME connection latency
                     if (this.charts.performance) {
                         const startTime = performance.now();
-                        await this.apiCall('/health');
-                        const responseTime = Math.round(performance.now() - startTime);
-                        this.updateChart(this.charts.performance, timestamp, responseTime);
+                        // Test actual connection latency with a lightweight endpoint
+                        try {
+                            await this.apiCall('/health');
+                            const connectionLatency = Math.round(performance.now() - startTime);
+                            this.updateChart(this.charts.performance, timestamp, connectionLatency);
+                        } catch (error) {
+                            // If connection fails, show high latency
+                            this.updateChart(this.charts.performance, timestamp, 5000);
+                        }
                     }
 
                     // Update memory chart with REAL memory data
@@ -1236,26 +1249,28 @@
                         this.charts.memory.update();
                     }
 
-                    // Response time chart - same as performance for now
-                    if (this.charts.responseTime) {
-                        const startTime = performance.now();
-                        await this.apiCall('/health');
-                        const responseTime = Math.round(performance.now() - startTime);
-                        this.updateChart(this.charts.responseTime, timestamp, responseTime);
+                    // Response time chart - use actual storage read duration
+                    if (this.charts.responseTime && systemMetrics.performance) {
+                        const storageTime = systemMetrics.performance.storage_read_duration_ms || 0;
+                        this.updateChart(this.charts.responseTime, timestamp, storageTime);
                     }
 
-                    // Request volume - use zero since we don't have real request metrics yet
-                    if (this.charts.requestVolume) {
-                        this.updateChart(this.charts.requestVolume, timestamp, 0);
+                    // Request volume - use actual query result count
+                    if (this.charts.requestVolume && systemMetrics.performance) {
+                        const queryCount = systemMetrics.performance.http_requests_total || 0;
+                        this.updateChart(this.charts.requestVolume, timestamp, queryCount);
                     }
 
-                    // Storage IOPS - use zero since we don't have real storage metrics yet
-                    if (this.charts.storageRead) {
-                        this.updateChart(this.charts.storageRead, timestamp, 0);
+                    // Storage Read - use actual storage read bytes
+                    if (this.charts.storageRead && systemMetrics.storage) {
+                        const readBytes = systemMetrics.storage.read_bytes || 0;
+                        this.updateChart(this.charts.storageRead, timestamp, Math.round(readBytes / 1024)); // Convert to KB
                     }
 
-                    if (this.charts.storageWrite) {
-                        this.updateChart(this.charts.storageWrite, timestamp, 0);
+                    // Storage Write - use actual storage write bytes
+                    if (this.charts.storageWrite && systemMetrics.storage) {
+                        const writeBytes = systemMetrics.storage.write_bytes || 0;
+                        this.updateChart(this.charts.storageWrite, timestamp, Math.round(writeBytes / 1024)); // Convert to KB
                     }
 
                     // Update custom chart with REAL entity counts
@@ -1842,20 +1857,23 @@
             }
             
             async loadHistoricalDataForChart(chartId, range, chart, timeLabels, startTimeMs, intervalMs) {
+                // Enhanced metrics mapping using actual temporal storage metrics
                 const metricsMap = {
-                    'performance': 'storage_read_duration_ms',
+                    'performance': 'query_execution_time_ms',
                     'responseTime': 'storage_read_duration_ms', 
                     'requestVolume': 'query_result_count',
-                    'storageRead': 'storage_read_duration_ms',
-                    'storageWrite': 'storage_read_duration_ms'
+                    'storageRead': 'storage_read_bytes',
+                    'storageWrite': 'storage_cache_hits'
                 };
                 
                 const metricName = metricsMap[chartId];
                 if (!metricName) return;
                 
                 try {
-                    console.log(`Loading historical data for ${chartId} using metric ${metricName}`);
-                    const metricsData = await this.apiCall(`/api/v1/metrics/history?metric_name=${metricName}&range=${range}`);
+                    console.log(`Loading temporal historical data for ${chartId} using metric ${metricName}`);
+                    // Use temporal storage endpoint with hours parameter for better data range
+                    const hours = this.getRangeInHours(range);
+                    const metricsData = await this.apiCall(`/api/v1/metrics/history?metric_name=${metricName}&hours=${hours}&limit=100`);
                     if (metricsData && metricsData.data_points && metricsData.data_points.length > 0) {
                         console.log(`Loaded ${metricsData.data_points.length} data points for ${chartId}`);
                         this.mapHistoricalDataToChart(chart, metricsData.data_points, timeLabels, startTimeMs, intervalMs);
@@ -2007,7 +2025,31 @@
             extractTagValue(entity, tagKey) {
                 if (!entity.tags) return 'N/A';
                 const tag = entity.tags.find(t => t.includes(tagKey + ':'));
-                return tag ? tag.split(tagKey + ':')[1].split('|')[0] : 'N/A';
+                if (!tag) return 'N/A';
+                return tag.split(tagKey + ':')[1] || 'N/A';
+            }
+
+            extractRoleValue(entity) {
+                if (!entity.tags) return 'N/A';
+                
+                const roleTag = entity.tags.find(t => t.startsWith('rbac:role:'));
+                if (roleTag) {
+                    const roleParts = roleTag.split(':');
+                    return roleParts.length >= 3 ? roleParts[2] : 'N/A';
+                }
+                
+                const adminPerm = entity.tags.find(t => t.startsWith('rbac:perm:*'));
+                if (adminPerm) {
+                    return 'admin';
+                }
+                
+                // Check for user permissions
+                const userPerm = entity.tags.find(t => t.startsWith('rbac:perm:') && !t.includes('*'));
+                if (userPerm) {
+                    return 'user';
+                }
+                
+                return 'N/A';
             }
 
             getLatestValue(metric) {
@@ -2018,7 +2060,19 @@
 
             formatDate(timestamp) {
                 if (!timestamp) return 'N/A';
-                return new Date(timestamp).toLocaleDateString();
+                
+                // Handle nanosecond timestamps (19 digits) by converting to milliseconds
+                let ms = timestamp;
+                if (typeof timestamp === 'string') {
+                    ms = parseInt(timestamp);
+                }
+                
+                // If timestamp looks like nanoseconds (> 13 digits), convert to milliseconds
+                if (ms > 9999999999999) { // More than 13 digits = nanoseconds
+                    ms = Math.floor(ms / 1000000); // Convert nanoseconds to milliseconds
+                }
+                
+                return new Date(ms).toLocaleDateString();
             }
 
             formatBytes(bytes) {
@@ -2395,15 +2449,16 @@
                 }
 
                 try {
-                    // Query metrics history for the specified metric
-                    const result = await this.apiCall(`/api/v1/metrics/history?metric=${metricName}&range=${timeRange}`);
+                    // Query temporal metrics history using the enhanced endpoint
+                    const hours = this.getRangeInHours(timeRange) || 24;
+                    const result = await this.apiCall(`/api/v1/metrics/history?metric_name=${metricName}&hours=${hours}&limit=200`);
                     
-                    if (result && result.data && result.data.length > 0) {
-                        this.displayCustomChart(result.data, metricName);
+                    if (result && result.data_points && result.data_points.length > 0) {
+                        this.displayCustomChart(result.data_points, metricName);
                         document.getElementById('customMetricsChart').style.display = 'block';
-                        this.showAlert(`Loaded ${result.data.length} data points for ${metricName}`, 'success');
+                        this.showAlert(`Loaded ${result.data_points.length} temporal data points for ${metricName}`, 'success');
                     } else {
-                        this.showAlert(`No data found for metric: ${metricName}`, 'info');
+                        this.showAlert(`No temporal data found for metric: ${metricName}`, 'info');
                         document.getElementById('customMetricsChart').style.display = 'none';
                     }
                 } catch (error) {
@@ -2430,7 +2485,8 @@
                     this.datasets.forEach(dataset => {
                         const option = document.createElement('option');
                         option.value = dataset.id;
-                        option.textContent = this.extractTagValue(dataset, 'name') || dataset.id.substring(0, 12);
+                        // Use dataset.name directly since /api/v1/datasets returns processed format
+                        option.textContent = dataset.name || dataset.id.substring(0, 12);
                         selector.appendChild(option);
                     });
                     
