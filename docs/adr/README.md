@@ -37,6 +37,22 @@ Each ADR follows the template:
 |-----|-------|--------|------|-------------|
 | [009](./009-memory-optimization-suite.md) | Comprehensive Memory Optimization Suite | Accepted | 2025-06-13 | `87a08fa4`, `0ed28c89` |
 | [010](./010-temporal-functionality-completion.md) | Complete Temporal Database Implementation | Accepted | 2025-06-16 | `cf6ce80e`, `456fee63` |
+| [011](./011-production-battle-testing.md) | Production Battle Testing and Multi-Tag Performance Optimization | Accepted | 2025-06-17 | `d57168c`, `6ef5003` |
+
+### Architecture & Engineering Decisions
+
+| ADR | Title | Status | Date | Git Commits |
+|-----|-------|--------|------|-------------|
+| [012](./012-binary-repository-unification.md) | Binary Repository Unification and Single Source of Truth | Accepted | 2025-06-15 | `a22193d`, `2baa028` |
+| [013](./013-pure-tag-based-session-management.md) | Pure Tag-Based Session Management | Accepted | 2025-06-15 | `b91d85a`, `a99cf6c` |
+| [014](./014-single-source-of-truth-enforcement.md) | Single Source of Truth Enforcement | Accepted | 2025-06-16 | `fc2361a`, `70a5b86` |
+
+### Reliability & Operations Decisions
+
+| ADR | Title | Status | Date | Git Commits |
+|-----|-------|--------|------|-------------|
+| [015](./015-wal-management-and-checkpointing.md) | WAL Management and Automatic Checkpointing | Accepted | 2025-06-16 | `af7ac83`, WAL fixes |
+| [016](./016-error-recovery-and-resilience.md) | Error Recovery and Resilience Architecture | Accepted | 2025-06-16 | Recovery implementations |
 
 ## Creating New ADRs
 
