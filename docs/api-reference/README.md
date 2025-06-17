@@ -6,6 +6,12 @@ Complete reference documentation for EntityDB's REST API. This section provides 
 
 ## 📋 Contents
 
+### [Endpoint Inventory](./00-endpoint-inventory.md)
+**Complete listing of all 40 API endpoints**
+- Comprehensive endpoint catalog with authentication requirements  
+- HTTP methods, paths, and functionality overview
+- Quick reference for developers and integrators
+
 ### [API Overview](./01-overview.md)
 **API fundamentals and getting started**
 - Base URL and versioning strategy
