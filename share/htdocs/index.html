@@ -2469,7 +2469,16 @@
 
             async loadDatasetSelector() {
                 try {
-                    this.datasets = await this.apiCall('/api/v1/datasets');
+                    // Use the new unique tag values endpoint to get available datasets
+                    const response = await this.apiCall('/api/v1/tags/values?namespace=dataset');
+                    const datasetValues = response.values || [];
+                    
+                    // Convert to dataset objects for compatibility
+                    this.datasets = datasetValues.map(value => ({
+                        id: value,
+                        name: value.charAt(0).toUpperCase() + value.slice(1) // Capitalize first letter
+                    }));
+                    
                     const selector = document.getElementById('datasetSelector');
                     
                     // Clear existing options
@@ -2485,8 +2494,7 @@
                     this.datasets.forEach(dataset => {
                         const option = document.createElement('option');
                         option.value = dataset.id;
-                        // Use dataset.name directly since /api/v1/datasets returns processed format
-                        option.textContent = dataset.name || dataset.id.substring(0, 12);
+                        option.textContent = dataset.name;
                         selector.appendChild(option);
                     });
                     
