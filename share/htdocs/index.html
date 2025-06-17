@@ -257,6 +257,27 @@
             font-size: 12px;
         }
 
+        /* Badges */
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            font-size: 12px;
+            font-weight: bold;
+            border-radius: 4px;
+            text-align: center;
+            white-space: nowrap;
+        }
+
+        .badge-success {
+            background-color: #48bb78;
+            color: white;
+        }
+
+        .badge-warning {
+            background-color: #ed8936;
+            color: white;
+        }
+
         /* Modal */
         .modal {
             display: none;
@@ -783,7 +804,9 @@
                 <div class="card">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                         <h3>Dataset Management</h3>
-                        <button class="btn btn-primary" onclick="app.showCreateDatasetModal()">Create Dataset</button>
+                        <div style="font-size: 14px; color: #666;">
+                            Datasets are discovered automatically from entity tags. Create or edit configuration entities below.
+                        </div>
                     </div>
                     <div id="datasetsTable">Loading datasets...</div>
                 </div>
@@ -1105,31 +1128,71 @@
 
             async loadDatasets() {
                 try {
-                    const datasets = await this.apiCall('/api/v1/datasets');
+                    // Get unique datasets from tag values
+                    const uniqueDatasetsResponse = await this.apiCall('/api/v1/tags/values?namespace=dataset');
+                    const uniqueDatasets = uniqueDatasetsResponse.values || [];
+                    
+                    // Get existing dataset configuration entities
+                    const configEntities = await this.apiCall('/api/v1/entities/list?tag=type:dataset');
+                    
+                    // Get entity counts per dataset
+                    const allEntities = await this.apiCall('/api/v1/entities/list');
+                    const datasetCounts = {};
+                    allEntities.forEach(entity => {
+                        const datasetTag = entity.tags.find(tag => tag.startsWith('dataset:'));
+                        if (datasetTag) {
+                            const dataset = datasetTag.split(':')[1];
+                            datasetCounts[dataset] = (datasetCounts[dataset] || 0) + 1;
+                        }
+                    });
+                    
+                    // Create dataset info combining unique datasets with config entities
+                    const datasetInfo = uniqueDatasets.map(datasetName => {
+                        const configEntity = configEntities.find(entity => 
+                            this.extractTagValue(entity, 'name') === datasetName
+                        );
+                        
+                        return {
+                            name: datasetName,
+                            hasConfig: !!configEntity,
+                            configEntity: configEntity,
+                            entityCount: datasetCounts[datasetName] || 0,
+                            description: configEntity ? this.extractTagValue(configEntity, 'description') : 'No configuration',
+                            created: configEntity ? this.formatDate(configEntity.created_at) : 'N/A'
+                        };
+                    });
                     
                     const tableHTML = `
                         <table class="table">
                             <thead>
                                 <tr>
-                                    <th>ID</th>
-                                    <th>Name</th>
+                                    <th>Dataset</th>
                                     <th>Description</th>
-                                    <th>Created</th>
                                     <th>Entities</th>
+                                    <th>Config Status</th>
+                                    <th>Created</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                ${datasets.map(dataset => `
+                                ${datasetInfo.map(dataset => `
                                     <tr>
-                                        <td>${dataset.id.substring(0, 12)}...</td>
-                                        <td><strong>${this.extractTagValue(dataset, 'name')}</strong></td>
-                                        <td>${this.extractTagValue(dataset, 'description')}</td>
-                                        <td>${this.formatDate(dataset.created_at)}</td>
-                                        <td>0</td>
+                                        <td><strong>${dataset.name}</strong></td>
+                                        <td>${dataset.description}</td>
+                                        <td><span class="badge">${dataset.entityCount}</span></td>
                                         <td>
-                                            <button class="btn btn-sm btn-primary" onclick="app.viewDataset('${dataset.id}')">View</button>
-                                            <button class="btn btn-sm btn-secondary" onclick="app.editDataset('${dataset.id}')">Edit</button>
+                                            ${dataset.hasConfig 
+                                                ? '<span class="badge badge-success">Configured</span>' 
+                                                : '<span class="badge badge-warning">No Config</span>'
+                                            }
+                                        </td>
+                                        <td>${dataset.created}</td>
+                                        <td>
+                                            <button class="btn btn-sm btn-primary" onclick="app.viewDataset('${dataset.name}')">View</button>
+                                            ${dataset.hasConfig 
+                                                ? `<button class="btn btn-sm btn-secondary" onclick="app.editDatasetConfig('${dataset.name}')">Edit Config</button>`
+                                                : `<button class="btn btn-sm btn-success" onclick="app.createDatasetConfig('${dataset.name}')">Create Config</button>`
+                                            }
                                         </td>
                                     </tr>
                                 `).join('')}
@@ -2289,64 +2352,172 @@
                 }
             }
 
-            showCreateDatasetModal() {
+            showDatasetConfigModal(datasetName, configEntity = null) {
+                const isEdit = !!configEntity;
+                const currentName = configEntity ? this.extractTagValue(configEntity, 'name') : datasetName;
+                const currentDescription = configEntity ? this.extractTagValue(configEntity, 'description') : '';
+                
                 const modalHTML = `
                     <div id="datasetModal" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; display: flex; justify-content: center; align-items: center;">
                         <div class="card" style="width: 500px; margin: 0;">
-                            <h3>Create New Dataset</h3>
+                            <h3>${isEdit ? 'Edit' : 'Create'} Dataset Configuration</h3>
                             <div class="form-group">
-                                <label>Name:</label>
-                                <input type="text" id="datasetName" required>
+                                <label>Dataset Name:</label>
+                                <input type="text" id="datasetConfigName" value="${currentName}" ${isEdit ? 'readonly' : ''} required>
+                                ${isEdit ? '<small>Dataset name cannot be changed</small>' : ''}
                             </div>
                             <div class="form-group">
                                 <label>Description:</label>
-                                <textarea id="datasetDescription" rows="3"></textarea>
+                                <textarea id="datasetConfigDescription" rows="3" placeholder="Describe this dataset's purpose and configuration">${currentDescription}</textarea>
+                            </div>
+                            <div class="form-group">
+                                <label>Additional Configuration:</label>
+                                <textarea id="datasetConfigExtra" rows="4" placeholder="Additional JSON configuration (optional)"></textarea>
+                                <small>Enter additional configuration as JSON (e.g., {"retention_days": 30, "backup_enabled": true})</small>
                             </div>
                             <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
                                 <button class="btn btn-secondary" onclick="app.closeModal()">Cancel</button>
-                                <button class="btn btn-primary" onclick="app.createDataset()">Create Dataset</button>
+                                <button class="btn btn-primary" onclick="app.${isEdit ? 'updateDatasetConfig' : 'saveDatasetConfig'}('${datasetName}', ${isEdit ? `'${configEntity.id}'` : 'null'})">${isEdit ? 'Update' : 'Create'} Configuration</button>
                             </div>
                         </div>
                     </div>
                 `;
                 document.body.insertAdjacentHTML('beforeend', modalHTML);
+                
+                // If editing, populate additional config
+                if (configEntity && configEntity.content) {
+                    try {
+                        const content = typeof configEntity.content === 'string' ? 
+                            JSON.parse(configEntity.content) : configEntity.content;
+                        document.getElementById('datasetConfigExtra').value = JSON.stringify(content, null, 2);
+                    } catch (e) {
+                        // Content is not JSON, leave it as is
+                    }
+                }
             }
 
-            async createDataset() {
-                const name = document.getElementById('datasetName').value;
-                const description = document.getElementById('datasetDescription').value;
+            async createDatasetConfig(datasetName) {
+                this.showDatasetConfigModal(datasetName);
+            }
+
+            async editDatasetConfig(datasetName) {
+                try {
+                    const configEntities = await this.apiCall('/api/v1/entities/list?tag=type:dataset');
+                    const configEntity = configEntities.find(entity => 
+                        this.extractTagValue(entity, 'name') === datasetName
+                    );
+                    
+                    if (!configEntity) {
+                        this.showAlert('Configuration entity not found', 'error');
+                        return;
+                    }
+                    
+                    this.showDatasetConfigModal(datasetName, configEntity);
+                } catch (error) {
+                    this.showAlert(`Error loading dataset configuration: ${error.message}`, 'error');
+                }
+            }
+
+            async saveDatasetConfig(datasetName, entityId) {
+                const name = document.getElementById('datasetConfigName').value;
+                const description = document.getElementById('datasetConfigDescription').value;
+                const extraConfigText = document.getElementById('datasetConfigExtra').value;
 
                 if (!name) {
                     this.showAlert('Dataset name is required', 'error');
                     return;
                 }
 
+                let extraConfig = {};
+                if (extraConfigText.trim()) {
+                    try {
+                        extraConfig = JSON.parse(extraConfigText);
+                    } catch (e) {
+                        this.showAlert('Invalid JSON in additional configuration', 'error');
+                        return;
+                    }
+                }
+
                 try {
-                    const result = await this.apiCall('/api/v1/datasets', 'POST', {
-                        name,
-                        description: description || `Dataset: ${name}`
+                    const tags = [
+                        'type:dataset',
+                        `name:${name}`,
+                        `description:${description || 'Dataset configuration'}`,
+                        'dataset:system'  // Store dataset configs in system dataset
+                    ];
+
+                    const result = await this.apiCall('/api/v1/entities/create', 'POST', {
+                        tags,
+                        content: JSON.stringify(extraConfig)
                     });
 
                     if (result.error) {
-                        this.showAlert(`Error creating dataset: ${result.error}`, 'error');
+                        this.showAlert(`Error creating dataset configuration: ${result.error}`, 'error');
                     } else {
-                        this.showAlert('Dataset created successfully', 'success');
+                        this.showAlert('Dataset configuration created successfully', 'success');
                         this.closeModal();
                         await this.loadDatasets();
                     }
                 } catch (error) {
-                    this.showAlert(`Error creating dataset: ${error.message}`, 'error');
+                    this.showAlert(`Error creating dataset configuration: ${error.message}`, 'error');
                 }
             }
 
-            async viewDataset(datasetId) {
-                // Navigate to entities tab and filter by dataset
-                switchTab('entities');
-                this.showAlert('Dataset view functionality coming soon', 'info');
+            async updateDatasetConfig(datasetName, entityId) {
+                const name = document.getElementById('datasetConfigName').value;
+                const description = document.getElementById('datasetConfigDescription').value;
+                const extraConfigText = document.getElementById('datasetConfigExtra').value;
+
+                if (!name) {
+                    this.showAlert('Dataset name is required', 'error');
+                    return;
+                }
+
+                let extraConfig = {};
+                if (extraConfigText.trim()) {
+                    try {
+                        extraConfig = JSON.parse(extraConfigText);
+                    } catch (e) {
+                        this.showAlert('Invalid JSON in additional configuration', 'error');
+                        return;
+                    }
+                }
+
+                try {
+                    const tags = [
+                        'type:dataset',
+                        `name:${name}`,
+                        `description:${description || 'Dataset configuration'}`,
+                        'dataset:system'  // Store dataset configs in system dataset
+                    ];
+
+                    const result = await this.apiCall(`/api/v1/entities/update?id=${entityId}`, 'PUT', {
+                        tags,
+                        content: JSON.stringify(extraConfig)
+                    });
+
+                    if (result.error) {
+                        this.showAlert(`Error updating dataset configuration: ${result.error}`, 'error');
+                    } else {
+                        this.showAlert('Dataset configuration updated successfully', 'success');
+                        this.closeModal();
+                        await this.loadDatasets();
+                    }
+                } catch (error) {
+                    this.showAlert(`Error updating dataset configuration: ${error.message}`, 'error');
+                }
             }
 
-            async editDataset(datasetId) {
-                this.showAlert('Dataset edit functionality coming soon', 'info');
+            async viewDataset(datasetName) {
+                // Navigate to entities tab and filter by dataset
+                switchTab('entities');
+                // Set the dataset selector to this dataset
+                const selector = document.getElementById('datasetSelector');
+                if (selector) {
+                    selector.value = datasetName;
+                    await this.switchDataset();
+                }
+                this.showAlert(`Viewing entities in dataset: ${datasetName}`, 'info');
             }
 
             // Temporal Query Functions
