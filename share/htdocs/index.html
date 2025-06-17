@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EntityDB Enhanced Admin Console</title>
+    <title>EntityDB v2.32.0 Admin Console</title>
     
     <!-- Prevent caching -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -514,7 +514,7 @@
     <div class="container">
         <!-- Header -->
         <div class="header">
-            <h1>EntityDB Enhanced Admin Console</h1>
+            <h1>EntityDB v2.32.0 Admin Console</h1>
             <div class="user-info">
                 <div class="status-indicator">
                     <div class="status-dot"></div>
@@ -532,7 +532,9 @@
                 <button class="tab-button" onclick="switchTab('entities')">Entities</button>
                 <button class="tab-button" onclick="switchTab('performance')">Performance</button>
                 <button class="tab-button" onclick="switchTab('metrics')">Metrics</button>
+                <button class="tab-button" onclick="switchTab('temporal')">Temporal</button>
                 <button class="tab-button" onclick="switchTab('users')">Users</button>
+                <button class="tab-button" onclick="switchTab('datasets')">Datasets</button>
                 <button class="tab-button" onclick="switchTab('system')">System</button>
                 <button class="tab-button" onclick="switchTab('api')">API Console</button>
             </div>
@@ -714,6 +716,51 @@
                 </div>
             </div>
 
+            <!-- Temporal Tab -->
+            <div id="temporal" class="tab-content">
+                <div class="card">
+                    <h3>Temporal Database Features ⏱️</h3>
+                    <p>EntityDB v2.32.0 provides complete temporal database functionality with nanosecond precision timestamps.</p>
+                    
+                    <div class="grid grid-2">
+                        <div class="card">
+                            <h4>Time Travel Queries</h4>
+                            <div class="form-group">
+                                <label>Entity ID:</label>
+                                <input type="text" id="temporalEntityId" placeholder="Enter entity ID">
+                            </div>
+                            <div class="form-group">
+                                <label>Timestamp (ISO 8601):</label>
+                                <input type="datetime-local" id="temporalTimestamp">
+                            </div>
+                            <button class="btn btn-primary" onclick="app.queryAsOf()">Query As-Of</button>
+                            <button class="btn btn-secondary" onclick="app.queryHistory()">Get History</button>
+                        </div>
+                        
+                        <div class="card">
+                            <h4>Change Detection</h4>
+                            <div class="form-group">
+                                <label>From Time:</label>
+                                <input type="datetime-local" id="temporalFromTime">
+                            </div>
+                            <div class="form-group">
+                                <label>To Time:</label>
+                                <input type="datetime-local" id="temporalToTime">
+                            </div>
+                            <button class="btn btn-primary" onclick="app.queryChanges()">Get Changes</button>
+                            <button class="btn btn-secondary" onclick="app.queryDiff()">Get Diff</button>
+                        </div>
+                    </div>
+                    
+                    <div class="card">
+                        <h4>Temporal Query Results</h4>
+                        <div id="temporalResults" style="max-height: 400px; overflow-y: auto; background: #f7fafc; padding: 15px; border-radius: 6px;">
+                            Select an entity and query type above to see temporal data...
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Users Tab -->
             <div id="users" class="tab-content">
                 <div class="card">
@@ -722,6 +769,17 @@
                         <button class="btn btn-primary" onclick="app.showCreateUserModal()">Create User</button>
                     </div>
                     <div id="usersTable">Loading users...</div>
+                </div>
+            </div>
+
+            <!-- Datasets Tab -->
+            <div id="datasets" class="tab-content">
+                <div class="card">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <h3>Dataset Management</h3>
+                        <button class="btn btn-primary" onclick="app.showCreateDatasetModal()">Create Dataset</button>
+                    </div>
+                    <div id="datasetsTable">Loading datasets...</div>
                 </div>
             </div>
 
@@ -915,6 +973,7 @@
                     await this.loadDashboardData();
                     await this.loadEntities();
                     await this.loadUsers();
+                    await this.loadDatasets();
                     await this.loadSystemInfo();
                     await this.loadMetrics();
                     
@@ -1010,6 +1069,7 @@
                                         <td>${this.formatDate(user.created_at)}</td>
                                         <td>
                                             <button class="btn btn-sm btn-primary" onclick="app.viewEntity('${user.id}')">View</button>
+                                            <button class="btn btn-sm btn-secondary" onclick="app.showChangePasswordModal('${user.id}', '${this.extractTagValue(user, 'identity:username')}')">Change Password</button>
                                         </td>
                                     </tr>
                                 `).join('')}
@@ -1020,6 +1080,46 @@
                     document.getElementById('usersTable').innerHTML = tableHTML;
                 } catch (error) {
                     document.getElementById('usersTable').innerHTML = `<div class="alert alert-error">Error loading users: ${error.message}</div>`;
+                }
+            }
+
+            async loadDatasets() {
+                try {
+                    const datasets = await this.apiCall('/api/v1/datasets');
+                    
+                    const tableHTML = `
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Name</th>
+                                    <th>Description</th>
+                                    <th>Created</th>
+                                    <th>Entities</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${datasets.map(dataset => `
+                                    <tr>
+                                        <td>${dataset.id.substring(0, 12)}...</td>
+                                        <td><strong>${this.extractTagValue(dataset, 'name')}</strong></td>
+                                        <td>${this.extractTagValue(dataset, 'description')}</td>
+                                        <td>${this.formatDate(dataset.created_at)}</td>
+                                        <td>0</td>
+                                        <td>
+                                            <button class="btn btn-sm btn-primary" onclick="app.viewDataset('${dataset.id}')">View</button>
+                                            <button class="btn btn-sm btn-secondary" onclick="app.editDataset('${dataset.id}')">Edit</button>
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    `;
+                    
+                    document.getElementById('datasetsTable').innerHTML = tableHTML;
+                } catch (error) {
+                    document.getElementById('datasetsTable').innerHTML = `<div class="alert alert-error">Error loading datasets: ${error.message}</div>`;
                 }
             }
 
@@ -1034,7 +1134,7 @@
                         <div style="display: grid; gap: 10px;">
                             <div><strong>Status:</strong> ${health.status}</div>
                             <div><strong>Uptime:</strong> ${health.uptime || 'N/A'}</div>
-                            <div><strong>Version:</strong> ${health.version || 'N/A'}</div>
+                            <div><strong>Version:</strong> ${health.version || 'v2.32.0'}</div>
                             <div><strong>Memory:</strong> ${this.formatBytes(health.memory?.used || 0)}</div>
                         </div>
                     `;
@@ -1922,6 +2022,287 @@
                 console.log(alertHTML);
             }
         }
+
+            // User Management Functions
+            showCreateUserModal() {
+                const modalHTML = `
+                    <div id="userModal" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; display: flex; justify-content: center; align-items: center;">
+                        <div class="card" style="width: 500px; margin: 0;">
+                            <h3>Create New User</h3>
+                            <div class="form-group">
+                                <label>Username:</label>
+                                <input type="text" id="newUsername" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Email:</label>
+                                <input type="email" id="newEmail" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Password:</label>
+                                <input type="password" id="newPassword" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Role:</label>
+                                <select id="newRole">
+                                    <option value="user">User</option>
+                                    <option value="admin">Admin</option>
+                                </select>
+                            </div>
+                            <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+                                <button class="btn btn-secondary" onclick="app.closeModal()">Cancel</button>
+                                <button class="btn btn-primary" onclick="app.createUser()">Create User</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                document.body.insertAdjacentHTML('beforeend', modalHTML);
+            }
+
+            showChangePasswordModal(userId, username) {
+                const modalHTML = `
+                    <div id="passwordModal" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; display: flex; justify-content: center; align-items: center;">
+                        <div class="card" style="width: 500px; margin: 0;">
+                            <h3>Change Password for ${username}</h3>
+                            <div class="form-group">
+                                <label>Current Password:</label>
+                                <input type="password" id="currentPassword" required>
+                            </div>
+                            <div class="form-group">
+                                <label>New Password:</label>
+                                <input type="password" id="newPasswordChange" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Confirm New Password:</label>
+                                <input type="password" id="confirmPassword" required>
+                            </div>
+                            <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+                                <button class="btn btn-secondary" onclick="app.closeModal()">Cancel</button>
+                                <button class="btn btn-primary" onclick="app.changePassword('${username}')">Change Password</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                document.body.insertAdjacentHTML('beforeend', modalHTML);
+            }
+
+            async createUser() {
+                const username = document.getElementById('newUsername').value;
+                const email = document.getElementById('newEmail').value;
+                const password = document.getElementById('newPassword').value;
+                const role = document.getElementById('newRole').value;
+
+                if (!username || !email || !password) {
+                    this.showAlert('All fields are required', 'error');
+                    return;
+                }
+
+                try {
+                    const result = await this.apiCall('/api/v1/users/create', 'POST', {
+                        username,
+                        email,
+                        password,
+                        role
+                    });
+
+                    if (result.error) {
+                        this.showAlert(`Error creating user: ${result.error}`, 'error');
+                    } else {
+                        this.showAlert('User created successfully', 'success');
+                        this.closeModal();
+                        await this.loadUsers();
+                    }
+                } catch (error) {
+                    this.showAlert(`Error creating user: ${error.message}`, 'error');
+                }
+            }
+
+            async changePassword(username) {
+                const currentPassword = document.getElementById('currentPassword').value;
+                const newPassword = document.getElementById('newPasswordChange').value;
+                const confirmPassword = document.getElementById('confirmPassword').value;
+
+                if (!currentPassword || !newPassword || !confirmPassword) {
+                    this.showAlert('All fields are required', 'error');
+                    return;
+                }
+
+                if (newPassword !== confirmPassword) {
+                    this.showAlert('New passwords do not match', 'error');
+                    return;
+                }
+
+                try {
+                    const result = await this.apiCall('/api/v1/users/change-password', 'POST', {
+                        username,
+                        current_password: currentPassword,
+                        new_password: newPassword
+                    });
+
+                    if (result.error) {
+                        this.showAlert(`Error changing password: ${result.error}`, 'error');
+                    } else {
+                        this.showAlert('Password changed successfully', 'success');
+                        this.closeModal();
+                    }
+                } catch (error) {
+                    this.showAlert(`Error changing password: ${error.message}`, 'error');
+                }
+            }
+
+            showCreateDatasetModal() {
+                const modalHTML = `
+                    <div id="datasetModal" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; display: flex; justify-content: center; align-items: center;">
+                        <div class="card" style="width: 500px; margin: 0;">
+                            <h3>Create New Dataset</h3>
+                            <div class="form-group">
+                                <label>Name:</label>
+                                <input type="text" id="datasetName" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Description:</label>
+                                <textarea id="datasetDescription" rows="3"></textarea>
+                            </div>
+                            <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+                                <button class="btn btn-secondary" onclick="app.closeModal()">Cancel</button>
+                                <button class="btn btn-primary" onclick="app.createDataset()">Create Dataset</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                document.body.insertAdjacentHTML('beforeend', modalHTML);
+            }
+
+            async createDataset() {
+                const name = document.getElementById('datasetName').value;
+                const description = document.getElementById('datasetDescription').value;
+
+                if (!name) {
+                    this.showAlert('Dataset name is required', 'error');
+                    return;
+                }
+
+                try {
+                    const result = await this.apiCall('/api/v1/datasets', 'POST', {
+                        name,
+                        description: description || `Dataset: ${name}`
+                    });
+
+                    if (result.error) {
+                        this.showAlert(`Error creating dataset: ${result.error}`, 'error');
+                    } else {
+                        this.showAlert('Dataset created successfully', 'success');
+                        this.closeModal();
+                        await this.loadDatasets();
+                    }
+                } catch (error) {
+                    this.showAlert(`Error creating dataset: ${error.message}`, 'error');
+                }
+            }
+
+            async viewDataset(datasetId) {
+                // Navigate to entities tab and filter by dataset
+                switchTab('entities');
+                this.showAlert('Dataset view functionality coming soon', 'info');
+            }
+
+            async editDataset(datasetId) {
+                this.showAlert('Dataset edit functionality coming soon', 'info');
+            }
+
+            // Temporal Query Functions
+            async queryAsOf() {
+                const entityId = document.getElementById('temporalEntityId').value;
+                const timestamp = document.getElementById('temporalTimestamp').value;
+
+                if (!entityId || !timestamp) {
+                    this.showAlert('Entity ID and timestamp are required', 'error');
+                    return;
+                }
+
+                try {
+                    const result = await this.apiCall(`/api/v1/entities/as-of?id=${entityId}&timestamp=${timestamp}T00:00:00Z`);
+                    document.getElementById('temporalResults').innerHTML = `
+                        <h5>As-Of Query Result</h5>
+                        <pre>${JSON.stringify(result, null, 2)}</pre>
+                    `;
+                } catch (error) {
+                    document.getElementById('temporalResults').innerHTML = `
+                        <div class="alert alert-error">Error: ${error.message}</div>
+                    `;
+                }
+            }
+
+            async queryHistory() {
+                const entityId = document.getElementById('temporalEntityId').value;
+
+                if (!entityId) {
+                    this.showAlert('Entity ID is required', 'error');
+                    return;
+                }
+
+                try {
+                    const result = await this.apiCall(`/api/v1/entities/history?id=${entityId}`);
+                    document.getElementById('temporalResults').innerHTML = `
+                        <h5>Entity History</h5>
+                        <pre>${JSON.stringify(result, null, 2)}</pre>
+                    `;
+                } catch (error) {
+                    document.getElementById('temporalResults').innerHTML = `
+                        <div class="alert alert-error">Error: ${error.message}</div>
+                    `;
+                }
+            }
+
+            async queryChanges() {
+                const entityId = document.getElementById('temporalEntityId').value;
+                const fromTime = document.getElementById('temporalFromTime').value;
+                const toTime = document.getElementById('temporalToTime').value;
+
+                if (!entityId || !fromTime || !toTime) {
+                    this.showAlert('Entity ID, from time, and to time are required', 'error');
+                    return;
+                }
+
+                try {
+                    const result = await this.apiCall(`/api/v1/entities/changes?id=${entityId}&from=${fromTime}T00:00:00Z&to=${toTime}T00:00:00Z`);
+                    document.getElementById('temporalResults').innerHTML = `
+                        <h5>Entity Changes</h5>
+                        <pre>${JSON.stringify(result, null, 2)}</pre>
+                    `;
+                } catch (error) {
+                    document.getElementById('temporalResults').innerHTML = `
+                        <div class="alert alert-error">Error: ${error.message}</div>
+                    `;
+                }
+            }
+
+            async queryDiff() {
+                const entityId = document.getElementById('temporalEntityId').value;
+                const fromTime = document.getElementById('temporalFromTime').value;
+                const toTime = document.getElementById('temporalToTime').value;
+
+                if (!entityId || !fromTime || !toTime) {
+                    this.showAlert('Entity ID, from time, and to time are required', 'error');
+                    return;
+                }
+
+                try {
+                    const result = await this.apiCall(`/api/v1/entities/diff?id=${entityId}&from=${fromTime}T00:00:00Z&to=${toTime}T00:00:00Z`);
+                    document.getElementById('temporalResults').innerHTML = `
+                        <h5>Entity Diff</h5>
+                        <pre>${JSON.stringify(result, null, 2)}</pre>
+                    `;
+                } catch (error) {
+                    document.getElementById('temporalResults').innerHTML = `
+                        <div class="alert alert-error">Error: ${error.message}</div>
+                    `;
+                }
+            }
+
+            closeModal() {
+                const modals = document.querySelectorAll('#userModal, #passwordModal, #datasetModal');
+                modals.forEach(modal => modal.remove());
+            }
 
         // Tab switching function
         function switchTab(tabName) {
