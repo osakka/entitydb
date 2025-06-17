@@ -76,6 +76,10 @@ type EntityRepository interface {
 	// Example: namespace "status" matches "status:active", "status:draft", etc.
 	ListByNamespace(namespace string) ([]*Entity, error)
 	
+	// GetUniqueTagValues returns unique values for a given tag namespace.
+	// Example: namespace "dataset" returns ["default", "production", "staging"].
+	GetUniqueTagValues(namespace string) ([]string, error)
+	
 	// Content Queries
 	
 	// SearchContent performs full-text search on entity content.

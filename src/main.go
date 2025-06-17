@@ -333,6 +333,9 @@ func main() {
 	apiRouter.HandleFunc("/entities/listbytag", server.securityMiddleware.RequirePermission("entity", "view")(server.entityHandler.ListEntities)).Methods("GET")
 	apiRouter.HandleFunc("/entities/summary", server.securityMiddleware.RequirePermission("entity", "view")(server.entityHandler.GetEntitySummary)).Methods("GET")
 	
+	// Tag operations with RBAC
+	apiRouter.HandleFunc("/tags/values", server.securityMiddleware.RequirePermission("entity", "view")(server.entityHandler.GetUniqueTagValues)).Methods("GET")
+	
 	// Entity temporal operations with RBAC
 	apiRouter.HandleFunc("/entities/as-of", server.securityMiddleware.RequirePermission("entity", "view")(server.entityHandler.GetEntityAsOf)).Methods("GET")
 	apiRouter.HandleFunc("/entities/history", server.securityMiddleware.RequirePermission("entity", "view")(server.entityHandler.GetEntityHistory)).Methods("GET")

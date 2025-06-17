@@ -2089,6 +2089,41 @@ func (h *EntityHandler) GetEntitySummary(w http.ResponseWriter, r *http.Request)
 	RespondJSON(w, http.StatusOK, summary)
 }
 
+// GetUniqueTagValues returns unique values for a tag namespace
+// @Summary Get unique tag values
+// @Description Get unique values for a specific tag namespace (e.g., get all dataset names)
+// @Tags tags
+// @Accept json
+// @Produce json
+// @Param namespace query string true "Tag namespace (e.g., 'dataset', 'type', 'status')"
+// @Success 200 {object} map[string]interface{}
+// @Router /api/v1/tags/values [get]
+func (h *EntityHandler) GetUniqueTagValues(w http.ResponseWriter, r *http.Request) {
+	namespace := r.URL.Query().Get("namespace")
+	if namespace == "" {
+		RespondError(w, http.StatusBadRequest, "namespace parameter is required")
+		return
+	}
+	
+	logger.TraceIf("api", "getting unique values for namespace: %s", namespace)
+	
+	values, err := h.repo.GetUniqueTagValues(namespace)
+	if err != nil {
+		logger.Error("failed to get unique tag values for namespace %s: %v", namespace, err)
+		RespondError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to get unique tag values: %v", err))
+		return
+	}
+	
+	response := map[string]interface{}{
+		"namespace": namespace,
+		"values":    values,
+		"count":     len(values),
+	}
+	
+	logger.TraceIf("api", "found %d unique values for namespace %s", len(values), namespace)
+	RespondJSON(w, http.StatusOK, response)
+}
+
 // extractDatasetFromPath extracts dataset from URL path for dataset-scoped routes
 // Handles paths like: /datasets/{dataset}/entities/create
 func extractDatasetFromPath(path string) string {

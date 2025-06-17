@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -2360,6 +2361,41 @@ func (r *EntityRepository) ListByNamespace(namespace string) ([]*models.Entity, 
 	defer r.readerPool.Put(reader)
 	
 	return r.fetchEntitiesWithReader(reader, entityIDs)
+}
+
+// GetUniqueTagValues returns unique values for a given tag namespace
+func (r *EntityRepository) GetUniqueTagValues(namespace string) ([]string, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	
+	uniqueValues := make(map[string]bool)
+	
+	// Iterate through all tags in the sharded index
+	for tag := range r.shardedTagIndex.GetAllTags() {
+		// Parse temporal tag format: "TIMESTAMP|tag:value"
+		actualTag := tag
+		if parts := strings.SplitN(tag, "|", 2); len(parts) == 2 {
+			actualTag = parts[1]
+		}
+		
+		// Check if tag matches the namespace
+		if strings.HasPrefix(actualTag, namespace+":") {
+			value := strings.TrimPrefix(actualTag, namespace+":")
+			if value != "" {
+				uniqueValues[value] = true
+			}
+		}
+	}
+	
+	// Convert map to sorted slice
+	result := make([]string, 0, len(uniqueValues))
+	for value := range uniqueValues {
+		result = append(result, value)
+	}
+	
+	// Sort for consistent output
+	sort.Strings(result)
+	return result, nil
 }
 
 // AddContent adds content to an entity

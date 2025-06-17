@@ -47,6 +47,7 @@ EntityDB now features a unified Entity model with unified sharded indexing:
 - **⚡ MULTI-TAG PERFORMANCE OPTIMIZATION (v2.32.0)**: Surgical optimization of multi-tag AND queries achieving 60%+ performance improvement. Smart ordering by result set size, early termination for empty intersections, and memory-efficient intersection algorithms. Complex queries now execute in 18-38ms (down from 101ms).
 - **🔒 CRITICAL SECURITY FIX (v2.32.0)**: Fixed major multi-tenancy security vulnerability where multiple tag parameters were using OR logic instead of AND logic, potentially exposing data across tenant boundaries. Implemented proper intersection-based AND logic with comprehensive testing.
 - **✅ COMPREHENSIVE CODE AUDIT COMPLETE (v2.32.0)**: Meticulous audit ensuring single source of truth compliance, clean workspace, and complete integration. All uncommitted changes validated, no regressions introduced, clean build with zero warnings. Authentication event tracking confirmed operational, all temporal fixes integrated, relationship system confirmed tag-based. Absolute code quality compliance achieved.
+- **🔍 UNIQUE TAG QUERY CAPABILITY (v2.32.0)**: Implemented comprehensive unique tag value discovery system with `/api/v1/tags/values` endpoint. Enables dynamic dataset discovery and multi-tenant management by querying unique values across tag namespaces (e.g., all dataset names, entity types, status values). Full temporal tag parsing with proper authentication and RBAC enforcement.
 
 ## What's Implemented
 
@@ -126,6 +127,9 @@ GET    /api/v1/entities/as-of        # Requires entity:view - entity state at ti
 GET    /api/v1/entities/history      # Requires entity:view - complete change history
 GET    /api/v1/entities/changes      # Requires entity:view - changes since timestamp
 GET    /api/v1/entities/diff         # Requires entity:view - differences between timestamps
+
+# Tag operations (RBAC enforced)
+GET    /api/v1/tags/values           # Get unique values for tag namespace (requires entity:view)
 
 # Relationship operations (RBAC enforced)
 POST   /api/v1/entity-relationships  # Requires relation:create
