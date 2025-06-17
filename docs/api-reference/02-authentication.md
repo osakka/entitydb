@@ -1,6 +1,6 @@
 # EntityDB Authentication API
 
-> **Version**: v2.32.20 | **Last Updated**: 2025-06-13 | **Status**: AUTHORITATIVE
+> **Version**: v2.32.0 | **Last Updated**: 2025-06-17 | **Status**: PRODUCTION VERIFIED
 
 ## Overview
 
@@ -34,11 +34,11 @@ curl -k -X POST https://localhost:8085/api/v1/auth/login \
 **Response** (200 OK):
 ```json
 {
-  "token": "session_12345abcdef...",
-  "expires_at": "2025-06-12T23:45:00Z",
-  "user_id": "user_admin_12345",
+  "token": "a6a5fdca19fb3b4f0f24316bb57ccd7d5736503bcec68413c8fc0b90d31f9831",
+  "expires_at": "2025-06-17T15:29:06+01:00",
+  "user_id": "72ec2b0b1cc4f8cffb7ac33e521ad819",
   "user": {
-    "id": "user_admin_12345",
+    "id": "72ec2b0b1cc4f8cffb7ac33e521ad819",
     "username": "admin",
     "email": "admin@entitydb.local",
     "roles": ["admin", "user"]
@@ -86,10 +86,10 @@ curl -k -X POST https://localhost:8085/api/v1/auth/refresh \
 ```json
 {
   "token": "new_session_67890xyz...",
-  "expires_at": "2025-06-13T12:00:00Z",
-  "user_id": "user_admin_12345",
+  "expires_at": "2025-06-17T16:29:06+01:00",
+  "user_id": "72ec2b0b1cc4f8cffb7ac33e521ad819",
   "user": {
-    "id": "user_admin_12345",
+    "id": "72ec2b0b1cc4f8cffb7ac33e521ad819",
     "username": "admin",
     "email": "admin@entitydb.local",
     "roles": ["admin", "user"]
@@ -110,7 +110,7 @@ curl -k -X GET https://localhost:8085/api/v1/auth/whoami \
 **Response** (200 OK):
 ```json
 {
-  "id": "user_admin_12345",
+  "id": "72ec2b0b1cc4f8cffb7ac33e521ad819",
   "username": "admin",
   "email": "admin@entitydb.local",
   "roles": ["admin", "user"]
@@ -226,6 +226,6 @@ curl -k -X POST https://localhost:8085/api/v1/auth/logout \
 
 ## Version History
 
-- **v2.30.0**: Current authentication system with embedded credentials
-- **v2.29.0**: Major authentication architecture change - embedded credentials introduced
+- **v2.32.0**: Current authentication system with embedded credentials and production battle-testing
+- **v2.29.0**: Major authentication architecture change - embedded credentials introduced  
 - **v2.28.0**: Session-based authentication with JWT tokens

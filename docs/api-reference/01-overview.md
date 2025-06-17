@@ -1,6 +1,6 @@
 # EntityDB API Overview
 
-> **Version**: v2.32.0-dev | **Last Updated**: 2025-06-15 | **Status**: 100% ACCURATE
+> **Version**: v2.32.0 | **Last Updated**: 2025-06-17 | **Status**: 100% ACCURATE
 > 
 > Complete overview of EntityDB's REST API - verified against actual implementation.
 
@@ -44,7 +44,7 @@ Only these endpoints work without authentication:
 
 ## 📊 Complete API Endpoint Reference
 
-**Total Endpoints**: 48 (verified against v2.32.0-dev implementation)
+**Total Endpoints**: 48 (verified against v2.32.0 implementation)
 
 ### 🔑 Authentication (4 endpoints)
 | Method | Endpoint | Auth Required | Permission | Description |
@@ -237,4 +237,4 @@ Files >4MB are automatically chunked. Use chunking endpoints for large file hand
 
 ---
 
-*This API overview provides complete, verified documentation for EntityDB v2.32.0-dev. All endpoints and examples are tested against the actual implementation.*
+*This API overview provides complete, verified documentation for EntityDB v2.32.0. All endpoints and examples are tested against the actual implementation.*

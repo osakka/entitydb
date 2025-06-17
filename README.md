@@ -138,11 +138,11 @@ EntityDB uses a layered architecture optimized for temporal operations:
 ## Documentation
 
 - [Quick Start Guide](./docs/getting-started/03-quick-start.md)
-- [API Reference](./docs/api-reference/03-entities.md)
+- [API Reference](./docs/api-reference/01-overview.md)
 - [Architecture Overview](./docs/architecture/01-system-overview.md)
-- [RBAC & Security](./docs/admin-guide/01-security-configuration.md)
+- [RBAC & Security](./docs/admin-guide/03-security-configuration.md)
 - [Development Guide](./docs/developer-guide/01-contributing.md)
-- [Performance Tuning](./docs/reference/performance/performance_optimization_report.md)
+- [Performance Tuning](./docs/reference/02-performance-guides.md)
 
 ## Project Structure
 
@@ -193,7 +193,7 @@ ENTITYDB_METRICS_INTERVAL=30         # Metrics collection interval
 - **Default**: `/opt/entitydb/share/config/entitydb.env`
 - **Instance**: `/opt/entitydb/var/entitydb.env` (overrides defaults)
 
-For complete configuration documentation, see [Configuration Management Guide](./docs/60-developer-guides/04-configuration-management.md).
+For complete configuration documentation, see [Configuration Management Guide](./docs/developer-guide/04-configuration-management.md).
 
 ## Performance
 
@@ -211,7 +211,7 @@ Benchmarks show:
 
 ## Contributing
 
-See [Contributing Guide](./docs/60-developer-guides/01-contributing.md) for development guidelines.
+See [Contributing Guide](./docs/developer-guide/01-contributing.md) for development guidelines.
 
 ## License
 
