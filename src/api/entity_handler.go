@@ -38,6 +38,136 @@ import (
 	"entitydb/logger"
 )
 
+// intersectTagQueries performs AND logic on multiple tag queries.
+// This fixes the critical multi-tenancy security vulnerability where multiple tag
+// parameters were being treated as OR instead of AND operations.
+// 
+// PERFORMANCE OPTIMIZATIONS:
+// - Smart ordering: processes smallest result sets first to minimize intersection work
+// - Early termination: stops immediately if any tag has no results
+// - Memory optimization: uses more efficient intersection for small result sets
+func (h *EntityHandler) intersectTagQueries(tags []string) ([]*models.Entity, error) {
+	if len(tags) == 0 {
+		return []*models.Entity{}, nil
+	}
+	
+	// OPTIMIZATION: Get result counts for all tags first to order by smallest result set
+	tagResults := make([]struct {
+		tag      string
+		entities []*models.Entity
+		count    int
+	}, len(tags))
+	
+	for i, tag := range tags {
+		entities, err := h.repo.ListByTag(tag)
+		if err != nil {
+			return nil, err
+		}
+		
+		// EARLY TERMINATION: If any tag has no results, intersection is empty
+		if len(entities) == 0 {
+			return []*models.Entity{}, nil
+		}
+		
+		tagResults[i] = struct {
+			tag      string
+			entities []*models.Entity
+			count    int
+		}{tag, entities, len(entities)}
+	}
+	
+	// OPTIMIZATION: Sort by result count (smallest first) to minimize intersection work
+	for i := 0; i < len(tagResults)-1; i++ {
+		for j := i + 1; j < len(tagResults); j++ {
+			if tagResults[j].count < tagResults[i].count {
+				tagResults[i], tagResults[j] = tagResults[j], tagResults[i]
+			}
+		}
+	}
+	
+	// Start with the smallest result set
+	result := tagResults[0].entities
+	
+	// Intersect with each subsequent tag's results
+	for i := 1; i < len(tagResults); i++ {
+		result = h.intersectEntitySetsOptimized(result, tagResults[i].entities)
+		
+		// Early termination if intersection becomes empty
+		if len(result) == 0 {
+			break
+		}
+	}
+	
+	return result, nil
+}
+
+// intersectEntitySets calculates the intersection of two entity slices.
+// Returns entities that exist in both sets (by ID comparison).
+func (h *EntityHandler) intersectEntitySets(set1, set2 []*models.Entity) []*models.Entity {
+	// Create a map for faster lookups
+	set2Map := make(map[string]*models.Entity)
+	for _, entity := range set2 {
+		set2Map[entity.ID] = entity
+	}
+	
+	// Find intersection
+	var result []*models.Entity
+	for _, entity := range set1 {
+		if _, exists := set2Map[entity.ID]; exists {
+			result = append(result, entity)
+		}
+	}
+	
+	return result
+}
+
+// intersectEntitySetsOptimized calculates intersection with performance optimizations.
+// Uses different strategies based on result set sizes for optimal performance.
+func (h *EntityHandler) intersectEntitySetsOptimized(set1, set2 []*models.Entity) []*models.Entity {
+	// OPTIMIZATION: Handle edge cases
+	if len(set1) == 0 || len(set2) == 0 {
+		return []*models.Entity{}
+	}
+	
+	// OPTIMIZATION: For very small sets, use linear search (no map overhead)
+	if len(set1) <= 5 && len(set2) <= 5 {
+		var result []*models.Entity
+		for _, e1 := range set1 {
+			for _, e2 := range set2 {
+				if e1.ID == e2.ID {
+					result = append(result, e1)
+					break
+				}
+			}
+		}
+		return result
+	}
+	
+	// OPTIMIZATION: Always map the larger set for better memory efficiency
+	var smallSet, largeSet []*models.Entity
+	if len(set1) <= len(set2) {
+		smallSet, largeSet = set1, set2
+	} else {
+		smallSet, largeSet = set2, set1
+	}
+	
+	// Create map from larger set
+	largeMap := make(map[string]*models.Entity, len(largeSet))
+	for _, entity := range largeSet {
+		largeMap[entity.ID] = entity
+	}
+	
+	// Iterate through smaller set for intersection
+	result := make([]*models.Entity, 0, len(smallSet)) // Pre-allocate capacity
+	for _, entity := range smallSet {
+		if _, exists := largeMap[entity.ID]; exists {
+			result = append(result, entity)
+		}
+	}
+	
+	return result
+}
+
 // EntityHandler handles entity-related API endpoints.
 // It provides the core CRUD operations for entities including:
 //   - Create: Creates new entities with tags and content
@@ -776,7 +906,8 @@ func (h *EntityHandler) QueryEntities(w http.ResponseWriter, r *http.Request) {
 	
 	// SURGICAL FIX: Add missing tag parameter support like ListEntities
 	// Parse tag-based query parameters (primary filtering)
-	tag := r.URL.Query().Get("tag")
+	tags := r.URL.Query()["tag"] // Get ALL tag parameters for AND logic
+	tag := r.URL.Query().Get("tag") // Keep single tag for backward compatibility
 	wildcard := r.URL.Query().Get("wildcard")
 	search := r.URL.Query().Get("search")
 	namespace := r.URL.Query().Get("namespace")
@@ -813,8 +944,14 @@ func (h *EntityHandler) QueryEntities(w http.ResponseWriter, r *http.Request) {
 		entities, err = h.repo.ListByNamespace(namespace)
 		queryTags = append(queryTags, "namespace:"+namespace)
 		queryType = "namespace"
+	case len(tags) > 1:
+		// CRITICAL FIX: Multi-tag AND filtering (intersection logic)
+		// This fixes the critical multi-tenancy security vulnerability
+		entities, err = h.intersectTagQueries(tags)
+		queryTags = append(queryTags, tags...)
+		queryType = "multi_tag_and"
 	case tag != "":
-		// Filter by specific tag
+		// Filter by specific tag (single tag)
 		entities, err = h.repo.ListByTag(tag)
 		queryTags = append(queryTags, tag)
 		queryType = "tag_filter"
