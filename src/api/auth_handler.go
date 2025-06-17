@@ -157,6 +157,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	logger.Info("user %s authenticated successfully", loginReq.Username)
+	
 
 	// Extract user roles from entity tags
 	// Roles are stored as tags with the format "rbac:role:rolename"

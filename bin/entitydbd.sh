@@ -6,7 +6,7 @@
 # EntityDB_DIR="$(dirname "$(realpath "../$0")")"
 EntityDB_DIR="/opt/entitydb";
 
-# HACK Â#
+# HACK ï¿½#
 cd ${EntityDB_DIR}/bin/
 # HACK #
 
@@ -104,13 +104,13 @@ start_server() {
     load_environment
 
     ###
-    ### TEMPORARY FOR TESTING.
+    ### TEMPORARY FOR TESTING - COMMENTED OUT TO PREVENT DB CORRUPTION.
     ###
-    local -A dbfiles="entities.db  entities.db.idx  entities.db.tmp  entities.ebf  entitydb.wal";
-    local dbf;
-    for dbf in ${dbfiles}; do
-      [ -r "${ENTITYDB_DATA_PATH}/${dbf}" ] && rm -f ${ENTITYDB_DATA_PATH}/${dbf};
-    done;
+    # local -A dbfiles="entities.db  entities.db.idx  entities.db.tmp  entities.ebf  entitydb.wal";
+    # local dbf;
+    # for dbf in ${dbfiles}; do
+    #   [ -r "${ENTITYDB_DATA_PATH}/${dbf}" ] && rm -f ${ENTITYDB_DATA_PATH}/${dbf};
+    # done;
     ### END OF TEMPORARY.
 
     # Get configuration values

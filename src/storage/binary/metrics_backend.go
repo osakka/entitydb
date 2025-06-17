@@ -294,33 +294,12 @@ func (ims *IsolatedMetricsStorage) persist() {
 }
 
 // load loads the metrics storage from file
+// DECOMMISSIONED: Legacy JSON file metrics loading disabled in favor of single source of truth
 func (ims *IsolatedMetricsStorage) load() {
-	file, err := os.Open(ims.metricsFilePath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			logger.Debug("IsolatedMetricsStorage: no existing metrics file at %s", ims.metricsFilePath)
-			return
-		}
-		logger.Warn("Failed to open metrics file: %v", err)
-		return
-	}
-	defer file.Close()
-	
-	var data MetricsStorageData
-	decoder := json.NewDecoder(file)
-	
-	if err := decoder.Decode(&data); err != nil {
-		logger.Warn("Failed to decode metrics data: %v", err)
-		return
-	}
-	
 	ims.mu.Lock()
 	defer ims.mu.Unlock()
 	
-	ims.entities = data.Entities
-	ims.tagIndex = data.TagIndex
-	
-	// Handle nil maps
+	// Initialize empty maps - no more loading from legacy JSON file
 	if ims.entities == nil {
 		ims.entities = make(map[string]*models.Entity)
 	}
@@ -328,8 +307,7 @@ func (ims *IsolatedMetricsStorage) load() {
 		ims.tagIndex = make(map[string][]string)
 	}
 	
-	logger.Info("IsolatedMetricsStorage: loaded %d entities from %s (updated: %v)", 
-		len(ims.entities), ims.metricsFilePath, data.Updated)
+	logger.Debug("IsolatedMetricsStorage: legacy JSON file loading decommissioned, using single source of truth")
 }
 
 // GetStats returns statistics about the isolated metrics storage

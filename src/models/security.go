@@ -5,21 +5,34 @@ import (
 	"encoding/hex"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 	"golang.org/x/crypto/bcrypt"
 	
 	"entitydb/logger"
 )
 
+// sessionValidationResult caches session validation results (safe copy, no pointers)
+type sessionValidationResult struct {
+	userID    string
+	username  string
+	email     string
+	timestamp time.Time
+	expiry    time.Time
+}
+
 // SecurityManager handles all relationship-based security operations
 type SecurityManager struct {
-	entityRepo EntityRepository
+	entityRepo          EntityRepository
+	sessionCache        sync.Map // map[string]*sessionValidationResult
+	sessionCacheTTL     time.Duration
 }
 
 // NewSecurityManager creates a new security manager
 func NewSecurityManager(entityRepo EntityRepository) *SecurityManager {
 	return &SecurityManager{
-		entityRepo: entityRepo,
+		entityRepo:      entityRepo,
+		sessionCacheTTL: 30 * time.Second, // Cache validation results for 30 seconds
 	}
 }
 
@@ -337,9 +350,33 @@ func (sm *SecurityManager) CreateSession(user *SecurityUser, ipAddress, userAgen
 	}, nil
 }
 
-// ValidateSession validates a session token and returns the associated user
+// ValidateSession validates a session token and returns the associated user (with caching)
 func (sm *SecurityManager) ValidateSession(token string) (*SecurityUser, error) {
 	logger.Debug("ValidateSession: Looking for session with token: %s", token)
+	
+	// Check cache first
+	if cached, ok := sm.sessionCache.Load(token); ok {
+		result := cached.(*sessionValidationResult)
+		
+		// Check if cache entry is still valid and session hasn't expired
+		now := time.Now()
+		if now.Sub(result.timestamp) < sm.sessionCacheTTL && now.Before(result.expiry) {
+			logger.Debug("ValidateSession: Cache hit for token: %s", token)
+			return &SecurityUser{
+				ID:       result.userID,
+				Username: result.username,
+				Email:    result.email,
+				Status:   "active",
+				Entity:   nil, // Don't reference entity from cache to prevent corruption
+			}, nil
+		}
+		
+		// Cache expired or session expired, remove it
+		sm.sessionCache.Delete(token)
+		logger.Debug("ValidateSession: Cache expired for token: %s", token)
+	}
+	
+	logger.Debug("ValidateSession: Cache miss, performing database lookup for token: %s", token)
 	
 	// Find session by token tag using the fixed temporal tag search
 	// Retry mechanism to handle indexing delays
@@ -374,19 +411,6 @@ func (sm *SecurityManager) ValidateSession(token string) (*SecurityUser, error) 
 	
 	sessionEntity := sessionEntities[0]
 	logger.Debug("ValidateSession: Found session entity: %s", sessionEntity.ID)
-	
-	// CRITICAL SESSION FIX: Always do a fresh fetch of the session entity to bypass cache
-	// This fixes the race condition where memory cache has stale data after invalidation
-	logger.Debug("ValidateSession: Performing fresh fetch of session entity %s to bypass cache", sessionEntity.ID)
-	freshSessionEntity, err := sm.entityRepo.GetByID(sessionEntity.ID)
-	if err != nil {
-		logger.Debug("ValidateSession: Failed to fresh fetch session entity: %v", err)
-		return nil, fmt.Errorf("session not found")
-	}
-	
-	// Use the fresh entity for validation instead of the potentially cached one
-	sessionEntity = freshSessionEntity
-	logger.Debug("ValidateSession: Using fresh session entity for validation")
 	
 	// Check if session is expired or invalidated
 	sessionTags := sessionEntity.GetTagsWithoutTimestamp()
@@ -459,6 +483,16 @@ func (sm *SecurityManager) ValidateSession(token string) (*SecurityUser, error) 
 		}
 	}
 	
+	// Cache the validation result for future requests (safe copy, no entity pointers)
+	sm.sessionCache.Store(token, &sessionValidationResult{
+		userID:    userEntity.ID,
+		username:  username,
+		email:     email,
+		timestamp: time.Now(),
+		expiry:    expiresAt,
+	})
+	logger.Debug("ValidateSession: Cached validation result for token: %s", token)
+	
 	return &SecurityUser{
 		ID:       userEntity.ID,
 		Username: username,
@@ -466,6 +500,12 @@ func (sm *SecurityManager) ValidateSession(token string) (*SecurityUser, error) 
 		Status:   "active",
 		Entity:   userEntity,
 	}, nil
+}
+
+// InvalidateSessionCache invalidates a session from the cache (called during logout)
+func (sm *SecurityManager) InvalidateSessionCache(token string) {
+	sm.sessionCache.Delete(token)
+	logger.Debug("InvalidateSessionCache: Removed token from cache: %s", token)
 }
 
 // HasPermission checks if a user has a specific permission via tag-based RBAC

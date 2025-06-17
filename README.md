@@ -2,7 +2,7 @@
 
 > A high-performance temporal database where every tag is timestamped with nanosecond precision
 
-[![Version](https://img.shields.io/badge/version-v2.32.2-blue)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-v2.32.0%20✅%20Audited-blue)](./CLAUDE.md)
 [![License](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
 [![Documentation](https://img.shields.io/badge/docs-comprehensive-brightgreen)](./docs)
 [![API Coverage](https://img.shields.io/badge/API%20docs-100%25%20accurate-success)](./docs/api-reference)

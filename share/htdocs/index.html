@@ -430,6 +430,84 @@
             from { opacity: 0; }
             to { opacity: 1; }
         }
+
+        /* Time Range Selector */
+        .time-range-selector {
+            display: flex;
+            gap: 2px;
+            background: #f7fafc;
+            padding: 4px;
+            border-radius: 6px;
+            border: 1px solid #e2e8f0;
+        }
+
+        .time-range-btn {
+            padding: 6px 12px;
+            border: none;
+            background: transparent;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 500;
+            color: #64748b;
+            transition: all 0.2s ease;
+            min-width: 40px;
+        }
+
+        .time-range-btn:hover {
+            background: #e2e8f0;
+            color: #334155;
+        }
+
+        .time-range-btn.active {
+            background: #2b6cb0;
+            color: white;
+            box-shadow: 0 2px 4px rgba(43, 108, 176, 0.3);
+        }
+
+        /* Chart Container Overlay Time Selectors */
+        .chart-container {
+            position: relative;
+        }
+
+        .chart-time-overlay {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 10;
+            display: flex;
+            gap: 1px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(8px);
+            padding: 3px;
+            border-radius: 6px;
+            border: 1px solid rgba(226, 232, 240, 0.8);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .chart-time-btn {
+            padding: 4px 8px;
+            border: none;
+            background: transparent;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: 500;
+            color: #64748b;
+            transition: all 0.2s ease;
+            min-width: 28px;
+        }
+
+        .chart-time-btn:hover {
+            background: rgba(226, 232, 240, 0.8);
+            color: #334155;
+        }
+
+        .chart-time-btn.active {
+            background: #2563eb;
+            color: white;
+            box-shadow: 0 1px 3px rgba(37, 99, 235, 0.4);
+        }
     </style>
 </head>
 <body>
@@ -484,6 +562,13 @@
                     <div class="card">
                         <h3>System Performance</h3>
                         <div class="chart-container">
+                            <div class="chart-time-overlay">
+                                <button class="chart-time-btn active" onclick="app.setChartTimeRange('performance', '5m')">5m</button>
+                                <button class="chart-time-btn" onclick="app.setChartTimeRange('performance', '1h')">1h</button>
+                                <button class="chart-time-btn" onclick="app.setChartTimeRange('performance', '6h')">6h</button>
+                                <button class="chart-time-btn" onclick="app.setChartTimeRange('performance', '24h')">24h</button>
+                                <button class="chart-time-btn" onclick="app.setChartTimeRange('performance', '7d')">7d</button>
+                            </div>
                             <canvas id="performanceChart"></canvas>
                         </div>
                     </div>
@@ -506,12 +591,16 @@
                 <div class="card">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                         <h3>Entity Management</h3>
-                        <button class="btn btn-primary" onclick="app.showCreateEntityModal()">Create Entity</button>
                     </div>
                     
-                    <div class="form-group" style="max-width: 400px;">
-                        <input type="text" id="entitySearch" placeholder="Search entities..." 
-                               onkeyup="app.searchEntities()" style="margin-bottom: 15px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <div class="form-group" style="margin: 0; flex-grow: 1; max-width: 400px;">
+                            <input type="text" id="entitySearch" placeholder="Search entities..." 
+                                   onkeyup="app.searchEntities()" style="margin: 0;">
+                        </div>
+                        <button class="btn btn-primary" onclick="app.showCreateEntityModal()">
+                            <span style="margin-right: 5px;">+</span> Create Entity
+                        </button>
                     </div>
                     
                     <div id="entitiesTable">Loading entities...</div>
@@ -520,6 +609,10 @@
 
             <!-- Performance Tab -->
             <div id="performance" class="tab-content">
+                <div style="margin-bottom: 20px;">
+                    <h3>Performance Monitoring</h3>
+                </div>
+                
                 <div class="grid grid-3">
                     <div class="metric-card">
                         <div class="metric-value" id="avgResponseTime">-</div>
@@ -539,12 +632,26 @@
                     <div class="card">
                         <h3>Response Time Trends</h3>
                         <div class="chart-container">
+                            <div class="chart-time-overlay">
+                                <button class="chart-time-btn active" onclick="app.setChartTimeRange('responseTime', '5m')">5m</button>
+                                <button class="chart-time-btn" onclick="app.setChartTimeRange('responseTime', '1h')">1h</button>
+                                <button class="chart-time-btn" onclick="app.setChartTimeRange('responseTime', '6h')">6h</button>
+                                <button class="chart-time-btn" onclick="app.setChartTimeRange('responseTime', '24h')">24h</button>
+                                <button class="chart-time-btn" onclick="app.setChartTimeRange('responseTime', '7d')">7d</button>
+                            </div>
                             <canvas id="responseTimeChart"></canvas>
                         </div>
                     </div>
                     <div class="card">
                         <h3>Request Volume</h3>
                         <div class="chart-container">
+                            <div class="chart-time-overlay">
+                                <button class="chart-time-btn active" onclick="app.setChartTimeRange('requestVolume', '5m')">5m</button>
+                                <button class="chart-time-btn" onclick="app.setChartTimeRange('requestVolume', '1h')">1h</button>
+                                <button class="chart-time-btn" onclick="app.setChartTimeRange('requestVolume', '6h')">6h</button>
+                                <button class="chart-time-btn" onclick="app.setChartTimeRange('requestVolume', '24h')">24h</button>
+                                <button class="chart-time-btn" onclick="app.setChartTimeRange('requestVolume', '7d')">7d</button>
+                            </div>
                             <canvas id="requestVolumeChart"></canvas>
                         </div>
                     </div>
@@ -554,9 +661,23 @@
                     <h3>Storage Performance</h3>
                     <div class="grid grid-2">
                         <div class="chart-container">
+                            <div class="chart-time-overlay">
+                                <button class="chart-time-btn active" onclick="app.setChartTimeRange('storageRead', '5m')">5m</button>
+                                <button class="chart-time-btn" onclick="app.setChartTimeRange('storageRead', '1h')">1h</button>
+                                <button class="chart-time-btn" onclick="app.setChartTimeRange('storageRead', '6h')">6h</button>
+                                <button class="chart-time-btn" onclick="app.setChartTimeRange('storageRead', '24h')">24h</button>
+                                <button class="chart-time-btn" onclick="app.setChartTimeRange('storageRead', '7d')">7d</button>
+                            </div>
                             <canvas id="storageReadChart"></canvas>
                         </div>
                         <div class="chart-container">
+                            <div class="chart-time-overlay">
+                                <button class="chart-time-btn active" onclick="app.setChartTimeRange('storageWrite', '5m')">5m</button>
+                                <button class="chart-time-btn" onclick="app.setChartTimeRange('storageWrite', '1h')">1h</button>
+                                <button class="chart-time-btn" onclick="app.setChartTimeRange('storageWrite', '6h')">6h</button>
+                                <button class="chart-time-btn" onclick="app.setChartTimeRange('storageWrite', '24h')">24h</button>
+                                <button class="chart-time-btn" onclick="app.setChartTimeRange('storageWrite', '7d')">7d</button>
+                            </div>
                             <canvas id="storageWriteChart"></canvas>
                         </div>
                     </div>
@@ -669,7 +790,19 @@
                 this.baseURL = window.location.origin;
                 this.token = localStorage.getItem('entitydb_token');
                 this.refreshInterval = null;
+                this.chartUpdateInterval = null;
                 this.charts = {};
+                this.currentTimeRange = '5m'; // Default to 5 minutes
+                this.timeRangeSettings = {
+                    '5m': { minutes: 5, maxPoints: 30, interval: 10000 },
+                    '1h': { minutes: 60, maxPoints: 60, interval: 60000 },
+                    '6h': { minutes: 360, maxPoints: 72, interval: 300000 },
+                    '12h': { minutes: 720, maxPoints: 72, interval: 600000 },
+                    '24h': { minutes: 1440, maxPoints: 96, interval: 900000 },
+                    '7d': { minutes: 10080, maxPoints: 168, interval: 3600000 },
+                    '30d': { minutes: 43200, maxPoints: 180, interval: 14400000 },
+                    '90d': { minutes: 129600, maxPoints: 180, interval: 43200000 }
+                };
                 
                 if (this.token) {
                     this.init();
@@ -682,7 +815,7 @@
                 console.log('Initializing Enhanced EntityDB Admin...');
                 await this.refreshData();
                 this.startAutoRefresh();
-                this.initCharts();
+                await this.initCharts();
             }
 
             showLogin() {
@@ -766,7 +899,19 @@
                     // Update connection status
                     document.getElementById('connectionStatus').textContent = 'Connected';
                     
-                    // Load dashboard data
+                    // PERFORMANCE FIX: Pre-validate session once per refresh cycle
+                    // This prevents 5 simultaneous session validations every 30 seconds
+                    if (this.token) {
+                        try {
+                            await this.apiCall('/health'); // Lightweight session validation
+                        } catch (sessionError) {
+                            console.warn('Session validation failed, redirecting to login');
+                            this.logout();
+                            return;
+                        }
+                    }
+                    
+                    // Load dashboard data - all calls now use pre-validated session
                     await this.loadDashboardData();
                     await this.loadEntities();
                     await this.loadUsers();
@@ -781,11 +926,10 @@
 
             async loadDashboardData() {
                 try {
-                    const [entities, health, users] = await Promise.all([
-                        this.apiCall('/api/v1/entities/list'),
-                        this.apiCall('/health'),
-                        this.apiCall('/api/v1/rbac/metrics/public')
-                    ]);
+                    // Sequential calls to prevent session validation storms
+                    const entities = await this.apiCall('/api/v1/entities/list');
+                    const health = await this.apiCall('/health');
+                    const users = await this.apiCall('/api/v1/rbac/metrics/public');
 
                     document.getElementById('totalEntities').textContent = entities.length || 0;
                     document.getElementById('activeUsers').textContent = users.active_users || 0;
@@ -914,6 +1058,9 @@
                     const entities = await this.apiCall('/api/v1/entities/list');
                     const metrics = entities.filter(e => e.tags?.some(t => t.includes('type:metric')));
                     
+                    // Also load system metrics for charts
+                    await this.updateCharts();
+                    
                     const metricsHTML = `
                         <div class="grid grid-2">
                             <div>
@@ -947,8 +1094,94 @@
                 }
             }
 
-            initCharts() {
-                // Initialize performance chart
+            async updateCharts() {
+                try {
+                    const [health, systemMetrics] = await Promise.all([
+                        this.apiCall('/health'),
+                        this.apiCall('/api/v1/system/metrics')
+                    ]);
+
+                    const timestamp = this.formatTimeLabel(new Date());
+
+                    // Update performance chart with REAL API response time
+                    if (this.charts.performance) {
+                        const startTime = performance.now();
+                        await this.apiCall('/health');
+                        const responseTime = Math.round(performance.now() - startTime);
+                        this.updateChart(this.charts.performance, timestamp, responseTime);
+                    }
+
+                    // Update memory chart with REAL memory data
+                    if (this.charts.memory && health.metrics?.memory_usage) {
+                        const memUsed = health.metrics.memory_usage.alloc_bytes || 0;
+                        const memTotal = health.metrics.memory_usage.sys_bytes || memUsed * 2;
+                        const usedMB = Math.round(memUsed / 1024 / 1024);
+                        const freeMB = Math.round((memTotal - memUsed) / 1024 / 1024);
+                        
+                        this.charts.memory.data.datasets[0].data = [usedMB, freeMB];
+                        this.charts.memory.data.labels = [`Used (${usedMB}MB)`, `Free (${freeMB}MB)`];
+                        this.charts.memory.update();
+                    }
+
+                    // Response time chart - same as performance for now
+                    if (this.charts.responseTime) {
+                        const startTime = performance.now();
+                        await this.apiCall('/health');
+                        const responseTime = Math.round(performance.now() - startTime);
+                        this.updateChart(this.charts.responseTime, timestamp, responseTime);
+                    }
+
+                    // Request volume - use zero since we don't have real request metrics yet
+                    if (this.charts.requestVolume) {
+                        this.updateChart(this.charts.requestVolume, timestamp, 0);
+                    }
+
+                    // Storage IOPS - use zero since we don't have real storage metrics yet
+                    if (this.charts.storageRead) {
+                        this.updateChart(this.charts.storageRead, timestamp, 0);
+                    }
+
+                    if (this.charts.storageWrite) {
+                        this.updateChart(this.charts.storageWrite, timestamp, 0);
+                    }
+
+                    // Update custom chart with REAL entity counts
+                    if (this.charts.custom && systemMetrics?.data) {
+                        const entityCount = systemMetrics.data.entities?.total_count || 0;
+                        const userCount = systemMetrics.data.entities?.user_count || 0;
+                        const sessionCount = health.metrics?.entity_count || 0;
+                        const metricCount = systemMetrics.data.entities?.metric_count || 0;
+                        
+                        this.charts.custom.data.datasets[0].data = [entityCount, userCount, sessionCount, metricCount];
+                        this.charts.custom.update();
+                    }
+
+                } catch (error) {
+                    console.error('Error updating charts:', error);
+                }
+            }
+
+            updateChart(chart, label, value) {
+                if (!chart || !chart.data) return;
+                
+                const settings = this.timeRangeSettings[this.currentTimeRange];
+                const maxDataPoints = settings.maxPoints;
+                
+                // Add new data point
+                chart.data.labels.push(label);
+                chart.data.datasets[0].data.push(value);
+                
+                // Remove old data points if too many
+                if (chart.data.labels.length > maxDataPoints) {
+                    chart.data.labels.shift();
+                    chart.data.datasets[0].data.shift();
+                }
+                
+                chart.update('none'); // Update without animation for performance
+            }
+
+            async initCharts() {
+                // Initialize performance chart with 5-minute historical timeline
                 const performanceCtx = document.getElementById('performanceChart');
                 if (performanceCtx) {
                     this.charts.performance = new Chart(performanceCtx, {
@@ -1015,6 +1248,7 @@
                             }
                         }
                     });
+                    
                 }
 
                 // Initialize request volume chart
@@ -1040,6 +1274,7 @@
                             }
                         }
                     });
+                    
                 }
 
                 // Initialize storage read chart
@@ -1065,6 +1300,7 @@
                             }
                         }
                     });
+                    
                 }
 
                 // Initialize storage write chart
@@ -1090,6 +1326,7 @@
                             }
                         }
                     });
+                    
                 }
 
                 // Initialize custom chart
@@ -1115,6 +1352,46 @@
                         }
                     });
                 }
+                
+                // Initialize historical data for all charts in sequence (not parallel)
+                // This prevents session validation storms and CPU spinning
+                setTimeout(() => this.initializeHistoricalDataSequentially(), 1000);
+            }
+            
+            async initializeHistoricalDataSequentially() {
+                // Prevent multiple concurrent initializations
+                if (this.initializingCharts) {
+                    console.log('Charts already initializing, skipping...');
+                    return;
+                }
+                
+                this.initializingCharts = true;
+                console.log('Starting sequential historical data initialization...');
+                
+                const chartsToInitialize = [
+                    'performance',
+                    'responseTime', 
+                    'requestVolume',
+                    'storageRead',
+                    'storageWrite'
+                ];
+                
+                for (const chartId of chartsToInitialize) {
+                    if (this.charts[chartId]) {
+                        console.log(`Initializing historical data for ${chartId}...`);
+                        try {
+                            await this.initializeChartWithTimeRange(chartId, '5m');
+                            console.log(`✓ Completed historical data for ${chartId}`);
+                            // Small delay between each chart to prevent API flooding
+                            await new Promise(resolve => setTimeout(resolve, 200));
+                        } catch (error) {
+                            console.warn(`Failed to initialize ${chartId}:`, error);
+                        }
+                    }
+                }
+                
+                this.initializingCharts = false;
+                console.log('✓ All charts initialized with historical data');
             }
 
             async viewEntity(entityId) {
@@ -1178,13 +1455,19 @@
                             <textarea id="entityContent" style="width: 100%; height: 200px; ${isEdit ? '' : 'background: #f5f5f5;'}" ${isEdit ? '' : 'readonly'}>${entity.content || ''}</textarea>
                         </div>
                         
-                        <div style="text-align: right; margin-top: 20px;">
-                            ${isEdit ? `
-                                <button class="btn btn-primary" onclick="app.saveEntity('${entity.id}')">Save Changes</button>
-                                <button class="btn btn-secondary" onclick="app.closeModal('${modalId}')">Cancel</button>
-                            ` : `
-                                <button class="btn btn-secondary" onclick="app.closeModal('${modalId}')">Close</button>
-                            `}
+                        <div style="display: flex; justify-content: space-between; margin-top: 20px;">
+                            <div>
+                                <button class="btn btn-danger" onclick="app.deleteEntity('${entity.id}')">Delete Entity</button>
+                            </div>
+                            <div>
+                                ${isEdit ? `
+                                    <button class="btn btn-primary" onclick="app.saveEntity('${entity.id}')">Save Changes</button>
+                                    <button class="btn btn-secondary" onclick="app.closeModal('${modalId}')">Cancel</button>
+                                ` : `
+                                    <button class="btn btn-primary" onclick="app.editEntity('${entity.id}')">Edit</button>
+                                    <button class="btn btn-secondary" onclick="app.closeModal('${modalId}')">Close</button>
+                                `}
+                            </div>
                         </div>
                     </div>
                 `;
@@ -1197,6 +1480,372 @@
                 if (modal) {
                     modal.style.display = 'none';
                 }
+            }
+
+            async saveEntity(entityId) {
+                try {
+                    const content = document.getElementById('entityContent').value;
+                    
+                    await this.apiCall(`/api/v1/entities/update?id=${entityId}`, 'PUT', {
+                        content: btoa(content) // Base64 encode content
+                    });
+                    
+                    this.showAlert('Entity updated successfully!', 'success');
+                    this.closeModal('entityModal');
+                    await this.loadEntities(); // Refresh entity list
+                } catch (error) {
+                    this.showAlert('Failed to update entity: ' + error.message, 'error');
+                }
+            }
+
+            async deleteEntity(entityId) {
+                if (!confirm('Are you sure you want to delete this entity? This action cannot be undone.')) {
+                    return;
+                }
+                
+                try {
+                    await this.apiCall(`/api/v1/entities/delete?id=${entityId}`, 'DELETE');
+                    this.showAlert('Entity deleted successfully!', 'success');
+                    this.closeModal('entityModal');
+                    await this.loadEntities(); // Refresh entity list
+                } catch (error) {
+                    this.showAlert('Failed to delete entity: ' + error.message, 'error');
+                }
+            }
+
+            showCreateEntityModal() {
+                const modalId = 'createEntityModal';
+                let modal = document.getElementById(modalId);
+                
+                if (!modal) {
+                    modal = document.createElement('div');
+                    modal.id = modalId;
+                    modal.className = 'modal';
+                    document.body.appendChild(modal);
+                }
+
+                modal.innerHTML = `
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h2>Create New Entity</h2>
+                            <span class="close" onclick="app.closeModal('${modalId}')">&times;</span>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Entity ID:</label>
+                            <input type="text" id="newEntityId" placeholder="Enter unique entity ID" style="width: 100%;">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Type:</label>
+                            <select id="newEntityType" style="width: 100%;">
+                                <option value="document">Document</option>
+                                <option value="user">User</option>
+                                <option value="config">Configuration</option>
+                                <option value="metric">Metric</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Tags (comma-separated):</label>
+                            <input type="text" id="newEntityTags" placeholder="status:active, category:example" style="width: 100%;">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Content:</label>
+                            <textarea id="newEntityContent" style="width: 100%; height: 200px;" placeholder="Enter entity content..."></textarea>
+                        </div>
+                        
+                        <div style="text-align: right; margin-top: 20px;">
+                            <button class="btn btn-primary" onclick="app.createEntity()">Create Entity</button>
+                            <button class="btn btn-secondary" onclick="app.closeModal('${modalId}')">Cancel</button>
+                        </div>
+                    </div>
+                `;
+                
+                modal.style.display = 'block';
+            }
+
+            async createEntity() {
+                try {
+                    const id = document.getElementById('newEntityId').value.trim();
+                    const type = document.getElementById('newEntityType').value;
+                    const tagsInput = document.getElementById('newEntityTags').value.trim();
+                    const content = document.getElementById('newEntityContent').value;
+                    
+                    if (!id) {
+                        this.showAlert('Entity ID is required', 'error');
+                        return;
+                    }
+                    
+                    // Build tags array
+                    const tags = [`type:${type}`];
+                    if (tagsInput) {
+                        tags.push(...tagsInput.split(',').map(tag => tag.trim()).filter(tag => tag));
+                    }
+                    
+                    await this.apiCall('/api/v1/entities/create', 'POST', {
+                        id: id,
+                        tags: tags,
+                        content: btoa(content) // Base64 encode content
+                    });
+                    
+                    this.showAlert('Entity created successfully!', 'success');
+                    this.closeModal('createEntityModal');
+                    await this.loadEntities(); // Refresh entity list
+                } catch (error) {
+                    this.showAlert('Failed to create entity: ' + error.message, 'error');
+                }
+            }
+
+            searchEntities() {
+                const searchTerm = document.getElementById('entitySearch').value.toLowerCase();
+                const tableRows = document.querySelectorAll('#entitiesTable tbody tr');
+                
+                tableRows.forEach(row => {
+                    const text = row.textContent.toLowerCase();
+                    row.style.display = text.includes(searchTerm) ? '' : 'none';
+                });
+            }
+
+
+            async loadHistoricalData() {
+                try {
+                    const settings = this.timeRangeSettings[this.currentTimeRange];
+                    const endTime = new Date();
+                    const startTime = new Date(endTime.getTime() - (settings.minutes * 60 * 1000));
+                    
+                    // For now, simulate historical data - in production this would call temporal endpoints
+                    // Example: /api/v1/entities/history?start=${startTime.toISOString()}&end=${endTime.toISOString()}
+                    this.generateHistoricalData(startTime, endTime, settings.maxPoints);
+                    
+                } catch (error) {
+                    console.error('Error loading historical data:', error);
+                }
+            }
+
+            generateHistoricalData(startTime, endTime, maxPoints) {
+                // For historical data, we would call actual temporal endpoints like:
+                // /api/v1/entities/history?start=${startTime.toISOString()}&end=${endTime.toISOString()}
+                // 
+                // Since we don't have historical metrics stored yet, start with empty charts
+                // Real implementation would populate with actual temporal data
+                
+                console.log(`Historical data range: ${startTime.toISOString()} to ${endTime.toISOString()}`);
+                console.log(`Would load ${maxPoints} data points for time range ${this.currentTimeRange}`);
+                
+                // TODO: Replace with real temporal API calls
+                // For now, charts start empty and fill with real-time data
+                
+                // Update all charts to ensure they're ready
+                Object.values(this.charts).forEach(chart => {
+                    if (chart && chart.update) chart.update();
+                });
+            }
+
+            formatTimeLabel(timestamp) {
+                const settings = this.timeRangeSettings[this.currentTimeRange];
+                
+                if (settings.minutes <= 60) {
+                    // For short ranges, show time only
+                    return timestamp.toLocaleTimeString('en-US', { 
+                        hour12: false, 
+                        hour: '2-digit', 
+                        minute: '2-digit' 
+                    });
+                } else if (settings.minutes <= 1440) {
+                    // For daily ranges, show time
+                    return timestamp.toLocaleTimeString('en-US', { 
+                        hour12: false, 
+                        hour: '2-digit', 
+                        minute: '2-digit' 
+                    });
+                } else {
+                    // For multi-day ranges, show date
+                    return timestamp.toLocaleDateString('en-US', { 
+                        month: 'short', 
+                        day: 'numeric' 
+                    });
+                }
+            }
+
+
+            async setChartTimeRange(chartId, range) {
+                // Find the chart container and update active button
+                const chartElement = document.getElementById(chartId + 'Chart');
+                if (!chartElement) return;
+                
+                const container = chartElement.closest('.chart-container');
+                if (!container) return;
+                
+                // Update active button within this chart's overlay
+                container.querySelectorAll('.chart-time-btn').forEach(btn => {
+                    btn.classList.remove('active');
+                });
+                
+                // Find and activate the clicked button
+                const clickedBtn = [...container.querySelectorAll('.chart-time-btn')].find(btn => 
+                    btn.textContent.trim() === range
+                );
+                if (clickedBtn) {
+                    clickedBtn.classList.add('active');
+                }
+                
+                // Set time range for this chart and regenerate data
+                if (!this.chartTimeRanges) this.chartTimeRanges = {};
+                this.chartTimeRanges[chartId] = range;
+                
+                await this.initializeChartWithTimeRange(chartId, range);
+            }
+
+            async initializeChartWithTimeRange(chartId, range) {
+                const chart = this.charts[chartId];
+                if (!chart) return;
+                
+                const settings = this.timeRangeSettings[range];
+                const endTime = new Date();
+                const startTime = new Date(endTime.getTime() - (settings.minutes * 60 * 1000));
+                
+                // Generate complete time axis with all labels
+                const timeLabels = [];
+                const dataPoints = [];
+                const timespan = endTime.getTime() - startTime.getTime();
+                const interval = timespan / settings.maxPoints;
+                
+                for (let i = 0; i < settings.maxPoints; i++) {
+                    const timestamp = new Date(startTime.getTime() + (i * interval));
+                    timeLabels.push(this.formatTimeLabel(timestamp));
+                    dataPoints.push(0); // Start with zeros
+                }
+                
+                // Update chart with empty timeline first
+                chart.data.labels = timeLabels;
+                chart.data.datasets[0].data = dataPoints;
+                chart.update();
+                
+                // Load historical data based on chart type
+                await this.loadHistoricalDataForChart(chartId, range, chart, timeLabels, startTime.getTime(), interval);
+            }
+            
+            async loadHistoricalDataForChart(chartId, range, chart, timeLabels, startTimeMs, intervalMs) {
+                const metricsMap = {
+                    'performance': 'storage_read_duration_ms',
+                    'responseTime': 'storage_read_duration_ms', 
+                    'requestVolume': 'query_result_count',
+                    'storageRead': 'storage_read_duration_ms',
+                    'storageWrite': 'storage_read_duration_ms'
+                };
+                
+                const metricName = metricsMap[chartId];
+                if (!metricName) return;
+                
+                try {
+                    console.log(`Loading historical data for ${chartId} using metric ${metricName}`);
+                    const metricsData = await this.apiCall(`/api/v1/metrics/history?metric_name=${metricName}&range=${range}`);
+                    if (metricsData && metricsData.data_points && metricsData.data_points.length > 0) {
+                        console.log(`Loaded ${metricsData.data_points.length} data points for ${chartId}`);
+                        this.mapHistoricalDataToChart(chart, metricsData.data_points, timeLabels, startTimeMs, intervalMs);
+                    } else {
+                        console.warn(`No historical data available for ${chartId}`);
+                    }
+                } catch (error) {
+                    console.warn(`Could not load historical data for ${chartId}:`, error);
+                }
+            }
+
+            mapHistoricalDataToChart(chart, dataPoints, timeLabels, startTimeMs, intervalMs) {
+                // Create new data array based on timeline
+                const chartData = new Array(timeLabels.length).fill(0);
+                
+                // Map each historical data point to the nearest timeline slot
+                dataPoints.forEach(point => {
+                    const timestamp = new Date(point.timestamp).getTime();
+                    const timeSlot = Math.floor((timestamp - startTimeMs) / intervalMs);
+                    
+                    // Only include data points within our time range
+                    if (timeSlot >= 0 && timeSlot < chartData.length) {
+                        // Take the average if multiple points map to the same slot
+                        if (chartData[timeSlot] === 0) {
+                            chartData[timeSlot] = point.value;
+                        } else {
+                            chartData[timeSlot] = (chartData[timeSlot] + point.value) / 2;
+                        }
+                    }
+                });
+                
+                // Update chart with historical data
+                chart.data.datasets[0].data = chartData;
+                chart.update('none'); // Update without animation for performance
+            }
+
+            addDataPoint(chart, label, value, update = true) {
+                if (!chart || !chart.data) return;
+                
+                chart.data.labels.push(label);
+                chart.data.datasets[0].data.push(value);
+                
+                if (update) {
+                    chart.update('none');
+                }
+            }
+
+            updateRefreshInterval() {
+                const settings = this.timeRangeSettings[this.currentTimeRange];
+                
+                // Clear existing intervals
+                if (this.refreshInterval) clearInterval(this.refreshInterval);
+                if (this.chartUpdateInterval) clearInterval(this.chartUpdateInterval);
+                
+                // Set new intervals based on time range
+                this.refreshInterval = setInterval(() => this.refreshData(), 30000);
+                this.chartUpdateInterval = setInterval(() => this.updateCharts(), settings.interval);
+            }
+
+            showAlert(message, type = 'info') {
+                // Remove existing alerts
+                document.querySelectorAll('.alert-overlay').forEach(alert => alert.remove());
+                
+                const alertOverlay = document.createElement('div');
+                alertOverlay.className = 'alert-overlay';
+                alertOverlay.style.cssText = `
+                    position: fixed;
+                    top: 20px;
+                    right: 20px;
+                    z-index: 10000;
+                    min-width: 300px;
+                    max-width: 500px;
+                    padding: 15px 20px;
+                    border-radius: 6px;
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                    color: white;
+                    font-weight: 500;
+                    background: ${type === 'success' ? '#38a169' : type === 'error' ? '#e53e3e' : '#4299e1'};
+                    transform: translateX(100%);
+                    transition: transform 0.3s ease;
+                `;
+                
+                alertOverlay.innerHTML = `
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span>${message}</span>
+                        <button onclick="this.parentElement.parentElement.remove()" style="background: none; border: none; color: white; font-size: 18px; cursor: pointer; margin-left: 10px;">&times;</button>
+                    </div>
+                `;
+                
+                document.body.appendChild(alertOverlay);
+                
+                // Trigger animation
+                setTimeout(() => {
+                    alertOverlay.style.transform = 'translateX(0)';
+                }, 10);
+                
+                // Auto-remove after 5 seconds
+                setTimeout(() => {
+                    if (alertOverlay.parentElement) {
+                        alertOverlay.style.transform = 'translateX(100%)';
+                        setTimeout(() => alertOverlay.remove(), 300);
+                    }
+                }, 5000);
             }
 
             async testAPI() {
@@ -1213,15 +1862,33 @@
             }
 
             startAutoRefresh() {
-                if (this.refreshInterval) clearInterval(this.refreshInterval);
-                this.refreshInterval = setInterval(() => this.refreshData(), 30000);
+                // Load initial historical data
+                this.loadHistoricalData();
+                
+                // Set up refresh intervals based on current time range
+                this.updateRefreshInterval();
             }
 
             // Utility functions
             getEntityType(entity) {
                 if (!entity.tags) return 'unknown';
-                const typeTag = entity.tags.find(tag => tag.includes('type:'));
-                return typeTag ? typeTag.split('type:')[1].split('|')[0] : 'unknown';
+                
+                // Fast path: look for type: tag first
+                for (const tag of entity.tags) {
+                    if (tag.startsWith('type:')) {
+                        return tag.split('type:')[1].split('|')[0];
+                    }
+                }
+                
+                // Fast path: check first few tags for metric indicators
+                for (let i = 0; i < Math.min(entity.tags.length, 10); i++) {
+                    const tag = entity.tags[i];
+                    if (tag.includes('value:') || tag.includes('count:') || tag.includes('avg:')) {
+                        return 'metric';
+                    }
+                }
+                
+                return 'unknown';
             }
 
             extractTagValue(entity, tagKey) {

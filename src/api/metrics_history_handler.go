@@ -85,17 +85,16 @@ func (h *MetricsHistoryHandler) GetMetricHistory(w http.ResponseWriter, r *http.
 	
 	logger.Debug("Fetching metric history: name=%s, hours=%d, limit=%d, aggregation=%s", metricName, hours, limit, aggregation)
 	
-	// Get the metric entity - check for aggregated version first if requested
-	metricID := fmt.Sprintf("metric_%s", metricName)
-	if aggregation != "raw" {
-		metricID = fmt.Sprintf("metric_%s_agg_%s", metricName, aggregation)
-	}
-	entity, err := h.repo.GetByID(metricID)
-	if err != nil {
-		logger.Warn("Metric entity not found: %s", metricID)
+	// Find the metric entity by name tag instead of guessing ID
+	nameTag := fmt.Sprintf("name:%s", metricName)
+	entities, err := h.repo.ListByTag(nameTag)
+	if err != nil || len(entities) == 0 {
+		logger.Warn("Metric entity not found for name: %s", metricName)
 		RespondError(w, http.StatusNotFound, fmt.Sprintf("Metric '%s' not found", metricName))
 		return
 	}
+	entity := entities[0] // Use the first matching entity
+	metricID := entity.ID
 	
 	// Get entity repository - handle wrapped repositories
 	// All temporal functionality is now merged into the base EntityRepository

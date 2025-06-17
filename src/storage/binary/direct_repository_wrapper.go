@@ -31,12 +31,8 @@ func NewDirectRepositoryWrapper(repo models.EntityRepository) DirectRepository {
 func (drw *DirectRepositoryWrapper) CreateDirect(entity *models.Entity) error {
 	logger.Trace("DirectRepositoryWrapper operating without instrumentation: CreateDirect")
 	
-	// For metrics entities, use isolated backend to prevent deadlocks
-	if drw.isMetricsEntity(entity) {
-		return drw.metricsBackend.CreateMetricsEntity(entity)
-	}
-	
-	// For non-metrics entities, use regular repository but skip instrumentation
+	// DECOMMISSIONED: All entities now use single source of truth (main database)
+	// No more isolated metrics backend - everything goes to main repository
 	return drw.underlying.Create(entity)
 }
 
@@ -44,12 +40,8 @@ func (drw *DirectRepositoryWrapper) CreateDirect(entity *models.Entity) error {
 func (drw *DirectRepositoryWrapper) GetByIDDirect(id string) (*models.Entity, error) {
 	logger.Trace("DirectRepositoryWrapper operating without instrumentation: GetByIDDirect")
 	
-	// For metrics entities, use isolated backend
-	if drw.isMetricsEntityID(id) {
-		return drw.metricsBackend.GetMetricsEntity(id)
-	}
-	
-	// For non-metrics entities, use regular repository
+	// DECOMMISSIONED: All entities now use single source of truth (main database)
+	// No more isolated metrics backend - everything goes to main repository
 	return drw.underlying.GetByID(id)
 }
 
@@ -57,12 +49,8 @@ func (drw *DirectRepositoryWrapper) GetByIDDirect(id string) (*models.Entity, er
 func (drw *DirectRepositoryWrapper) ListByTagDirect(tag string) ([]*models.Entity, error) {
 	logger.Trace("DirectRepositoryWrapper operating without instrumentation: ListByTagDirect")
 	
-	// For metrics-related tags, use isolated backend
-	if drw.isMetricsTag(tag) {
-		return drw.metricsBackend.ListMetricsEntitiesByTag(tag)
-	}
-	
-	// For non-metrics tags, use regular repository
+	// DECOMMISSIONED: All entities now use single source of truth (main database)
+	// No more isolated metrics backend - everything goes to main repository  
 	return drw.underlying.ListByTag(tag)
 }
 
@@ -70,12 +58,8 @@ func (drw *DirectRepositoryWrapper) ListByTagDirect(tag string) ([]*models.Entit
 func (drw *DirectRepositoryWrapper) AddTagDirect(entityID, tag string) error {
 	logger.Trace("DirectRepositoryWrapper operating without instrumentation: AddTagDirect")
 	
-	// For metrics entities, use isolated backend
-	if drw.isMetricsEntityID(entityID) {
-		return drw.metricsBackend.AddTagToMetricsEntity(entityID, tag)
-	}
-	
-	// For non-metrics entities, use regular repository
+	// DECOMMISSIONED: All entities now use single source of truth (main database)
+	// No more isolated metrics backend - everything goes to main repository
 	return drw.underlying.AddTag(entityID, tag)
 }
 
