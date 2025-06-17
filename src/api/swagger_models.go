@@ -239,7 +239,8 @@ type PublicSessionMetrics struct {
 
 // PublicRBACMetricsResponse represents public RBAC metrics
 type PublicRBACMetricsResponse struct {
-	Timestamp time.Time              `json:"timestamp"`
-	Auth      *SimplifiedAuthMetrics `json:"auth"`
-	Sessions  *PublicSessionMetrics  `json:"sessions"`
+	Timestamp   time.Time              `json:"timestamp"`
+	Auth        *SimplifiedAuthMetrics `json:"auth"`
+	Sessions    *PublicSessionMetrics  `json:"sessions"`
+	ActiveUsers int                    `json:"active_users"`
 }

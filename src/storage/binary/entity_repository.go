@@ -3492,10 +3492,11 @@ func (r *EntityRepository) detectAndFixIndexCorruption(entityID string) error {
 
 // SaveTagIndex persists the current tag index to disk
 func (r *EntityRepository) SaveTagIndex() error {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
+	// CRITICAL FIX: Use write lock for atomic dirty flag management
+	r.mu.Lock()
 	
 	if !r.tagIndexDirty {
+		r.mu.Unlock()
 		logger.Trace("Tag index not dirty, skipping save")
 		return nil
 	}
@@ -3503,15 +3504,24 @@ func (r *EntityRepository) SaveTagIndex() error {
 	startTime := time.Now()
 	logger.Debug("Saving tag index")
 	
-	// Convert sharded index to regular index for persistence
+	// Get snapshot while holding lock to ensure consistency
 	indexToSave := r.shardedTagIndex.GetAllTags()
 	
-	if err := SaveTagIndex(r.getDataFile(), indexToSave); err != nil {
-		return fmt.Errorf("failed to save tag index: %w", err)
-	}
-	
+	// CRITICAL: Set flags BEFORE releasing lock to prevent race conditions
 	r.tagIndexDirty = false
 	r.lastIndexSave = time.Now()
+	
+	// Release lock before disk I/O to avoid blocking other operations
+	r.mu.Unlock()
+	
+	// Perform disk I/O without holding locks
+	if err := SaveTagIndex(r.getDataFile(), indexToSave); err != nil {
+		// CRITICAL: Re-acquire lock to reset dirty flag on failure
+		r.mu.Lock()
+		r.tagIndexDirty = true
+		r.mu.Unlock()
+		return fmt.Errorf("failed to save tag index: %w", err)
+	}
 	
 	logger.Info("Tag index saved in %v", time.Since(startTime))
 	return nil

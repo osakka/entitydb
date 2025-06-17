@@ -58,6 +58,10 @@ func (h *TemporalRBACMetricsHandler) GetPublicRBACMetrics(w http.ResponseWriter,
 		}
 	}
 	
+	// Get user count
+	userEntities, _ := h.entityRepo.ListByTag("type:user")
+	activeUsers := len(userEntities)
+	
 	// Get authentication events from temporal storage
 	authEventEntities, _ := h.entityRepo.ListByTag("type:auth_event")
 	
@@ -99,7 +103,8 @@ func (h *TemporalRBACMetricsHandler) GetPublicRBACMetrics(w http.ResponseWriter,
 		Sessions: &PublicSessionMetrics{
 			ActiveCount: activeSessions,
 		},
-		Timestamp: time.Now(),
+		ActiveUsers: activeUsers,
+		Timestamp:   time.Now(),
 	}
 	
 	RespondJSON(w, http.StatusOK, response)

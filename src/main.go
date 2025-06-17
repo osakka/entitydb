@@ -415,19 +415,17 @@ func main() {
 	comprehensiveMetricsHandler := api.NewComprehensiveMetricsHandler(server.entityRepo)
 	apiRouter.HandleFunc("/metrics/comprehensive", comprehensiveMetricsHandler.ServeHTTP).Methods("GET")
 	
-	// TEMPORARY FIX: Disable background metrics collector to prevent authentication deadlock
 	// Background metrics collector - designed to handle entities with many temporal tags
 	// The v2.32.0 system with sharded indexing, tag caching, and memory-mapped files
 	// should efficiently handle entities with 100s or 1000s of tags (this is normal for temporal data)
-	logger.Info("Metrics collection interval set to %v (DISABLED)", cfg.MetricsInterval)
+	logger.Info("Metrics collection interval set to %v", cfg.MetricsInterval)
 	
-	// DISABLED: Background metrics collection temporarily disabled to fix authentication hang
-	// backgroundCollector := api.NewBackgroundMetricsCollector(server.entityRepo, cfg.MetricsInterval)
-	// backgroundCollector.Start()
-	// defer backgroundCollector.Stop()
+	// Enable background metrics collection now that race conditions are fixed
+	backgroundCollector := api.NewBackgroundMetricsCollector(server.entityRepo, cfg.MetricsInterval)
+	backgroundCollector.Start()
+	defer backgroundCollector.Stop()
 	
-	// DISABLED: Metrics retention manager - part of metrics feedback loop
-	/*
+	// Enable metrics retention manager
 	if cfg.MetricsRetentionRaw > 0 {
 		retentionManager := api.NewMetricsRetentionManager(
 			server.entityRepo,
@@ -440,7 +438,6 @@ func main() {
 		defer retentionManager.Stop()
 		logger.Info("Metrics retention manager started")
 	}
-	*/
 	
 	// Initialize query metrics collector
 	api.InitQueryMetrics(server.entityRepo)
@@ -520,8 +517,8 @@ func main() {
 	
 	// Add request metrics middleware (conditionally)
 	var requestMetrics *api.RequestMetricsMiddleware
-	// TEMPORARY FIX: Disable request metrics to prevent authentication deadlock
-	if false && cfg.MetricsEnableRequestTracking {
+	// Enable request metrics now that race conditions are fixed
+	if cfg.MetricsEnableRequestTracking {
 		requestMetrics = api.NewRequestMetricsMiddleware(server.entityRepo)
 		logger.Info("Request metrics tracking enabled")
 	} else {

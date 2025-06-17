@@ -1061,6 +1061,39 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/tags/values": {
+            "get": {
+                "description": "Get unique values for a specific tag namespace (e.g., get all dataset names)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "tags"
+                ],
+                "summary": "Get unique tag values",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Tag namespace (e.g., 'dataset', 'type', 'status')",
+                        "name": "namespace",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/users/change-password": {
             "post": {
                 "description": "Change the current user's password",
@@ -1815,6 +1848,9 @@ const docTemplate = `{
         "api.PublicRBACMetricsResponse": {
             "type": "object",
             "properties": {
+                "active_users": {
+                    "type": "integer"
+                },
                 "auth": {
                     "$ref": "#/definitions/api.SimplifiedAuthMetrics"
                 },

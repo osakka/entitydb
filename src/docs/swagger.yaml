@@ -413,6 +413,8 @@ definitions:
     type: object
   api.PublicRBACMetricsResponse:
     properties:
+      active_users:
+        type: integer
       auth:
         $ref: '#/definitions/api.SimplifiedAuthMetrics'
       sessions:
@@ -1363,6 +1365,29 @@ paths:
       summary: EntityDB system metrics
       tags:
       - metrics
+  /api/v1/tags/values:
+    get:
+      consumes:
+      - application/json
+      description: Get unique values for a specific tag namespace (e.g., get all dataset
+        names)
+      parameters:
+      - description: Tag namespace (e.g., 'dataset', 'type', 'status')
+        in: query
+        name: namespace
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get unique tag values
+      tags:
+      - tags
   /api/v1/users/change-password:
     post:
       consumes:
