@@ -2298,6 +2298,88 @@
                 }
             }
 
+            async queryMetrics() {
+                const metricName = document.getElementById('metricName').value;
+                const timeRange = document.getElementById('timeRange').value;
+
+                if (!metricName) {
+                    this.showAlert('Metric name is required', 'error');
+                    return;
+                }
+
+                try {
+                    // Query metrics history for the specified metric
+                    const result = await this.apiCall(`/api/v1/metrics/history?metric=${metricName}&range=${timeRange}`);
+                    
+                    if (result && result.data && result.data.length > 0) {
+                        this.displayCustomChart(result.data, metricName);
+                        document.getElementById('customMetricsChart').style.display = 'block';
+                        this.showAlert(`Loaded ${result.data.length} data points for ${metricName}`, 'success');
+                    } else {
+                        this.showAlert(`No data found for metric: ${metricName}`, 'info');
+                        document.getElementById('customMetricsChart').style.display = 'none';
+                    }
+                } catch (error) {
+                    this.showAlert(`Error querying metrics: ${error.message}`, 'error');
+                    document.getElementById('customMetricsChart').style.display = 'none';
+                }
+            }
+
+            displayCustomChart(data, metricName) {
+                const ctx = document.getElementById('customChart').getContext('2d');
+                
+                // Destroy existing chart if it exists
+                if (this.customChart) {
+                    this.customChart.destroy();
+                }
+
+                // Prepare data for Chart.js
+                const labels = data.map(point => new Date(point.timestamp).toLocaleTimeString());
+                const values = data.map(point => parseFloat(point.value) || 0);
+
+                this.customChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: metricName,
+                            data: values,
+                            borderColor: '#4299e1',
+                            backgroundColor: 'rgba(66, 153, 225, 0.1)',
+                            tension: 0.4,
+                            fill: true
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: 'Value'
+                                }
+                            },
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: 'Time'
+                                }
+                            }
+                        },
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: `${metricName} - ${document.getElementById('timeRange').value}`
+                            },
+                            legend: {
+                                display: true
+                            }
+                        }
+                    }
+                });
+            }
+
             closeModal() {
                 const modals = document.querySelectorAll('#userModal, #passwordModal, #datasetModal');
                 modals.forEach(modal => modal.remove());
