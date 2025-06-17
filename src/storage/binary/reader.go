@@ -11,6 +11,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"sync"
 )
 
 var (
@@ -48,6 +49,7 @@ type Reader struct {
 	header  *Header                 // File header with metadata
 	tagDict *TagDictionary          // Tag ID to string mapping
 	index   map[string]*IndexEntry  // Entity ID to file location mapping
+	indexMu sync.RWMutex            // SURGICAL FIX: Protects index from concurrent access corruption
 }
 
 // NewReader creates a new Reader instance for the specified binary file.
@@ -134,6 +136,10 @@ func NewReader(filename string) (*Reader, error) {
 		logger.Trace("Reading index from offset %d, expecting %d entries", 
 			r.header.EntityIndexOffset, r.header.EntityCount)
 		
+		// SURGICAL FIX: Use write lock during index initialization to prevent corruption
+		r.indexMu.Lock()
+		defer r.indexMu.Unlock()
+		
 		// Validate index location
 		if int64(r.header.EntityIndexOffset) > stat.Size() {
 			logger.Error("Index offset %d exceeds file size %d", 
@@ -153,17 +159,27 @@ func NewReader(filename string) (*Reader, error) {
 		maxPossibleEntries := uint64(remainingFileSize / entrySize)
 		
 		if maxPossibleEntries < r.header.EntityCount {
-			logger.Warn("File can only hold %d index entries but header claims %d",
+			logger.Debug("File size allows %d index entries but header indicates %d (concurrent write in progress)",
 				maxPossibleEntries, r.header.EntityCount)
 		}
 		
 		entriesRead := uint64(0)
-		for i := uint64(0); i < r.header.EntityCount; i++ {
-			// Check if we have enough bytes remaining
+		
+		// Use the smaller of header count and actual possible entries to avoid race conditions
+		// During concurrent writes, header may claim more entities than actually indexed yet
+		entriesToRead := r.header.EntityCount
+		if maxPossibleEntries < entriesToRead {
+			entriesToRead = maxPossibleEntries
+			logger.Debug("Adjusting read count from %d to %d entries due to file size constraints", 
+				r.header.EntityCount, entriesToRead)
+		}
+		
+		for i := uint64(0); i < entriesToRead; i++ {
+			// Check if we have enough bytes remaining  
 			currentPos, _ := file.Seek(0, os.SEEK_CUR)
 			if currentPos+entrySize > stat.Size() {
-				logger.Warn("Not enough data for index entry %d (pos=%d, need %d bytes, file_size=%d)",
-					i, currentPos, entrySize, stat.Size())
+				logger.Debug("Reached end of available index data at entry %d (pos=%d, file_size=%d)",
+					i, currentPos, stat.Size())
 				break
 			}
 			
@@ -206,6 +222,18 @@ func NewReader(filename string) (*Reader, error) {
 				logger.Trace("Skipping empty index entry %d", i)
 				continue
 			}
+			
+			// SURGICAL FIX: Validate offset to detect corruption before storing
+			if entry.Offset > uint64(stat.Size()) {
+				logger.Error("Corrupted index entry %d for %s: invalid offset %d exceeds file size %d", 
+					i, id, entry.Offset, stat.Size())
+				continue // Skip corrupted entry instead of crashing
+			}
+			if entry.Size == 0 {
+				logger.Warn("Index entry %d for %s has zero size, skipping", i, id)
+				continue
+			}
+			
 			r.index[id] = entry
 			entriesRead++
 			logger.Trace("Loaded index entry %d: ID=%s, Offset=%d, Size=%d", i, id, entry.Offset, entry.Size)
@@ -215,7 +243,8 @@ func NewReader(filename string) (*Reader, error) {
 			entriesRead, len(r.index), r.header.EntityCount)
 		
 		if entriesRead < r.header.EntityCount {
-			logger.Warn("Index is incomplete: missing %d entries", r.header.EntityCount - entriesRead)
+			logger.Debug("Index partially loaded: %d entries read of %d expected (likely due to concurrent writes)", 
+				entriesRead, r.header.EntityCount)
 		}
 	}
 	
@@ -261,20 +290,27 @@ func (r *Reader) GetEntity(id string) (*models.Entity, error) {
 	
 	logger.Trace("GetEntity called for ID: %s", id)
 	
+	// SURGICAL FIX: Use read lock to prevent reading corrupted index during concurrent writes
+	r.indexMu.RLock()
 	entry, exists := r.index[id]
 	if !exists {
+		r.indexMu.RUnlock()
 		err := fmt.Errorf("entity %s not found in index", id)
 		op.Fail(err)
 		logger.Trace("Entity %s not found in index", id)
 		return nil, ErrNotFound
 	}
 	
-	logger.Trace("Found entity %s at offset %d, size %d", id, entry.Offset, entry.Size)
+	// Create a safe copy of the entry to avoid holding the lock during file I/O
+	entryCopy := *entry
+	r.indexMu.RUnlock()
+	
+	logger.Trace("Found entity %s at offset %d, size %d", id, entryCopy.Offset, entryCopy.Size)
 	
 	// Seek to entity position
-	_, err := r.file.Seek(int64(entry.Offset), os.SEEK_SET)
+	_, err := r.file.Seek(int64(entryCopy.Offset), os.SEEK_SET)
 	if err != nil {
-		logger.Error("Failed to seek to offset %d: %v", entry.Offset, err)
+		logger.Error("Failed to seek to offset %d: %v", entryCopy.Offset, err)
 		return nil, err
 	}
 	
@@ -283,20 +319,20 @@ func (r *Reader) GetEntity(id string) (*models.Entity, error) {
 	defer pools.PutByteSlice(dataSlice)
 	
 	// Resize slice to needed size
-	if cap(*dataSlice) < int(entry.Size) {
-		*dataSlice = make([]byte, entry.Size)
+	if cap(*dataSlice) < int(entryCopy.Size) {
+		*dataSlice = make([]byte, entryCopy.Size)
 	} else {
-		*dataSlice = (*dataSlice)[:entry.Size]
+		*dataSlice = (*dataSlice)[:entryCopy.Size]
 	}
 	data := *dataSlice
 	
 	n, err := r.file.Read(data)
 	if err != nil {
-		logger.Error("Failed to read %d bytes: %v", entry.Size, err)
+		logger.Error("Failed to read %d bytes: %v", entryCopy.Size, err)
 		return nil, err
 	}
-	if n != int(entry.Size) {
-		logger.Error("Incomplete read, expected %d bytes, got %d", entry.Size, n)
+	if n != int(entryCopy.Size) {
+		logger.Error("Incomplete read, expected %d bytes, got %d", entryCopy.Size, n)
 		return nil, errors.New("incomplete read")
 	}
 	

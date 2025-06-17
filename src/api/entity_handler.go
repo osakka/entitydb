@@ -774,7 +774,14 @@ func (h *EntityHandler) ListEntities(w http.ResponseWriter, r *http.Request) {
 func (h *EntityHandler) QueryEntities(w http.ResponseWriter, r *http.Request) {
 	startTime := time.Now()
 	
-	// Parse query parameters
+	// SURGICAL FIX: Add missing tag parameter support like ListEntities
+	// Parse tag-based query parameters (primary filtering)
+	tag := r.URL.Query().Get("tag")
+	wildcard := r.URL.Query().Get("wildcard")
+	search := r.URL.Query().Get("search")
+	namespace := r.URL.Query().Get("namespace")
+	
+	// Parse legacy filter parameters (secondary filtering)
 	filter := r.URL.Query().Get("filter")
 	operator := r.URL.Query().Get("operator")
 	value := r.URL.Query().Get("value")
@@ -783,52 +790,80 @@ func (h *EntityHandler) QueryEntities(w http.ResponseWriter, r *http.Request) {
 	limitStr := r.URL.Query().Get("limit")
 	offsetStr := r.URL.Query().Get("offset")
 	
-	// Build query using EntityQuery
-	query := h.repo.Query()
-	
 	// Collect tags for complexity calculation
 	var queryTags []string
+	var queryType string
+	var entities []*models.Entity
+	var err error
 	
-	// Add filter if provided
-	if filter != "" && operator != "" && value != "" {
+	// SURGICAL FIX: Use tag-based filtering first (consistent with ListEntities)
+	switch {
+	case wildcard != "":
+		// Query with wildcard pattern
+		entities, err = h.repo.ListByTagWildcard(wildcard)
+		queryTags = append(queryTags, wildcard)
+		queryType = "wildcard"
+	case search != "":
+		// General content search
+		entities, err = h.repo.SearchContent(search)
+		queryTags = append(queryTags, "search:"+search)
+		queryType = "search"
+	case namespace != "":
+		// List by namespace
+		entities, err = h.repo.ListByNamespace(namespace)
+		queryTags = append(queryTags, "namespace:"+namespace)
+		queryType = "namespace"
+	case tag != "":
+		// Filter by specific tag
+		entities, err = h.repo.ListByTag(tag)
+		queryTags = append(queryTags, tag)
+		queryType = "tag_filter"
+	case filter != "" && operator != "" && value != "":
+		// Legacy filter system - build query using EntityQuery
+		query := h.repo.Query()
 		query.AddFilter(filter, operator, value)
 		queryTags = append(queryTags, filter+operator+value)
-	}
-	
-	// Add sorting
-	if sort != "" {
-		if order == "" {
-			order = "asc"
+		queryType = "legacy_filter"
+		
+		// Add sorting for legacy queries
+		if sort != "" {
+			if order == "" {
+				order = "asc"
+			}
+			query.OrderBy(sort, order)
 		}
-		query.OrderBy(sort, order)
-	}
-	
-	// Add pagination
-	if limitStr != "" {
-		limit, err := strconv.Atoi(limitStr)
-		if err == nil && limit > 0 {
-			query.Limit(limit)
+		
+		// Add pagination for legacy queries
+		if limitStr != "" {
+			limit, err := strconv.Atoi(limitStr)
+			if err == nil && limit > 0 {
+				query.Limit(limit)
+			}
 		}
-	}
-	
-	if offsetStr != "" {
-		offset, err := strconv.Atoi(offsetStr)
-		if err == nil && offset >= 0 {
-			query.Offset(offset)
+		
+		if offsetStr != "" {
+			offset, err := strconv.Atoi(offsetStr)
+			if err == nil && offset >= 0 {
+				query.Offset(offset)
+			}
 		}
+		
+		// Execute legacy query
+		entities, err = query.Execute()
+	default:
+		// No filters provided - return all entities
+		entities, err = h.repo.List()
+		queryType = "list_all"
 	}
-	
-	// Execute query
-	entities, err := query.Execute()
 	
 	// Track query metrics
 	if queryMetrics != nil {
-		queryMetrics.TrackQuery("entity_query", queryTags, startTime, len(entities), err)
+		queryMetrics.TrackQuery(queryType, queryTags, startTime, len(entities), err)
 	}
 	
 	if err != nil {
-		logger.Error("failed to execute query with filter=%s, operator=%s, value=%s, sort=%s: %v", 
-			filter, operator, value, sort, err)
+		logger.Error("failed to execute query: type=%s, tags=%v, error: %v", 
+			queryType, queryTags, err)
 		RespondError(w, http.StatusInternalServerError, "Failed to execute query")
 		return
 	}

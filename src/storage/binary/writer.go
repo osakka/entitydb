@@ -413,10 +413,11 @@ func (w *Writer) WriteEntity(entity *models.Entity) error {
 		}
 	}
 	
-	// Update header - only increment count for new entities
+	// Update EntityCount immediately for new entities to match index reality
+	// The index map already contains the entry, so header should reflect this
 	if !isUpdate {
 		w.header.EntityCount++
-		logger.TraceIf("storage", "Incremented EntityCount to %d for new entity %s", w.header.EntityCount, entity.ID)
+		logger.TraceIf("storage", "New entity %s added, EntityCount updated to %d", entity.ID, w.header.EntityCount)
 	} else {
 		logger.TraceIf("storage", "Updated existing entity %s, EntityCount remains %d", entity.ID, w.header.EntityCount)
 	}
@@ -424,10 +425,9 @@ func (w *Writer) WriteEntity(entity *models.Entity) error {
 	w.header.LastModified = time.Now().Unix()
 	
 	logger.TraceIf("storage", "Updated header: EntityCount=%d, FileSize=%d", w.header.EntityCount, w.header.FileSize)
-	op.SetMetadata("final_entity_count", w.header.EntityCount)
 	op.SetMetadata("final_file_size", w.header.FileSize)
 	
-	// Write updated header back to file
+	// Write updated header back to file (EntityCount now matches index)
 	currentPos, err := w.file.Seek(0, os.SEEK_CUR)
 	if err != nil {
 		logger.Error("Failed to get current position: %v", err)
@@ -442,7 +442,7 @@ func (w *Writer) WriteEntity(entity *models.Entity) error {
 		return err
 	}
 	
-	logger.Debug("Writing updated header to file")
+	logger.Debug("Writing updated header to file (EntityCount matches index)")
 	if err := w.writeHeader(); err != nil {
 		logger.Error("Failed to write header: %v", err)
 		return err

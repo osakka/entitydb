@@ -26,6 +26,7 @@ type SecurityManager struct {
 	entityRepo          EntityRepository
 	sessionCache        sync.Map // map[string]*sessionValidationResult
 	sessionCacheTTL     time.Duration
+	sessionCacheMutex   sync.RWMutex // Prevents race conditions in session validation
 }
 
 // NewSecurityManager creates a new security manager
@@ -356,6 +357,9 @@ func (sm *SecurityManager) CreateSession(user *SecurityUser, ipAddress, userAgen
 func (sm *SecurityManager) ValidateSession(token string) (*SecurityUser, error) {
 	logger.Debug("ValidateSession: Looking for session with token: %s", token)
 	
+	// SURGICAL FIX: Use read lock for cache check to prevent race conditions
+	sm.sessionCacheMutex.RLock()
+	
 	// Check cache first
 	if cached, ok := sm.sessionCache.Load(token); ok {
 		result := cached.(*sessionValidationResult)
@@ -364,18 +368,36 @@ func (sm *SecurityManager) ValidateSession(token string) (*SecurityUser, error) 
 		now := time.Now()
 		if now.Sub(result.timestamp) < sm.sessionCacheTTL && now.Before(result.expiry) {
 			logger.Debug("ValidateSession: Cache hit for token: %s", token)
-			return &SecurityUser{
-				ID:       result.userID,
-				Username: result.username,
-				Email:    result.email,
-				Status:   "active",
-				Entity:   nil, // Don't reference entity from cache to prevent corruption
-			}, nil
+			sm.sessionCacheMutex.RUnlock() // Release read lock before user entity fetch
+			
+			// CRITICAL FIX: Must fetch entity for permission checking
+			userEntity, err := sm.entityRepo.GetByID(result.userID)
+			if err != nil {
+				// Cache invalidated due to missing entity - use write lock for deletion
+				sm.sessionCacheMutex.Lock()
+				sm.sessionCache.Delete(token)
+				sm.sessionCacheMutex.Unlock()
+				logger.Debug("ValidateSession: Cache invalidated due to missing user entity: %s", result.userID)
+				// SURGICAL FIX: Fall through to database lookup instead of returning error
+			} else {
+				return &SecurityUser{
+					ID:       result.userID,
+					Username: result.username,
+					Email:    result.email,
+					Status:   "active",
+					Entity:   userEntity, // Must include entity for RBAC permission checking
+				}, nil
+			}
+		} else {
+			// Cache expired or session expired, remove it - upgrade to write lock
+			sm.sessionCacheMutex.RUnlock()
+			sm.sessionCacheMutex.Lock()
+			sm.sessionCache.Delete(token)
+			sm.sessionCacheMutex.Unlock()
+			logger.Debug("ValidateSession: Cache expired for token: %s", token)
 		}
-		
-		// Cache expired or session expired, remove it
-		sm.sessionCache.Delete(token)
-		logger.Debug("ValidateSession: Cache expired for token: %s", token)
+	} else {
+		sm.sessionCacheMutex.RUnlock()
 	}
 	
 	logger.Debug("ValidateSession: Cache miss, performing database lookup for token: %s", token)
@@ -385,13 +407,13 @@ func (sm *SecurityManager) ValidateSession(token string) (*SecurityUser, error) 
 	var sessionEntities []*Entity
 	var err error
 	
-	for i := 0; i < 2; i++ { // Reduced from 5 to 2 retries
+	for i := 0; i < 3; i++ { // SURGICAL FIX: Increased retries to handle indexing delays
 		logger.Debug("ValidateSession: Attempt %d to find session with token: %s", i+1, token)
 		sessionEntities, err = sm.entityRepo.ListByTag("token:" + token)
 		if err != nil {
 			logger.Error("ValidateSession: Error finding session (attempt %d): %v", i+1, err)
-			if i < 1 {
-				time.Sleep(10 * time.Millisecond) // Reduced delay from 50ms to 10ms
+			if i < 2 {
+				time.Sleep(25 * time.Millisecond) // SURGICAL FIX: Increased delay for proper indexing
 				continue
 			}
 			return nil, fmt.Errorf("session lookup failed: %v", err)
@@ -400,9 +422,9 @@ func (sm *SecurityManager) ValidateSession(token string) (*SecurityUser, error) 
 		if len(sessionEntities) > 0 {
 			break // Found session
 		}
-		if i < 1 {
-			logger.Debug("ValidateSession: Session not found, retrying (attempt %d) after 10ms", i+1)
-			time.Sleep(10 * time.Millisecond) // Reduced delay for faster failure
+		if i < 2 {
+			logger.Debug("ValidateSession: Session not found, retrying (attempt %d) after 25ms", i+1)
+			time.Sleep(25 * time.Millisecond) // SURGICAL FIX: Proper delay for indexing completion
 		}
 	}
 	
@@ -486,6 +508,8 @@ func (sm *SecurityManager) ValidateSession(token string) (*SecurityUser, error) 
 	}
 	
 	// Cache the validation result for future requests (safe copy, no entity pointers)
+	// SURGICAL FIX: Use write lock for cache update to prevent race conditions
+	sm.sessionCacheMutex.Lock()
 	sm.sessionCache.Store(token, &sessionValidationResult{
 		userID:    userEntity.ID,
 		username:  username,
@@ -493,6 +517,7 @@ func (sm *SecurityManager) ValidateSession(token string) (*SecurityUser, error) 
 		timestamp: time.Now(),
 		expiry:    expiresAt,
 	})
+	sm.sessionCacheMutex.Unlock()
 	logger.Debug("ValidateSession: Cached validation result for token: %s", token)
 	
 	return &SecurityUser{
@@ -506,7 +531,10 @@ func (sm *SecurityManager) ValidateSession(token string) (*SecurityUser, error) 
 
 // InvalidateSessionCache invalidates a session from the cache (called during logout)
 func (sm *SecurityManager) InvalidateSessionCache(token string) {
+	// SURGICAL FIX: Use write lock for cache invalidation to prevent race conditions
+	sm.sessionCacheMutex.Lock()
 	sm.sessionCache.Delete(token)
+	sm.sessionCacheMutex.Unlock()
 	logger.Debug("InvalidateSessionCache: Removed token from cache: %s", token)
 }
 
@@ -517,6 +545,16 @@ func (sm *SecurityManager) HasPermission(user *SecurityUser, resource, action st
 
 // HasPermissionInDataset checks if a user has a specific permission in a dataset via tag-based RBAC
 func (sm *SecurityManager) HasPermissionInDataset(user *SecurityUser, resource, action, datasetID string) (bool, error) {
+	// CRITICAL FIX: Prevent nil pointer dereference in production
+	if user == nil {
+		logger.Error("HasPermissionInDataset: user is nil")
+		return false, fmt.Errorf("user cannot be nil")
+	}
+	if user.Entity == nil {
+		logger.Error("HasPermissionInDataset: user.Entity is nil for user %s", user.ID)
+		return false, fmt.Errorf("user entity not loaded")
+	}
+	
 	userTags := user.Entity.GetTagsWithoutTimestamp()
 	logger.Debug("HasPermissionInDataset: checking permission %s:%s for user %s with tags: %v", resource, action, user.ID, userTags)
 	
