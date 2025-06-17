@@ -242,9 +242,18 @@ func NewReader(filename string) (*Reader, error) {
 		logger.Trace("Index loading complete: read %d entries, loaded %d into index (expected %d)",
 			entriesRead, len(r.index), r.header.EntityCount)
 		
-		if entriesRead < r.header.EntityCount {
-			logger.Debug("Index partially loaded: %d entries read of %d expected (likely due to concurrent writes)", 
-				entriesRead, r.header.EntityCount)
+		// Check for significant corruption
+		corruptedEntries := int64(r.header.EntityCount) - int64(entriesRead)
+		if corruptedEntries > 0 {
+			corruptionRate := float64(corruptedEntries) / float64(r.header.EntityCount)
+			
+			if corruptionRate > 0.1 { // More than 10% corruption
+				logger.Warn("Significant index corruption detected: %d/%d entries corrupted (%.1f%%) - automatic recovery recommended", 
+					corruptedEntries, r.header.EntityCount, corruptionRate*100)
+			} else if entriesRead < r.header.EntityCount {
+				logger.Debug("Index partially loaded: %d entries read of %d expected (likely due to concurrent writes)", 
+					entriesRead, r.header.EntityCount)
+			}
 		}
 	}
 	

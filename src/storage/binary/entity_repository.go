@@ -752,6 +752,11 @@ func (r *EntityRepository) buildIndexes() error {
 		logger.Debug("Preserving existing indexes - %d entities already loaded (likely from WAL replay)", len(r.entities))
 	}
 	
+	// AUTOMATIC INDEX CORRUPTION RECOVERY
+	if err := r.performAutomaticRecovery(); err != nil {
+		logger.Warn("Automatic recovery failed: %v", err)
+	}
+	
 	// Try to load persisted index first
 	indexFile := r.getDataFile() + ".idx"
 	if _, err := os.Stat(indexFile); err == nil {
@@ -3658,5 +3663,45 @@ func (r *EntityRepository) GetStats() map[string]interface{} {
 		"skipListSize":    0, // We don't have a Count() method for skip list
 		"bloomFilterSize": bloomFilterSize,
 	}
+}
+
+// performAutomaticRecovery automatically detects and recovers from index corruption
+func (r *EntityRepository) performAutomaticRecovery() error {
+	logger.Debug("Performing automatic corruption detection and recovery...")
+	
+	// Create recovery manager
+	recovery := NewIndexCorruptionRecovery(r.dataPath)
+	
+	// Quick corruption check
+	dbPath := r.getDataFile()
+	idxPath := dbPath + ".idx"
+	
+	// Check if index file exists and is valid
+	dbStat, err := os.Stat(dbPath)
+	if err != nil {
+		logger.Debug("Database file not accessible during recovery check: %v", err)
+		return nil // Not necessarily corruption, might be first run
+	}
+	
+	idxStat, err := os.Stat(idxPath)
+	if err != nil {
+		logger.Info("Index file missing - will be rebuilt automatically")
+		return nil // Missing index will be rebuilt by normal flow
+	}
+	
+	// Quick timestamp check - if index is much older than DB, it's likely corrupt
+	if idxStat.ModTime().Before(dbStat.ModTime().Add(-5 * time.Minute)) {
+		logger.Warn("Index file appears stale (DB modified %v, index modified %v) - running recovery", 
+			dbStat.ModTime(), idxStat.ModTime())
+		
+		if err := recovery.DiagnoseAndRecover(); err != nil {
+			logger.Error("Automatic recovery failed: %v", err)
+			return err
+		}
+		
+		logger.Info("Automatic index recovery completed successfully")
+	}
+	
+	return nil
 }
 
