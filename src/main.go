@@ -295,7 +295,12 @@ func main() {
 	server.authHandler = api.NewAuthHandler(server.securityManager)
 	server.securityMiddleware = api.NewSecurityMiddleware(server.securityManager)
 	
-	// Initialize with default entities
+	// Migrate legacy user_ prefixed UUIDs to pure UUIDs (one-time migration - BEFORE entity initialization)
+	if err := MigrateLegacyUUIDs(entityRepo); err != nil {
+		logger.Warn("Legacy UUID migration failed (non-fatal): %v", err)
+	}
+	
+	// Initialize with default entities (after migration)
 	server.initializeEntities()
 
 	// Set up HTTP server with gorilla/mux 
@@ -876,4 +881,74 @@ func (s *EntityDBServer) serveStaticFile(w http.ResponseWriter, r *http.Request)
 	}
 	
 	http.ServeFile(w, r, fullPath)
+}
+
+// MigrateLegacyUUIDs fixes legacy user_ prefixed UUIDs to pure 32-character UUIDs
+func MigrateLegacyUUIDs(repo models.EntityRepository) error {
+	logger.Info("Starting legacy UUID migration...")
+	
+	// Get all entities with legacy user_ prefixes
+	allEntities, err := repo.List()
+	if err != nil {
+		return fmt.Errorf("failed to list entities: %v", err)
+	}
+	
+	migratedCount := 0
+	for _, entity := range allEntities {
+		if strings.HasPrefix(entity.ID, "user_") {
+			// Extract the UUID part after the prefix
+			parts := strings.SplitN(entity.ID, "_", 2)
+			if len(parts) != 2 {
+				logger.Warn("Invalid legacy ID format: %s", entity.ID)
+				continue
+			}
+			
+			newUUID := parts[1]
+			
+			// Validate the extracted UUID
+			if err := models.ValidateEntityUUID(newUUID); err != nil {
+				logger.Warn("Invalid UUID extracted from %s: %v", entity.ID, err)
+				continue
+			}
+			
+			logger.Info("Migrating entity ID: %s -> %s", entity.ID, newUUID)
+			
+			// Create new entity with pure UUID
+			newEntity := &models.Entity{
+				ID:      newUUID,
+				Tags:    entity.Tags,
+				Content: entity.Content,
+			}
+			
+			// Add migration tracking tag
+			newEntity.Tags = append(newEntity.Tags, "migrated:from:"+entity.ID)
+			
+			// Create the new entity
+			if err := repo.Create(newEntity); err != nil {
+				// If it already exists, update it instead
+				if strings.Contains(err.Error(), "already exists") {
+					logger.Info("Entity %s already exists, updating...", newUUID)
+					if err := repo.Update(newEntity); err != nil {
+						logger.Error("Failed to update migrated entity %s: %v", newUUID, err)
+						continue
+					}
+				} else {
+					logger.Error("Failed to create migrated entity %s: %v", newUUID, err)
+					continue
+				}
+			}
+			
+			// Delete the old entity
+			if err := repo.Delete(entity.ID); err != nil {
+				logger.Error("Failed to delete legacy entity %s: %v", entity.ID, err)
+				// Continue anyway - the new entity is created
+			}
+			
+			migratedCount++
+			logger.Info("Successfully migrated entity: %s -> %s", entity.ID, newUUID)
+		}
+	}
+	
+	logger.Info("Legacy UUID migration complete: %d entities migrated", migratedCount)
+	return nil
 }

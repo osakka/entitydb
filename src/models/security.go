@@ -289,6 +289,8 @@ func (sm *SecurityManager) AuthenticateUser(username, password string) (*Securit
 		}
 	}
 	
+	logger.TraceIf("auth", "AuthenticateUser returning user with ID: %s (length: %d)", userEntity.ID, len(userEntity.ID))
+	
 	return &SecurityUser{
 		ID:       userEntity.ID,
 		Username: username,
