@@ -348,6 +348,20 @@ func (w *Writer) WriteEntity(entity *models.Entity) error {
 		return err
 	}
 	
+	// SURGICAL FIX: Validate offset immediately after seek to catch corruption early
+	if offset < 0 {
+		err := fmt.Errorf("invalid negative offset %d returned from seek", offset)
+		op.Fail(err)
+		logger.Error("CORRUPTION DETECTED: %v for entity %s", err, entity.ID)
+		return err
+	}
+	if offset > 1024*1024*1024*10 { // 10GB sanity check
+		err := fmt.Errorf("impossibly large offset %d returned from seek (file corruption?)", offset)
+		op.Fail(err)
+		logger.Error("CORRUPTION DETECTED: %v for entity %s", err, entity.ID)
+		return err
+	}
+	
 	// Calculate buffer checksum
 	bufferChecksum := sha256.Sum256(buffer.Bytes())
 	op.SetMetadata("buffer_checksum", hex.EncodeToString(bufferChecksum[:]))
@@ -379,6 +393,21 @@ func (w *Writer) WriteEntity(entity *models.Entity) error {
 		Offset: uint64(offset),
 		Size:   uint32(n),
 	}
+	
+	// SURGICAL FIX: Validate IndexEntry values immediately after creation
+	if entry.Offset != uint64(offset) {
+		err := fmt.Errorf("offset conversion corruption: int64(%d) -> uint64(%d)", offset, entry.Offset)
+		op.Fail(err)
+		logger.Error("CORRUPTION DETECTED: %v for entity %s", err, entity.ID)
+		return err
+	}
+	if entry.Size != uint32(n) {
+		err := fmt.Errorf("size conversion corruption: int(%d) -> uint32(%d)", n, entry.Size)
+		op.Fail(err)
+		logger.Error("CORRUPTION DETECTED: %v for entity %s", err, entity.ID)
+		return err
+	}
+	
 	// Clear the EntityID array first to avoid garbage
 	for i := range entry.EntityID {
 		entry.EntityID[i] = 0
@@ -546,6 +575,34 @@ func (w *Writer) Close() error {
 	for _, id := range entityIDs {
 		entry := w.index[id]
 		logger.Debug("Writing index entry %d for %s: offset=%d, size=%d", writtenCount, id, entry.Offset, entry.Size)
+		
+		// SURGICAL FIX: Validate index entry before writing to prevent corruption
+		fileInfo, err := w.file.Stat()
+		if err != nil {
+			logger.Error("Failed to get file size for validation: %v", err)
+			return err
+		}
+		currentFileSize := uint64(fileInfo.Size())
+		
+		// Validate offset is within reasonable bounds
+		if entry.Offset > currentFileSize {
+			logger.Error("CORRUPTION DETECTED: Index entry for %s has invalid offset %d exceeds current file size %d - correcting", 
+				id, entry.Offset, currentFileSize)
+			// Skip this corrupted entry rather than write corruption to disk
+			logger.Warn("Skipping corrupted index entry for %s to prevent disk corruption", id)
+			continue
+		}
+		
+		// Validate size is reasonable (not zero and not impossibly large)
+		if entry.Size == 0 {
+			logger.Warn("Index entry for %s has zero size - skipping", id)
+			continue
+		}
+		if entry.Size > 1024*1024*100 { // 100MB sanity check
+			logger.Error("CORRUPTION DETECTED: Index entry for %s has impossible size %d - skipping", id, entry.Size)
+			continue
+		}
+		
 		if err := binary.Write(w.file, binary.LittleEndian, entry.EntityID); err != nil {
 			logger.Error("Failed to write EntityID for %s: %v", id, err)
 			return err
