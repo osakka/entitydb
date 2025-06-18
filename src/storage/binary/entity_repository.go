@@ -827,26 +827,29 @@ func (r *EntityRepository) buildIndexes() error {
 	}
 	
 	// Try to load persisted index first
-	indexFile := r.getDataFile() + ".idx"
-	if _, err := os.Stat(indexFile); err == nil {
-		logger.Debug("Loading persisted tag index from %s", indexFile)
-		if loadedIndex, err := LoadTagIndex(r.getDataFile()); err == nil {
-			// Always populate sharded index from loaded data in parallel
-			logger.Debug("Populating sharded index from loaded data with parallel processing")
-			r.populateShardedIndexParallel(loadedIndex)
-			r.persistentIndexLoaded = true
-			
-			// Populate sharded index from loaded index in parallel
-			logger.Debug("Populating sharded index from loaded data with parallel processing")
-			r.populateShardedIndexParallel(loadedIndex)
-			
-			logger.Info("Loaded persisted tag index with %d tags", len(loadedIndex))
-			// Still need to load entities into memory
-			// Continue to load entities below
-		} else {
-			logger.Warn("Failed to load persisted index: %v, will rebuild", err)
-		}
-	}
+	// DISABLED: External index loading to prevent dual-indexing corruption  
+	// Using in-memory sharded index only, rebuilt from database for single source of truth
+	// indexFile := r.getDataFile() + ".idx"
+	// if _, err := os.Stat(indexFile); err == nil {
+	//	logger.Debug("Loading persisted tag index from %s", indexFile)
+	//	if loadedIndex, err := LoadTagIndex(r.getDataFile()); err == nil {
+	//		// Always populate sharded index from loaded data in parallel
+	//		logger.Debug("Populating sharded index from loaded data with parallel processing")
+	//		r.populateShardedIndexParallel(loadedIndex)
+	//		r.persistentIndexLoaded = true
+	//		
+	//		// Populate sharded index from loaded index in parallel
+	//		logger.Debug("Populating sharded index from loaded data with parallel processing")
+	//		r.populateShardedIndexParallel(loadedIndex)
+	//		
+	//		logger.Info("Loaded persisted tag index with %d tags", len(loadedIndex))
+	//		// Still need to load entities into memory
+	//		// Continue to load entities below
+	//	} else {
+	//		logger.Warn("Failed to load persisted index: %v, will rebuild", err)
+	//	}
+	// }
+	logger.Info("Using in-memory index only - rebuilding from database for consistency")
 	
 	var entities []*models.Entity
 	
@@ -3608,8 +3611,8 @@ func (r *EntityRepository) SaveTagIndex() error {
 	startTime := time.Now()
 	logger.Debug("Saving tag index")
 	
-	// Get snapshot while holding lock to ensure consistency
-	indexToSave := r.shardedTagIndex.GetAllTags()
+	// DISABLED: External index persistence - no need to snapshot for single source of truth
+	// indexToSave := r.shardedTagIndex.GetAllTags()
 	
 	// CRITICAL: Set flags BEFORE releasing lock to prevent race conditions
 	r.tagIndexDirty = false
@@ -3618,14 +3621,15 @@ func (r *EntityRepository) SaveTagIndex() error {
 	// Release lock before disk I/O to avoid blocking other operations
 	r.mu.Unlock()
 	
-	// Perform disk I/O without holding locks
-	if err := SaveTagIndex(r.getDataFile(), indexToSave); err != nil {
-		// CRITICAL: Re-acquire lock to reset dirty flag on failure
-		r.mu.Lock()
-		r.tagIndexDirty = true
-		r.mu.Unlock()
-		return fmt.Errorf("failed to save tag index: %w", err)
-	}
+	// DISABLED: External index persistence to prevent dual-indexing corruption
+	// Using in-memory sharded index only for single source of truth
+	// if err := SaveTagIndex(r.getDataFile(), indexToSave); err != nil {
+	//	// CRITICAL: Re-acquire lock to reset dirty flag on failure
+	//	r.mu.Lock()
+	//	r.tagIndexDirty = true
+	//	r.mu.Unlock()
+	//	return fmt.Errorf("failed to save tag index: %w", err)
+	// }
 	
 	logger.Info("Tag index saved in %v", time.Since(startTime))
 	return nil
