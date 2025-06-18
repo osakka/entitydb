@@ -1,6 +1,6 @@
 # EntityDB Entities API Reference
 
-> **Version**: v2.32.0-dev | **Last Updated**: 2025-06-15 | **Status**: 100% ACCURATE
+> **Version**: v2.32.5 | **Last Updated**: 2025-06-18 | **Status**: 100% ACCURATE
 > 
 > Complete entity API documentation - verified against actual implementation.
 
@@ -333,7 +333,7 @@ curl -k -X GET "https://localhost:8085/api/v1/entities/diff?id=doc_api_guide_001
 
 ## Tag-Based Relationships
 
-EntityDB v2.32.0 uses **tag-based relationships** instead of separate relationship entities. This provides better performance and simpler querying.
+EntityDB v2.32.5 uses **tag-based relationships** instead of separate relationship entities. This provides better performance and simpler querying.
 
 ### Relationship Model
 
@@ -668,6 +668,6 @@ All API endpoints return consistent error responses:
 
 ## Version History
 
-- **v2.32.20**: Current entity API with embedded credentials and temporal tag search fixes
+- **v2.32.5**: Current entity API with embedded credentials and temporal tag search fixes
 - **v2.29.0**: Major authentication architecture change, dataset terminology
 - **v2.28.0**: Enhanced entity model with temporal utilities and metrics integration

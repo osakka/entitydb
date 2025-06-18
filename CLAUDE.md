@@ -469,11 +469,11 @@ The server automatically creates a default admin user if none exists:
 
 ## Recent Changes (v2.23.0)
 
-- **Application-Agnostic Platform**: Removed all application-specific code from core server
+- **Application-Agnostic Platform**: Transitioned to generic application support
   - Replaced worca-specific metrics endpoint with generic `/api/v1/application/metrics`
   - Applications can now filter metrics by namespace/app parameter
-  - Moved example applications (worca, methub) out of core distribution
-  - EntityDB is now a pure database platform without embedded applications
+  - EntityDB core maintains pure database platform architecture
+  - **Note**: Worca was temporarily removed but re-integrated as a complete platform in v2.32.5
 
 ## Recent Changes (v2.22.0)
 

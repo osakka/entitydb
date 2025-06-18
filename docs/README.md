@@ -1,13 +1,13 @@
 # EntityDB Documentation Library
 
-> **Version**: v2.32.4 | **Status**: Debt-Free Production Excellence | **Last Updated**: 2025-06-18
+> **Version**: v2.32.5 | **Status**: Debt-Free Production Excellence | **Last Updated**: 2025-06-18
 > 
 > **Industry-Standard Technical Documentation** for EntityDB - A high-performance temporal database where every tag is timestamped with nanosecond precision.
 
 ## 🏆 Documentation Excellence
 
 This documentation library implements **industry-leading technical writing standards**:
-- ✅ **100% Accuracy**: Every detail verified against v2.32.4 debt-free production codebase
+- ✅ **100% Accuracy**: Every detail verified against v2.32.5 debt-free production codebase
 - ✅ **Single Source of Truth**: Zero duplicate content, authoritative sources
 - ✅ **Professional Taxonomy**: Industry-standard information architecture
 - ✅ **Comprehensive Coverage**: Complete API and feature documentation

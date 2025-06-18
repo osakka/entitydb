@@ -2,8 +2,8 @@
 title: Installation Guide
 category: Getting Started
 tags: [installation, setup, quick-start]
-last_updated: 2025-06-13
-version: v2.32.2
+last_updated: 2025-06-18
+version: v2.32.5
 ---
 
 # EntityDB Installation Guide
@@ -13,7 +13,7 @@ This guide walks you through installing and running EntityDB on your system.
 ## Prerequisites
 
 - Linux, macOS, or Windows with WSL2
-- Go 1.19+ (for building from source)
+- Go 1.23+ (for building from source)
 - 512MB+ RAM
 - 1GB+ disk space
 
@@ -23,10 +23,10 @@ This guide walks you through installing and running EntityDB on your system.
 
 ```bash
 # Download the latest release
-wget https://git.home.arpa/itdlabs/entitydb/releases/download/v2.32.2/entitydb-v2.32.2-linux-amd64.tar.gz
+wget https://git.home.arpa/itdlabs/entitydb/releases/download/v2.32.5/entitydb-v2.32.5-linux-amd64.tar.gz
 
 # Extract and install
-tar -xzf entitydb-v2.32.2-linux-amd64.tar.gz
+tar -xzf entitydb-v2.32.5-linux-amd64.tar.gz
 sudo cp entitydb /usr/local/bin/
 ```
 

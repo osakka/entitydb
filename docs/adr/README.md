@@ -51,11 +51,62 @@ Each ADR follows the template:
 
 | ADR | Title | Status | Date | Git Commits |
 |-----|-------|--------|------|-------------|
-| [015](./015-wal-management-and-checkpointing.md) | WAL Management and Automatic Checkpointing | Accepted | 2025-06-16 | `af7ac83`, WAL fixes |
-| [016](./016-error-recovery-and-resilience.md) | Error Recovery and Resilience Architecture | Accepted | 2025-06-16 | Recovery implementations |
-| [017](./017-automatic-index-corruption-recovery.md) | Automatic Index Corruption Recovery | Accepted | 2025-06-16 | `f6cc03a`, Recovery system |
-| [018](./018-self-cleaning-temporal-retention.md) | Self-Cleaning Temporal Retention Architecture | Accepted | 2025-06-18 | `d7111b3`, Retention fix |
-| [019](./019-index-rebuild-loop-fix.md) | Index Rebuild Loop Critical Fix | Accepted | 2025-06-18 | `d7111b3`, CPU fix |
+| [015](./015-wal-management-and-checkpointing.md) | WAL Management and Automatic Checkpointing | Accepted | 2025-06-16 | `c10f023`, `wal commits` |
+| [016](./016-error-recovery-and-resilience.md) | Error Recovery and Resilience Architecture | Accepted | 2025-06-17 | `de9cd28`, `975afa5` |
+| [017](./017-automatic-index-corruption-recovery.md) | Automatic Index Corruption Recovery | Accepted | 2025-06-17 | `cef9101`, `ec84efe` |
+| [018](./018-self-cleaning-temporal-retention.md) | Self-Cleaning Temporal Retention Architecture | Accepted | 2025-06-18 | `e03ae65`, `7464c52` |
+| [019](./019-index-rebuild-loop-fix.md) | Index Rebuild Loop Critical Fix | Accepted | 2025-06-18 | `d7111b3`, ADR creation |
+
+### Comprehensive Documentation
+
+| ADR | Title | Status | Date | Git Commits |
+|-----|-------|--------|------|-------------|
+| [020](./020-comprehensive-architectural-timeline.md) | Comprehensive Architectural Decision Timeline | Accepted | 2025-06-18 | `verification commits` |
+
+## Decision Verification Status
+
+All ADRs have been verified against the actual v2.32.5 codebase implementation. The comprehensive timeline in ADR-020 provides complete traceability between decisions, git commits, and actual code changes.
+
+## Architecture Evolution Summary
+
+### Phase 1: Foundation (May 2025)
+- **ADR-001**: Temporal tag storage foundation
+- **ADR-002**: Custom binary format (EBF)
+- **ADR-004**: Tag-based RBAC system
+
+### Phase 2: Performance & Optimization (June 2025)
+- **ADR-007**: Memory-mapped file access
+- **ADR-008**: Three-tier configuration
+- **ADR-009**: Memory optimization suite
+
+### Phase 3: Production Readiness (June 2025)
+- **ADR-010**: Complete temporal functionality
+- **ADR-011**: Production battle testing
+- **ADR-012**: Binary repository unification
+
+### Phase 4: Reliability & Operations (June 2025)
+- **ADR-015**: WAL management
+- **ADR-016**: Error recovery
+- **ADR-017**: Index corruption recovery
+- **ADR-018**: Self-cleaning retention
+- **ADR-019**: Index rebuild loop fix
+
+## Architectural Principles
+
+Based on our decision history, EntityDB follows these core principles:
+
+1. **Single Source of Truth**: No duplicate implementations or parallel code paths
+2. **Performance First**: All decisions optimized for high-performance temporal operations
+3. **Production Focus**: Every decision contributes to production-grade reliability
+4. **Unified Entity Model**: Everything is an entity with tags
+5. **Zero Technical Debt**: Clean codebase with no TODOs or technical shortcuts
+
+## Decision Governance
+
+- **New ADRs**: Must align with established architectural principles
+- **Verification**: All decisions must be verified against actual implementation
+- **Traceability**: Complete audit trail from decision to code changes
+- **Timeline Maintenance**: ADR-020 provides comprehensive decision timeline
 
 ## Creating New ADRs
 

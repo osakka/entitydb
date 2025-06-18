@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Real-time synchronization with 5-second polling intervals
   - Multi-workspace dataset management with namespace isolation
   - Professional UI with Alpine.js + Chart.js + responsive design
-- **Production-Ready Integration**: EntityDB v2.32.4 temporal database compatibility
+- **Production-Ready Integration**: EntityDB v2.32.5 temporal database compatibility
   - JWT Bearer token authentication with automatic refresh
   - Binary content storage with base64 encoding support
   - RBAC enforcement with tag-based permissions

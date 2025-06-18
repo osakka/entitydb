@@ -1,6 +1,6 @@
 # EntityDB API Overview
 
-> **Version**: v2.32.0 | **Last Updated**: 2025-06-17 | **Status**: 100% ACCURATE
+> **Version**: v2.32.5 | **Last Updated**: 2025-06-18 | **Status**: 100% ACCURATE
 > 
 > Complete overview of EntityDB's REST API - verified against actual implementation.
 
@@ -44,7 +44,7 @@ Only these endpoints work without authentication:
 
 ## 📊 Complete API Endpoint Reference
 
-**Total Endpoints**: 48 (verified against v2.32.0 implementation)
+**Total Endpoints**: 48 (verified against v2.32.5 implementation)
 
 ### 🔑 Authentication (4 endpoints)
 | Method | Endpoint | Auth Required | Permission | Description |

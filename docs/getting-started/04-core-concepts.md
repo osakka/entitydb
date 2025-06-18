@@ -3,7 +3,7 @@ title: Core Concepts
 category: Getting Started
 tags: [concepts, entities, tags, temporal]
 last_updated: 2025-06-13
-version: v2.32.20
+version: v2.32.5
 ---
 
 # EntityDB Core Concepts

@@ -5,19 +5,22 @@ Thank you for your interest in contributing to the EntityDB (EntityDB) platform.
 ## Development Setup
 
 ### Prerequisites
-- Go 1.18 or higher
+- Go 1.23 or higher (current: Go 1.23.0 with toolchain 1.24.2)
 - Git
 
 ### Setting Up the Development Environment
 1. Clone the repository:
    ```bash
-   git clone https://git.home.arpa/osakka/entitydb.git
+   git clone https://git.home.arpa/itdlabs/entitydb.git
    cd entitydb
    ```
 
-2. Start the server:
+2. Build and start the server:
    ```bash
-   ./bin/entitydbd.sh start
+   cd src
+   make
+   make install
+   ../bin/entitydbd.sh start
    ```
 
 3. Verify the server is running:
@@ -27,19 +30,20 @@ Thank you for your interest in contributing to the EntityDB (EntityDB) platform.
 
 ## Project Structure
 
-- `/bin` - System binaries and scripts
-- `/docs` - Documentation
-- `/share` - Shared resources and test scripts
-- `/src` - Source code
-  - `/src/api` - API endpoints and handlers
-  - `/src/models` - Data models and repository implementations
-  - `/src/tools` - Utility tools and test implementations
-- `/var` - Variable data (database, logs, PID files)
+- `/bin/` - System binaries and daemon scripts
+- `/docs/` - Comprehensive documentation library
+- `/share/` - Static web assets, configuration templates, and test cases
+- `/src/` - Go source code
+  - `/src/api/` - HTTP handlers and middleware
+  - `/src/models/` - Entity models and business logic
+  - `/src/storage/` - Binary storage implementation with WAL
+  - `/src/tools/` - Administrative and maintenance utilities
+- `/var/` - Runtime data (binary database, WAL, logs, PID files)
 
 ## Coding Standards
 
 ### Go Code Style
-- Follow the [Go Code Review Comments](https://gitdataset.com/golang/go/wiki/CodeReviewComments)
+- Follow the [Go Code Review Comments](https://github.com/golang/go/wiki/CodeReviewComments)
 - Use `gofmt` to format code before committing
 - Add appropriate comments for public functions and packages
 - Use meaningful variable and function names
@@ -80,22 +84,37 @@ Thank you for your interest in contributing to the EntityDB (EntityDB) platform.
 ## Testing
 
 ### Running Tests
-- Use the test runner to run API tests:
+- Run comprehensive test suite:
   ```bash
-  ./src/tools/run_api_tests.sh.improved --verbose
+  cd src
+  make test
+  ```
+- Run specific test categories:
+  ```bash
+  # API integration tests
+  ../tests/run_all_tests.sh
+  
+  # Performance tests
+  ../tests/performance/test_performance.sh
+  
+  # Temporal functionality tests
+  ../tests/temporal/test_temporal.sh
   ```
 
 ### Adding New Tests
-- Add unit tests for new code in the appropriate test directory
-- For API endpoints, add API tests in the share/tests/api directory
-- Ensure your tests are included in the appropriate test runner
+- **Unit Tests**: Add Go unit tests alongside source files with `_test.go` suffix
+- **Integration Tests**: Add shell-based tests in `/tests/` directory structure
+- **API Tests**: Add test cases to `/share/tests/cases/` with `.test` extension
+- **Performance Tests**: Add benchmarks to `/tests/performance/` directory
+- Follow existing patterns in test directory structure
 
 ## Documentation
 
-- Update the README.md file with any changes to the system's functionality
-- Document new API endpoints
-- Add inline documentation for complex code
-- Update the STATE.md and WORKFLOW.md files as needed
+- Update documentation in `/docs/` following the professional taxonomy
+- Document new API endpoints in `/docs/api-reference/`
+- Add inline Go documentation for public functions and types
+- Update `/docs/developer-guide/` for development-related changes
+- Follow documentation standards in [Documentation Architecture](./09-documentation-architecture.md)
 
 ## Issue Reporting
 

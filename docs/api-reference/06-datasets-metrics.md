@@ -1,6 +1,6 @@
 # Dataset and Metrics API Reference
 
-> **Version**: v2.32.20 | **Last Updated**: 2025-06-14 | **Status**: AUTHORITATIVE
+> **Version**: v2.32.5 | **Last Updated**: 2025-06-18 | **Status**: AUTHORITATIVE
 
 This document covers EntityDB's dataset management and metrics API endpoints, providing comprehensive examples and implementation guidance for data organization and monitoring integration.
 
@@ -173,11 +173,11 @@ entitydb_memory_usage_bytes 536870912
 # TYPE entitydb_storage_size_bytes gauge
 entitydb_storage_size_bytes 1073741824
 
-# HELP entitydb_tag_cache_hits_total Tag cache hits (v2.32.20)
+# HELP entitydb_tag_cache_hits_total Tag cache hits (v2.32.5)
 # TYPE entitydb_tag_cache_hits_total counter
 entitydb_tag_cache_hits_total 5000
 
-# HELP entitydb_parallel_index_operations_total Parallel index operations (v2.32.20)
+# HELP entitydb_parallel_index_operations_total Parallel index operations (v2.32.5)
 # TYPE entitydb_parallel_index_operations_total counter
 entitydb_parallel_index_operations_total 150
 ```
@@ -451,7 +451,7 @@ curl -H "Authorization: Bearer $TOKEN" \
   "http://localhost:8085/api/v1/entities/list?tags=type:metric&sort_by=timestamp&sort_order=desc&limit=50"
 ```
 
-## Performance Optimization (v2.32.20)
+## Performance Optimization (v2.32.5)
 
 ### Metrics-Specific Optimizations
 
@@ -532,4 +532,4 @@ ENTITYDB_BATCH_WRITE_TIMEOUT=100ms
 
 ---
 
-*This API reference covers EntityDB's dataset and metrics capabilities in v2.32.20. For additional monitoring setup, see [Monitoring Guide](../50-admin-guides/02-monitoring-guide.md).*
+*This API reference covers EntityDB's dataset and metrics capabilities in v2.32.5. For additional monitoring setup, see [Monitoring Guide](../admin-guide/07-monitoring-guide.md).*

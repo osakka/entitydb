@@ -1,6 +1,6 @@
 # EntityDB Logging Standards
 
-> **Version**: v2.30.0 | **Last Updated**: 2025-06-12 | **Status**: AUTHORITATIVE  
+> **Version**: v2.32.5 | **Last Updated**: 2025-06-18 | **Status**: AUTHORITATIVE  
 > **Component**: Professional logging system with runtime control
 
 ## Overview

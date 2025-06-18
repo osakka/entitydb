@@ -1,12 +1,12 @@
 # EntityDB API Endpoint Inventory
 
-> **Version**: v2.32.0 | **Last Verified**: 2025-06-16 | **Status**: AUTHORITATIVE
+> **Version**: v2.32.5 | **Last Verified**: 2025-06-18 | **Status**: AUTHORITATIVE
 >
-> **Complete inventory of all API endpoints in EntityDB v2.32.0, verified against actual codebase implementation.**
+> **Complete inventory of all API endpoints in EntityDB v2.32.5, verified against actual codebase implementation.**
 
 ## Endpoint Summary
 
-**Total Endpoints**: 40 (verified against `src/main.go`)
+**Total Endpoints**: 61+ (verified against `src/main.go` v2.32.5 - includes dataset management)
 **Authentication Model**: JWT Bearer tokens
 **Base URL**: `https://localhost:8085` (SSL enabled by default)
 
@@ -17,7 +17,7 @@
 | `POST` | `/api/v1/auth/login` | None | User login with username/password |
 | `POST` | `/api/v1/auth/logout` | Authenticated | Invalidate current session |
 | `GET` | `/api/v1/auth/whoami` | Authenticated | Get current user information |
-| `POST` | `/api/v1/auth/refresh` | None | Refresh session token |
+| `POST` | `/api/v1/auth/refresh` | Authenticated | Refresh session token |
 
 ## Entity Operations (13)
 
@@ -37,17 +37,20 @@
 | `GET` | `/api/v1/entities/get-chunk` | `entity:view` | Get chunked content |
 | `GET` | `/api/v1/entities/stream-content` | `entity:view` | Stream large entity content |
 
-## Dataset Operations (7)
+## Dataset Operations (10)
 
 | Method | Endpoint | Permission | Description |
 |--------|----------|------------|-------------|
 | `GET` | `/api/v1/datasets` | `dataset:view` | List available datasets |
 | `POST` | `/api/v1/datasets` | `dataset:create` | Create new dataset |
-| `GET` | `/api/v1/datasets/{name}` | `dataset:view` | Get dataset information |
-| `PUT` | `/api/v1/datasets/{name}` | `dataset:update` | Update dataset properties |
-| `DELETE` | `/api/v1/datasets/{name}` | `dataset:delete` | Delete dataset |
-| `GET` | `/api/v1/datasets/{name}/entities/list` | `entity:view` | List entities in dataset |
-| `POST` | `/api/v1/datasets/{name}/entities/create` | `entity:create` | Create entity in dataset |
+| `GET` | `/api/v1/datasets/{id}` | `dataset:view` | Get dataset information |
+| `PUT` | `/api/v1/datasets/{id}` | `dataset:update` | Update dataset properties |
+| `DELETE` | `/api/v1/datasets/{id}` | `dataset:delete` | Delete dataset |
+| `GET` | `/api/v1/datasets/{dataset}/entities/list` | `entity:view` | List entities in dataset |
+| `POST` | `/api/v1/datasets/{dataset}/entities/create` | `entity:create` | Create entity in dataset |
+| `GET` | `/api/v1/datasets/{dataset}/entities/query` | `entity:view` | Query entities in dataset |
+| `GET` | `/api/v1/datasets/{dataset}/entities/get` | `entity:view` | Get entity in dataset |
+| `PUT` | `/api/v1/datasets/{dataset}/entities/update` | `entity:update` | Update entity in dataset |
 
 ## User Management (3)
 
@@ -57,26 +60,53 @@
 | `POST` | `/api/v1/users/change-password` | `user:update` | Change user password |
 | `POST` | `/api/v1/users/reset-password` | `user:update` | Reset user password |
 
-## Metrics & Monitoring (7)
+## Tag Operations (1)
+
+| Method | Endpoint | Permission | Description |
+|--------|----------|------------|-------------|
+| `GET` | `/api/v1/tags/values` | `entity:view` | Get unique tag values by namespace |
+
+## Configuration Management (4)
+
+| Method | Endpoint | Permission | Description |
+|--------|----------|------------|-------------|
+| `GET` | `/api/v1/config` | `config:view` | Get configuration values |
+| `POST` | `/api/v1/config/set` | `config:update` | Set configuration values |
+| `GET` | `/api/v1/feature-flags` | `config:view` | Get feature flags |
+| `POST` | `/api/v1/feature-flags/set` | `config:update` | Set feature flags |
+
+## Dashboard Operations (1)
+
+| Method | Endpoint | Permission | Description |
+|--------|----------|------------|-------------|
+| `GET` | `/api/v1/dashboard/stats` | `system:view` | Get dashboard statistics |
+
+## Metrics & Monitoring (11)
 
 | Method | Endpoint | Permission | Description |
 |--------|----------|------------|-------------|
 | `GET` | `/health` | None | System health check |
 | `GET` | `/metrics` | None | Prometheus metrics |
 | `POST` | `/api/v1/metrics/collect` | `metrics:write` | Collect custom metric |
-| `GET` | `/api/v1/metrics/history` | `metrics:read` | Get metrics history |
+| `GET` | `/api/v1/metrics/history` | None | Get metrics history |
 | `GET` | `/api/v1/metrics/current` | `metrics:read` | Get current metrics |
-| `GET` | `/api/v1/metrics/available` | `metrics:read` | List available metrics |
-| `GET` | `/api/v1/metrics/comprehensive` | `metrics:read` | Comprehensive metrics data |
+| `GET` | `/api/v1/metrics/available` | None | List available metrics |
+| `GET` | `/api/v1/metrics/comprehensive` | None | Comprehensive metrics data |
+| `GET` | `/api/v1/system/metrics` | None | EntityDB system metrics |
+| `GET` | `/api/v1/application/metrics` | `metrics:read` | Application-specific metrics |
+| `GET` | `/api/v1/rbac/metrics` | `admin:view` | RBAC metrics (admin only) |
+| `GET` | `/api/v1/rbac/metrics/public` | None | Public RBAC metrics |
 
-## Administrative Operations (6)
+## Administrative Operations (8)
 
 | Method | Endpoint | Permission | Description |
 |--------|----------|------------|-------------|
 | `POST` | `/api/v1/admin/reindex` | `admin:reindex` | Rebuild system indexes |
 | `GET` | `/api/v1/admin/health` | `admin:health` | Detailed system health |
-| `POST` | `/api/v1/admin/log-level` | `admin:config` | Change runtime log level |
-| `POST` | `/api/v1/admin/trace-subsystems` | `admin:config` | Configure trace subsystems |
+| `POST` | `/api/v1/admin/log-level` | `admin:update` | Change runtime log level |
+| `GET` | `/api/v1/admin/log-level` | `admin:view` | Get current log level |
+| `POST` | `/api/v1/admin/trace-subsystems` | `admin:update` | Configure trace subsystems |
+| `GET` | `/api/v1/admin/trace-subsystems` | `admin:view` | Get current trace subsystems |
 | `GET` | `/api/v1/status` | None | Server status check |
 | `GET` | `/swagger/doc.json` | None | OpenAPI specification |
 
@@ -135,5 +165,5 @@ All API responses follow this consistent structure:
 
 **Verification Method**: This inventory was generated by parsing `src/main.go` and cross-referencing with actual handler implementations. All endpoints have been verified to exist in the codebase.
 
-**Last Updated**: 2025-06-16 by Technical Documentation Team
-**Source**: `/opt/entitydb/src/main.go` lines 150-300 (route registrations)
+**Last Updated**: 2025-06-18 by Technical Documentation Team  
+**Source**: `/opt/entitydb/src/main.go` lines 314-499 (route registrations)
