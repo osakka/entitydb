@@ -1,4 +1,4 @@
-# ADR-007: Self-Cleaning Temporal Retention Architecture
+# ADR-018: Self-Cleaning Temporal Retention Architecture
 
 **Status**: Accepted  
 **Date**: 2025-06-18  

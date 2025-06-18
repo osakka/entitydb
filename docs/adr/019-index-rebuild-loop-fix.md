@@ -1,4 +1,4 @@
-# ADR-015: Index Rebuild Loop Critical Fix
+# ADR-019: Index Rebuild Loop Critical Fix
 
 **Status**: Accepted  
 **Date**: 2025-06-18  

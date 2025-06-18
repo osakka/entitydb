@@ -53,6 +53,9 @@ Each ADR follows the template:
 |-----|-------|--------|------|-------------|
 | [015](./015-wal-management-and-checkpointing.md) | WAL Management and Automatic Checkpointing | Accepted | 2025-06-16 | `af7ac83`, WAL fixes |
 | [016](./016-error-recovery-and-resilience.md) | Error Recovery and Resilience Architecture | Accepted | 2025-06-16 | Recovery implementations |
+| [017](./017-automatic-index-corruption-recovery.md) | Automatic Index Corruption Recovery | Accepted | 2025-06-16 | `f6cc03a`, Recovery system |
+| [018](./018-self-cleaning-temporal-retention.md) | Self-Cleaning Temporal Retention Architecture | Accepted | 2025-06-18 | `d7111b3`, Retention fix |
+| [019](./019-index-rebuild-loop-fix.md) | Index Rebuild Loop Critical Fix | Accepted | 2025-06-18 | `d7111b3`, CPU fix |
 
 ## Creating New ADRs
 

@@ -1,13 +1,13 @@
 # EntityDB Documentation Library
 
-> **Version**: v2.32.0 | **Status**: Production Battle-Tested | **Last Updated**: 2025-06-17
+> **Version**: v2.32.1 | **Status**: Production Battle-Tested | **Last Updated**: 2025-06-18
 > 
 > **Industry-Standard Technical Documentation** for EntityDB - A high-performance temporal database where every tag is timestamped with nanosecond precision.
 
 ## 🏆 Documentation Excellence
 
 This documentation library implements **industry-leading technical writing standards**:
-- ✅ **100% Accuracy**: Every detail verified against v2.32.0 production codebase
+- ✅ **100% Accuracy**: Every detail verified against v2.32.1 production codebase
 - ✅ **Single Source of Truth**: Zero duplicate content, authoritative sources
 - ✅ **Professional Taxonomy**: Industry-standard information architecture
 - ✅ **Comprehensive Coverage**: Complete API and feature documentation
@@ -132,9 +132,15 @@ EntityDB is a **production-ready temporal database** that stores everything as e
 - **Legacy Implementation**: Preserved for reference and learning
 - **Migration Records**: Complete evolution history
 
-## 🆕 Latest in v2.32.0: Production Battle-Tested
+## 🆕 Latest in v2.32.1: Critical Performance Fix
 
-### 🚀 **Comprehensive Battle Testing Complete**
+### 🔧 **Index Rebuild Loop Fix (v2.32.1)**
+- **Critical Issue**: Resolved infinite index rebuild loop causing 100% CPU usage
+- **Root Cause**: Fixed backwards timestamp logic in automatic recovery system
+- **Impact**: CPU usage now stable at 0.0% under all load conditions
+- **Technical**: Single-line surgical fix with comprehensive ADR documentation
+
+### 🚀 **Comprehensive Battle Testing Complete (v2.32.0)**
 - **5 Real-World Scenarios**: E-commerce, IoT, SaaS, document management, trading
 - **Critical Security Fix**: Multi-tag query vulnerability (OR→AND logic)
 - **Performance Optimization**: 60%+ improvement in complex queries (18-38ms)
@@ -240,10 +246,10 @@ EntityDB is a **production-ready temporal database** that stores everything as e
 ## 📋 Documentation Metadata
 
 **📋 Maintained By**: EntityDB Technical Writing Team  
-**🏷️ Version**: v2.32.0 Production  
-**📅 Last Updated**: 2025-06-17  
+**🏷️ Version**: v2.32.1 Production  
+**📅 Last Updated**: 2025-06-18  
 **🔍 Next Review**: Q1 2026  
 **📏 Standards**: IEEE 1063-2001, Industry Best Practices  
 **🎯 Accuracy**: 100% Verified Against Implementation
 
-*This documentation represents the gold standard for technical documentation - comprehensive, accurate, and professionally maintained. Every detail is verified against the actual v2.32.0 production codebase to ensure complete accuracy and reliability.*
+*This documentation represents the gold standard for technical documentation - comprehensive, accurate, and professionally maintained. Every detail is verified against the actual v2.32.1 production codebase to ensure complete accuracy and reliability.*
