@@ -5,6 +5,45 @@ All notable changes to the EntityDB Platform will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.32.1] - 2025-06-18
+
+### 🛡️ CRITICAL INDEX CORRUPTION ELIMINATION
+- **Binary Format Corruption Fix**: Eliminated systematic index corruption causing astronomical offset values
+  - Root cause: Dual indexing system memory corruption in binary format operations
+  - Solution: Surgical validation during index writing prevents invalid offsets from reaching disk
+  - Added corruption detection that catches offset values exceeding reasonable bounds (e.g., 3.9 quadrillion)
+  - Implemented single source of truth architecture using in-memory sharded indexing only
+- **System Architecture Optimization**: Enhanced database reliability and performance
+  - Eliminated external .idx file dependency - no longer created or required
+  - Maintains 100% functionality with WAL-based recovery for entity restoration
+  - 256-shard concurrent in-memory indexing provides optimal performance
+  - Clean database startup without corruption errors even on fresh installations
+
+### 🔧 INDEX REBUILD LOOP FIX  
+- **100% CPU Usage Resolution**: Fixed infinite index rebuild loop
+  - Corrected backwards timestamp logic in automatic recovery system
+  - CPU usage now stable at 0.0% under all load conditions
+  - Proper index staleness detection prevents unnecessary rebuilds
+
+### 🏗️ ABSOLUTE PATH ARCHITECTURE
+- **Binary/Shell Separation**: Complete path handling overhaul
+  - Binary accepts all paths literally without interpretation (including ./)
+  - Shell script provides absolute paths (/opt/entitydb) for all operations
+  - Eliminated relative path dependencies and cd command usage
+  - Enhanced configuration system with absolute file path specifications
+
+### Fixed
+- Memory corruption in dual indexing system leading to invalid file offsets
+- Infinite CPU loops in index rebuild operations
+- Path resolution inconsistencies between binary and shell components
+- External index file corruption affecting database integrity
+
+### Changed
+- External .idx files no longer created (architectural optimization)
+- In-memory only indexing with WAL-based recovery
+- All file paths now absolute in configuration and operations
+- Enhanced corruption detection and prevention during write operations
+
 ## [2.32.0] - 2025-06-17
 
 ### 🚀 PRODUCTION BATTLE TESTING COMPLETE

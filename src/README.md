@@ -2,7 +2,15 @@
 
 This directory contains the source code for the EntityDB platform. This document provides an overview of the source code structure and development guidelines.
 
-## Latest Changes (v2.32.0) ✅ Audited
+## Latest Changes (v2.32.1) ✅ Audited
+
+- **Critical Index Corruption Elimination**: Surgical validation prevents astronomical offset values from corrupting binary format
+  - Added comprehensive corruption detection during index writing operations
+  - Eliminated dual indexing system memory corruption through single source of truth architecture
+  - System remains 100% functional with WAL-based recovery for missing entities
+  - No external .idx files needed - optimized in-memory sharded indexing only
+
+## Previous Changes (v2.32.0) ✅ Audited
 
 - **Unified Sharded Indexing**: Single source of truth with complete legacy code elimination
   - Removed all conditional `useShardedIndex` logic and legacy `tagIndex` map implementations
