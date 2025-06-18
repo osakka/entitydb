@@ -2,7 +2,9 @@ package binary
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/binary"
+	"encoding/hex"
 	"entitydb/models"
 	"entitydb/logger"
 	"entitydb/storage/pools"
@@ -526,10 +528,35 @@ func (r *Reader) parseEntity(data []byte, id string) (*models.Entity, error) {
 			entity.AddTag("content:type:" + contentType)
 		}
 		
-		// Note: Checksum validation temporarily disabled due to systematic implementation issues
-		// where checksums were calculated on compressed content but validated against decompressed content.
-		// This created false positives that blocked normal operation without providing real security value.
-		// TODO: Re-implement checksum validation properly if needed for data integrity verification.
+		// Content Integrity Validation:
+		// Validate content checksum against stored checksum tag for data integrity verification
+		// Algorithm matches writer: SHA256 of final decompressed content
+		actualChecksum := sha256.Sum256(contentBytes)
+		actualChecksumHex := hex.EncodeToString(actualChecksum[:])
+		
+		// Find stored checksum in entity tags (temporal format: "timestamp|checksum:sha256:hash")
+		var storedChecksumHex string
+		for _, tag := range entity.Tags {
+			if strings.Contains(tag, "|checksum:sha256:") {
+				parts := strings.SplitN(tag, "|", 2)
+				if len(parts) == 2 && strings.HasPrefix(parts[1], "checksum:sha256:") {
+					storedChecksumHex = strings.TrimPrefix(parts[1], "checksum:sha256:")
+					break
+				}
+			}
+		}
+		
+		// Perform validation if checksum tag exists
+		if storedChecksumHex != "" {
+			if actualChecksumHex != storedChecksumHex {
+				logger.Warn("Content checksum mismatch for entity %s: expected %s, got %s", 
+					id, storedChecksumHex, actualChecksumHex)
+				// Note: Continue operation but log integrity issue for monitoring
+			} else {
+				logger.Trace("Content integrity verified for entity %s", id)
+			}
+		}
+		
 		logger.Trace("Content loaded for entity %s (%d bytes)", id, len(contentBytes))
 	}
 	
