@@ -1,183 +1,93 @@
-# 🐋 Worca - Workforce Orchestrator
+# 🚀 Worca - Workforce Orchestrator
 
-> **A comprehensive workforce management platform built on EntityDB**
+> **Complete workforce management platform built on EntityDB v2.32.4**
 
-Worca is a powerful, scalable workforce orchestrator that provides both rich web interfaces and conversational CLI tools for managing teams, projects, and tasks across organizations of any size.
+## 📁 Directory Structure
 
-## ✨ Features
-
-### 🌐 Rich Web Dashboard
-- **Interactive Kanban Boards** with drag-drop functionality
-- **Real-time Analytics** with charts and performance metrics
-- **Team Management** with workload visualization
-- **Project Hierarchy** management (Org → Project → Epic → Story → Task)
-- **Mobile-responsive** design with modern UI
-
-### 📊 Analytics & Reporting
-- Task status distribution charts
-- Team workload analysis
-- Performance metrics and KPIs
-- Real-time activity feeds
-- Time tracking capabilities
-
-### 🏗️ Scalable Architecture
-- **5-Level Hierarchy**: Organization → Project → Epic → Story → Task
-- **EntityDB Powered**: High-performance temporal database backend
-- **Tag-Based**: Flexible metadata and categorization
-- **RBAC Ready**: Role-based access control integration
-
-## 🎯 Quick Start
-
-### Access the Web Interface
 ```
-https://localhost:8085/worca/
-```
-
-### Use the CLI Interface
-```
-https://localhost:8085/worca/cli.html
-```
-
-## 💼 Use Cases
-
-### For Small Teams (5-15 people)
-- Simple task tracking
-- Basic project management
-- Team collaboration
-
-### For Medium Teams (15-50 people)
-- Multi-project coordination
-- Sprint planning
-- Performance analytics
-
-### For Large Organizations (50+ people)
-- Complex hierarchies
-- Cross-team collaboration
-- Executive dashboards
-
-## 🎨 User Interface
-
-### Main Dashboard
-- **Real-time Statistics**: Total tasks, active work, completed items
-- **Team Overview**: Member workloads and availability
-- **Recent Activity**: Live feed of team actions
-- **Quick Actions**: Fast task creation and updates
-
-### Kanban Board
-- **Four Columns**: To Do, In Progress, Review, Done
-- **Drag & Drop**: Move tasks between statuses
-- **Task Cards**: Rich information display
-- **Filtering**: By assignee, project, priority
-
-### CLI Commands
-```bash
-# Natural language
-"show me tasks"
-"what team members do we have"
-"create a new task"
-"assign task123 to john"
-
-# Traditional commands
-list tasks
-team
-create task "Fix login bug"
-assign task_456 to sarah
-status task_789 done
-my tasks
-stats
+worca/
+├── index.html              # 🏠 Main application entry point
+├── README.md               # 📖 This file
+│
+├── 📂 bootstrap/           # 🌱 Data bootstrapping & initialization
+│   ├── dataset-manager.js  # Multi-workspace dataset management
+│   ├── sample-data.js      # Template-based sample data generation
+│   └── schema-validator.js # Data validation and integrity checks
+│
+├── 📂 config/             # ⚙️ Configuration & API integration
+│   ├── defaults.json       # Default configuration values
+│   ├── entitydb-client.js  # EntityDB v2.32.4 API client wrapper
+│   └── worca-config.js     # Configuration management system
+│
+├── 📂 css/                # 🎨 Stylesheets (if needed)
+│
+├── 📂 docs/               # 📚 Documentation
+│   ├── README.md           # Main documentation
+│   ├── README-INTEGRATION.md # Integration guide
+│   ├── TESTING.md          # Testing procedures
+│   └── demo.md             # Demo scenarios
+│
+├── 📂 js/                 # 💻 JavaScript modules
+│   ├── worca-api.js        # Core business logic & EntityDB integration
+│   ├── worca-events.js     # Real-time synchronization & events
+│   ├── worca-widgets.js    # UI widgets & components
+│   └── worca.js            # Main Alpine.js application logic
+│
+├── 📂 resources/          # 🎭 Assets & static resources
+│   ├── worca-icon.svg      # Application favicon
+│   ├── worca-logo-dark.svg # Dark theme logo
+│   └── worca-logo-light.svg # Light theme logo
+│
+└── 📂 tools/              # 🔧 Utilities & development tools
+    ├── bootstrap.html      # Sample data bootstrap interface
+    ├── fix-config.html     # Configuration troubleshooting
+    └── test-bootstrap.html # Bootstrap validation & testing
 ```
 
-## 🏗️ Data Model
+## 🚀 Quick Start
 
-### Entity Hierarchy
-```
-Organization
-├── Projects
-│   ├── Epics
-│   │   ├── Stories
-│   │   │   ├── Tasks
-```
+1. **Access Worca**: Navigate to `/worca/` in your EntityDB installation
+2. **Login**: Use your EntityDB credentials
+3. **Bootstrap Data**: Visit `/worca/tools/bootstrap.html` for sample data
+4. **Start Working**: Create organizations, projects, epics, stories, and tasks!
 
-### EntityDB Integration
-All data is stored as entities in EntityDB with appropriate tags:
+## 🔧 Configuration
 
-- **Organizations**: `type:organization` + `name:AcmeCorp`
-- **Projects**: `type:project` + `org:acme` + `name:MobileApp`
-- **Epics**: `type:epic` + `project:mobile-app` + `title:UserAuth`
-- **Stories**: `type:story` + `epic:user-auth` + `title:LoginForm`
-- **Tasks**: `type:task` + `story:login-form` + `assignee:john` + `status:doing`
+Worca automatically detects your EntityDB server configuration. For manual configuration or troubleshooting, use:
+- `/worca/tools/fix-config.html` - Fix connection issues
+- `/worca/tools/test-bootstrap.html` - Validate integration
 
-## 🚀 Technical Features
+## 📖 Documentation
 
-### Web Technologies
-- **Alpine.js**: Reactive frontend framework
-- **Chart.js**: Interactive charts and analytics
-- **SortableJS**: Drag-and-drop functionality
-- **Font Awesome**: Icon library
-- **CSS Grid/Flexbox**: Responsive layout
+See the `docs/` directory for comprehensive documentation:
+- **Integration Guide**: How Worca integrates with EntityDB
+- **Testing Guide**: Validation and troubleshooting procedures
+- **Demo Scenarios**: Example use cases and workflows
 
-### Backend Integration
-- **EntityDB API**: Direct integration with EntityDB REST endpoints
-- **Real-time Updates**: Live data synchronization
-- **Temporal Queries**: Historical data access
-- **Tag-based Filtering**: Flexible data queries
+## 🏗️ Architecture
 
-## 📱 Responsive Design
+**Frontend**: Alpine.js + Chart.js + Modern CSS
+**Backend**: EntityDB v2.32.4 Temporal Database
+**Integration**: Real-time synchronization with 5-second polling
+**Authentication**: JWT Bearer tokens with automatic refresh
+**Data Model**: Tag-based entities with binary content storage
 
-Worca works seamlessly across:
-- **Desktop**: Full-featured dashboard experience
-- **Tablet**: Touch-optimized interface
-- **Mobile**: Essential features accessible on-the-go
+## 🎯 Features
 
-## 🔧 Customization
+- ✅ **Complete Workforce Management**: Organizations → Projects → Epics → Stories → Tasks
+- ✅ **Real-time Collaboration**: Live updates with conflict resolution
+- ✅ **Temporal Database**: Full history tracking with nanosecond precision
+- ✅ **RBAC Integration**: EntityDB role-based access control
+- ✅ **Multi-workspace Support**: Dataset isolation and management
+- ✅ **Professional UI**: Dark/light themes, responsive design
+- ✅ **Sample Data Bootstrap**: Quick setup with realistic examples
 
-### Themes
-- Modern gradient backgrounds
-- Customizable color schemes
-- Dark/light mode support
+## 🔗 Related
 
-### Workflow Statuses
-- Configurable kanban columns
-- Custom status definitions
-- Workflow automation
-
-### Team Roles
-- Flexible role definitions
-- Permission-based access
-- Custom user hierarchies
-
-## 🎯 Roadmap
-
-### Phase 1: Core Features ✅
-- ✅ Web dashboard with kanban boards
-- ✅ Basic analytics and reporting
-- ✅ Team management
-
-### Phase 2: Advanced Features 🚧
-- 🔄 Sprint planning integration
-- 🔄 Time tracking
-- 🔄 Advanced analytics
-- 🔄 Mobile app
-
-### Phase 3: Enterprise Features 📋
-- 📋 Advanced RBAC integration
-- 📋 API webhooks
-- 📋 Third-party integrations
-- 📋 Custom workflows
-
-## 🤝 Contributing
-
-Worca is built on EntityDB and follows its development patterns:
-
-1. **Entity-First Design**: All features use EntityDB entities
-2. **Tag-Based Logic**: Leverage tags for flexible categorization
-3. **Temporal Awareness**: Utilize EntityDB's temporal capabilities
-4. **Performance Focus**: Optimize for EntityDB's strengths
-
-## 📄 License
-
-Built as part of the EntityDB ecosystem.
+- **EntityDB**: https://git.home.arpa/itdlabs/entitydb.git
+- **Version**: v2.32.4 integration
+- **License**: Same as EntityDB project
 
 ---
 
-**Worca** - Where workforce orchestration meets intelligent simplicity. 🎯✨
+*Built with ❤️ on EntityDB temporal database platform*

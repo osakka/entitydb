@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Worca - Workforce Orchestrator</title>
-    <link rel="icon" type="image/svg+xml" href="worca-icon.svg">
+    <link rel="icon" type="image/svg+xml" href="resources/worca-icon.svg">
     <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.12.3/dist/cdn.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
@@ -1549,7 +1549,7 @@
             <div class="login-container">
                 <div class="login-header">
                     <div class="logo" style="display: flex; flex-direction: column; align-items: center; gap: 10px;">
-                        <img :src="darkMode ? 'worca-logo-dark.svg' : 'worca-logo-light.svg'" width="220" height="220" alt="Worca" style="filter: drop-shadow(0 4px 8px rgba(6, 182, 212, 0.3));">
+                        <img :src="darkMode ? 'resources/worca-logo-dark.svg' : 'resources/worca-logo-light.svg'" width="220" height="220" alt="Worca" style="filter: drop-shadow(0 4px 8px rgba(6, 182, 212, 0.3));">
                     </div>
                 </div>
                 
@@ -1584,7 +1584,7 @@
         <div x-show="isAuthenticated" class="taskbar">
             <!-- Left side: Logo, Worca text, section name, and Quick Add -->
             <div class="taskbar-left">
-                <img :src="darkMode ? 'worca-logo-dark.svg' : 'worca-logo-light.svg'" 
+                <img :src="darkMode ? 'resources/worca-logo-dark.svg' : 'resources/worca-logo-light.svg'" 
                      width="40" height="40" 
                      alt="Worca" 
                      class="taskbar-logo"
@@ -2835,8 +2835,8 @@
         </div>
     </div>
 
-    <script src="worca-api.js"></script>
-    <script src="worca-widgets.js"></script>
-    <script src="worca.js"></script>
+    <script src="js/worca-api.js"></script>
+    <script src="js/worca-widgets.js"></script>
+    <script src="js/worca.js"></script>
 </body>
 </html>
