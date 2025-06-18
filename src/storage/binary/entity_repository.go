@@ -143,6 +143,9 @@ type EntityRepository struct {
 	
 	// Temporal retention manager for automatic cleanup
 	temporalRetention *TemporalRetentionManager
+	
+	// Circuit breaker for update operations
+	updateCircuitBreaker *UpdateCircuitBreaker
 }
 
 // PerformanceStats tracks performance metrics for the repository
@@ -620,6 +623,9 @@ func NewEntityRepositoryWithConfig(cfg *config.Config) (*EntityRepository, error
 	
 	// Initialize temporal retention manager for automatic cleanup
 	repo.temporalRetention = NewTemporalRetentionManager(repo)
+	
+	// Initialize circuit breaker for update operations
+	repo.updateCircuitBreaker = NewUpdateCircuitBreaker()
 	
 	// Initialize memory-mapped reader if database file exists and has content
 	if stat, err := os.Stat(dataFile); err == nil && stat.Size() > HeaderSize {
@@ -1524,9 +1530,21 @@ func (r *EntityRepository) Update(entity *models.Entity) error {
 		return fmt.Errorf("entity ID is required for update")
 	}
 	
+	// Circuit breaker check - prevent cascading failures from high-frequency updates
+	if r.updateCircuitBreaker != nil {
+		if allowed, reason := r.updateCircuitBreaker.CanUpdate(entity.ID); !allowed {
+			logger.Debug("Update blocked by circuit breaker for entity %s: %s", entity.ID, reason)
+			return fmt.Errorf("update rate limited: %s", reason)
+		}
+	}
+	
 	// Verify the entity exists (prevents ID manipulation)
 	existingEntity, err := r.GetByID(entity.ID)
 	if err != nil {
+		// Record failure in circuit breaker
+		if r.updateCircuitBreaker != nil {
+			r.updateCircuitBreaker.RecordFailure(entity.ID, err)
+		}
 		return fmt.Errorf("entity not found: %w", err)
 	}
 	
@@ -1553,6 +1571,10 @@ func (r *EntityRepository) Update(entity *models.Entity) error {
 	
 	// Log to WAL first
 	if err := r.wal.LogUpdate(entity); err != nil {
+		// Record failure in circuit breaker
+		if r.updateCircuitBreaker != nil {
+			r.updateCircuitBreaker.RecordFailure(entity.ID, err)
+		}
 		return fmt.Errorf("error logging to WAL: %w", err)
 	}
 	
@@ -1632,6 +1654,11 @@ func (r *EntityRepository) Update(entity *models.Entity) error {
 		duration := time.Since(startTime)
 		size := int64(len(entity.Content))
 		storageMetrics.TrackWrite("update_entity", size, duration, nil)
+	}
+	
+	// Record successful update in circuit breaker
+	if r.updateCircuitBreaker != nil {
+		r.updateCircuitBreaker.RecordSuccess(entity.ID)
 	}
 	
 	return nil
@@ -3768,8 +3795,8 @@ func (r *EntityRepository) performAutomaticRecovery() error {
 	// Enhanced corruption detection - more aggressive recovery
 	shouldRecover := false
 	
-	// 1. Check timestamp staleness (reduced threshold for more aggressive recovery)
-	if idxStat.ModTime().Before(dbStat.ModTime().Add(-2 * time.Minute)) {
+	// 1. Check timestamp staleness - index should be newer than database (within reasonable margin)
+	if dbStat.ModTime().After(idxStat.ModTime().Add(2 * time.Minute)) {
 		logger.Warn("Index file appears stale (DB modified %v, index modified %v) - triggering recovery", 
 			dbStat.ModTime(), idxStat.ModTime())
 		shouldRecover = true

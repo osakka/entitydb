@@ -49,8 +49,17 @@ class EntityDBClient:
         else:
             raise Exception(f"Authentication failed: {response.text}")
     
+    def refresh_auth_if_needed(self):
+        """Re-authenticate if needed"""
+        # Simple test request to check if auth is still valid
+        response = self.session.get(f"{self.base_url}/health")
+        if response.status_code == 401:
+            print("🔄 Re-authenticating...")
+            self.authenticate("admin", "admin")
+    
     def create_entity(self, entity_type: str, dataset: str, tags: Dict[str, str], content: str = "") -> str:
         """Create an entity with tags"""
+        self.refresh_auth_if_needed()
         tag_list = [f"{k}:{v}" for k, v in tags.items()]
         tag_list.extend([f"type:{entity_type}", f"dataset:{dataset}"])
         
@@ -63,27 +72,44 @@ class EntityDBClient:
                 "content": content_b64
             }
         )
-        if response.status_code == 200:
+        if response.status_code == 201:
             return response.json()["id"]
         else:
-            raise Exception(f"Failed to create entity: {response.text}")
+            raise Exception(f"Failed to create entity: {response.status_code} - {response.text}")
     
     def add_metric_value(self, entity_id: str, metric_name: str, value: float, timestamp: Optional[str] = None):
         """Add a metric value as a temporal tag"""
+        self.refresh_auth_if_needed()
         if timestamp is None:
             timestamp = datetime.now().isoformat()
         
+        # Get current entity to add metric value
+        entity_response = self.session.get(f"{self.base_url}/api/v1/entities/get?id={entity_id}")
+        if entity_response.status_code != 200:
+            print(f"Warning: Failed to get entity for metric update: {entity_response.text}")
+            return
+        
+        entity = entity_response.json()
+        current_tags = entity.get("tags", [])
+        
         # Add value tag with timestamp for temporal tracking
         tag = f"value:{value}"
-        response = self.session.post(
-            f"{self.base_url}/api/v1/entities/{entity_id}/tags",
-            json={"tag": tag}
-        )
+        updated_tags = current_tags + [tag]
+        
+        # Update entity with new metric value
+        update_data = {
+            "id": entity_id,
+            "tags": updated_tags,
+            "content": entity["content"]
+        }
+        
+        response = self.session.put(f"{self.base_url}/api/v1/entities/update", json=update_data)
         if response.status_code != 200:
             print(f"Warning: Failed to add metric value: {response.text}")
     
     def query_entities(self, tag: str) -> List[Dict]:
         """Query entities by tag"""
+        self.refresh_auth_if_needed()
         response = self.session.get(
             f"{self.base_url}/api/v1/entities/query",
             params={"tag": tag}
@@ -94,6 +120,7 @@ class EntityDBClient:
     
     def get_entity_history(self, entity_id: str, hours_back: int = 24) -> List[Dict]:
         """Get entity history using temporal queries"""
+        self.refresh_auth_if_needed()
         response = self.session.get(
             f"{self.base_url}/api/v1/entities/history",
             params={"id": entity_id}
@@ -104,6 +131,7 @@ class EntityDBClient:
     
     def get_entity_as_of(self, entity_id: str, timestamp: str) -> Optional[Dict]:
         """Get entity state as of specific timestamp"""
+        self.refresh_auth_if_needed()
         response = self.session.get(
             f"{self.base_url}/api/v1/entities/as-of",
             params={"id": entity_id, "timestamp": timestamp}
