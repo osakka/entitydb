@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Worca Bootstrap</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
+        .container { max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        button { background: #0891b2; color: white; border: none; padding: 12px 24px; border-radius: 6px; cursor: pointer; margin: 10px; font-size: 16px; }
+        button:hover { background: #06b6d4; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+        .result { margin-top: 20px; padding: 15px; border-radius: 6px; }
+        .success { background: #d1fae5; color: #065f46; }
+        .error { background: #fee2e2; color: #dc2626; }
+        .loading { background: #dbeafe; color: #1e40af; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 4px; overflow-x: auto; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Worca Sample Data Bootstrap</h1>
+        <p>Choose a template to populate your Worca workspace with sample data:</p>
+        
+        <button onclick="bootstrap('minimal')" id="minimalBtn">
+            🚀 Minimal Sample (Quick)
+        </button>
+        
+        <button onclick="bootstrap('startup')" id="startupBtn">
+            🏢 Startup Template (Recommended)
+        </button>
+        
+        <button onclick="bootstrap('demo')" id="demoBtn">
+            🎯 Full Demo (Comprehensive)
+        </button>
+        
+        <button onclick="clearData()" id="clearBtn" style="background: #ef4444;">
+            🗑️ Clear All Data
+        </button>
+        
+        <div id="result"></div>
+        
+        <p><a href="index.html">← Back to Worca</a></p>
+    </div>
+
+    <!-- Load Worca dependencies in correct order -->
+    <script src="config/worca-config.js"></script>
+    <script src="config/entitydb-client.js"></script>
+    <script src="worca-api.js"></script>
+    <script src="bootstrap/sample-data.js"></script>
+    
+    <!-- Wait for all scripts to load before showing ready -->
+    <script>
+        window.addEventListener('load', function() {
+            console.log('🚀 All scripts loaded');
+            console.log('🔍 WorcaAPI available:', typeof WorcaAPI);
+            console.log('🔍 entityDBClient available:', typeof window.entityDBClient);
+            console.log('🔍 sampleDataGenerator available:', typeof window.sampleDataGenerator);
+        });
+    </script>
+
+    <script>
+        let isLoading = false;
+        
+        async function bootstrap(template) {
+            if (isLoading) return;
+            
+            const resultDiv = document.getElementById('result');
+            const buttons = document.querySelectorAll('button');
+            
+            try {
+                isLoading = true;
+                buttons.forEach(btn => btn.disabled = true);
+                
+                resultDiv.innerHTML = '<div class="loading">🔄 Generating sample data... This may take 10-30 seconds.</div>';
+                
+                // Initialize if needed
+                if (!window.sampleDataGenerator) {
+                    throw new Error('Sample data generator not available');
+                }
+                
+                let results;
+                
+                if (template === 'minimal') {
+                    results = await window.sampleDataGenerator.generateMinimalSample();
+                } else if (template === 'startup') {
+                    results = await window.sampleDataGenerator.generateFromTemplate({
+                        name: 'startup',
+                        structure: {
+                            organizations: 2,
+                            projects: 4,
+                            epics: 8,
+                            stories: 16,
+                            tasks: 40,
+                            users: 12,
+                            sprints: 4
+                        }
+                    });
+                } else if (template === 'demo') {
+                    results = await window.sampleDataGenerator.generateDemoData();
+                }
+                
+                const summary = {
+                    organizations: results.organizations?.length || 0,
+                    projects: results.projects?.length || 0,
+                    epics: results.epics?.length || 0,
+                    stories: results.stories?.length || 0,
+                    tasks: results.tasks?.length || 0,
+                    users: results.users?.length || 0,
+                    sprints: results.sprints?.length || 0
+                };
+                
+                resultDiv.innerHTML = `
+                    <div class="success">
+                        <h3>✅ Bootstrap Complete!</h3>
+                        <p>Successfully generated sample data for the <strong>${template}</strong> template.</p>
+                        <h4>📊 Created:</h4>
+                        <ul>
+                            <li><strong>${summary.organizations}</strong> Organizations</li>
+                            <li><strong>${summary.projects}</strong> Projects</li>
+                            <li><strong>${summary.epics}</strong> Epics</li>
+                            <li><strong>${summary.stories}</strong> Stories</li>
+                            <li><strong>${summary.tasks}</strong> Tasks</li>
+                            <li><strong>${summary.users}</strong> Team Members</li>
+                            <li><strong>${summary.sprints}</strong> Sprints</li>
+                        </ul>
+                        <p><strong>🎯 Next:</strong> <a href="index.html">Return to Worca</a> to see your populated workspace!</p>
+                    </div>
+                `;
+                
+            } catch (error) {
+                console.error('Bootstrap error:', error);
+                resultDiv.innerHTML = `
+                    <div class="error">
+                        <h3>❌ Bootstrap Failed</h3>
+                        <p><strong>Error:</strong> ${error.message}</p>
+                        <p>Please make sure you're logged into EntityDB and try again.</p>
+                        <details>
+                            <summary>Technical Details</summary>
+                            <pre>${error.stack || error.toString()}</pre>
+                        </details>
+                    </div>
+                `;
+            } finally {
+                isLoading = false;
+                buttons.forEach(btn => btn.disabled = false);
+            }
+        }
+        
+        async function clearData() {
+            if (isLoading) return;
+            
+            if (!confirm('Are you sure you want to clear all sample data? This cannot be undone.')) {
+                return;
+            }
+            
+            const resultDiv = document.getElementById('result');
+            const buttons = document.querySelectorAll('button');
+            
+            try {
+                isLoading = true;
+                buttons.forEach(btn => btn.disabled = true);
+                
+                resultDiv.innerHTML = '<div class="loading">🗑️ Clearing sample data...</div>';
+                
+                const cleared = await window.sampleDataGenerator.clearSampleData();
+                
+                resultDiv.innerHTML = `
+                    <div class="success">
+                        <h3>✅ Data Cleared</h3>
+                        <p>Successfully cleared <strong>${cleared}</strong> entities from the workspace.</p>
+                        <p><a href="index.html">Return to Worca</a></p>
+                    </div>
+                `;
+                
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="error">
+                        <h3>❌ Clear Failed</h3>
+                        <p><strong>Error:</strong> ${error.message}</p>
+                    </div>
+                `;
+            } finally {
+                isLoading = false;
+                buttons.forEach(btn => btn.disabled = false);
+            }
+        }
+        
+        // Check if we can access the sample data generator
+        window.addEventListener('load', function() {
+            setTimeout(function() {
+                if (!window.sampleDataGenerator || !window.WorcaAPI) {
+                    document.getElementById('result').innerHTML = `
+                        <div class="error">
+                            <h3>⚠️ Not Ready</h3>
+                            <p>Required components not available:</p>
+                            <ul>
+                                <li>Sample data generator: ${window.sampleDataGenerator ? '✅' : '❌'}</li>
+                                <li>WorcaAPI: ${window.WorcaAPI ? '✅' : '❌'}</li>
+                                <li>EntityDB client: ${window.entityDBClient ? '✅' : '❌'}</li>
+                            </ul>
+                            <p>Please make sure you're accessing this from the same server as Worca.</p>
+                        </div>
+                    `;
+                }
+            }, 100); // Small delay to allow scripts to initialize
+        });
+    </script>
+</body>
+</html>

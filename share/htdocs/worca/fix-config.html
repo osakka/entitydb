@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Worca Configuration Fix</title>
+</head>
+<body>
+    <h1>Worca Configuration Fix</h1>
+    <p>This will reset Worca's configuration to use the current host.</p>
+    
+    <button onclick="fixConfig()">Fix Configuration</button>
+    <button onclick="clearConfig()">Clear All Configuration</button>
+    
+    <div id="result"></div>
+    
+    <script>
+        function fixConfig() {
+            const currentHost = window.location.hostname;
+            const config = {
+                entitydb: {
+                    host: currentHost,
+                    port: 8085,
+                    ssl: true,
+                    basePath: '/api/v1',
+                    timeout: 30000,
+                    retries: 3,
+                    autoDetect: true,
+                    healthCheckInterval: 30000
+                },
+                dataset: {
+                    name: 'worca-workspace',
+                    namespace: 'worca',
+                    autoBootstrap: true,
+                    sampleData: true,
+                    validation: true
+                }
+            };
+            
+            localStorage.setItem('worca-config-v2', JSON.stringify(config));
+            document.getElementById('result').innerHTML = `
+                <p>✅ Configuration fixed!</p>
+                <p>Host: ${currentHost}</p>
+                <p>URL: https://${currentHost}:8085/api/v1</p>
+                <p><a href="index.html">Return to Worca</a></p>
+            `;
+        }
+        
+        function clearConfig() {
+            localStorage.removeItem('worca-config-v2');
+            document.getElementById('result').innerHTML = `
+                <p>✅ Configuration cleared!</p>
+                <p><a href="index.html">Return to Worca</a></p>
+            `;
+        }
+        
+        // Show current state
+        document.addEventListener('DOMContentLoaded', function() {
+            const currentHost = window.location.hostname;
+            const stored = localStorage.getItem('worca-config-v2');
+            document.getElementById('result').innerHTML = `
+                <h3>Current State:</h3>
+                <p>Detected host: ${currentHost}</p>
+                <p>Expected URL: https://${currentHost}:8085/api/v1</p>
+                <p>Stored config: ${stored ? 'EXISTS' : 'NONE'}</p>
+                ${stored ? `<pre>${JSON.stringify(JSON.parse(stored), null, 2)}</pre>` : ''}
+            `;
+        });
+    </script>
+</body>
+</html>

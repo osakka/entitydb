@@ -1,0 +1,309 @@
+{
+  "version": "2.32.4",
+  "worca": {
+    "title": "Worca - Workforce Orchestrator",
+    "subtitle": "Intelligent workforce management on EntityDB",
+    "description": "A comprehensive workforce management platform built on EntityDB's temporal database"
+  },
+  "entitydb": {
+    "servers": [
+      {
+        "name": "Current Host HTTPS",
+        "host": "auto",
+        "port": 8443,
+        "ssl": true,
+        "description": "EntityDB server with SSL (auto-detected host)"
+      },
+      {
+        "name": "Current Host HTTP",
+        "host": "auto", 
+        "port": 8085,
+        "ssl": false,
+        "description": "EntityDB server without SSL (auto-detected host)"
+      },
+      {
+        "name": "Local HTTPS",
+        "host": "localhost",
+        "port": 8443,
+        "ssl": true,
+        "description": "Local EntityDB server with SSL"
+      },
+      {
+        "name": "Local HTTP",
+        "host": "localhost", 
+        "port": 8085,
+        "ssl": false,
+        "description": "Local EntityDB server without SSL"
+      }
+    ],
+    "healthEndpoint": "/health",
+    "metricsEndpoint": "/system/metrics",
+    "connectionTimeout": 30000,
+    "retryAttempts": 3,
+    "retryDelay": 1000
+  },
+  "workspaces": {
+    "default": "worca-workspace",
+    "templates": [
+      {
+        "name": "startup",
+        "displayName": "Startup Team",
+        "description": "Small agile team (5-15 people)",
+        "structure": {
+          "organizations": 1,
+          "projects": 2,
+          "epics": 4,
+          "stories": 8,
+          "tasks": 20,
+          "users": 8,
+          "sprints": 2
+        }
+      },
+      {
+        "name": "enterprise",
+        "displayName": "Enterprise Division",
+        "description": "Large organization (50+ people)",
+        "structure": {
+          "organizations": 3,
+          "projects": 8,
+          "epics": 16,
+          "stories": 32,
+          "tasks": 100,
+          "users": 60,
+          "sprints": 8
+        }
+      },
+      {
+        "name": "consulting",
+        "displayName": "Consulting Agency",
+        "description": "Multiple client projects",
+        "structure": {
+          "organizations": 5,
+          "projects": 12,
+          "epics": 24,
+          "stories": 60,
+          "tasks": 200,
+          "users": 25,
+          "sprints": 12
+        }
+      }
+    ]
+  },
+  "sampleData": {
+    "organizations": [
+      {
+        "name": "TechCorp Solutions",
+        "description": "Leading technology solutions provider",
+        "industry": "Technology",
+        "size": "large"
+      },
+      {
+        "name": "StartupFlow",
+        "description": "Innovative startup accelerator",
+        "industry": "Venture Capital",
+        "size": "medium"
+      }
+    ],
+    "projects": [
+      {
+        "name": "Mobile Banking App",
+        "description": "Next-generation mobile banking application",
+        "priority": "high",
+        "status": "active"
+      },
+      {
+        "name": "Customer Portal",
+        "description": "Web-based customer service portal",
+        "priority": "medium",
+        "status": "planning"
+      },
+      {
+        "name": "Analytics Dashboard",
+        "description": "Real-time business analytics platform",
+        "priority": "high",
+        "status": "active"
+      }
+    ],
+    "users": [
+      {
+        "username": "alex",
+        "displayName": "Alex Johnson",
+        "role": "Developer",
+        "email": "alex@techcorp.com",
+        "skills": ["JavaScript", "React", "Node.js"],
+        "timezone": "America/New_York"
+      },
+      {
+        "username": "sarah",
+        "displayName": "Sarah Chen",
+        "role": "Designer",
+        "email": "sarah@techcorp.com",
+        "skills": ["UI/UX", "Figma", "CSS"],
+        "timezone": "America/Los_Angeles"
+      },
+      {
+        "username": "mike",
+        "displayName": "Mike Rodriguez",
+        "role": "Developer",
+        "email": "mike@techcorp.com",
+        "skills": ["Python", "Backend", "APIs"],
+        "timezone": "America/Chicago"
+      },
+      {
+        "username": "emma",
+        "displayName": "Emma Williams",
+        "role": "Manager",
+        "email": "emma@techcorp.com",
+        "skills": ["Project Management", "Agile", "Leadership"],
+        "timezone": "Europe/London"
+      }
+    ],
+    "taskStatuses": [
+      {
+        "id": "todo",
+        "name": "To Do",
+        "color": "#94a3b8",
+        "order": 1,
+        "description": "Tasks waiting to be started"
+      },
+      {
+        "id": "doing",
+        "name": "In Progress",
+        "color": "#3b82f6",
+        "order": 2,
+        "description": "Tasks currently being worked on"
+      },
+      {
+        "id": "review",
+        "name": "Review",
+        "color": "#f59e0b",
+        "order": 3,
+        "description": "Tasks pending review"
+      },
+      {
+        "id": "done",
+        "name": "Done",
+        "color": "#10b981",
+        "order": 4,
+        "description": "Completed tasks"
+      }
+    ],
+    "priorities": [
+      {
+        "id": "low",
+        "name": "Low",
+        "color": "#6b7280",
+        "order": 1
+      },
+      {
+        "id": "medium",
+        "name": "Medium",
+        "color": "#3b82f6",
+        "order": 2
+      },
+      {
+        "id": "high",
+        "name": "High",
+        "color": "#f59e0b",
+        "order": 3
+      },
+      {
+        "id": "urgent",
+        "name": "Urgent",
+        "color": "#ef4444",
+        "order": 4
+      }
+    ]
+  },
+  "ui": {
+    "themes": [
+      {
+        "id": "ocean-light",
+        "name": "Ocean Light",
+        "description": "Crystal clear waters theme",
+        "primary": "#0891b2",
+        "secondary": "#06b6d4",
+        "background": "linear-gradient(135deg, #fefefe 0%, #f8fafc 25%, #f1f5f9 50%, #e2e8f0 75%, #cbd5e1 100%)"
+      },
+      {
+        "id": "ocean-dark",
+        "name": "Ocean Dark", 
+        "description": "Deep waters theme",
+        "primary": "#06b6d4",
+        "secondary": "#0891b2",
+        "background": "linear-gradient(135deg, #020617 0%, #0f172a 25%, #1e293b 50%, #334155 75%, #475569 100%)"
+      }
+    ],
+    "chartColors": [
+      "#0891b2",
+      "#06b6d4", 
+      "#0ea5e9",
+      "#3b82f6",
+      "#6366f1",
+      "#8b5cf6",
+      "#a855f7",
+      "#d946ef"
+    ],
+    "animations": {
+      "enabled": true,
+      "duration": 300,
+      "easing": "ease-in-out"
+    },
+    "layout": {
+      "sidebarWidth": 280,
+      "sidebarCollapsedWidth": 80,
+      "headerHeight": 64,
+      "gridGap": 16,
+      "cardPadding": 24
+    }
+  },
+  "features": {
+    "realTimeSync": {
+      "enabled": true,
+      "interval": 5000,
+      "description": "Real-time data synchronization"
+    },
+    "offlineMode": {
+      "enabled": false,
+      "cacheSize": 100,
+      "description": "Offline operation capabilities"
+    },
+    "notifications": {
+      "enabled": true,
+      "position": "top-right",
+      "duration": 5000,
+      "description": "System notifications"
+    },
+    "analytics": {
+      "enabled": true,
+      "retention": 90,
+      "description": "Usage analytics tracking"
+    },
+    "collaboration": {
+      "enabled": true,
+      "maxUsers": 100,
+      "description": "Multi-user collaboration"
+    }
+  },
+  "performance": {
+    "queryCache": {
+      "enabled": true,
+      "ttl": 300000,
+      "maxSize": 1000
+    },
+    "pagination": {
+      "defaultLimit": 50,
+      "maxLimit": 500
+    },
+    "debounce": {
+      "search": 300,
+      "autoSave": 1000
+    }
+  },
+  "security": {
+    "sessionTimeout": 3600000,
+    "tokenRefreshBuffer": 300000,
+    "maxLoginAttempts": 5,
+    "lockoutDuration": 900000
+  }
+}
