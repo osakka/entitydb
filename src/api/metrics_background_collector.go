@@ -4,6 +4,7 @@ import (
 	"context"
 	"entitydb/models"
 	"entitydb/logger"
+	"entitydb/storage/binary"
 	"fmt"
 	"runtime"
 	"sync"
@@ -199,6 +200,9 @@ func (b *BackgroundMetricsCollector) collectEntityMetrics() {
 
 // storeMetric stores a metric value using time-series optimized storage pattern
 func (b *BackgroundMetricsCollector) storeMetric(name string, value float64, unit string, description string) {
+	// Mark this goroutine as performing metrics operations to prevent recursion
+	binary.SetMetricsOperation(true)
+	defer binary.SetMetricsOperation(false)
 	// Check if value has changed using change detection
 	b.mu.RLock()
 	lastValue, exists := b.lastValues[name]

@@ -11,6 +11,7 @@ import (
 	
 	"entitydb/logger"
 	"entitydb/models"
+	"entitydb/storage/binary"
 )
 
 // RequestMetricsMiddleware tracks HTTP request metrics
@@ -151,6 +152,10 @@ func isStaticFile(path string) bool {
 
 // storeRequestMetrics stores the collected metrics
 func (m *RequestMetricsMiddleware) storeRequestMetrics(method, path string, statusCode int, duration time.Duration, requestSize, responseSize int64) {
+	// Mark this goroutine as performing metrics operations to prevent recursion
+	binary.SetMetricsOperation(true)
+	defer binary.SetMetricsOperation(false)
+	
 	// Add panic recovery to ensure goroutine doesn't crash
 	defer func() {
 		if r := recover(); r != nil {

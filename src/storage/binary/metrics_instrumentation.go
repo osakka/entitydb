@@ -208,10 +208,19 @@ func isMetricEntity(entity *models.Entity) bool {
 		return false
 	}
 	
-	// Check if entity has type:metric tag
+	// Check if entity has type:metric tag (more precise detection)
 	for _, tag := range entity.Tags {
 		// Handle both timestamped and non-timestamped tags
-		if strings.Contains(tag, "type:metric") || strings.Contains(tag, "name:") {
+		actualTag := tag
+		if strings.Contains(tag, "|") {
+			parts := strings.SplitN(tag, "|", 2)
+			if len(parts) == 2 {
+				actualTag = parts[1]
+			}
+		}
+		
+		// Only flag entities that explicitly have type:metric
+		if actualTag == "type:metric" {
 			return true
 		}
 	}

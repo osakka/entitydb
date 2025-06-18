@@ -20,12 +20,58 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 )
+
+// Thread-local context to prevent metrics collection recursion
+var (
+	metricsOperationContext = make(map[int64]bool)
+	metricsContextMu        sync.RWMutex
+)
+
+// setMetricsOperation marks the current goroutine as performing metrics operations
+func setMetricsOperation(active bool) {
+	metricsContextMu.Lock()
+	defer metricsContextMu.Unlock()
+	
+	goroutineID := getGoroutineID()
+	if active {
+		metricsOperationContext[goroutineID] = true
+	} else {
+		delete(metricsOperationContext, goroutineID)
+	}
+}
+
+// SetMetricsOperation marks the current goroutine as performing metrics operations (exported)
+func SetMetricsOperation(active bool) {
+	setMetricsOperation(active)
+}
+
+// isMetricsOperation checks if current goroutine is performing metrics operations
+func isMetricsOperation() bool {
+	metricsContextMu.RLock()
+	defer metricsContextMu.RUnlock()
+	
+	goroutineID := getGoroutineID()
+	return metricsOperationContext[goroutineID]
+}
+
+// getGoroutineID returns a simple goroutine identifier (hash-based)
+func getGoroutineID() int64 {
+	// Simple hash of stack pointer for goroutine identification
+	var buf [64]byte
+	n := runtime.Stack(buf[:], false)
+	hash := int64(0)
+	for i := 0; i < n; i++ {
+		hash = hash*31 + int64(buf[i])
+	}
+	return hash
+}
 
 // EntityRepository implements models.EntityRepository using a custom binary format.
 // It provides high-performance storage with temporal capabilities, supporting
@@ -1294,8 +1340,8 @@ func (r *EntityRepository) Create(entity *models.Entity) error {
 	// Check if we need to perform checkpoint
 	r.checkAndPerformCheckpoint()
 	
-	// Track write metrics (skip metric entities to avoid recursion)
-	if !storageMetricsDisabled && storageMetrics != nil && !isMetricEntity(entity) {
+	// Track write metrics (skip metric entities and metric operations to avoid recursion)
+	if !storageMetricsDisabled && storageMetrics != nil && !isMetricEntity(entity) && !isMetricsOperation() {
 		duration := time.Since(startTime)
 		size := int64(len(entity.Content))
 		storageMetrics.TrackWrite("create_entity", size, duration, nil)
@@ -1317,7 +1363,7 @@ func (r *EntityRepository) GetByID(id string) (*models.Entity, error) {
 	if exists {
 		logger.Trace("Found in memory cache: %s", id)
 		// Skip metrics for metric entities to avoid recursion
-		if !storageMetricsDisabled && storageMetrics != nil && !isMetricEntity(entity) {
+		if !storageMetricsDisabled && storageMetrics != nil && !isMetricEntity(entity) && !isMetricsOperation() {
 			storageMetrics.TrackCacheOperation("entity", true)
 		}
 		return entity, nil
@@ -1325,7 +1371,7 @@ func (r *EntityRepository) GetByID(id string) (*models.Entity, error) {
 	
 	// Cache miss - we don't have the entity yet to check its type, so use ID-based heuristic
 	// Most metric entities won't pass this check anyway since they get created later
-	if !storageMetricsDisabled && storageMetrics != nil && !strings.HasPrefix(id, "metric_") {
+	if !storageMetricsDisabled && storageMetrics != nil && !strings.HasPrefix(id, "metric_") && !isMetricsOperation() {
 		storageMetrics.TrackCacheOperation("entity", false)
 	}
 	
@@ -1379,7 +1425,7 @@ func (r *EntityRepository) GetByID(id string) (*models.Entity, error) {
 		readDuration := time.Since(readStart)
 		
 		// Track read metrics (skip metric entities to avoid recursion)
-		if !storageMetricsDisabled && storageMetrics != nil && !strings.HasPrefix(id, "metric_") {
+		if !storageMetricsDisabled && storageMetrics != nil && !strings.HasPrefix(id, "metric_") && !isMetricsOperation() {
 			size := int64(0)
 			if entity != nil {
 				size = int64(len(entity.Content))
@@ -1400,7 +1446,7 @@ func (r *EntityRepository) GetByID(id string) (*models.Entity, error) {
 				r.mu.Unlock()
 				
 				// Track overall operation time including recovery (skip metric entities to avoid recursion)
-				if !storageMetricsDisabled && storageMetrics != nil && !isMetricEntity(recoveredEntity) {
+				if !storageMetricsDisabled && storageMetrics != nil && !isMetricEntity(recoveredEntity) && !isMetricsOperation() {
 					totalDuration := time.Since(startTime)
 					storageMetrics.TrackRead("get_entity_with_recovery", int64(len(recoveredEntity.Content)), totalDuration, nil)
 				}
@@ -1569,7 +1615,7 @@ func (r *EntityRepository) Update(entity *models.Entity) error {
 	r.checkAndPerformCheckpoint()
 	
 	// Track write metrics (skip metric entities to avoid recursion)
-	if !storageMetricsDisabled && storageMetrics != nil && !isMetricEntity(entity) {
+	if !storageMetricsDisabled && storageMetrics != nil && !isMetricEntity(entity) && !isMetricsOperation() {
 		duration := time.Since(startTime)
 		size := int64(len(entity.Content))
 		storageMetrics.TrackWrite("update_entity", size, duration, nil)
@@ -1820,7 +1866,7 @@ func (r *EntityRepository) List() ([]*models.Entity, error) {
 			}
 		}
 		
-		if !hasMetricEntities {
+		if !hasMetricEntities && !isMetricsOperation() {
 			totalSize := int64(0)
 			if entities != nil {
 				for _, entity := range entities {
@@ -1846,7 +1892,7 @@ func (r *EntityRepository) ListByTag(tag string) ([]*models.Entity, error) {
 		entities := cached.([]*models.Entity)
 		
 		// Track cache hit (skip metric-related tags to avoid recursion)
-		if !storageMetricsDisabled && storageMetrics != nil && !strings.HasPrefix(tag, "name:") && !strings.HasPrefix(tag, "type:metric") {
+		if !storageMetricsDisabled && storageMetrics != nil && !strings.HasPrefix(tag, "name:") && !strings.HasPrefix(tag, "type:metric") && !isMetricsOperation() {
 			storageMetrics.TrackCacheOperation("tag_query", true)
 			// Still track the read with 0 duration since it was from cache
 			totalSize := int64(0)
@@ -1933,7 +1979,7 @@ func (r *EntityRepository) ListByTag(tag string) ([]*models.Entity, error) {
 	logger.Trace("Fetched %d entities", len(entities))
 	
 	// Track metrics (skip metric-related tags to avoid recursion)
-	if !storageMetricsDisabled && storageMetrics != nil && !strings.HasPrefix(tag, "name:") && !strings.HasPrefix(tag, "type:metric") {
+	if !storageMetricsDisabled && storageMetrics != nil && !strings.HasPrefix(tag, "name:") && !strings.HasPrefix(tag, "type:metric") && !isMetricsOperation() {
 		storageMetrics.TrackCacheOperation("tag_query", false) // Cache miss
 		totalSize := int64(0)
 		if entities != nil {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"entitydb/logger"
 	"entitydb/models"
+	"entitydb/storage/binary"
 	"fmt"
 	"strconv"
 	"strings"
@@ -95,6 +96,10 @@ func (m *MetricsRetentionManager) Stop() {
 func (m *MetricsRetentionManager) enforceRetention() {
 	logger.Info("Starting metrics retention enforcement")
 	startTime := time.Now()
+	
+	// Mark this goroutine as performing metrics operations to prevent recursion
+	binary.SetMetricsOperation(true)
+	defer binary.SetMetricsOperation(false)
 	
 	// Get all metric entities
 	metrics, err := m.repo.ListByTag("type:metric")
@@ -200,6 +205,10 @@ func (m *MetricsRetentionManager) performAggregation() {
 	}
 	m.aggregationRunning = true
 	m.mu.Unlock()
+	
+	// Mark this goroutine as performing metrics operations to prevent recursion
+	binary.SetMetricsOperation(true)
+	defer binary.SetMetricsOperation(false)
 	
 	defer func() {
 		m.mu.Lock()
