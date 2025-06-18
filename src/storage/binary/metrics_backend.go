@@ -15,16 +15,25 @@ import (
 // MetricsBackend provides completely isolated backend for metrics persistence
 // This operates independently of the main repository to prevent any deadlocks
 type MetricsBackend struct {
-	dataPath    string
-	initialized bool
-	mu          sync.Mutex
-	storage     *IsolatedMetricsStorage
+	dataPath        string
+	metricsFilePath string
+	initialized     bool
+	mu              sync.Mutex
+	storage         *IsolatedMetricsStorage
 }
 
 // NewMetricsBackend creates an isolated metrics backend
 func NewMetricsBackend(dataPath string) *MetricsBackend {
 	return &MetricsBackend{
 		dataPath: dataPath,
+	}
+}
+
+// NewMetricsBackendWithPath creates an isolated metrics backend with complete metrics file path
+func NewMetricsBackendWithPath(dataPath, metricsFilePath string) *MetricsBackend {
+	return &MetricsBackend{
+		dataPath:        dataPath,
+		metricsFilePath: metricsFilePath,
 	}
 }
 
@@ -41,11 +50,17 @@ type IsolatedMetricsStorage struct {
 
 // NewIsolatedMetricsStorage creates a new isolated metrics storage
 func NewIsolatedMetricsStorage(dataPath string) *IsolatedMetricsStorage {
+	metricsFilePath := filepath.Join(dataPath, "metrics.json")
+	return NewIsolatedMetricsStorageWithPath(dataPath, metricsFilePath)
+}
+
+// NewIsolatedMetricsStorageWithPath creates a new isolated metrics storage with complete file path
+func NewIsolatedMetricsStorageWithPath(dataPath, metricsFilePath string) *IsolatedMetricsStorage {
 	storage := &IsolatedMetricsStorage{
 		dataPath:        dataPath,
 		entities:        make(map[string]*models.Entity),
 		tagIndex:        make(map[string][]string),
-		metricsFilePath: filepath.Join(dataPath, "metrics.json"),
+		metricsFilePath: metricsFilePath,
 	}
 	
 	// Load existing metrics from file
@@ -60,7 +75,11 @@ func (mb *MetricsBackend) CreateMetricsEntity(entity *models.Entity) error {
 	defer mb.mu.Unlock()
 	
 	if !mb.initialized {
-		mb.storage = NewIsolatedMetricsStorage(mb.dataPath)
+		if mb.metricsFilePath != "" {
+			mb.storage = NewIsolatedMetricsStorageWithPath(mb.dataPath, mb.metricsFilePath)
+		} else {
+			mb.storage = NewIsolatedMetricsStorage(mb.dataPath)
+		}
 		mb.initialized = true
 	}
 	
@@ -73,7 +92,11 @@ func (mb *MetricsBackend) GetMetricsEntity(id string) (*models.Entity, error) {
 	defer mb.mu.Unlock()
 	
 	if !mb.initialized {
-		mb.storage = NewIsolatedMetricsStorage(mb.dataPath)
+		if mb.metricsFilePath != "" {
+			mb.storage = NewIsolatedMetricsStorageWithPath(mb.dataPath, mb.metricsFilePath)
+		} else {
+			mb.storage = NewIsolatedMetricsStorage(mb.dataPath)
+		}
 		mb.initialized = true
 	}
 	
@@ -86,7 +109,11 @@ func (mb *MetricsBackend) ListMetricsEntitiesByTag(tag string) ([]*models.Entity
 	defer mb.mu.Unlock()
 	
 	if !mb.initialized {
-		mb.storage = NewIsolatedMetricsStorage(mb.dataPath)
+		if mb.metricsFilePath != "" {
+			mb.storage = NewIsolatedMetricsStorageWithPath(mb.dataPath, mb.metricsFilePath)
+		} else {
+			mb.storage = NewIsolatedMetricsStorage(mb.dataPath)
+		}
 		mb.initialized = true
 	}
 	
@@ -99,7 +126,11 @@ func (mb *MetricsBackend) AddTagToMetricsEntity(entityID, tag string) error {
 	defer mb.mu.Unlock()
 	
 	if !mb.initialized {
-		mb.storage = NewIsolatedMetricsStorage(mb.dataPath)
+		if mb.metricsFilePath != "" {
+			mb.storage = NewIsolatedMetricsStorageWithPath(mb.dataPath, mb.metricsFilePath)
+		} else {
+			mb.storage = NewIsolatedMetricsStorage(mb.dataPath)
+		}
 		mb.initialized = true
 	}
 	

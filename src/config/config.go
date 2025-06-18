@@ -80,6 +80,34 @@ type Config struct {
 	// Contains: dashboard HTML, JavaScript, CSS, Swagger documentation
 	StaticDir string
 	
+	// Specific File Path Configuration
+	// ================================
+	// These paths are used literally by the binary - no path joining
+	
+	// DatabaseFilename is the full path to the main database file.
+	// Environment: ENTITYDB_DATABASE_FILE
+	// Default: "./var/entities.db"
+	// Used for the main entity storage file
+	DatabaseFilename string
+	
+	// WALFilename is the full path to the Write-Ahead Log file.
+	// Environment: ENTITYDB_WAL_FILE
+	// Default: "./var/entitydb.wal"
+	// Used for transactional safety and recovery
+	WALFilename string
+	
+	// IndexFilename is the full path to the tag index file.
+	// Environment: ENTITYDB_INDEX_FILE
+	// Default: "./var/entities.db.idx"
+	// Used for fast tag-based queries
+	IndexFilename string
+	
+	// MetricsFilename is the full path to the metrics storage file.
+	// Environment: ENTITYDB_METRICS_FILE
+	// Default: "./var/metrics.json"
+	// Used for metrics persistence
+	MetricsFilename string
+	
 	// Security Configuration
 	// ======================
 	
@@ -303,11 +331,11 @@ type Config struct {
 	// File and Path Configuration
 	// ===========================
 	
-	// DatabaseFilename is the main database file name.
+	// DatabaseBaseFilename is the main database file name (legacy).
 	// Environment: ENTITYDB_DATABASE_FILENAME
 	// Default: "entities.db"
-	// Used in database path construction
-	DatabaseFilename string
+	// Used in database path construction (deprecated - use DatabaseFilename)
+	DatabaseBaseFilename string
 	
 	// WALSuffix is the suffix appended to database path for WAL files.
 	// Environment: ENTITYDB_WAL_SUFFIX
@@ -415,6 +443,12 @@ func Load() *Config {
 		DataPath:         getEnv("ENTITYDB_DATA_PATH", "./var"),
 		StaticDir:        getEnv("ENTITYDB_STATIC_DIR", "./share/htdocs"),
 		
+		// Specific file paths - binary uses these literally
+		DatabaseFilename: getEnv("ENTITYDB_DATABASE_FILE", "./var/entities.db"),
+		WALFilename:      getEnv("ENTITYDB_WAL_FILE", "./var/entitydb.wal"),
+		IndexFilename:    getEnv("ENTITYDB_INDEX_FILE", "./var/entities.db.idx"),
+		MetricsFilename:  getEnv("ENTITYDB_METRICS_FILE", "./var/metrics.json"),
+		
 		// Security
 		TokenSecret:      getEnv("ENTITYDB_TOKEN_SECRET", "entitydb-secret-key"),
 		SessionTTLHours:  getEnvInt("ENTITYDB_SESSION_TTL_HOURS", 2),
@@ -469,7 +503,7 @@ func Load() *Config {
 		BcryptCost:      getEnvInt("ENTITYDB_BCRYPT_COST", 10),
 		
 		// File and Path Configuration
-		DatabaseFilename: getEnv("ENTITYDB_DATABASE_FILENAME", "entities.ebf"),
+		DatabaseBaseFilename: getEnv("ENTITYDB_DATABASE_FILENAME", "entities.ebf"),
 		WALSuffix:        getEnv("ENTITYDB_WAL_SUFFIX", ".wal"),
 		IndexSuffix:      getEnv("ENTITYDB_INDEX_SUFFIX", ".idx"),
 		BackupPath:       getEnv("ENTITYDB_BACKUP_PATH", "./backup"),
@@ -513,7 +547,7 @@ func Load() *Config {
 //   by the EntityDB process. The server will create the database file
 //   if it doesn't exist but won't create parent directories.
 func (c *Config) DatabasePath() string {
-	return c.DataPath + "/data/" + c.DatabaseFilename
+	return c.DataPath + "/data/" + c.DatabaseBaseFilename
 }
 
 // WALPath returns the full path to the Write-Ahead Log file.

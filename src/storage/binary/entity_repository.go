@@ -544,8 +544,8 @@ func NewEntityRepositoryWithConfig(cfg *config.Config) (*EntityRepository, error
 	// Default to true for improved write throughput
 	useBatchWrites := os.Getenv("ENTITYDB_USE_BATCH_WRITES") != "false"
 	
-	// Use configuration for database filename instead of hardcoded value
-	databasePath := filepath.Join(cfg.DataPath, cfg.DatabaseFilename)
+	// Use complete database path literally from configuration
+	databasePath := cfg.DatabaseFilename
 	
 	repo := &EntityRepository{
 		dataPath:        cfg.DataPath,
@@ -611,8 +611,8 @@ func NewEntityRepositoryWithConfig(cfg *config.Config) (*EntityRepository, error
 		},
 	}
 	
-	// Initialize WAL
-	wal, err := NewWAL(cfg.DataPath)
+	// Initialize WAL with complete path from configuration
+	wal, err := NewWALWithPath(cfg.WALFilename)
 	if err != nil {
 		return nil, fmt.Errorf("error creating WAL: %w", err)
 	}
@@ -784,10 +784,21 @@ func (r *EntityRepository) Close() error {
 // getDataFile returns the path to the current data file
 func (r *EntityRepository) getDataFile() string {
 	if r.config != nil {
-		return filepath.Join(r.dataPath, r.config.DatabaseFilename)
+		// Use complete database path literally from configuration
+		return r.config.DatabaseFilename
 	}
 	// Fallback for legacy compatibility
 	return filepath.Join(r.dataPath, "entities.ebf")
+}
+
+// getWALFile returns the path to the WAL file
+func (r *EntityRepository) getWALFile() string {
+	if r.config != nil {
+		// Use complete WAL path literally from configuration
+		return r.config.WALFilename
+	}
+	// Fallback for legacy compatibility
+	return filepath.Join(r.dataPath, "entitydb.wal")
 }
 
 // buildIndexes reads the entire file and builds in-memory indexes with parallel processing
@@ -2654,7 +2665,7 @@ func (r *EntityRepository) checkAndPerformCheckpoint() {
 		checkpointReason = fmt.Sprintf("time elapsed: %v", time.Since(r.lastCheckpoint))
 	} else {
 		// Check WAL file size
-		walPath := filepath.Join(r.dataPath, "entitydb.wal")
+		walPath := r.getWALFile()
 		if info, err := os.Stat(walPath); err == nil && info.Size() > 100*1024*1024 { // 100MB
 			shouldCheckpoint = true
 			checkpointReason = fmt.Sprintf("WAL size: %d bytes", info.Size())
@@ -2667,7 +2678,7 @@ func (r *EntityRepository) checkAndPerformCheckpoint() {
 		// Track checkpoint metrics
 		startTime := time.Now()
 		var walSizeBefore int64
-		walPath := filepath.Join(r.dataPath, "entitydb.wal")
+		walPath := r.getWALFile()
 		if info, err := os.Stat(walPath); err == nil {
 			walSizeBefore = info.Size()
 		}

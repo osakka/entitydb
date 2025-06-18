@@ -25,7 +25,7 @@ func main() {
 	logger.Info("[main] === Force Complete Reindex ===")
 
 	// Remove the persistent index file to force a complete rebuild
-	indexFile := cfg.DataPath + "/data/" + cfg.DatabaseFilename + cfg.IndexSuffix
+	indexFile := cfg.IndexFilename
 	if _, err := os.Stat(indexFile); err == nil {
 		logger.Info("[main] Removing existing index file: %s", indexFile)
 		if err := os.Remove(indexFile); err != nil {

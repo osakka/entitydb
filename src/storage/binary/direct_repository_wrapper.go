@@ -15,15 +15,26 @@ type DirectRepositoryWrapper struct {
 
 // NewDirectRepositoryWrapper creates a new direct repository wrapper
 func NewDirectRepositoryWrapper(repo models.EntityRepository) DirectRepository {
-	// Get data path from repository if possible
+	// Get data path and config from repository if possible
 	dataPath := "/opt/entitydb/var" // fallback default
+	var metricsBackend *MetricsBackend
+	
 	if entityRepo, ok := repo.(*EntityRepository); ok {
 		dataPath = entityRepo.dataPath
+		// Use complete metrics path from config if available
+		if entityRepo.config != nil {
+			metricsBackend = NewMetricsBackendWithPath(dataPath, entityRepo.config.MetricsFilename)
+		}
+	}
+	
+	// Fallback to old method if config not available
+	if metricsBackend == nil {
+		metricsBackend = NewMetricsBackend(dataPath)
 	}
 	
 	return &DirectRepositoryWrapper{
 		underlying:     repo,
-		metricsBackend: NewMetricsBackend(dataPath),
+		metricsBackend: metricsBackend,
 	}
 }
 

@@ -783,17 +783,18 @@ func (s *EntityDBServer) serveStaticFile(w http.ResponseWriter, r *http.Request)
 		path = "/index.html"
 	}
 
-	// Resolve staticDir to absolute path
-	absStaticDir, _ := filepath.Abs(s.config.StaticDir)
-	logger.Debug("staticDir: %s, absStaticDir: %s", s.config.StaticDir, absStaticDir)
-	fullPath := filepath.Join(absStaticDir, path)
+	// Use StaticDir literally - no path resolution
+	// Shell script provides absolute paths, binary accepts them as-is
+	staticDir := s.config.StaticDir
+	logger.Debug("staticDir (literal): %s", staticDir)
+	fullPath := filepath.Join(staticDir, path)
 	logger.Debug("fullPath: %s", fullPath)
 	
 	// Security check - prevent directory traversal
 	cleanPath := filepath.Clean(fullPath)
 	logger.Debug("cleanPath: %s", cleanPath)
-	if !strings.HasPrefix(cleanPath, absStaticDir) {
-		logger.Warn("Security check failed: cleanPath doesn't start with absStaticDir")
+	if !strings.HasPrefix(cleanPath, staticDir) {
+		logger.Warn("Security check failed: cleanPath doesn't start with staticDir")
 		http.NotFound(w, r)
 		return
 	}

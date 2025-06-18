@@ -157,7 +157,7 @@ func (rm *RecoveryManager) recoverFromBackup(entityID string) (*models.Entity, e
 // partialRecovery attempts to recover whatever data is available
 func (rm *RecoveryManager) partialRecovery(repo *EntityRepository, entityID string) (*models.Entity, error) {
 	// Try to read from the data file directly
-	dataFile := filepath.Join(rm.dataPath, rm.config.DatabaseFilename)
+	dataFile := rm.config.DatabaseFilename
 	file, err := os.Open(dataFile)
 	if err != nil {
 		return nil, err

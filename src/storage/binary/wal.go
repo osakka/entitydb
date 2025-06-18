@@ -95,6 +95,13 @@ func NewWAL(dataPath string) (*WAL, error) {
 	walPath := filepath.Join(dataPath, "entitydb.wal")
 	logger.TraceIf("storage", "Creating WAL with dataPath: %s, resulting walPath: %s", dataPath, walPath)
 	
+	return NewWALWithPath(walPath)
+}
+
+// NewWALWithPath creates a new WAL with the complete file path specified
+func NewWALWithPath(walPath string) (*WAL, error) {
+	logger.TraceIf("storage", "Creating WAL with complete path: %s", walPath)
+	
 	file, err := os.OpenFile(walPath, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0644)
 	if err != nil {
 		return nil, err

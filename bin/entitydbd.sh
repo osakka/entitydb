@@ -2,13 +2,11 @@
 # entitydbd.sh - Simplified Daemon Controller for EntityDB server
 # Uses ConfigManager for all configuration logic - no duplication!
 
-# Determine EntityDB directory
-# EntityDB_DIR="$(dirname "$(realpath "../$0")")"
-EntityDB_DIR="/opt/entitydb";
+# Determine EntityDB directory using absolute paths
+EntityDB_DIR="/opt/entitydb"
 
-# HACK �#
-cd ${EntityDB_DIR}/bin/
-# HACK #
+# Use absolute paths throughout - no cd needed
+# Binary will accept paths literally without interpretation
 
 # Colors for output
 GREEN='\033[0;32m'
@@ -27,14 +25,14 @@ print_message() {
 # Load environment configurations (ConfigManager handles the rest)
 load_environment() {
     # Load default environment configuration
-    DEFAULT_ENV_FILE="$EntityDB_DIR/share/config/entitydb.env"
+    DEFAULT_ENV_FILE="/opt/entitydb/share/config/entitydb.env"
     if [ -f "$DEFAULT_ENV_FILE" ]; then
         print_message "$BLUE" "Loading defaults from $DEFAULT_ENV_FILE"
         source "$DEFAULT_ENV_FILE"
     fi
     
     # Override with instance-specific env file
-    INSTANCE_ENV_FILE="$EntityDB_DIR/var/entitydb.env"
+    INSTANCE_ENV_FILE="/opt/entitydb/var/entitydb.env"
     if [ -f "$INSTANCE_ENV_FILE" ]; then
         print_message "$BLUE" "Loading instance config from $INSTANCE_ENV_FILE"
         source "$INSTANCE_ENV_FILE"
@@ -50,11 +48,11 @@ load_environment() {
 
 # Get configuration values (using environment variables with fallbacks)
 get_pid_file() {
-    echo "${ENTITYDB_PID_FILE:-$EntityDB_DIR/var/entitydb.pid}"
+    echo "${ENTITYDB_PID_FILE:-/opt/entitydb/var/entitydb.pid}"
 }
 
 get_log_file() {
-    echo "${ENTITYDB_LOG_FILE:-$EntityDB_DIR/var/entitydb.log}"
+    echo "${ENTITYDB_LOG_FILE:-/opt/entitydb/var/entitydb.log}"
 }
 
 get_server_url() {
@@ -67,14 +65,14 @@ get_server_url() {
 
 # Find the server binary
 find_server_binary() {
-    ENTITY_SERVER_BIN="$EntityDB_DIR/bin/entitydb"
+    ENTITY_SERVER_BIN="/opt/entitydb/bin/entitydb"
     
     if [ -x "$ENTITY_SERVER_BIN" ]; then
         echo "$ENTITY_SERVER_BIN"
         return 0
     else
         print_message "$RED" "Server binary not found at $ENTITY_SERVER_BIN"
-        print_message "$YELLOW" "Make sure to build the server using 'cd $EntityDB_DIR/src && make'"
+        print_message "$YELLOW" "Make sure to build the server using 'cd /opt/entitydb/src && make'"
         return 1
     fi
 }

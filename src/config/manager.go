@@ -197,8 +197,8 @@ func (cm *ConfigManager) RegisterFlags() {
 		"Rate limit window in minutes")
 
 	// File and Path Configuration - all long flags
-	flag.StringVar(&cm.config.DatabaseFilename, "entitydb-database-filename", cm.config.DatabaseFilename,
-		"Main database filename")
+	flag.StringVar(&cm.config.DatabaseBaseFilename, "entitydb-database-filename", cm.config.DatabaseBaseFilename,
+		"Main database filename (legacy)")
 	flag.StringVar(&cm.config.WALSuffix, "entitydb-wal-suffix", cm.config.WALSuffix,
 		"Write-Ahead Log file suffix")
 	flag.StringVar(&cm.config.IndexSuffix, "entitydb-index-suffix", cm.config.IndexSuffix,
@@ -303,7 +303,7 @@ func (cm *ConfigManager) applyFlags() {
 		
 		// File and Path Configuration
 		case "entitydb-database-filename":
-			cm.config.DatabaseFilename = f.Value.String()
+			cm.config.DatabaseBaseFilename = f.Value.String()
 		case "entitydb-wal-suffix":
 			cm.config.WALSuffix = f.Value.String()
 		case "entitydb-index-suffix":

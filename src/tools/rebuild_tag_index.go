@@ -24,7 +24,7 @@ func main() {
 	dataPath := cfg.DataPath
 	
 	// Delete the old corrupt index using configurable index path
-	indexPath := cfg.DataPath + "/data/" + cfg.DatabaseFilename + cfg.IndexSuffix
+	indexPath := cfg.IndexFilename
 	if err := os.Remove(indexPath); err != nil && !os.IsNotExist(err) {
 		log.Printf("Warning: Failed to remove old index: %v", err)
 	} else {
