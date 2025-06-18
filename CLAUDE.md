@@ -9,7 +9,7 @@
 > This eliminates separate credential entities and relationships. Users with credentials have the `has:credentials` tag.
 > NO BACKWARD COMPATIBILITY - all users must be recreated.
 
-## Current State (v2.32.4)
+## Current State (v2.32.5)
 
 EntityDB now features a unified Entity model with unified sharded indexing:
 - **Unified Entity Model**: Single content field ([]byte) per entity
@@ -34,6 +34,12 @@ EntityDB now features a unified Entity model with unified sharded indexing:
 - **Enhanced UI Dashboard**: Real-time metrics dashboard with comprehensive system monitoring, health scoring, memory charting, and responsive design
 - **Authentication Stability**: Resolved recurring timeout issues with optimized HTTP timeout configuration for production-grade reliability
 - **Complete UI/UX Suite**: Professional web interface with PWA support, advanced search, data export, temporal queries, and relationship visualization
+- **Worca Workforce Orchestrator (v2.32.5)**: Complete workforce management platform built on EntityDB
+  - Full-stack application with Alpine.js frontend and EntityDB temporal backend
+  - Real-time synchronization, multi-workspace support, and professional UI
+  - Bootstrap system with template-based sample data generation
+  - Complete CRUD operations for organizations, projects, epics, stories, tasks
+  - Professional directory structure with clean separation of concerns
 - **High-Performance Optimizations**: Comprehensive performance optimizations including O(1) tag value caching, parallel index building, JSON encoder pooling, batch write operations, and temporal tag variant caching for significant memory, CPU, and storage improvements
 - **Unified Sharded Indexing (v2.32.0)**: Complete elimination of legacy indexing code with single source of truth using 256-shard concurrent indexing for improved performance and consistency
 - **Professional Documentation Architecture (v2.32.0)**: Complete documentation system overhaul with industry-standard taxonomy, 100% API accuracy verification, and comprehensive maintenance frameworks

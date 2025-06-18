@@ -5,6 +5,51 @@ All notable changes to the EntityDB Platform will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.32.5] - 2025-06-18
+
+### 🚀 WORCA WORKFORCE ORCHESTRATOR - COMPLETE INTEGRATION
+- **Full Application Platform**: Complete workforce management application built on EntityDB
+  - 4-phase implementation: Configuration, API compatibility, Bootstrap, Enhanced features
+  - Real-time synchronization with 5-second polling intervals
+  - Multi-workspace dataset management with namespace isolation
+  - Professional UI with Alpine.js + Chart.js + responsive design
+- **Production-Ready Integration**: EntityDB v2.32.4 temporal database compatibility
+  - JWT Bearer token authentication with automatic refresh
+  - Binary content storage with base64 encoding support
+  - RBAC enforcement with tag-based permissions
+  - Complete CRUD operations for organizations, projects, epics, stories, tasks
+- **Bootstrap System**: Template-based sample data generation
+  - Startup, minimal, and comprehensive demo templates
+  - Automatic relationship creation and data validation
+  - Error recovery and troubleshooting utilities
+- **Professional Directory Structure**: Clean, scalable organization
+  - Logical separation: js/, resources/, docs/, tools/, config/, bootstrap/
+  - Updated all path references and maintained backward compatibility
+  - Comprehensive documentation with quick-start guides
+
+### 🔧 CRITICAL FIXES
+- **Worca Initialization Error**: Fixed "Required systems not available" error
+  - Corrected JavaScript path references after directory reorganization
+  - Ensured proper script loading order and dependency resolution
+- **Epic Display Issue**: Resolved "Unnamed Epic" showing in lists
+  - Fixed tag-to-property mapping (title vs name) in entity transformation
+  - Updated helper functions to prioritize title over name for epics/stories
+  - Maintained backward compatibility for legacy data
+
+### Added
+- Complete Worca workforce management platform with real-time features
+- Bootstrap UI for sample data generation and testing
+- Professional directory structure following industry standards
+- Comprehensive error handling and connectivity monitoring
+- Multi-workspace support with dataset isolation
+- Temporal database integration with nanosecond precision
+
+### Fixed
+- JavaScript module loading paths after directory reorganization
+- Epic and story name display throughout the application
+- Entity relationship mapping (projectId, epicId, orgId) in transformations
+- Configuration auto-detection for external IP access
+
 ## [2.32.4] - 2025-06-18
 
 ### 🎯 TECHNICAL DEBT ELIMINATION - ZERO DEBT ACHIEVEMENT
