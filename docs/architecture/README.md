@@ -70,6 +70,16 @@ This section provides comprehensive technical documentation of EntityDB's archit
 - Dashboard integration and visualization
 - Performance impact and optimization
 
+## 📝 Architecture Decision Records (ADRs)
+
+### [ADR-007: Self-Cleaning Temporal Retention](./adr/ADR-007-self-cleaning-temporal-retention.md)
+**Bar-raising temporal retention architecture (v2.32.0)**
+- Eliminates 100% CPU feedback loops through architectural design
+- Self-cleaning retention during normal operations
+- Goroutine-level recursion prevention
+- Performance improvement from 100% CPU to 0.0% stable
+- Comprehensive architectural solution vs symptom patching
+
 ## 🎯 Reading Paths
 
 ### For System Architects
