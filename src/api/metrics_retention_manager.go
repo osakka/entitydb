@@ -281,6 +281,10 @@ func (m *MetricsRetentionManager) performAggregation() {
 
 // aggregateMetric creates an aggregated version of a metric
 func (m *MetricsRetentionManager) aggregateMetric(metric *models.Entity, metricName string, interval time.Duration, intervalName string) error {
+	// Mark this operation as metrics-related to prevent recursion
+	binary.SetMetricsOperation(true)
+	defer binary.SetMetricsOperation(false)
+	
 	// Create aggregated metric ID
 	aggMetricID := fmt.Sprintf("metric_%s_agg_%s", metricName, intervalName)
 	

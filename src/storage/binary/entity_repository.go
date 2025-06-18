@@ -140,6 +140,9 @@ type EntityRepository struct {
 	
 	// Recovery manager
 	recovery *RecoveryManager
+	
+	// Temporal retention manager for automatic cleanup
+	temporalRetention *TemporalRetentionManager
 }
 
 // PerformanceStats tracks performance metrics for the repository
@@ -614,6 +617,9 @@ func NewEntityRepositoryWithConfig(cfg *config.Config) (*EntityRepository, error
 	
 	// Initialize recovery manager
 	repo.recovery = NewRecoveryManagerWithConfig(cfg)
+	
+	// Initialize temporal retention manager for automatic cleanup
+	repo.temporalRetention = NewTemporalRetentionManager(repo)
 	
 	// Initialize memory-mapped reader if database file exists and has content
 	if stat, err := os.Stat(dataFile); err == nil && stat.Size() > HeaderSize {
@@ -1614,6 +1620,13 @@ func (r *EntityRepository) Update(entity *models.Entity) error {
 	// Check if we need to perform checkpoint
 	r.checkAndPerformCheckpoint()
 	
+	// Apply temporal retention to clean up old data (bar-raising solution)
+	if r.temporalRetention != nil && r.temporalRetention.ShouldApplyRetention(entity) {
+		if err := r.temporalRetention.ApplyRetention(entity); err != nil {
+			logger.Warn("Failed to apply temporal retention during update: %v", err)
+		}
+	}
+	
 	// Track write metrics (skip metric entities to avoid recursion)
 	if !storageMetricsDisabled && storageMetrics != nil && !isMetricEntity(entity) && !isMetricsOperation() {
 		duration := time.Since(startTime)
@@ -2577,6 +2590,13 @@ func (r *EntityRepository) AddTag(entityID, tag string) error {
 	r.cache.Clear()
 	
 	logger.Debug("AddTag completed successfully for entity %s, tag '%s'", entityID, tag)
+	
+	// Apply temporal retention cleanup during normal operations (bar-raising solution)
+	if r.temporalRetention != nil && entity != nil && r.temporalRetention.ShouldApplyRetention(entity) {
+		if err := r.temporalRetention.CleanupByAge(entity); err != nil {
+			logger.Warn("Failed to apply temporal retention during AddTag: %v", err)
+		}
+	}
 	
 	// Check if we need to perform checkpoint
 	r.checkAndPerformCheckpoint()
