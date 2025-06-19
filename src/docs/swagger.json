@@ -12,7 +12,7 @@
             "name": "MIT",
             "url": "https://github.com/osakka/entitydb/blob/main/LICENSE"
         },
-        "version": "2.32.5"
+        "version": "2.32.0"
     },
     "host": "localhost:8085",
     "basePath": "/api/v1",

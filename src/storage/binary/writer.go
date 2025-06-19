@@ -190,13 +190,49 @@ func (w *Writer) WriteEntity(entity *models.Entity) error {
 	logger.TraceIf("storage", "Starting write for entity %s (tags=%d, content=%d bytes)", 
 		entity.ID, len(entity.Tags), len(entity.Content))
 	
-	// Validate entity
+	// ENHANCED ENTITY VALIDATION: Comprehensive pre-write checks
 	if entity.ID == "" {
 		err := fmt.Errorf("entity ID cannot be empty")
 		op.Fail(err)
 		logger.Error("Validation failed: %v", err)
 		return err
 	}
+	
+	// Validate entity ID length and format
+	if len(entity.ID) > 64 {
+		err := fmt.Errorf("entity ID length %d exceeds maximum of 64 characters", len(entity.ID))
+		op.Fail(err)
+		logger.Error("Validation failed: %v", err)
+		return err
+	}
+	
+	// Validate content size is reasonable
+	if len(entity.Content) > 1024*1024*1024 { // 1GB per entity limit
+		err := fmt.Errorf("entity content size %d exceeds 1GB limit", len(entity.Content))
+		op.Fail(err)
+		logger.Error("Validation failed: %v", err)
+		return err
+	}
+	
+	// Validate tag count is reasonable
+	if len(entity.Tags) > 10000 { // 10k tags per entity should be more than enough
+		err := fmt.Errorf("entity tag count %d exceeds 10000 limit", len(entity.Tags))
+		op.Fail(err)
+		logger.Error("Validation failed: %v", err)
+		return err
+	}
+	
+	// Check current file state before proceeding
+	currentPos := w.getFilePosition()
+	if currentPos < 0 {
+		err := fmt.Errorf("invalid file position %d before write", currentPos)
+		op.Fail(err)
+		logger.Error("PRE-WRITE CORRUPTION DETECTED: %v for entity %s", err, entity.ID)
+		return err
+	}
+	
+	logger.TraceIf("storage", "Pre-write validation passed for entity %s (ID len=%d, content=%d bytes, tags=%d, file pos=%d)", 
+		entity.ID, len(entity.ID), len(entity.Content), len(entity.Tags), currentPos)
 	
 	// Calculate content checksum for data integrity verification
 	// SHA256 provides strong collision resistance and is used throughout
@@ -348,18 +384,74 @@ func (w *Writer) WriteEntity(entity *models.Entity) error {
 		return err
 	}
 	
-	// SURGICAL FIX: Validate offset immediately after seek to catch corruption early
+	// CRITICAL: Validate offset immediately after seek to prevent corruption propagation
+	// Get file stats for cross-validation
+	fileInfo, statErr := w.file.Stat()
+	if statErr != nil {
+		err := fmt.Errorf("cannot validate offset - file stat failed: %v", statErr)
+		op.Fail(err)
+		logger.Error("CORRUPTION PREVENTION: %v for entity %s", err, entity.ID)
+		return err
+	}
+	
+	expectedOffset := fileInfo.Size()
+	if offset != expectedOffset {
+		err := fmt.Errorf("CRITICAL: Seek returned corrupted offset %d, expected %d (diff: %d)", 
+			offset, expectedOffset, offset-expectedOffset)
+		op.Fail(err)
+		logger.Error("CORRUPTION DETECTED: %v for entity %s - ABORTING to prevent propagation", err, entity.ID)
+		return err
+	}
+	
+	// ENHANCED CORRUPTION DETECTION: Aggressive offset validation before writes
 	if offset < 0 {
 		err := fmt.Errorf("invalid negative offset %d returned from seek", offset)
 		op.Fail(err)
 		logger.Error("CORRUPTION DETECTED: %v for entity %s", err, entity.ID)
 		return err
 	}
-	if offset > 1024*1024*1024*10 { // 10GB sanity check
-		err := fmt.Errorf("impossibly large offset %d returned from seek (file corruption?)", offset)
-		op.Fail(err)
-		logger.Error("CORRUPTION DETECTED: %v for entity %s", err, entity.ID)
-		return err
+	
+	// Get file stat for additional validation context
+	stat, statErr := w.file.Stat()
+	if statErr == nil {
+		fileSize := stat.Size()
+		
+		// Enhanced validation checks
+		if offset > fileSize+1024*1024 { // Offset should not exceed file size by more than 1MB
+			err := fmt.Errorf("offset %d exceeds file size %d by more than 1MB (corruption?)", offset, fileSize)
+			op.Fail(err)
+			logger.Error("CORRUPTION DETECTED: %v for entity %s", err, entity.ID)
+			return err
+		}
+		
+		if offset > 1024*1024*1024*10 { // 10GB absolute sanity check
+			err := fmt.Errorf("impossibly large offset %d returned from seek (file corruption?)", offset)
+			op.Fail(err)
+			logger.Error("CORRUPTION DETECTED: %v for entity %s", err, entity.ID)
+			return err
+		}
+		
+		// Check for astronomical jumps in offset values
+		expectedOffset := fileSize
+		if offset > expectedOffset && (offset-expectedOffset) > 1024*1024*100 { // 100MB jump threshold
+			err := fmt.Errorf("suspicious offset jump: expected ~%d, got %d (diff: %d bytes)", 
+				expectedOffset, offset, offset-expectedOffset)
+			op.Fail(err)
+			logger.Error("CORRUPTION DETECTED: %v for entity %s", err, entity.ID)
+			return err
+		}
+		
+		logger.TraceIf("storage", "Offset validation passed: offset=%d, fileSize=%d, entity=%s", 
+			offset, fileSize, entity.ID)
+	} else {
+		// Fallback validation without file stat
+		if offset > 1024*1024*1024*10 { // 10GB sanity check
+			err := fmt.Errorf("impossibly large offset %d returned from seek (file corruption?)", offset)
+			op.Fail(err)
+			logger.Error("CORRUPTION DETECTED: %v for entity %s", err, entity.ID)
+			return err
+		}
+		logger.Warn("Could not stat file for enhanced validation: %v", statErr)
 	}
 	
 	// Calculate buffer checksum
@@ -394,7 +486,7 @@ func (w *Writer) WriteEntity(entity *models.Entity) error {
 		Size:   uint32(n),
 	}
 	
-	// SURGICAL FIX: Validate IndexEntry values immediately after creation
+	// ENHANCED INDEX VALIDATION: Comprehensive corruption detection
 	if entry.Offset != uint64(offset) {
 		err := fmt.Errorf("offset conversion corruption: int64(%d) -> uint64(%d)", offset, entry.Offset)
 		op.Fail(err)
@@ -407,6 +499,31 @@ func (w *Writer) WriteEntity(entity *models.Entity) error {
 		logger.Error("CORRUPTION DETECTED: %v for entity %s", err, entity.ID)
 		return err
 	}
+	
+	// Additional corruption checks on the index entry
+	if entry.Offset > 0xFFFFFFFFFFFFFF { // Max safe uint64 (2^56-1, leaving room for error)
+		err := fmt.Errorf("index entry offset %d exceeds safe uint64 range (corruption?)", entry.Offset)
+		op.Fail(err)
+		logger.Error("CORRUPTION DETECTED: %v for entity %s", err, entity.ID)
+		return err
+	}
+	
+	if entry.Size == 0 && buffer.Len() > 0 {
+		err := fmt.Errorf("index entry size is 0 but buffer contains %d bytes (corruption?)", buffer.Len())
+		op.Fail(err)
+		logger.Error("CORRUPTION DETECTED: %v for entity %s", err, entity.ID)
+		return err
+	}
+	
+	if entry.Size > 1024*1024*1024 { // 1GB per entity seems excessive
+		err := fmt.Errorf("index entry size %d exceeds 1GB limit (corruption?)", entry.Size)
+		op.Fail(err)
+		logger.Error("CORRUPTION DETECTED: %v for entity %s", err, entity.ID)
+		return err
+	}
+	
+	logger.TraceIf("storage", "Index entry validation passed: offset=%d, size=%d, entity=%s", 
+		entry.Offset, entry.Size, entity.ID)
 	
 	// Clear the EntityID array first to avoid garbage
 	for i := range entry.EntityID {
@@ -457,7 +574,7 @@ func (w *Writer) WriteEntity(entity *models.Entity) error {
 	op.SetMetadata("final_file_size", w.header.FileSize)
 	
 	// Write updated header back to file (EntityCount now matches index)
-	currentPos, err := w.file.Seek(0, os.SEEK_CUR)
+	currentPos, err = w.file.Seek(0, os.SEEK_CUR)
 	if err != nil {
 		logger.Error("Failed to get current position: %v", err)
 		return err
