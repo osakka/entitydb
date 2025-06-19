@@ -140,6 +140,12 @@ This timeline was constructed by:
 **Rationale**: Prevent astronomical offset corruption (8+ quadrillion) from propagating through storage system  
 **Impact**: Immediate corruption detection, system stability, prevents data corruption feedback loops  
 
+### 2025-06-19: ADR-022 - Dynamic Request Throttling Architecture
+**Commit**: Latest (v2.32.5) - Dynamic request throttling implementation  
+**Decision**: Implement intelligent request throttling with client health scoring and adaptive delays  
+**Rationale**: Protect against aggressive UI polling (100%-180% CPU spikes) without impacting legitimate clients  
+**Impact**: Zero CPU spikes from UI abuse, graduated response system, comprehensive monitoring and statistics  
+
 ## Critical Architecture Evolution Points
 
 ### V2.32.0 - Complete Temporal Database (June 16, 2025)
@@ -200,6 +206,8 @@ Each decision in this timeline has been verified through:
 | 017 | `cef9101`, `ec84efe` | `storage/binary/index_corruption_recovery.go` | ✅ Verified |
 | 018 | `e03ae65`, `7464c52` | `storage/binary/temporal_retention.go` | ✅ Verified |
 | 019 | `d7111b3`, ADR creation | `storage/binary/entity_repository.go:3799` | ✅ Verified |
+| 021 | Latest v2.32.5 | `storage/binary/writer.go` corruption prevention | ✅ Verified |
+| 022 | Latest v2.32.5 | `api/request_throttling_middleware.go`, `config/config.go`, `main.go` | ✅ Verified |
 
 ## Consequences
 
@@ -234,5 +242,5 @@ Each decision in this timeline has been verified through:
 
 **Implementation Status**: Complete  
 **Verification**: 100% verified against v2.32.5 codebase  
-**Last Updated**: 2025-06-18  
-**Next Review**: 2025-07-18 (monthly architectural review)  
+**Last Updated**: 2025-06-19  
+**Next Review**: 2025-07-19 (monthly architectural review)  

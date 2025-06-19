@@ -168,6 +168,39 @@ type Config struct {
 	// Purpose: Smooth CPU usage spikes during metrics collection
 	// Recommendation: 50-200ms to balance smoothness vs collection speed
 	MetricsGentlePauseMs time.Duration
+
+	// Request Throttling Configuration
+	// =================================
+	
+	// ThrottleEnabled enables intelligent request throttling and abuse protection.
+	// Environment: ENTITYDB_THROTTLE_ENABLED
+	// Default: true
+	// Purpose: Protect against aggressive UI polling and request abuse patterns
+	ThrottleEnabled bool
+
+	// ThrottleRequestsPerMinute defines the baseline requests/minute before throttling activates.
+	// Environment: ENTITYDB_THROTTLE_REQUESTS_PER_MINUTE
+	// Default: 60 requests/minute (1 request/second average)
+	// Purpose: Detect aggressive polling patterns
+	ThrottleRequestsPerMinute int
+
+	// ThrottlePollingThreshold defines repeated requests to same endpoint that trigger throttling.
+	// Environment: ENTITYDB_THROTTLE_POLLING_THRESHOLD
+	// Default: 10 requests to same endpoint within time window
+	// Purpose: Detect UI polling patterns specifically
+	ThrottlePollingThreshold int
+
+	// ThrottleMaxDelayMs defines maximum delay applied to throttled requests.
+	// Environment: ENTITYDB_THROTTLE_MAX_DELAY_MS (milliseconds)
+	// Default: 2000ms (2 seconds)
+	// Purpose: Prevent complete blocking while discouraging abuse
+	ThrottleMaxDelayMs time.Duration
+
+	// ThrottleCacheDuration defines how long to cache responses for repeated requests.
+	// Environment: ENTITYDB_THROTTLE_CACHE_DURATION (seconds)
+	// Default: 30 seconds
+	// Purpose: Serve cached responses to rapid repeated requests
+	ThrottleCacheDuration time.Duration
 	
 	// AggregationInterval defines how often to aggregate collected metrics.
 	// Environment: ENTITYDB_METRICS_AGGREGATION_INTERVAL (seconds)
@@ -285,7 +318,7 @@ type Config struct {
 	
 	// AppVersion is the application version for API documentation.
 	// Environment: ENTITYDB_APP_VERSION
-	// Default: "2.31.0"
+	// Default: "2.32.5"
 	// Should match build version for consistency
 	AppVersion string
 	
@@ -470,6 +503,13 @@ func Load() *Config {
 		MetricsInterval:  getEnvDuration("ENTITYDB_METRICS_INTERVAL", 30),
 		MetricsGentlePauseMs: getEnvDurationMs("ENTITYDB_METRICS_GENTLE_PAUSE_MS", 100),
 		AggregationInterval: getEnvDuration("ENTITYDB_METRICS_AGGREGATION_INTERVAL", 30),
+
+		// Request Throttling
+		ThrottleEnabled:           getEnvBool("ENTITYDB_THROTTLE_ENABLED", true),
+		ThrottleRequestsPerMinute: getEnvInt("ENTITYDB_THROTTLE_REQUESTS_PER_MINUTE", 60),
+		ThrottlePollingThreshold:  getEnvInt("ENTITYDB_THROTTLE_POLLING_THRESHOLD", 10),
+		ThrottleMaxDelayMs:        getEnvDurationMs("ENTITYDB_THROTTLE_MAX_DELAY_MS", 2000),
+		ThrottleCacheDuration:     getEnvDuration("ENTITYDB_THROTTLE_CACHE_DURATION", 30),
 		
 		// Enhanced Metrics Configuration
 		MetricsRetentionRaw:    getEnvDuration("ENTITYDB_METRICS_RETENTION_RAW", 24*60), // 24 hours in minutes
@@ -496,7 +536,7 @@ func Load() *Config {
 		
 		// Application Info
 		AppName:          getEnv("ENTITYDB_APP_NAME", "EntityDB Server"),
-		AppVersion:       getEnv("ENTITYDB_APP_VERSION", "2.32.0"),
+		AppVersion:       getEnv("ENTITYDB_APP_VERSION", "2.32.5"),
 		
 		// Default Admin User Configuration
 		DefaultAdminUsername: getEnv("ENTITYDB_DEFAULT_ADMIN_USERNAME", "admin"),

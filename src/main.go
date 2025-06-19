@@ -37,7 +37,7 @@ import (
 )
 
 // @title EntityDB API
-// @version 2.32.0
+// @version 2.32.5
 // @description A temporal database with pure entity-based architecture
 // @termsOfService https://github.com/osakka/entitydb
 
@@ -77,10 +77,10 @@ import (
 // to help with deployment tracking and support diagnostics.
 var (
 	// Version is the EntityDB version string, typically in semantic versioning format.
-	// Default: "2.32.0" (current development version)
+	// Default: "2.32.5" (current development version)
 	// Build override: -ldflags "-X main.Version=x.y.z"
 	// Used in: version command output, API responses, swagger documentation
-	Version = "2.32.0"
+	Version = "2.32.5"
 	
 	// BuildDate is the date when the binary was compiled.
 	// Default: "unknown" (for development builds)
@@ -414,6 +414,9 @@ func main() {
 	// Comprehensive metrics endpoint for 70T scale monitoring
 	comprehensiveMetricsHandler := api.NewComprehensiveMetricsHandler(server.entityRepo)
 	apiRouter.HandleFunc("/metrics/comprehensive", comprehensiveMetricsHandler.ServeHTTP).Methods("GET")
+
+	// Request throttling statistics endpoint (will be populated after middleware creation)
+	var throttlingStatsHandler http.HandlerFunc
 	
 	// Background metrics collector - designed to handle entities with many temporal tags
 	// The v2.32.0 system with sharded indexing, tag caching, and memory-mapped files
@@ -524,11 +527,59 @@ func main() {
 	} else {
 		logger.Info("Request metrics tracking disabled (FORCED)")
 	}
+
+	// Add request throttling middleware for protection against UI abuse
+	var requestThrottling *api.RequestThrottlingMiddleware
+	if cfg.ThrottleEnabled {
+		requestThrottling = api.NewRequestThrottlingMiddleware(cfg)
+		logger.Info("Request throttling enabled - protecting against polling abuse (max delay: %v)", cfg.ThrottleMaxDelayMs)
+		
+		// Add throttling statistics endpoint
+		throttlingStatsHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			stats := requestThrottling.GetStats()
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"throttling": stats,
+				"timestamp": time.Now(),
+			})
+		})
+		apiRouter.HandleFunc("/throttling/stats", throttlingStatsHandler).Methods("GET")
+		
+		// Start cleanup routine for stale client trackers
+		go func() {
+			ticker := time.NewTicker(5 * time.Minute)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ticker.C:
+					requestThrottling.CleanupStaleClients()
+				}
+			}
+		}()
+	} else {
+		logger.Info("Request throttling disabled")
+		
+		// Add disabled throttling stats endpoint
+		throttlingStatsHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"throttling": map[string]interface{}{
+					"enabled": false,
+					"message": "Request throttling is disabled",
+				},
+				"timestamp": time.Now(),
+			})
+		})
+		apiRouter.HandleFunc("/throttling/stats", throttlingStatsHandler).Methods("GET")
+	}
 	
 	// Chain middleware together
 	chainedMiddleware := func(h http.Handler) http.Handler {
-		// Apply in order: TE header fix -> request metrics -> handler
+		// Apply in order: TE header fix -> throttling -> request metrics -> handler
 		h = teHeaderMiddleware.Middleware(h)
+		if requestThrottling != nil {
+			h = requestThrottling.Handler(h)
+		}
 		if requestMetrics != nil {
 			h = requestMetrics.Middleware(h)
 		}
