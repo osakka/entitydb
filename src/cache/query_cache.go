@@ -137,7 +137,7 @@ func (c *QueryCache) Invalidate(pattern string) {
 	
 	// Simple pattern matching - could be enhanced
 	for key := range c.entries {
-		if len(pattern) == 0 || key[:len(pattern)] == pattern {
+		if len(pattern) == 0 || (len(key) >= len(pattern) && key[:len(pattern)] == pattern) {
 			delete(c.entries, key)
 		}
 	}

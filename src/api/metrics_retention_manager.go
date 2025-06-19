@@ -73,6 +73,17 @@ func (m *MetricsRetentionManager) Start() {
 	
 	// Run aggregation every 5 minutes
 	go func() {
+		// Initial delay to let system stabilize, but shorter than retention delay
+		select {
+		case <-time.After(2 * time.Minute):
+		case <-m.ctx.Done():
+			return
+		}
+		
+		// Run immediately on start (before retention kicks in)
+		m.performAggregation()
+		
+		// Then run periodically
 		ticker := time.NewTicker(5 * time.Minute)
 		defer ticker.Stop()
 		
@@ -216,7 +227,7 @@ func (m *MetricsRetentionManager) performAggregation() {
 		m.mu.Unlock()
 	}()
 	
-	logger.Debug("Starting metrics aggregation")
+	logger.Info("Starting metrics aggregation")
 	startTime := time.Now()
 	
 	// Get all raw metrics (non-aggregated)
@@ -226,7 +237,10 @@ func (m *MetricsRetentionManager) performAggregation() {
 		return
 	}
 	
+	logger.Info("Found %d total metrics for aggregation processing", len(metrics))
+	
 	aggregatedCount := 0
+	rawMetricsCount := 0
 	
 	for _, metric := range metrics {
 		// Skip if already aggregated
@@ -239,8 +253,12 @@ func (m *MetricsRetentionManager) performAggregation() {
 		}
 		
 		if isAggregated {
+			logger.Debug("Skipping aggregated metric: %s", metric.ID)
 			continue
 		}
+		
+		rawMetricsCount++
+		logger.Debug("Processing raw metric: %s", metric.ID)
 		
 		// Get metric name
 		metricName := ""
@@ -276,7 +294,7 @@ func (m *MetricsRetentionManager) performAggregation() {
 	}
 	
 	duration := time.Since(startTime)
-	logger.Debug("Aggregation complete: %d aggregations performed in %v", aggregatedCount, duration)
+	logger.Info("Aggregation complete: %d raw metrics processed, %d aggregations performed in %v", rawMetricsCount, aggregatedCount, duration)
 }
 
 // aggregateMetric creates an aggregated version of a metric

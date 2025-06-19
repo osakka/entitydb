@@ -102,7 +102,7 @@ func (r *MMapReader) buildIndex() error {
 		}
 		
 		// Direct memory access
-		entry := &IndexEntry{
+		tempEntry := &IndexEntry{
 			Offset: *(*uint64)(unsafe.Pointer(&r.data[offset+36])),
 			Size:   *(*uint32)(unsafe.Pointer(&r.data[offset+44])),
 			Flags:  *(*uint32)(unsafe.Pointer(&r.data[offset+48])),
@@ -110,7 +110,17 @@ func (r *MMapReader) buildIndex() error {
 		
 		// Extract entity ID
 		entityID := string(r.data[offset:offset+36])
-		r.index[entityID] = entry
+		
+		// RACE CONDITION FIX: Create a defensive copy of IndexEntry to prevent concurrent access corruption
+		// Unsafe pointer operations can create shared memory access patterns causing corruption
+		indexEntry := &IndexEntry{
+			Offset: tempEntry.Offset,
+			Size:   tempEntry.Size,
+			Flags:  tempEntry.Flags,
+		}
+		// Copy EntityID from the extracted string
+		copy(indexEntry.EntityID[:], []byte(entityID))
+		r.index[entityID] = indexEntry
 		
 		offset += 52
 	}
@@ -122,11 +132,22 @@ func (r *MMapReader) buildIndex() error {
 func (r *MMapReader) GetEntity(id string) (*models.Entity, error) {
 	r.indexMu.RLock()
 	entry, exists := r.index[id]
-	r.indexMu.RUnlock()
-	
 	if !exists {
+		r.indexMu.RUnlock()
 		return nil, fmt.Errorf("entity not found: %s", id)
 	}
+	
+	// RACE CONDITION FIX: Create defensive copy of IndexEntry to prevent shared pointer access
+	entryCopy := &IndexEntry{
+		Offset: entry.Offset,
+		Size:   entry.Size,
+		Flags:  entry.Flags,
+	}
+	copy(entryCopy.EntityID[:], entry.EntityID[:])
+	r.indexMu.RUnlock()
+	
+	// Use entryCopy instead of entry for safe access
+	entry = entryCopy
 	
 	if entry.Offset+uint64(entry.Size) > uint64(r.size) {
 		return nil, fmt.Errorf("entity data exceeds file size")

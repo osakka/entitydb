@@ -428,7 +428,9 @@ func main() {
 	backgroundCollector.Start()
 	defer backgroundCollector.Stop()
 	
-	// Enable metrics retention manager
+	// FIXED: Metrics retention manager - now uses incremental Update() method
+	// The Update() method has been fixed to use incremental updates instead of rebuilding 
+	// the entire database file, eliminating the CPU spikes caused by metrics retention.
 	if cfg.MetricsRetentionRaw > 0 {
 		retentionManager := api.NewMetricsRetentionManager(
 			server.entityRepo,

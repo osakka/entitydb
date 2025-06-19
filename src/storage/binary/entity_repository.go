@@ -1592,68 +1592,35 @@ func (r *EntityRepository) Update(entity *models.Entity) error {
 		return fmt.Errorf("error logging to WAL: %w", err)
 	}
 	
-	// Acquire write lock
+	// INCREMENTAL UPDATE ARCHITECTURE FIX
+	// Previous implementation caused massive CPU spikes by:
+	// 1. Reading ALL entities from disk
+	// 2. Rewriting the ENTIRE database file
+	// 3. Rebuilding ALL indexes from scratch
+	// 4. Clearing ALL caches
+	// This new approach updates only in-memory structures and relies on WAL for durability
+	
+	// Acquire write lock for in-memory update
 	r.lockManager.AcquireEntityLock(entity.ID, WriteLock)
 	defer r.lockManager.ReleaseEntityLock(entity.ID, WriteLock)
 	
-	// Create temporary file for writing
-	tempPath := r.getDataFile() + ".tmp"
-	writer, err := NewWriter(tempPath)
-	if err != nil {
-		return err
-	}
-	defer writer.Close()
+	// Update in-memory entity storage
+	r.mu.Lock()
+	r.entities[entity.ID] = entity
 	
-	// Read all entities and update the target
-	reader, err := NewReader(r.getDataFile())
-	if err != nil {
-		return err
-	}
-	defer reader.Close()
+	// Update indexes incrementally (no full rebuild)
+	r.updateIndexes(entity)
+	r.mu.Unlock()
 	
-	entities, err := reader.GetAllEntities()
-	if err != nil {
-		return err
-	}
+	// Invalidate cache for this specific entity only (not all caches)
+	r.cache.Invalidate(entity.ID)
 	
-	// Write updated entities
-	updated := false
-	for _, e := range entities {
-		if e.ID == entity.ID {
-			if err := writer.WriteEntity(entity); err != nil {
-				return err
-			}
-			updated = true
-		} else {
-			if err := writer.WriteEntity(e); err != nil {
-				return err
-			}
-		}
-	}
-	
-	if !updated {
-		return fmt.Errorf("entity not found: %s", entity.ID)
-	}
-	
-	writer.Close()
-	
-	// Replace the original file with the temporary file
-	if err := os.Rename(tempPath, r.getDataFile()); err != nil {
-		return err
-	}
-	
-	// Rebuild indexes
-	r.buildIndexes()
-	
-	// Invalidate cache
-	r.cache.Clear()
-	
-	// Save tag index periodically
+	// Save tag index periodically (but don't force a rebuild)
 	if err := r.SaveTagIndexIfNeeded(); err != nil {
 		logger.Warn("Failed to save tag index: %v", err)
 	}
 	
-	// Check if we need to perform checkpoint
+	// Check if we need to perform checkpoint (WAL durability mechanism)
 	r.checkAndPerformCheckpoint()
 	
 	// Apply temporal retention to clean up old data (bar-raising solution)
@@ -1690,7 +1657,22 @@ func (r *EntityRepository) VerifyIndexIntegrity() []error {
 	defer reader.Close()
 	
 	// Check 1: Every index entry points to valid data
+	// RACE CONDITION FIX: Create safe copy of index to prevent concurrent access corruption
+	reader.indexMu.RLock()
+	indexCopy := make(map[string]*IndexEntry)
 	for id, entry := range reader.index {
+		// Create defensive copy of IndexEntry
+		entryCopy := &IndexEntry{
+			Offset: entry.Offset,
+			Size:   entry.Size,
+			Flags:  entry.Flags,
+		}
+		copy(entryCopy.EntityID[:], entry.EntityID[:])
+		indexCopy[id] = entryCopy
+	}
+	reader.indexMu.RUnlock()
+	
+	for id, entry := range indexCopy {
 		// Try to read the entity
 		entity, err := reader.GetEntity(id)
 		if err != nil {
@@ -1729,7 +1711,15 @@ func (r *EntityRepository) FindOrphanedEntries() []string {
 	defer reader.Close()
 	
 	// Check each index entry
+	// RACE CONDITION FIX: Create safe copy of index IDs to prevent concurrent access corruption
+	reader.indexMu.RLock()
+	indexIDs := make([]string, 0, len(reader.index))
 	for id := range reader.index {
+		indexIDs = append(indexIDs, id)
+	}
+	reader.indexMu.RUnlock()
+	
+	for _, id := range indexIDs {
 		_, err := reader.GetEntity(id)
 		if err != nil {
 			orphaned = append(orphaned, id)
@@ -3138,8 +3128,11 @@ func (r *EntityRepository) ReplayWAL() error {
 					return err
 				}
 				
-				// Update indexes
+				// Update indexes - RACE CONDITION FIX: Add proper mutex protection
+				// updateIndexes() modifies shared index structures and MUST be called with mutex locked
+				r.mu.Lock()
 				r.updateIndexes(entry.Entity)
+				r.mu.Unlock()
 			}
 			
 		case WALOpDelete:

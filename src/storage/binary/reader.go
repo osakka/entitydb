@@ -243,7 +243,15 @@ func NewReader(filename string) (*Reader, error) {
 				continue
 			}
 			
-			r.index[id] = entry
+			// RACE CONDITION FIX: Create a defensive copy of IndexEntry to prevent concurrent access corruption
+			// Multiple goroutines accessing the same Reader instance could corrupt shared IndexEntry pointers
+			indexEntry := &IndexEntry{
+				Offset: entry.Offset,
+				Size:   entry.Size,
+				Flags:  entry.Flags,
+			}
+			copy(indexEntry.EntityID[:], entry.EntityID[:])
+			r.index[id] = indexEntry
 			entriesRead++
 			logger.Trace("Loaded index entry %d: ID=%s, Offset=%d, Size=%d", i, id, entry.Offset, entry.Size)
 		}

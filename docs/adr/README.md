@@ -91,6 +91,13 @@ All ADRs have been verified against the actual v2.32.5 codebase implementation. 
 - **ADR-018**: Self-cleaning retention
 - **ADR-019**: Index rebuild loop fix
 
+### Phase 5: System Stability & Metrics (June 2025)
+- **ADR-021**: Critical corruption prevention fix
+- **ADR-022**: Dynamic request throttling
+- **ADR-023**: Index entry race condition elimination
+- **ADR-024**: Incremental update architecture
+- **ADR-025**: Aggregation timing bootstrap fix
+
 ## Architectural Principles
 
 Based on our decision history, EntityDB follows these core principles:
