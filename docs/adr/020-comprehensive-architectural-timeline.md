@@ -134,6 +134,12 @@ This timeline was constructed by:
 **Rationale**: Eliminate infinite index rebuild causing 100% CPU usage  
 **Impact**: CPU usage stable at 0.0% under all load conditions  
 
+### 2025-06-19: ADR-021 - Critical Corruption Prevention Fix
+**Commit**: Latest (v2.32.5) - Cross-validation corruption prevention  
+**Decision**: Implement cross-validation between file.Seek() and file.Stat() results  
+**Rationale**: Prevent astronomical offset corruption (8+ quadrillion) from propagating through storage system  
+**Impact**: Immediate corruption detection, system stability, prevents data corruption feedback loops  
+
 ## Critical Architecture Evolution Points
 
 ### V2.32.0 - Complete Temporal Database (June 16, 2025)
@@ -145,6 +151,11 @@ This timeline was constructed by:
 - **Commits**: `139c7ec`, `1fd9f8d`, `d7111b3`
 - **Achievement**: Eliminated systematic binary format corruption
 - **Impact**: Stable database operations, zero corruption risk
+
+### V2.32.5 - Corruption Prevention Architecture (June 19, 2025)
+- **Commit**: Latest - Critical corruption prevention fix
+- **Achievement**: Eliminated astronomical offset corruption through cross-validation
+- **Impact**: Production-grade stability, corruption-proof storage layer
 
 ### V2.32.4 - Technical Debt Elimination (June 18, 2025)
 - **Commit**: `128b522`
