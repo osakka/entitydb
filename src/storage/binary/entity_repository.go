@@ -3787,55 +3787,12 @@ func (r *EntityRepository) GetStats() map[string]interface{} {
 func (r *EntityRepository) performAutomaticRecovery() error {
 	logger.Debug("Performing automatic corruption detection and recovery...")
 	
-	// Create recovery manager
-	recovery := NewIndexCorruptionRecovery(r.dataPath)
+	// NOTE: External index persistence is intentionally disabled in favor of 
+	// in-memory sharded indexing for single source of truth architecture.
+	// This function previously checked for external .idx files that no longer exist.
+	// Since the system uses in-memory indexes, no external index corruption detection is needed.
 	
-	// Quick corruption check
-	dbPath := r.getDataFile()
-	idxPath := dbPath + ".idx"
-	
-	// Check if index file exists and is valid
-	dbStat, err := os.Stat(dbPath)
-	if err != nil {
-		logger.Debug("Database file not accessible during recovery check: %v", err)
-		return nil // Not necessarily corruption, might be first run
-	}
-	
-	idxStat, err := os.Stat(idxPath)
-	if err != nil {
-		logger.Info("Index file missing - will be rebuilt automatically")
-		return nil // Missing index will be rebuilt by normal flow
-	}
-	
-	// Enhanced corruption detection - more aggressive recovery
-	shouldRecover := false
-	
-	// 1. Check timestamp staleness - index should be newer than database (within reasonable margin)
-	if dbStat.ModTime().After(idxStat.ModTime().Add(2 * time.Minute)) {
-		logger.Warn("Index file appears stale (DB modified %v, index modified %v) - triggering recovery", 
-			dbStat.ModTime(), idxStat.ModTime())
-		shouldRecover = true
-	}
-	
-	// 2. Check size anomalies - if index is too small relative to DB
-	dbSize := dbStat.Size()
-	idxSize := idxStat.Size()
-	if dbSize > 100*1024*1024 && idxSize < 100*1024 { // DB > 100MB but index < 100KB
-		logger.Warn("Index file suspiciously small (%d bytes) for large database (%d bytes) - triggering recovery", 
-			idxSize, dbSize)
-		shouldRecover = true
-	}
-	
-	// 3. Force recovery if we detect continuous corruption issues
-	if shouldRecover {
-		if err := recovery.DiagnoseAndRecover(); err != nil {
-			logger.Error("Automatic recovery failed: %v", err)
-			return err
-		}
-		
-		logger.Info("Automatic index recovery completed successfully")
-	}
-	
+	logger.Debug("Using in-memory sharded indexing - no external index corruption checks needed")
 	return nil
 }
 

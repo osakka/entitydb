@@ -18,6 +18,7 @@ type BackgroundMetricsCollector struct {
 	collector  *MetricsCollector
 	repo       models.EntityRepository
 	interval   time.Duration
+	gentlePause time.Duration      // Configurable pause between metric collection blocks
 	ctx        context.Context
 	cancel     context.CancelFunc
 	lastValues map[string]float64 // Track last values for change detection
@@ -25,15 +26,16 @@ type BackgroundMetricsCollector struct {
 }
 
 // NewBackgroundMetricsCollector creates a new background metrics collector
-func NewBackgroundMetricsCollector(repo models.EntityRepository, interval time.Duration) *BackgroundMetricsCollector {
+func NewBackgroundMetricsCollector(repo models.EntityRepository, interval time.Duration, gentlePause time.Duration) *BackgroundMetricsCollector {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &BackgroundMetricsCollector{
-		collector:  NewMetricsCollector(repo),
-		repo:       repo,
-		interval:   interval,
-		ctx:        ctx,
-		cancel:     cancel,
-		lastValues: make(map[string]float64),
+		collector:   NewMetricsCollector(repo),
+		repo:        repo,
+		interval:    interval,
+		gentlePause: gentlePause,
+		ctx:         ctx,
+		cancel:      cancel,
+		lastValues:  make(map[string]float64),
 	}
 }
 
@@ -73,11 +75,11 @@ func (b *BackgroundMetricsCollector) Stop() {
 	b.cancel()
 }
 
-// collectMetrics collects all system metrics
+// collectMetrics collects all system metrics with gentle pacing to reduce CPU spikes
 func (b *BackgroundMetricsCollector) collectMetrics() {
-	logger.Trace("Collecting system metrics...")
+	logger.Trace("Collecting system metrics with gentle pacing...")
 	
-	// Memory metrics
+	// Memory metrics block
 	var m runtime.MemStats
 	runtime.ReadMemStats(&m)
 	
@@ -87,7 +89,10 @@ func (b *BackgroundMetricsCollector) collectMetrics() {
 	b.storeMetric("memory_heap_alloc", float64(m.HeapAlloc), "bytes", "Heap memory allocated")
 	b.storeMetric("memory_heap_inuse", float64(m.HeapInuse), "bytes", "Heap memory in use")
 	
-	// GC metrics
+	// Gentle pause between metric collection blocks to smooth CPU usage
+	time.Sleep(b.gentlePause)
+	
+	// GC metrics block
 	b.storeMetric("gc_runs", float64(m.NumGC), "count", "Number of GC runs")
 	if m.NumGC > 0 {
 		b.storeMetric("gc_pause_ns", float64(m.PauseNs[(m.NumGC+255)%256]), "nanoseconds", "Last GC pause duration")
@@ -99,13 +104,19 @@ func (b *BackgroundMetricsCollector) collectMetrics() {
 	// CPU metrics
 	b.storeMetric("cpu_count", float64(runtime.NumCPU()), "count", "Number of CPUs")
 	
+	// Gentle pause before database metrics
+	time.Sleep(b.gentlePause)
+	
 	// Database metrics
 	b.collectDatabaseMetrics()
+	
+	// Gentle pause before entity metrics
+	time.Sleep(b.gentlePause)
 	
 	// Entity metrics
 	b.collectEntityMetrics()
 	
-	logger.Trace("System metrics collection completed")
+	logger.Trace("Gentle system metrics collection completed")
 }
 
 // collectDatabaseMetrics collects database-specific metrics

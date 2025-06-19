@@ -421,7 +421,7 @@ func main() {
 	logger.Info("Metrics collection interval set to %v", cfg.MetricsInterval)
 	
 	// Enable background metrics collection now that race conditions are fixed
-	backgroundCollector := api.NewBackgroundMetricsCollector(server.entityRepo, cfg.MetricsInterval)
+	backgroundCollector := api.NewBackgroundMetricsCollector(server.entityRepo, cfg.MetricsInterval, cfg.MetricsGentlePauseMs)
 	backgroundCollector.Start()
 	defer backgroundCollector.Stop()
 	

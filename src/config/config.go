@@ -161,6 +161,13 @@ type Config struct {
 	// Default: 30 seconds
 	// Recommendation: 10-60 seconds depending on monitoring requirements
 	MetricsInterval time.Duration
+
+	// MetricsGentlePauseMs defines pause duration between metric collection blocks.
+	// Environment: ENTITYDB_METRICS_GENTLE_PAUSE_MS (milliseconds)
+	// Default: 100 milliseconds
+	// Purpose: Smooth CPU usage spikes during metrics collection
+	// Recommendation: 50-200ms to balance smoothness vs collection speed
+	MetricsGentlePauseMs time.Duration
 	
 	// AggregationInterval defines how often to aggregate collected metrics.
 	// Environment: ENTITYDB_METRICS_AGGREGATION_INTERVAL (seconds)
@@ -461,6 +468,7 @@ func Load() *Config {
 		
 		// Metrics
 		MetricsInterval:  getEnvDuration("ENTITYDB_METRICS_INTERVAL", 30),
+		MetricsGentlePauseMs: getEnvDurationMs("ENTITYDB_METRICS_GENTLE_PAUSE_MS", 100),
 		AggregationInterval: getEnvDuration("ENTITYDB_METRICS_AGGREGATION_INTERVAL", 30),
 		
 		// Enhanced Metrics Configuration
@@ -720,6 +728,31 @@ func getEnvDuration(key string, defaultSeconds int) time.Duration {
 		}
 	}
 	return time.Duration(defaultSeconds) * time.Second
+}
+
+// getEnvDurationMs retrieves a duration environment variable in milliseconds with a default fallback.
+//
+// The function expects the environment variable to contain an integer representing
+// milliseconds, which is then converted to a time.Duration. This provides fine-grained
+// control for timing-sensitive operations like gentle pacing.
+//
+// Parameters:
+//   key - Environment variable name
+//   defaultMs - Default duration in milliseconds if variable is unset/invalid
+//
+// Returns:
+//   time.Duration based on environment variable or default
+//
+// Examples:
+//   ENTITYDB_METRICS_GENTLE_PAUSE_MS=100 -> 100 * time.Millisecond
+//   ENTITYDB_METRICS_GENTLE_PAUSE_MS=    -> defaultMs * time.Millisecond
+func getEnvDurationMs(key string, defaultMs int) time.Duration {
+	if value := os.Getenv(key); value != "" {
+		if intValue, err := strconv.Atoi(value); err == nil {
+			return time.Duration(intValue) * time.Millisecond
+		}
+	}
+	return time.Duration(defaultMs) * time.Millisecond
 }
 
 // getEnvFloatSlice retrieves a comma-separated float slice with a default fallback.
