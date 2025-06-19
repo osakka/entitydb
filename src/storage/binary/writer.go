@@ -538,7 +538,16 @@ func (w *Writer) WriteEntity(entity *models.Entity) error {
 	
 	// Check if this is a new entity (not an update)
 	_, isUpdate := w.index[entity.ID]
-	w.index[entity.ID] = entry
+	
+	// RACE CONDITION FIX: Create a new IndexEntry copy to prevent concurrent access corruption
+	// The issue was multiple goroutines accessing the same IndexEntry pointer causing memory corruption
+	indexEntry := &IndexEntry{
+		Offset: entry.Offset,
+		Size:   entry.Size,
+		Flags:  entry.Flags,
+	}
+	copy(indexEntry.EntityID[:], entry.EntityID[:])
+	w.index[entity.ID] = indexEntry
 	
 	logger.TraceIf("storage", "Added index entry for %s: offset=%d, size=%d, isUpdate=%v", entity.ID, entry.Offset, entry.Size, isUpdate)
 	op.SetMetadata("index_offset", entry.Offset)
