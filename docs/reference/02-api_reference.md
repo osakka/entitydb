@@ -1,7 +1,8 @@
 # EntityDB API Reference (Complete)
 
-**Version**: 2.29.0  
-**Last Updated**: 2025-06-08
+**Version**: 2.32.8  
+**Last Updated**: 2025-06-20  
+**Architectural Decisions**: Reflects ADR-001 through ADR-031 implementation
 
 ## Table of Contents
 1. [Overview](#overview)
@@ -41,7 +42,7 @@ Authorization: Bearer <token>
 
 ## Authentication
 
-> **Authentication Architecture v2.29.0+**: EntityDB now uses embedded credentials stored directly in user entity content. No separate credential entities or relationships are needed.
+> **Authentication Architecture v2.29.0+ (ADR-013)**: EntityDB uses embedded credentials stored directly in user entity content following pure tag-based session management architecture. No separate credential entities or relationships needed (single source of truth compliance).
 
 ### Login
 Authenticate and receive a session token.

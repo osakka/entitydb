@@ -5,6 +5,7 @@
 **Deciders:** EntityDB Core Team  
 **Technical Lead:** Claude AI Assistant  
 **Git Commits:** `81cf44a`, `3157f1b`, `ebd945b`  
+**Validation Commit:** `b5dfd94` (storage efficiency validation)  
 
 ## Context
 
