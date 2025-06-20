@@ -55,16 +55,27 @@ import (
 
 const (
 	// MagicNumber identifies valid EBF files.
-	// Value: 0x45424446 ("EBDF" - EntityDB Format)
+	// Value: 0x45424446 ("EBDF" - EntityDB Format) - LEGACY
 	MagicNumber uint32 = 0x45424446
+	
+	// UnifiedMagicNumber identifies unified EntityDB files.
+	// Value: 0x45555446 ("EUFF" - EntityDB Unified File Format)
+	UnifiedMagicNumber uint32 = 0x45555446
 	
 	// FormatVersion indicates the binary format version.
 	// Version 1: Initial format with temporal tags and compression support
 	FormatVersion uint32 = 1
 	
-	// HeaderSize is the fixed size of the file header in bytes.
-	// The header contains file metadata and section offsets.
+	// UnifiedFormatVersion indicates the unified format version.
+	// Version 2: Unified file format with embedded WAL and sections
+	UnifiedFormatVersion uint32 = 2
+	
+	// HeaderSize is the fixed size of the legacy file header in bytes.
 	HeaderSize = 64
+	
+	// UnifiedHeaderSize is the fixed size of the unified file header in bytes.
+	// The unified header contains metadata and section offsets for all components.
+	UnifiedHeaderSize = 128
 	
 	// IndexEntrySize is the size of each entity index entry.
 	// Structure: EntityID (96 bytes) + Offset (8 bytes) + Size (4 bytes) + Flags (4 bytes)
@@ -77,6 +88,9 @@ var (
 	
 	// ErrVersionMismatch is returned when the format version is unsupported
 	ErrVersionMismatch = errors.New("unsupported format version")
+	
+	// ErrUnknownFormat is returned when file format cannot be determined
+	ErrUnknownFormat = errors.New("unknown file format")
 )
 
 // Header represents the EBF file header containing metadata and section offsets.
@@ -182,6 +196,169 @@ func (h *Header) Read(r io.Reader) error {
 	}
 	
 	return nil
+}
+
+// UnifiedHeader represents the unified file header containing metadata and section offsets
+// for all components in a single file. The header is always 128 bytes and located at the
+// beginning of the file.
+//
+// # Binary Layout (Little Endian)
+//
+//	Offset  Size  Field
+//	0x00    4     Magic (0x45555446) "EUFF"
+//	0x04    4     Version (2)
+//	0x08    8     FileSize
+//	0x10    8     WALOffset
+//	0x18    8     WALSize
+//	0x20    8     DataOffset
+//	0x28    8     DataSize
+//	0x30    8     TagDictOffset
+//	0x38    8     TagDictSize
+//	0x40    8     EntityIndexOffset
+//	0x48    8     EntityIndexSize
+//	0x50    8     EntityCount
+//	0x58    8     LastModified (Unix timestamp)
+//	0x60    8     WALSequence
+//	0x68    8     CheckpointSequence
+//	0x70    16    Reserved (for future sections)
+type UnifiedHeader struct {
+	Magic              uint32  // File format identifier (must be UnifiedMagicNumber)
+	Version            uint32  // Format version (must be UnifiedFormatVersion)
+	FileSize           uint64  // Total file size in bytes
+	WALOffset          uint64  // Offset to WAL section
+	WALSize            uint64  // Size of WAL section in bytes
+	DataOffset         uint64  // Offset to entity data section
+	DataSize           uint64  // Size of entity data section in bytes
+	TagDictOffset      uint64  // Offset to tag dictionary section
+	TagDictSize        uint64  // Size of tag dictionary in bytes
+	EntityIndexOffset  uint64  // Offset to entity index section
+	EntityIndexSize    uint64  // Size of entity index in bytes
+	EntityCount        uint64  // Number of entities in the file
+	LastModified       int64   // Unix timestamp of last modification
+	WALSequence        uint64  // Current WAL sequence number
+	CheckpointSequence uint64  // Last checkpoint sequence number
+	Reserved           [16]byte // Reserved for future sections
+}
+
+// Write serializes the unified header to the provided writer.
+// The header is written as a fixed 128-byte block in little-endian format.
+//
+// Returns an error if the write operation fails.
+func (h *UnifiedHeader) Write(w io.Writer) error {
+	buf := make([]byte, UnifiedHeaderSize)
+	
+	// Serialize all fields to the buffer in little-endian format
+	binary.LittleEndian.PutUint32(buf[0:4], h.Magic)
+	binary.LittleEndian.PutUint32(buf[4:8], h.Version)
+	binary.LittleEndian.PutUint64(buf[8:16], h.FileSize)
+	binary.LittleEndian.PutUint64(buf[16:24], h.WALOffset)
+	binary.LittleEndian.PutUint64(buf[24:32], h.WALSize)
+	binary.LittleEndian.PutUint64(buf[32:40], h.DataOffset)
+	binary.LittleEndian.PutUint64(buf[40:48], h.DataSize)
+	binary.LittleEndian.PutUint64(buf[48:56], h.TagDictOffset)
+	binary.LittleEndian.PutUint64(buf[56:64], h.TagDictSize)
+	binary.LittleEndian.PutUint64(buf[64:72], h.EntityIndexOffset)
+	binary.LittleEndian.PutUint64(buf[72:80], h.EntityIndexSize)
+	binary.LittleEndian.PutUint64(buf[80:88], h.EntityCount)
+	binary.LittleEndian.PutUint64(buf[88:96], uint64(h.LastModified))
+	binary.LittleEndian.PutUint64(buf[96:104], h.WALSequence)
+	binary.LittleEndian.PutUint64(buf[104:112], h.CheckpointSequence)
+	copy(buf[112:128], h.Reserved[:])
+	
+	logger.Debug("UnifiedHeader.Write - EntityCount=%d, WALSequence=%d, FileSize=%d", 
+		h.EntityCount, h.WALSequence, h.FileSize)
+	n, err := w.Write(buf)
+	if err != nil {
+		logger.Error("UnifiedHeader.Write failed: %v", err)
+		return err
+	}
+	logger.Debug("UnifiedHeader.Write wrote %d bytes", n)
+	return nil
+}
+
+// Read deserializes the unified header from the provided reader.
+// The method reads exactly 128 bytes and validates the magic number and version.
+//
+// Returns:
+//   - ErrInvalidFormat if the magic number doesn't match
+//   - ErrVersionMismatch if the version is unsupported
+//   - io.ErrUnexpectedEOF if the header is incomplete
+func (h *UnifiedHeader) Read(r io.Reader) error {
+	buf := make([]byte, UnifiedHeaderSize)
+	n, err := io.ReadFull(r, buf)
+	if err != nil {
+		// Check if we have a partial header
+		if n > 0 && err == io.ErrUnexpectedEOF {
+			// Try to parse what we have
+			if n >= 8 {
+				h.Magic = binary.LittleEndian.Uint32(buf[0:4])
+				h.Version = binary.LittleEndian.Uint32(buf[4:8])
+				if h.Magic == UnifiedMagicNumber && h.Version == UnifiedFormatVersion {
+					// Valid header but incomplete - assume empty file
+					h.EntityCount = 0
+					return nil
+				}
+			}
+		}
+		return err
+	}
+	
+	h.Magic = binary.LittleEndian.Uint32(buf[0:4])
+	h.Version = binary.LittleEndian.Uint32(buf[4:8])
+	h.FileSize = binary.LittleEndian.Uint64(buf[8:16])
+	h.WALOffset = binary.LittleEndian.Uint64(buf[16:24])
+	h.WALSize = binary.LittleEndian.Uint64(buf[24:32])
+	h.DataOffset = binary.LittleEndian.Uint64(buf[32:40])
+	h.DataSize = binary.LittleEndian.Uint64(buf[40:48])
+	h.TagDictOffset = binary.LittleEndian.Uint64(buf[48:56])
+	h.TagDictSize = binary.LittleEndian.Uint64(buf[56:64])
+	h.EntityIndexOffset = binary.LittleEndian.Uint64(buf[64:72])
+	h.EntityIndexSize = binary.LittleEndian.Uint64(buf[72:80])
+	h.EntityCount = binary.LittleEndian.Uint64(buf[80:88])
+	h.LastModified = int64(binary.LittleEndian.Uint64(buf[88:96]))
+	h.WALSequence = binary.LittleEndian.Uint64(buf[96:104])
+	h.CheckpointSequence = binary.LittleEndian.Uint64(buf[104:112])
+	copy(h.Reserved[:], buf[112:128])
+	
+	if h.Magic != UnifiedMagicNumber {
+		return ErrInvalidFormat
+	}
+	if h.Version != UnifiedFormatVersion {
+		return ErrVersionMismatch
+	}
+	
+	return nil
+}
+
+// DetectFileFormat determines the format of a file by reading its magic number.
+// Returns the detected format type and format version.
+func DetectFileFormat(r io.Reader) (magic uint32, version uint32, isUnified bool, err error) {
+	buf := make([]byte, 8)
+	n, err := io.ReadFull(r, buf)
+	if err != nil {
+		if n >= 4 {
+			// At least we can check the magic number
+			magic = binary.LittleEndian.Uint32(buf[0:4])
+			if magic == UnifiedMagicNumber {
+				return magic, 0, true, err
+			} else if magic == MagicNumber {
+				return magic, 0, false, err
+			}
+		}
+		return 0, 0, false, err
+	}
+	
+	magic = binary.LittleEndian.Uint32(buf[0:4])
+	version = binary.LittleEndian.Uint32(buf[4:8])
+	
+	switch magic {
+	case UnifiedMagicNumber:
+		return magic, version, true, nil
+	case MagicNumber:
+		return magic, version, false, nil
+	default:
+		return magic, version, false, ErrUnknownFormat
+	}
 }
 
 // IndexEntry represents an entry in the entity index section.

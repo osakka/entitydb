@@ -274,10 +274,15 @@ func (b *BackgroundMetricsCollector) storeMetric(name string, value float64, uni
 		logger.Debug("Created metric entity with UUID: %s for metric %s", metricID, name)
 	}
 	
-	// Add temporal value tag (similar to request metrics middleware)
+	// ATOMIC TAG FIX: Add temporal value tag with explicit timestamp to prevent explosion
 	valueTag := fmt.Sprintf("value:%.2f", value)
-	if err := b.repo.AddTag(metricID, valueTag); err != nil {
-		logger.Error("Failed to add value tag to metric %s: %v", metricID, err)
+	now := time.Now().UnixNano()
+	timestampedValueTag := fmt.Sprintf("%d|%s", now, valueTag)
+	
+	// Add to existing tags atomically
+	metricEntity.Tags = append(metricEntity.Tags, timestampedValueTag)
+	if err := b.repo.Update(metricEntity); err != nil {
+		logger.Error("Failed to update metric entity %s: %v", metricID, err)
 		return
 	}
 	

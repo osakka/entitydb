@@ -51,12 +51,17 @@ const (
 // the main data file. This ensures that no data is lost even if the system
 // crashes during a write operation.
 //
+// The WAL supports both standalone files (legacy) and embedded sections within
+// unified files. The implementation automatically detects the format and uses
+// appropriate read/write methods.
+//
 // Key features:
 //   - Append-only for optimal write performance
 //   - Automatic checkpointing to prevent unbounded growth
 //   - SHA256 checksums for corruption detection
 //   - Thread-safe through mutex synchronization
 //   - Sequence numbers for operation ordering
+//   - Unified file support for reduced I/O overhead
 //
 // Recovery process:
 //   1. Read all entries since last checkpoint
@@ -64,10 +69,13 @@ const (
 //   3. Replay operations in sequence order
 //   4. Create new checkpoint after recovery
 type WAL struct {
-	mu       sync.Mutex // Protects concurrent access
-	file     *os.File   // WAL file handle
-	path     string     // Full path to WAL file
-	sequence uint64     // Monotonic operation counter
+	mu         sync.Mutex     // Protects concurrent access
+	file       *os.File       // WAL file handle (standalone) or unified file
+	path       string         // Full path to WAL file
+	sequence   uint64         // Monotonic operation counter
+	isUnified  bool           // Whether WAL is embedded in unified file
+	walOffset  uint64         // Offset to WAL section in unified file
+	walSize    uint64         // Size of WAL section in unified file
 }
 
 // NewWAL creates a new write-ahead log instance for the given data directory.
@@ -118,6 +126,66 @@ func NewWALWithPath(walPath string) (*WAL, error) {
 	}
 	
 	return wal, nil
+}
+
+// NewUnifiedWAL creates a WAL instance that reads from a unified file's WAL section.
+// This is used when the WAL is embedded within a unified EntityDB file rather than
+// being a separate file.
+//
+// Parameters:
+//   - unifiedFile: Open file handle to the unified EntityDB file
+//   - walOffset: Byte offset to the WAL section within the file
+//   - walSize: Size of the WAL section in bytes
+//
+// Returns:
+//   - *WAL: Initialized WAL for reading embedded entries
+//   - error: Initialization errors
+func NewUnifiedWAL(unifiedFile *os.File, walOffset, walSize uint64) (*WAL, error) {
+	logger.TraceIf("wal", "Creating unified WAL at offset %d, size %d", walOffset, walSize)
+	
+	wal := &WAL{
+		file:       unifiedFile,
+		path:       unifiedFile.Name(),
+		isUnified:  true,
+		walOffset:  walOffset,
+		walSize:    walSize,
+	}
+	
+	// Read the sequence number from the WAL section
+	if err := wal.readUnifiedSequence(); err != nil {
+		return nil, err
+	}
+	
+	return wal, nil
+}
+
+// readUnifiedSequence reads the current sequence number from the unified WAL section.
+func (w *WAL) readUnifiedSequence() error {
+	if !w.isUnified {
+		return fmt.Errorf("readUnifiedSequence called on non-unified WAL")
+	}
+	
+	// Seek to WAL section
+	if _, err := w.file.Seek(int64(w.walOffset), os.SEEK_SET); err != nil {
+		return err
+	}
+	
+	// Read WAL header (sequence + entry count)
+	buf := make([]byte, 16)
+	if _, err := w.file.Read(buf); err != nil {
+		if err == io.EOF {
+			// Empty WAL section, start at sequence 1
+			w.sequence = 1
+			return nil
+		}
+		return err
+	}
+	
+	w.sequence = binary.LittleEndian.Uint64(buf[0:8])
+	entryCount := binary.LittleEndian.Uint64(buf[8:16])
+	
+	logger.TraceIf("wal", "Unified WAL sequence: %d, entry count: %d", w.sequence, entryCount)
+	return nil
 }
 
 // LogCreate logs an entity creation operation to the WAL.

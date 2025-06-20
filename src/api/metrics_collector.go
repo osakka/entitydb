@@ -101,12 +101,8 @@ func (c *MetricsCollector) CollectMetric(w http.ResponseWriter, r *http.Request)
 		logger.Info("Created new metric entity with UUID: %s", metricID)
 	}
 	
-	// Add new temporal value tag
-	// This is the KEY - we're adding a NEW tag with the current timestamp
-	// EntityDB will automatically timestamp this tag!
+	// ATOMIC TAG FIX: Create all new tags with same timestamp to prevent temporal explosion
 	valueTag := fmt.Sprintf("metric:value:%.2f:%s", update.Value, update.Unit)
-	
-	// Also add a snapshot tag for easy querying of current value
 	snapshotTag := fmt.Sprintf("metric:current:%s:%.2f:%s", update.MetricName, update.Value, update.Unit)
 	
 	// Remove old snapshot tag if exists (handle temporal tags)
@@ -118,16 +114,22 @@ func (c *MetricsCollector) CollectMetric(w http.ResponseWriter, r *http.Request)
 			actualTag = tag[idx+1:]
 		}
 		
-		// Keep all tags except old snapshot
-		if !strings.HasPrefix(actualTag, "metric:current:") {
+		// Keep all tags except old snapshot and value tags
+		if !strings.HasPrefix(actualTag, "metric:current:") && !strings.HasPrefix(actualTag, "metric:value:") {
 			filteredTags = append(filteredTags, tag)
 		}
 	}
-	entity.Tags = append(filteredTags, valueTag, snapshotTag)
 	
-	// Update content with latest value
+	// CRITICAL FIX: Use same timestamp for all new tags to prevent temporal explosion
+	now := time.Now().UnixNano()
+	timestampedValueTag := fmt.Sprintf("%d|%s", now, valueTag)
+	timestampedSnapshotTag := fmt.Sprintf("%d|%s", now, snapshotTag)
+	
+	// Set all tags atomically with same timestamp
+	entity.Tags = append(filteredTags, timestampedValueTag, timestampedSnapshotTag)
 	entity.Content = c.createMetricContent(update)
 	
+	// Use direct update to avoid AddTag() temporal explosion
 	if err := c.repo.Update(entity); err != nil {
 		RespondError(w, http.StatusInternalServerError, "Failed to update metric: " + err.Error())
 		return

@@ -99,10 +99,19 @@ func (m *MetricsTypeManager) RecordCounter(name string, value float64, labels ma
 	lastValue := m.getLastValue(entity)
 	newValue := lastValue + value
 	
-	// Add temporal value tag
+	// ATOMIC TAG FIX: Add temporal value tag with explicit timestamp
 	valueTag := fmt.Sprintf("value:%.6f", newValue)
-	if err := m.repo.AddTag(metricID, valueTag); err != nil {
-		return fmt.Errorf("failed to update counter: %w", err)
+	nowNano := time.Now().UnixNano()
+	timestampedValueTag := fmt.Sprintf("%d|%s", nowNano, valueTag)
+	
+	// Get entity and update atomically
+	entity, getErr := m.repo.GetByID(metricID)
+	if getErr != nil {
+		return fmt.Errorf("failed to get counter entity: %w", getErr)
+	}
+	entity.Tags = append(entity.Tags, timestampedValueTag)
+	if updateErr := m.repo.Update(entity); updateErr != nil {
+		return fmt.Errorf("failed to update counter: %w", updateErr)
 	}
 	
 	logger.Trace("Recorded counter %s = %.6f (increment: %.6f)", name, newValue, value)
@@ -142,10 +151,15 @@ func (m *MetricsTypeManager) RecordGauge(name string, value float64, labels map[
 		}
 	}
 	
-	// For gauges, we just set the current value
+	// ATOMIC TAG FIX: For gauges, set current value with explicit timestamp
 	valueTag := fmt.Sprintf("value:%.6f", value)
-	if err := m.repo.AddTag(metricID, valueTag); err != nil {
-		return fmt.Errorf("failed to update gauge: %w", err)
+	nowNano := time.Now().UnixNano()
+	timestampedValueTag := fmt.Sprintf("%d|%s", nowNano, valueTag)
+	
+	// Update entity atomically
+	entity.Tags = append(entity.Tags, timestampedValueTag)
+	if updateErr := m.repo.Update(entity); updateErr != nil {
+		return fmt.Errorf("failed to update gauge: %w", updateErr)
 	}
 	
 	logger.Trace("Recorded gauge %s = %.6f", name, value)
@@ -195,11 +209,20 @@ func (m *MetricsTypeManager) RecordHistogram(name string, value float64, labels 
 		}
 	}
 	
-	// For histograms, we store individual observations
+	// ATOMIC TAG FIX: For histograms, store individual observations with explicit timestamp
 	// The aggregation will calculate buckets and percentiles
 	obsTag := fmt.Sprintf("observation:%.6f", value)
-	if err := m.repo.AddTag(metricID, obsTag); err != nil {
-		return fmt.Errorf("failed to record histogram observation: %w", err)
+	nowNano := time.Now().UnixNano()
+	timestampedObsTag := fmt.Sprintf("%d|%s", nowNano, obsTag)
+	
+	// Get entity and update atomically
+	entity, getErr := m.repo.GetByID(metricID)
+	if getErr != nil {
+		return fmt.Errorf("failed to get histogram entity: %w", getErr)
+	}
+	entity.Tags = append(entity.Tags, timestampedObsTag)
+	if updateErr := m.repo.Update(entity); updateErr != nil {
+		return fmt.Errorf("failed to record histogram observation: %w", updateErr)
 	}
 	
 	logger.Trace("Recorded histogram observation %s = %.6f", name, value)

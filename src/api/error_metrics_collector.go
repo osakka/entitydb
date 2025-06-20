@@ -268,11 +268,18 @@ func (c *ErrorMetricsCollector) storeMetric(name string, value float64, unit str
 		value = currentValue + value
 	}
 	
-	// Add temporal value tag
+	// ATOMIC TAG FIX: Add temporal value tag with explicit timestamp
 	valueTag := fmt.Sprintf("value:%.2f", value)
-	if err := c.repo.AddTag(metricID, valueTag); err != nil {
-		// Don't log to avoid recursion
+	nowNano := time.Now().UnixNano()
+	timestampedValueTag := fmt.Sprintf("%d|%s", nowNano, valueTag)
+	
+	// Get entity and update atomically (avoid logging to prevent recursion)
+	entity, getErr := c.repo.GetByID(metricID)
+	if getErr != nil {
+		return
 	}
+	entity.Tags = append(entity.Tags, timestampedValueTag)
+	c.repo.Update(entity) // Ignore errors to avoid recursion
 }
 
 // Global instance

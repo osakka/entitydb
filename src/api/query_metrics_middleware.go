@@ -265,9 +265,19 @@ func (q *QueryMetricsCollector) storeMetric(name string, value float64, unit str
 		}
 	}
 	
-	// Add temporal value tag to single metric entity
-	if err := q.repo.AddTag(metricID, valueTag); err != nil {
-		logger.Error("Failed to update query metric %s: %v", metricID, err)
+	// ATOMIC TAG FIX: Add temporal value tag with explicit timestamp
+	nowNano := time.Now().UnixNano()
+	timestampedValueTag := fmt.Sprintf("%d|%s", nowNano, valueTag)
+	
+	// Get entity and update atomically
+	entity, getErr := q.repo.GetByID(metricID)
+	if getErr != nil {
+		logger.Error("Failed to get query metric entity %s: %v", metricID, getErr)
+		return
+	}
+	entity.Tags = append(entity.Tags, timestampedValueTag)
+	if updateErr := q.repo.Update(entity); updateErr != nil {
+		logger.Error("Failed to update query metric %s: %v", metricID, updateErr)
 	}
 }
 

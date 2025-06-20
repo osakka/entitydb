@@ -266,11 +266,22 @@ func (a *MetricsAggregator) aggregateMetric(metricName, unit, aggregation, descr
 		// Don't return - continue to add temporal value tag
 	}
 	
-	// Always add new temporal value tag
+	// ATOMIC TAG FIX: Add temporal value tag with explicit timestamp to prevent explosion
 	valueTag := fmt.Sprintf("value:%.2f", aggregatedValue)
-	logger.Debug("Calling AddTag for %s with tag: %s", simpleMetricID, valueTag)
-	if err := a.repo.AddTag(simpleMetricID, valueTag); err != nil {
-		logger.Error("Failed to update aggregated metric %s: %v", simpleMetricID, err)
+	nowNano := time.Now().UnixNano()
+	timestampedValueTag := fmt.Sprintf("%d|%s", nowNano, valueTag)
+	
+	// Get current entity and update atomically
+	entity, getErr := a.repo.GetByID(simpleMetricID)
+	if getErr != nil {
+		logger.Error("Failed to get aggregated metric %s: %v", simpleMetricID, getErr)
+		return
+	}
+	
+	// Add timestamped tag atomically
+	entity.Tags = append(entity.Tags, timestampedValueTag)
+	if updateErr := a.repo.Update(entity); updateErr != nil {
+		logger.Error("Failed to update aggregated metric %s: %v", simpleMetricID, updateErr)
 		return
 	}
 	logger.Debug("Successfully called AddTag for %s", simpleMetricID)

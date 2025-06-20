@@ -373,10 +373,20 @@ func (m *RequestMetricsMiddleware) storeMetric(name string, value float64, unit 
 		}
 	}
 	
-	// Add temporal value tag
+	// ATOMIC TAG FIX: Add temporal value tag with explicit timestamp
 	valueTag := "value:" + strconv.FormatFloat(value, 'f', 2, 64)
-	if err := m.repo.AddTag(metricID, valueTag); err != nil {
-		logger.Error("Failed to update request metric %s: %v", metricID, err)
+	nowNano := time.Now().UnixNano()
+	timestampedValueTag := fmt.Sprintf("%d|%s", nowNano, valueTag)
+	
+	// Get entity and update atomically
+	entity, getErr := m.repo.GetByID(metricID)
+	if getErr != nil {
+		logger.Error("Failed to get request metric entity %s: %v", metricID, getErr)
+		return
+	}
+	entity.Tags = append(entity.Tags, timestampedValueTag)
+	if updateErr := m.repo.Update(entity); updateErr != nil {
+		logger.Error("Failed to update request metric %s: %v", metricID, updateErr)
 	}
 	
 	logger.Trace("Stored request metric %s with value: %.2f %s (entity: %s)", metricKey, value, unit, metricID)

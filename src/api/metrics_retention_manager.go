@@ -71,7 +71,8 @@ func (m *MetricsRetentionManager) Start() {
 		}
 	}()
 	
-	// Run aggregation every 5 minutes
+	// Run aggregation every 5 minutes  
+	// PERFORMANCE FIX: Reduced aggregated metrics retention periods to prevent exponential accumulation
 	go func() {
 		// Initial delay to let system stabilize, but shorter than retention delay
 		select {

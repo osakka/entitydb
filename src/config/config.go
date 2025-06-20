@@ -108,6 +108,12 @@ type Config struct {
 	// Used for metrics persistence
 	MetricsFilename string
 	
+	// UnifiedFilename is the full path to the unified database file.
+	// Environment: ENTITYDB_UNIFIED_FILE
+	// Default: "./var/entities.unified"
+	// Used for the unified file format (WAL + data + index in single file)
+	UnifiedFilename string
+	
 	// Security Configuration
 	// ======================
 	
@@ -488,6 +494,7 @@ func Load() *Config {
 		WALFilename:      getEnv("ENTITYDB_WAL_FILE", "./var/entitydb.wal"),
 		IndexFilename:    getEnv("ENTITYDB_INDEX_FILE", "./var/entities.db.idx"),
 		MetricsFilename:  getEnv("ENTITYDB_METRICS_FILE", "./var/metrics.json"),
+		UnifiedFilename:  getEnv("ENTITYDB_UNIFIED_FILE", "./var/entities.unified"),
 		
 		// Security
 		TokenSecret:      getEnv("ENTITYDB_TOKEN_SECRET", "entitydb-secret-key"),
@@ -513,9 +520,9 @@ func Load() *Config {
 		
 		// Enhanced Metrics Configuration
 		MetricsRetentionRaw:    getEnvDuration("ENTITYDB_METRICS_RETENTION_RAW", 24*60), // 24 hours in minutes
-		MetricsRetention1Min:   getEnvDuration("ENTITYDB_METRICS_RETENTION_1MIN", 7*24*60), // 7 days in minutes
-		MetricsRetention1Hour:  getEnvDuration("ENTITYDB_METRICS_RETENTION_1HOUR", 30*24*60), // 30 days in minutes
-		MetricsRetention1Day:   getEnvDuration("ENTITYDB_METRICS_RETENTION_1DAY", 365*24*60), // 365 days in minutes
+		MetricsRetention1Min:   getEnvDuration("ENTITYDB_METRICS_RETENTION_1MIN", 2*60), // 2 hours in minutes (was 7 days - performance fix)
+		MetricsRetention1Hour:  getEnvDuration("ENTITYDB_METRICS_RETENTION_1HOUR", 24*60), // 24 hours in minutes (was 30 days - performance fix)
+		MetricsRetention1Day:   getEnvDuration("ENTITYDB_METRICS_RETENTION_1DAY", 7*24*60), // 7 days in minutes (was 365 days - performance fix)
 		MetricsHistogramBuckets: getEnvFloatSlice("ENTITYDB_METRICS_HISTOGRAM_BUCKETS", []float64{0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1, 5, 10}),
 		MetricsEnableRequestTracking: getEnvBool("ENTITYDB_METRICS_ENABLE_REQUEST_TRACKING", true),
 		MetricsEnableStorageTracking: getEnvBool("ENTITYDB_METRICS_ENABLE_STORAGE_TRACKING", true),

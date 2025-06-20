@@ -42,8 +42,8 @@ func NewMMapReader(filename string) (*MMapReader, error) {
 		return nil, fmt.Errorf("file is empty")
 	}
 	
-	// Memory-map the file
-	data, err := syscall.Mmap(int(file.Fd()), 0, int(size), syscall.PROT_READ, syscall.MAP_SHARED)
+	// Memory-map the file with private mapping to prevent external corruption
+	data, err := syscall.Mmap(int(file.Fd()), 0, int(size), syscall.PROT_READ, syscall.MAP_PRIVATE)
 	if err != nil {
 		file.Close()
 		return nil, fmt.Errorf("error mapping file: %w", err)
