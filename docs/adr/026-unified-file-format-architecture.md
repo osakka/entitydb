@@ -3,7 +3,7 @@
 **Status:** Implemented  
 **Date:** 2025-06-20  
 **Deciders:** EntityDB Core Team  
-**Technical Lead:** Claude AI Assistant  
+**Technical Lead:** Claude Reasoning Model  
 
 ## Context
 

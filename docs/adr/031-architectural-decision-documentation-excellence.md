@@ -3,7 +3,7 @@
 **Status**: Accepted  
 **Date**: 2025-06-20  
 **Deciders**: EntityDB Core Team  
-**Technical Lead**: Claude AI Assistant  
+**Technical Lead**: Claude Reasoning Model  
 **Git Commits**: Complete architectural decision documentation (current session)  
 
 ## Context

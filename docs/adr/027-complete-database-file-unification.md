@@ -3,7 +3,7 @@
 **Status:** Implemented  
 **Date:** 2025-06-20  
 **Deciders:** EntityDB Core Team  
-**Technical Lead:** Claude AI Assistant  
+**Technical Lead:** Claude Reasoning Model  
 **Git Commits:** `81cf44a`, `3157f1b`, `ebd945b`  
 **Validation Commit:** `b5dfd94` (storage efficiency validation)  
 
