@@ -1,6 +1,8 @@
 # EntityDB Architecture Overview
 
-> **Version**: v2.32.5 | **Last Updated**: 2025-06-18 | **Status**: AUTHORITATIVE
+> **Version**: v2.32.6 | **Last Updated**: 2025-06-20 | **Status**: AUTHORITATIVE
+> 
+> **Major Update**: Unified file format consolidation - single `.edb` files only
 
 ## System Architecture
 
@@ -39,11 +41,14 @@ EntityDB is a high-performance temporal database built around a pure entity mode
 └─────────────────────────────────────────────────────────────────┘
                                  │
 ┌─────────────────────────────────────────────────────────────────┐
-│                      Binary Storage                             │
-│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐ │
-│  │ Memory-Mapped   │  │ Write-Ahead     │  │ Tag Indexes     │ │
-│  │ Files (.ebf)    │  │ Log (.wal)      │  │ (.idx)          │ │
-│  └─────────────────┘  └─────────────────┘  └─────────────────┘ │
+│                      Unified Binary Storage                    │
+│  ┌─────────────────────────────────────────────────────────────┐ │
+│  │        EntityDB Unified File Format (.edb)                 │ │
+│  │  ┌─────────────┐ ┌─────────────┐ ┌─────────────────────┐   │ │
+│  │  │ Data Section│ │ WAL Section │ │ Index Section       │   │ │
+│  │  │ (embedded)  │ │ (embedded)  │ │ (embedded)          │   │ │
+│  │  └─────────────┘ └─────────────┘ └─────────────────────┘   │ │
+│  └─────────────────────────────────────────────────────────────┘ │
 └─────────────────────────────────────────────────────────────────┘
 ```
 

@@ -5,6 +5,59 @@ All notable changes to the EntityDB Platform will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.32.6] - 2025-06-20
+
+### 🚀 BREAKING CHANGE: COMPLETE DATABASE FILE UNIFICATION
+
+**ADR-027: Complete Database File Unification - Single Source of Truth Architecture**
+
+#### Major Architectural Change
+- **BREAKING CHANGE**: Complete elimination of separate database files
+- **Single File Architecture**: Only unified `.edb` format supported (no `.db`, `.wal`, `.idx` files)
+- **Legacy Format Removal**: All legacy format support and parallel implementations eliminated
+- **Code Reduction**: 547 lines of legacy format code removed, 1 complete file deleted (`legacy_reader.go`)
+
+#### Technical Implementation
+- **Unified File Format (EUFF)**: Magic number `0x45555446` - exclusive format
+- **Embedded Sections**: WAL, data, and index embedded within single file
+- **Configuration Consolidation**: All paths updated to reference unified `.edb` format
+- **Build Verification**: Zero compilation warnings, clean codebase
+
+#### Architecture Benefits
+- **Single Source of Truth**: 100% achievement - no duplicate implementations
+- **Reduced Complexity**: 66% reduction in file handles (3 files → 1 file)
+- **Simplified Operations**: Single file for backup, recovery, and deployment
+- **Better Resource Utilization**: Reduced I/O overhead and system calls
+- **Atomic Operations**: All database operations within single file boundary
+
+#### Related ADRs
+- **ADR-026**: Unified File Format Architecture (foundation)
+- **ADR-027**: Complete Database File Unification (this release)
+- Git commits: `81cf44a`, `3157f1b`, `ebd945b`
+
+### Added
+- Unified EntityDB File Format (EUFF) as exclusive database format
+- Single file architecture eliminating separate WAL and index files
+- Comprehensive architectural decision documentation (ADR-027)
+
+### Changed
+- **BREAKING**: Removed all legacy format support and detection
+- **BREAKING**: Eliminated backward compatibility for separate file formats
+- Updated all configuration references to unified format paths
+- Simplified file management and recovery procedures
+
+### Removed
+- **BREAKING**: Legacy format support completely eliminated
+- **BREAKING**: Separate `.db`, `.wal`, and `.idx` file creation
+- `src/storage/binary/legacy_reader.go` - complete file removal
+- 547 lines of legacy format detection and handling code
+- Parallel implementation complexity and conditional logic
+
+### Fixed
+- Configuration conflicts causing legacy file creation
+- Index corruption recovery updated for unified format
+- Build system compilation warnings resolved
+
 ## [2.32.5] - 2025-06-18
 
 ### 🚀 WORCA WORKFORCE ORCHESTRATOR - COMPLETE INTEGRATION

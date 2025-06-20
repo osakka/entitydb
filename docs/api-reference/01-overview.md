@@ -1,8 +1,10 @@
 # EntityDB API Overview
 
-> **Version**: v2.32.5 | **Last Updated**: 2025-06-18 | **Status**: 100% ACCURATE
+> **Version**: v2.32.6 | **Last Updated**: 2025-06-20 | **Status**: 100% ACCURATE
 > 
 > Complete overview of EntityDB's REST API - verified against actual implementation.
+> 
+> **Major Change**: v2.32.6 introduces unified database file format (single `.edb` files only)
 
 ## 🎯 API Fundamentals
 
@@ -44,7 +46,7 @@ Only these endpoints work without authentication:
 
 ## 📊 Complete API Endpoint Reference
 
-**Total Endpoints**: 48 (verified against v2.32.5 implementation)
+**Total Endpoints**: 48 (verified against v2.32.6 implementation)
 
 ### 🔑 Authentication (4 endpoints)
 | Method | Endpoint | Auth Required | Permission | Description |

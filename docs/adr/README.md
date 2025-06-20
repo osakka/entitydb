@@ -57,6 +57,23 @@ Each ADR follows the template:
 | [018](./018-self-cleaning-temporal-retention.md) | Self-Cleaning Temporal Retention Architecture | Accepted | 2025-06-18 | `e03ae65`, `7464c52` |
 | [019](./019-index-rebuild-loop-fix.md) | Index Rebuild Loop Critical Fix | Accepted | 2025-06-18 | `d7111b3`, ADR creation |
 
+### System Stability & Performance (June 2025)
+
+| ADR | Title | Status | Date | Git Commits |
+|-----|-------|--------|------|-------------|
+| [021](./021-critical-corruption-prevention-fix.md) | Critical Corruption Prevention Fix | Accepted | 2025-06-19 | `4c0bb51`, `17fba0a` |
+| [022](./022-dynamic-request-throttling.md) | Dynamic Request Throttling for UI Abuse Protection | Accepted | 2025-06-19 | `e3af73d` |
+| [023](./023-index-entry-race-condition-elimination.md) | Index Entry Race Condition Elimination | Accepted | 2025-06-19 | `5a9fa9d` |
+| [024](./024-incremental-update-architecture.md) | Incremental Update Architecture | Accepted | 2025-06-19 | `02c251a` |
+| [025](./025-aggregation-timing-bootstrap-fix.md) | Aggregation Timing Bootstrap Fix | Accepted | 2025-06-19 | `0689115` |
+
+### Database File Unification (June 2025)
+
+| ADR | Title | Status | Date | Git Commits |
+|-----|-------|--------|------|-------------|
+| [026](./026-unified-file-format-architecture.md) | Unified File Format Architecture | Accepted | 2025-06-20 | `ebd945b`, `3157f1b` |
+| [027](./027-complete-database-file-unification.md) | Complete Database File Unification | Accepted | 2025-06-20 | `81cf44a`, `3157f1b`, `ebd945b` |
+
 ### Comprehensive Documentation
 
 | ADR | Title | Status | Date | Git Commits |
@@ -97,6 +114,10 @@ All ADRs have been verified against the actual v2.32.5 codebase implementation. 
 - **ADR-023**: Index entry race condition elimination
 - **ADR-024**: Incremental update architecture
 - **ADR-025**: Aggregation timing bootstrap fix
+
+### Phase 6: Database File Unification (June 2025)
+- **ADR-026**: Unified file format architecture
+- **ADR-027**: Complete database file unification
 
 ## Architectural Principles
 

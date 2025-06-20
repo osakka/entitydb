@@ -9,7 +9,14 @@
 > This eliminates separate credential entities and relationships. Users with credentials have the `has:credentials` tag.
 > NO BACKWARD COMPATIBILITY - all users must be recreated.
 
-## Current State (v2.32.5)
+## Current State (v2.32.6)
+
+> [!BREAKING]
+> **Database File Unification (v2.32.6)**  
+> Complete elimination of separate database files. EntityDB now uses ONLY unified `.edb` format.
+> - **NO separate files**: No `.db`, `.wal`, or `.idx` files created  
+> - **Single source of truth**: All data, WAL, and indexes embedded in unified `.edb` files
+> - **Breaking change**: All legacy format support removed - no backward compatibility
 
 EntityDB now features a unified Entity model with unified sharded indexing:
 - **Unified Entity Model**: Single content field ([]byte) per entity
@@ -20,7 +27,7 @@ EntityDB now features a unified Entity model with unified sharded indexing:
 - **Memory-Mapped Files**: Zero-copy reads with OS-managed caching
 - **Temporal Storage**: All data stored with nanosecond timestamps internally
 - **Unified API**: Current state endpoints return clean deduplicated tags, temporal endpoints show full history
-- **Binary Storage**: Custom binary format (EBF) with WAL and concurrent access
+- **Unified Storage**: EntityDB Unified File Format (EUFF) with embedded WAL, data, and index sections
 - **Pure Entity Model**: Everything is an entity with tags
 - **RBAC Enforcement**: Full permission system with tag-based access control
 - **Entity Relationships**: Binary format supports relationships between entities
@@ -34,6 +41,7 @@ EntityDB now features a unified Entity model with unified sharded indexing:
 - **Enhanced UI Dashboard**: Real-time metrics dashboard with comprehensive system monitoring, health scoring, memory charting, and responsive design
 - **Authentication Stability**: Resolved recurring timeout issues with optimized HTTP timeout configuration for production-grade reliability
 - **Complete UI/UX Suite**: Professional web interface with PWA support, advanced search, data export, temporal queries, and relationship visualization
+- **🚀 COMPLETE DATABASE FILE UNIFICATION (v2.32.6)**: BREAKING CHANGE - Eliminated all separate database files achieving pure single source of truth architecture. Consolidated from 3-file system (.db, .wal, .idx) to unified .edb format exclusively. Removed 547 lines of legacy format code, deleted legacy_reader.go completely, updated all configuration paths. 66% reduction in file handles (3→1 file), simplified operations, improved resource utilization. EntityDB now operates with true unified file architecture following "no wal, no db, no idx separate files" principle. ADR-027 documents this bar-raising consolidation.
 - **Worca Workforce Orchestrator (v2.32.5)**: Complete workforce management platform built on EntityDB
   - Full-stack application with Alpine.js frontend and EntityDB temporal backend
   - Real-time synchronization, multi-workspace support, and professional UI
