@@ -544,15 +544,15 @@ func NewEntityRepositoryWithConfig(cfg *config.Config) (*EntityRepository, error
 	// Default to true for improved write throughput
 	useBatchWrites := os.Getenv("ENTITYDB_USE_BATCH_WRITES") != "false"
 	
-	// Use complete database path literally from configuration
-	databasePath := cfg.DatabaseFilename
+	// Use unified filename for unified file format
+	databasePath := cfg.UnifiedFilename
 	
 	repo := &EntityRepository{
-		dataPath:        cfg.DataPath,
+		dataPath:        cfg.UnifiedFilename, // Use unified file path
 		contentIndex:    make(map[string][]string),
 		entities:        make(map[string]*models.Entity),
 		lockManager:     NewLockManager(),
-		writerManager:   NewWriterManager(databasePath),
+		writerManager:   NewWriterManager(databasePath), // Uses unified format
 		cache:           cache.NewQueryCache(1000, 5*time.Minute), // Cache up to 1000 queries for 5 minutes
 		temporalIndex:   NewTemporalIndex(),
 		namespaceIndex:  NewNamespaceIndex(),
@@ -571,7 +571,7 @@ func NewEntityRepositoryWithConfig(cfg *config.Config) (*EntityRepository, error
 		lastCompact:     time.Now(),
 	}
 	
-	logger.Info("Using sharded tag index for improved concurrency")
+	logger.Info("Using unified file format with sharded tag index for improved concurrency")
 	
 	if useVariants {
 		logger.Info("Using tag variant cache for optimized temporal tag lookups")
@@ -3796,87 +3796,4 @@ func (r *EntityRepository) performAutomaticRecovery() error {
 	return nil
 }
 
-// NewUnifiedRepositoryWithConfig creates a new EntityRepository using the unified file format.
-// This creates a single file containing WAL, data, index, and dictionary sections for optimal
-// I/O performance and simplified deployment.
-//
-// The unified format provides:
-//   - Single file deployment (backup/restore/migration simplicity)
-//   - Reduced syscalls and file handles
-//   - Better cache locality for related data
-//   - Atomic file operations
-//   - Embedded WAL for improved durability
-//
-// Parameters:
-//   - cfg: Configuration containing file paths and settings
-//
-// Returns:
-//   - *EntityRepository: Initialized repository using unified format
-//   - error: Initialization errors
-func NewUnifiedRepositoryWithConfig(cfg *config.Config) (*EntityRepository, error) {
-	logger.Info("Initializing EntityRepository with unified file format")
-	
-	// Ensure data directory exists
-	if err := os.MkdirAll(cfg.DataPath, 0755); err != nil {
-		return nil, fmt.Errorf("failed to create data directory: %w", err)
-	}
-	
-	// Create repository with unified file format
-	// Create a modified config that points DatabaseFilename to the unified file
-	// This ensures all existing file I/O uses the unified file transparently
-	unifiedConfig := *cfg // Copy the config
-	unifiedConfig.DatabaseFilename = cfg.UnifiedFilename
-	
-	repo := &EntityRepository{
-		dataPath:        cfg.UnifiedFilename, // Use unified file path
-		config:          &unifiedConfig,
-		entities:        make(map[string]*models.Entity),
-		contentIndex:    make(map[string][]string),
-		shardedTagIndex: NewShardedTagIndex(),
-		temporalIndex:   NewTemporalIndex(),
-		namespaceIndex:  NewNamespaceIndex(),
-		cache:           cache.NewQueryCache(1000, 5*time.Minute), // Cache up to 1000 queries for 5 minutes
-		useVariantCache: true, // Enable optimizations for unified format
-		useBatchWrites:  true, // Enable batch writing for better performance
-		tagVariantCache: NewTagVariantCache(),
-	}
-	
-	// Initialize batch writer for unified format
-	if repo.useBatchWrites {
-		repo.batchWriter = NewBatchWriter(repo, 10, 100*time.Millisecond)
-		repo.batchWriter.Start()
-	}
-	
-	// Load existing entities from unified file
-	if err := repo.loadFromUnifiedFile(cfg.UnifiedFilename); err != nil {
-		logger.Warn("Failed to load existing data from unified file: %v", err)
-	}
-	
-	logger.Info("Unified EntityRepository initialized successfully with file: %s", cfg.UnifiedFilename)
-	return repo, nil
-}
-
-// loadFromUnifiedFile loads existing entities from a unified format file
-func (r *EntityRepository) loadFromUnifiedFile(filename string) error {
-	logger.Debug("Loading entities from unified file: %s", filename)
-	
-	// Check if file exists
-	if _, err := os.Stat(filename); os.IsNotExist(err) {
-		logger.Debug("Unified file does not exist, starting with empty repository")
-		return nil
-	}
-	
-	// Create unified reader
-	reader, err := NewUnifiedReader(filename)
-	if err != nil {
-		return fmt.Errorf("failed to create unified reader: %w", err)
-	}
-	defer reader.Close()
-	
-	// For now, use a simple approach - the unified reader handles format detection
-	// In a full implementation, we would iterate through the index and load entities
-	// For this initial version, we'll rely on the existing data loading mechanisms
-	logger.Debug("Unified file loaded successfully")
-	return nil
-}
 

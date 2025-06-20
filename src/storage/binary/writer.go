@@ -32,7 +32,7 @@ import (
 	"entitydb/logger"
 )
 
-// Writer handles writing entities to the EntityDB Binary Format (EBF).
+// Writer handles writing entities to the EntityDB Unified File Format (EUFF).
 // It manages the file structure, maintains indexes for fast lookups,
 // and ensures data integrity through checksums and atomic operations.
 //
@@ -40,11 +40,8 @@ import (
 // However, only one Writer instance should be active per file to prevent
 // corruption. Use WriterManager for safe concurrent access patterns.
 //
-// File Layout (Legacy):
-//   [Header][Entity1][Entity2]...[EntityN][TagDictionary][Index]
-//
-// File Layout (Unified):
-//   [UnifiedHeader][WAL][Entity1][Entity2]...[EntityN][TagDictionary][Index]
+// File Layout:
+//   [Header][WAL][Entity1][Entity2]...[EntityN][TagDictionary][Index]
 //
 // Performance characteristics:
 //   - O(1) append operations for new entities
@@ -53,14 +50,12 @@ import (
 //   - Memory pools minimize allocation overhead
 //   - Embedded WAL reduces syscalls and improves atomicity
 type Writer struct {
-	file          *os.File                // Underlying file handle
-	header        *Header                 // Legacy file header with metadata
-	unifiedHeader *UnifiedHeader          // Unified file header with metadata
-	tagDict       *TagDictionary          // Tag string to ID mapping
-	index         map[string]*IndexEntry  // Entity ID to file location mapping
-	mu            sync.Mutex              // Protects concurrent access
-	isUnified     bool                    // Whether using unified format
-	walSequence   uint64                  // Current WAL sequence number
+	file        *os.File                // Underlying file handle
+	header      *Header                 // Unified file header with metadata
+	tagDict     *TagDictionary          // Tag string to ID mapping
+	index       map[string]*IndexEntry  // Entity ID to file location mapping
+	mu          sync.Mutex              // Protects concurrent access
+	walSequence uint64                  // Current WAL sequence number
 }
 
 // getFilePosition returns the current file position for tracking write operations.
@@ -74,69 +69,7 @@ func (w *Writer) getFilePosition() int64 {
 	return pos
 }
 
-// NewWriter creates a new Writer instance for the specified file.
-// If the file exists and contains valid data, it loads the existing header,
-// tag dictionary, and index. For new files, it initializes the header structure.
-//
-// The Writer maintains exclusive access to the file while open. Use WriterManager
-// for safe concurrent access patterns in production environments.
-//
-// Parameters:
-//   - filename: Path to the EBF file to open or create
-//
-// Returns:
-//   - *Writer: Initialized writer ready for entity operations
-//   - error: File access errors, corruption, or invalid format
-//
-// Example:
-//   writer, err := NewWriter("/var/lib/entitydb/entities.ebf")
-//   if err != nil {
-//       log.Fatal(err)
-//   }
-//   defer writer.Close()
-func NewWriter(filename string) (*Writer, error) {
-	file, err := os.OpenFile(filename, os.O_CREATE|os.O_RDWR, 0644)
-	if err != nil {
-		return nil, err
-	}
-	
-	w := &Writer{
-		file:    file,
-		header:  &Header{Magic: MagicNumber, Version: FormatVersion},
-		tagDict: NewTagDictionary(),
-		index:   make(map[string]*IndexEntry),
-	}
-	
-	// Try to read existing file
-	if stat, err := file.Stat(); err == nil && stat.Size() > 0 {
-		if err := w.readExisting(); err != nil {
-			logger.Warn("Failed to read existing file, creating new: %v", err)
-			// Reset the file
-			file.Truncate(0)
-			file.Seek(0, 0)
-			// Write initial header
-			if err := w.writeHeader(); err != nil {
-				return nil, err
-			}
-			if err := w.file.Sync(); err != nil {
-				return nil, err
-			}
-		}
-	} else {
-		// New file, write initial header
-		if err := w.writeHeader(); err != nil {
-			return nil, err
-		}
-		// Ensure data is flushed to disk
-		if err := w.file.Sync(); err != nil {
-			return nil, err
-		}
-	}
-	
-	return w, nil
-}
-
-// NewUnifiedWriter creates a new Writer instance for the unified file format.
+// NewWriter creates a new Writer instance for the unified file format.
 // If the file exists and contains valid data, it loads the existing header,
 // tag dictionary, and index. For new files, it initializes the unified header structure.
 //
@@ -151,35 +84,34 @@ func NewWriter(filename string) (*Writer, error) {
 //   - error: File access errors, corruption, or invalid format
 //
 // Example:
-//   writer, err := NewUnifiedWriter("/var/lib/entitydb/entities.unified")
+//   writer, err := NewWriter("/var/lib/entitydb/entities.unified")
 //   if err != nil {
 //       log.Fatal(err)
 //   }
 //   defer writer.Close()
-func NewUnifiedWriter(filename string) (*Writer, error) {
+func NewWriter(filename string) (*Writer, error) {
 	file, err := os.OpenFile(filename, os.O_CREATE|os.O_RDWR, 0644)
 	if err != nil {
 		return nil, err
 	}
 	
 	w := &Writer{
-		file:          file,
-		unifiedHeader: &UnifiedHeader{Magic: UnifiedMagicNumber, Version: UnifiedFormatVersion},
-		tagDict:       NewTagDictionary(),
-		index:         make(map[string]*IndexEntry),
-		isUnified:     true,
-		walSequence:   1,
+		file:        file,
+		header:      &Header{Magic: MagicNumber, Version: FormatVersion},
+		tagDict:     NewTagDictionary(),
+		index:       make(map[string]*IndexEntry),
+		walSequence: 1,
 	}
 	
 	// Try to read existing file
 	if stat, err := file.Stat(); err == nil && stat.Size() > 0 {
-		if err := w.readExistingUnified(); err != nil {
+		if err := w.readExisting(); err != nil {
 			logger.Warn("Failed to read existing unified file, creating new: %v", err)
 			// Reset the file
 			file.Truncate(0)
 			file.Seek(0, 0)
 			// Write initial unified header
-			if err := w.writeUnifiedHeader(); err != nil {
+			if err := w.writeHeader(); err != nil {
 				return nil, err
 			}
 			if err := w.file.Sync(); err != nil {
@@ -195,6 +127,7 @@ func NewUnifiedWriter(filename string) (*Writer, error) {
 	
 	return w, nil
 }
+
 
 // WriteEntity persists an entity to the binary file with automatic compression,
 // checksumming, and index updates. This is the primary method for storing entities.
@@ -237,12 +170,7 @@ func NewUnifiedWriter(filename string) (*Writer, error) {
 //   }
 func (w *Writer) WriteEntity(entity *models.Entity) error {
 	// Start operation tracking for observability
-	var entityCount uint64
-	if w.isUnified {
-		entityCount = w.unifiedHeader.EntityCount
-	} else {
-		entityCount = w.header.EntityCount
-	}
+	entityCount := w.header.EntityCount
 	
 	op := models.StartOperation(models.OpTypeWrite, entity.ID, map[string]interface{}{
 		"tags_count":    len(entity.Tags),
@@ -260,13 +188,11 @@ func (w *Writer) WriteEntity(entity *models.Entity) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	
-	// Write to WAL first if using unified format
-	if w.isUnified {
-		if err := w.writeWALEntry(1, entity.ID, entity); err != nil { // OpType 1 = create/update
-			op.Fail(err)
-			logger.Error("Failed to write WAL entry for entity %s: %v", entity.ID, err)
-			return err
-		}
+	// Write to WAL first
+	if err := w.writeWALEntry(1, entity.ID, entity); err != nil { // OpType 1 = create/update
+		op.Fail(err)
+		logger.Error("Failed to write WAL entry for entity %s: %v", entity.ID, err)
+		return err
 	}
 	
 	// Log write intent
@@ -475,46 +401,20 @@ func (w *Writer) WriteEntity(entity *models.Entity) error {
 		binary.Write(buffer, binary.LittleEndian, time.Now().UnixNano())
 	}
 	
-	// Get current file position (adjusted for unified format)
-	var offset int64
-	var err error
-	
-	if w.isUnified {
-		// For unified format, append to data section
-		dataEnd := w.unifiedHeader.DataOffset + w.unifiedHeader.DataSize
-		offset, err = w.file.Seek(int64(dataEnd), os.SEEK_SET)
-		if err != nil {
-			op.Fail(err)
-			logger.Error("Failed to seek to data section end for entity %s: %v", entity.ID, err)
-			return err
-		}
-	} else {
-		// For legacy format, append to file end
-		offset, err = w.file.Seek(0, os.SEEK_END)
-		if err != nil {
-			op.Fail(err)
-			logger.Error("Failed to seek to end for entity %s: %v", entity.ID, err)
-			return err
-		}
-	}
-	
-	// CRITICAL: Validate offset immediately after seek to prevent corruption propagation
-	// Get file stats for cross-validation
-	fileInfo, statErr := w.file.Stat()
-	if statErr != nil {
-		err := fmt.Errorf("cannot validate offset - file stat failed: %v", statErr)
+	// Get current file position for unified format
+	// Append to data section
+	dataEnd := w.header.DataOffset + w.header.DataSize
+	offset, err := w.file.Seek(int64(dataEnd), os.SEEK_SET)
+	if err != nil {
 		op.Fail(err)
-		logger.Error("CORRUPTION PREVENTION: %v for entity %s", err, entity.ID)
+		logger.Error("Failed to seek to data section end for entity %s: %v", entity.ID, err)
 		return err
 	}
 	
-	// For unified format, validate against data section end, not file size
-	var expectedOffset int64
-	if w.isUnified {
-		expectedOffset = int64(w.unifiedHeader.DataOffset + w.unifiedHeader.DataSize)
-	} else {
-		expectedOffset = fileInfo.Size()
-	}
+	// CRITICAL: Validate offset immediately after seek to prevent corruption propagation
+	
+	// For unified format, validate against data section end
+	expectedOffset := int64(w.header.DataOffset + w.header.DataSize)
 	
 	if offset != expectedOffset {
 		err := fmt.Errorf("CRITICAL: Seek returned corrupted offset %d, expected %d (diff: %d)", 
@@ -689,83 +589,40 @@ func (w *Writer) WriteEntity(entity *models.Entity) error {
 		}
 	}
 	
-	// Update header (unified or legacy)
-	if w.isUnified {
-		// Update unified header
-		if !isUpdate {
-			w.unifiedHeader.EntityCount++
-			logger.TraceIf("storage", "New entity %s added, EntityCount updated to %d", entity.ID, w.unifiedHeader.EntityCount)
-		} else {
-			logger.TraceIf("storage", "Updated existing entity %s, EntityCount remains %d", entity.ID, w.unifiedHeader.EntityCount)
-		}
-		w.unifiedHeader.DataSize += uint64(n)
-		w.unifiedHeader.FileSize = w.unifiedHeader.DataOffset + w.unifiedHeader.DataSize
-		w.unifiedHeader.LastModified = time.Now().Unix()
-		
-		logger.TraceIf("storage", "Updated unified header: EntityCount=%d, DataSize=%d, FileSize=%d", 
-			w.unifiedHeader.EntityCount, w.unifiedHeader.DataSize, w.unifiedHeader.FileSize)
-		op.SetMetadata("final_file_size", w.unifiedHeader.FileSize)
-		
-		// Write updated unified header
-		currentPos, err = w.file.Seek(0, os.SEEK_CUR)
-		if err != nil {
-			logger.Error("Failed to get current position: %v", err)
-			return err
-		}
-		
-		if err := w.writeUnifiedHeader(); err != nil {
-			logger.Error("Failed to write unified header: %v", err)
-			return err
-		}
-		
-		// Seek back to original position
-		_, err = w.file.Seek(currentPos, os.SEEK_SET)
-		if err != nil {
-			logger.Error("Failed to seek back to position %d: %v", currentPos, err)
-			return err
-		}
+	// Update unified header
+	if !isUpdate {
+		w.header.EntityCount++
+		logger.TraceIf("storage", "New entity %s added, EntityCount updated to %d", entity.ID, w.header.EntityCount)
 	} else {
-		// Update legacy header
-		if !isUpdate {
-			w.header.EntityCount++
-			logger.TraceIf("storage", "New entity %s added, EntityCount updated to %d", entity.ID, w.header.EntityCount)
-		} else {
-			logger.TraceIf("storage", "Updated existing entity %s, EntityCount remains %d", entity.ID, w.header.EntityCount)
-		}
-		w.header.FileSize = uint64(offset) + uint64(n)
-		w.header.LastModified = time.Now().Unix()
-		
-		logger.TraceIf("storage", "Updated header: EntityCount=%d, FileSize=%d", w.header.EntityCount, w.header.FileSize)
-		op.SetMetadata("final_file_size", w.header.FileSize)
-		
-		// Write updated header back to file (EntityCount now matches index)
-		currentPos, err = w.file.Seek(0, os.SEEK_CUR)
-		if err != nil {
-			logger.Error("Failed to get current position: %v", err)
-			return err
-		}
-		logger.Debug("Current position: %d", currentPos)
-		
-		// Seek to start to write header
-		_, err = w.file.Seek(0, os.SEEK_SET)
-		if err != nil {
-			logger.Error("Failed to seek to start: %v", err)
-			return err
-		}
-		
-		logger.Debug("Writing updated header to file (EntityCount matches index)")
-		if err := w.writeHeader(); err != nil {
-			logger.Error("Failed to write header: %v", err)
-			return err
-		}
-		
-		// Seek back to original position
-		_, err = w.file.Seek(currentPos, os.SEEK_SET)
-		if err != nil {
-			logger.Error("Failed to seek back to position %d: %v", currentPos, err)
-			return err
-		}
+		logger.TraceIf("storage", "Updated existing entity %s, EntityCount remains %d", entity.ID, w.header.EntityCount)
 	}
+	w.header.DataSize += uint64(n)
+	w.header.FileSize = w.header.DataOffset + w.header.DataSize
+	w.header.LastModified = time.Now().Unix()
+	
+	logger.TraceIf("storage", "Updated unified header: EntityCount=%d, DataSize=%d, FileSize=%d", 
+		w.header.EntityCount, w.header.DataSize, w.header.FileSize)
+	op.SetMetadata("final_file_size", w.header.FileSize)
+	
+	// Write updated unified header
+	currentPos, err = w.file.Seek(0, os.SEEK_CUR)
+	if err != nil {
+		logger.Error("Failed to get current position: %v", err)
+		return err
+	}
+	
+	if err := w.writeHeader(); err != nil {
+		logger.Error("Failed to write unified header: %v", err)
+		return err
+	}
+	
+	// Seek back to original position
+	_, err = w.file.Seek(currentPos, os.SEEK_SET)
+	if err != nil {
+		logger.Error("Failed to seek back to position %d: %v", currentPos, err)
+		return err
+	}
+		
 	
 	// Sync data to disk
 	if err := w.file.Sync(); err != nil {
@@ -810,11 +667,7 @@ func (w *Writer) Close() error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	
-	if w.isUnified {
-		logger.Debug("Close called, EntityCount=%d, FileSize=%d", w.unifiedHeader.EntityCount, w.unifiedHeader.FileSize)
-	} else {
-		logger.Debug("Close called, EntityCount=%d, FileSize=%d", w.header.EntityCount, w.header.FileSize)
-	}
+	logger.Debug("Close called, EntityCount=%d, FileSize=%d", w.header.EntityCount, w.header.FileSize)
 	
 	// Write tag dictionary
 	dictOffset, err := w.file.Seek(0, os.SEEK_END)
@@ -908,49 +761,26 @@ func (w *Writer) Close() error {
 		}
 		writtenCount++
 	}
-	if w.isUnified {
-		logger.TraceIf("storage", "Wrote %d index entries (unified header claims %d)", writtenCount, w.unifiedHeader.EntityCount)
-		
-		// Verify index count matches unified header
-		if writtenCount != int(w.unifiedHeader.EntityCount) {
-			logger.Warn("Index entry count mismatch detected: wrote %d entries but unified header claims %d, correcting header", writtenCount, w.unifiedHeader.EntityCount)
-			// Update unified header to match actual count
-			w.unifiedHeader.EntityCount = uint64(writtenCount)
-			logger.Debug("Corrected unified header EntityCount to match actual index: %d", w.unifiedHeader.EntityCount)
-		} else {
-			logger.Debug("Index count verification passed: %d entries match unified header count", writtenCount)
-		}
-		
-		// Update unified header
-		w.unifiedHeader.TagDictOffset = uint64(dictOffset)
-		w.unifiedHeader.TagDictSize = uint64(dictBuf.Len())
-		w.unifiedHeader.EntityIndexOffset = uint64(indexOffset)
-		w.unifiedHeader.EntityIndexSize = uint64(writtenCount * IndexEntrySize)
-		
-		logger.Debug("Updated unified header: TagDictOffset=%d, TagDictSize=%d, EntityIndexOffset=%d, EntityIndexSize=%d",
-			w.unifiedHeader.TagDictOffset, w.unifiedHeader.TagDictSize, w.unifiedHeader.EntityIndexOffset, w.unifiedHeader.EntityIndexSize)
+	logger.TraceIf("storage", "Wrote %d index entries (unified header claims %d)", writtenCount, w.header.EntityCount)
+	
+	// Verify index count matches unified header
+	if writtenCount != int(w.header.EntityCount) {
+		logger.Warn("Index entry count mismatch detected: wrote %d entries but unified header claims %d, correcting header", writtenCount, w.header.EntityCount)
+		// Update unified header to match actual count
+		w.header.EntityCount = uint64(writtenCount)
+		logger.Debug("Corrected unified header EntityCount to match actual index: %d", w.header.EntityCount)
 	} else {
-		logger.TraceIf("storage", "Wrote %d index entries (header claims %d)", writtenCount, w.header.EntityCount)
-		
-		// Verify index count matches header
-		if writtenCount != int(w.header.EntityCount) {
-			logger.Warn("Index entry count mismatch detected: wrote %d entries but header claims %d, correcting header", writtenCount, w.header.EntityCount)
-			// Update header to match actual count
-			w.header.EntityCount = uint64(writtenCount)
-			logger.Debug("Corrected header EntityCount to match actual index: %d", w.header.EntityCount)
-		} else {
-			logger.Debug("Index count verification passed: %d entries match header count", writtenCount)
-		}
-		
-		// Update header
-		w.header.TagDictOffset = uint64(dictOffset)
-		w.header.TagDictSize = uint64(dictBuf.Len())
-		w.header.EntityIndexOffset = uint64(indexOffset)
-		w.header.EntityIndexSize = uint64(writtenCount * IndexEntrySize)
-		
-		logger.Debug("Updated header: TagDictOffset=%d, TagDictSize=%d, EntityIndexOffset=%d, EntityIndexSize=%d",
-			w.header.TagDictOffset, w.header.TagDictSize, w.header.EntityIndexOffset, w.header.EntityIndexSize)
+		logger.Debug("Index count verification passed: %d entries match unified header count", writtenCount)
 	}
+	
+	// Update unified header
+	w.header.TagDictOffset = uint64(dictOffset)
+	w.header.TagDictSize = uint64(dictBuf.Len())
+	w.header.EntityIndexOffset = uint64(indexOffset)
+	w.header.EntityIndexSize = uint64(writtenCount * IndexEntrySize)
+	
+	logger.Debug("Updated unified header: TagDictOffset=%d, TagDictSize=%d, EntityIndexOffset=%d, EntityIndexSize=%d",
+		w.header.TagDictOffset, w.header.TagDictSize, w.header.EntityIndexOffset, w.header.EntityIndexSize)
 	
 	// Rewrite header at beginning
 	_, err = w.file.Seek(0, os.SEEK_SET)
@@ -960,16 +790,9 @@ func (w *Writer) Close() error {
 	}
 	
 	logger.Debug("Rewriting header")
-	if w.isUnified {
-		if err := w.writeUnifiedHeader(); err != nil {
-			logger.Error("Failed to write unified header: %v", err)
-			return err
-		}
-	} else {
-		if err := w.writeHeader(); err != nil {
-			logger.Error("Failed to write header: %v", err)
-			return err
-		}
+	if err := w.writeHeader(); err != nil {
+		logger.Error("Failed to write unified header: %v", err)
+		return err
 	}
 	
 	// Ensure all data is written
@@ -995,16 +818,6 @@ func (w *Writer) Close() error {
 //
 // Returns:
 //   - error: Write failures or seek errors
-func (w *Writer) writeHeader() error {
-	logger.Debug("writeHeader called - EntityCount=%d, FileSize=%d", w.header.EntityCount, w.header.FileSize)
-	err := w.header.Write(w.file)
-	if err != nil {
-		logger.Error("Failed to write header: %v", err)
-		return err
-	}
-	logger.Debug("Header written successfully")
-	return nil
-}
 
 // readExisting loads an existing binary file's metadata into memory.
 // This includes the header, tag dictionary, and entity index, allowing
@@ -1087,22 +900,22 @@ func (w *Writer) initializeUnifiedFile() error {
 	logger.Debug("Initializing new unified file")
 	
 	// Initialize unified header with default section layout
-	w.unifiedHeader.WALOffset = UnifiedHeaderSize
-	w.unifiedHeader.WALSize = 64 * 1024 // 64KB initial WAL space
-	w.unifiedHeader.DataOffset = w.unifiedHeader.WALOffset + w.unifiedHeader.WALSize
-	w.unifiedHeader.DataSize = 0 // Will grow as entities are added
-	w.unifiedHeader.TagDictOffset = w.unifiedHeader.DataOffset
-	w.unifiedHeader.TagDictSize = 0
-	w.unifiedHeader.EntityIndexOffset = w.unifiedHeader.DataOffset
-	w.unifiedHeader.EntityIndexSize = 0
-	w.unifiedHeader.EntityCount = 0
-	w.unifiedHeader.LastModified = time.Now().Unix()
-	w.unifiedHeader.WALSequence = 1
-	w.unifiedHeader.CheckpointSequence = 0
-	w.unifiedHeader.FileSize = w.unifiedHeader.DataOffset
+	w.header.WALOffset = HeaderSize
+	w.header.WALSize = 64 * 1024 // 64KB initial WAL space
+	w.header.DataOffset = w.header.WALOffset + w.header.WALSize
+	w.header.DataSize = 0 // Will grow as entities are added
+	w.header.TagDictOffset = w.header.DataOffset
+	w.header.TagDictSize = 0
+	w.header.EntityIndexOffset = w.header.DataOffset
+	w.header.EntityIndexSize = 0
+	w.header.EntityCount = 0
+	w.header.LastModified = time.Now().Unix()
+	w.header.WALSequence = 1
+	w.header.CheckpointSequence = 0
+	w.header.FileSize = w.header.DataOffset
 	
 	// Write unified header
-	if err := w.writeUnifiedHeader(); err != nil {
+	if err := w.writeHeader(); err != nil {
 		return err
 	}
 	
@@ -1120,17 +933,17 @@ func (w *Writer) initializeUnifiedFile() error {
 	return nil
 }
 
-// writeUnifiedHeader writes the unified header to the beginning of the file.
-func (w *Writer) writeUnifiedHeader() error {
-	logger.Debug("writeUnifiedHeader called - EntityCount=%d, FileSize=%d, WALSequence=%d", 
-		w.unifiedHeader.EntityCount, w.unifiedHeader.FileSize, w.unifiedHeader.WALSequence)
+// writeHeader writes the unified header to the beginning of the file.
+func (w *Writer) writeHeader() error {
+	logger.Debug("writeHeader called - EntityCount=%d, FileSize=%d, WALSequence=%d", 
+		w.header.EntityCount, w.header.FileSize, w.header.WALSequence)
 	
 	// Seek to beginning
 	if _, err := w.file.Seek(0, os.SEEK_SET); err != nil {
 		return err
 	}
 	
-	err := w.unifiedHeader.Write(w.file)
+	err := w.header.Write(w.file)
 	if err != nil {
 		logger.Error("Failed to write unified header: %v", err)
 		return err
@@ -1148,17 +961,17 @@ func (w *Writer) readExistingUnified() error {
 		return err
 	}
 	
-	if err := w.unifiedHeader.Read(w.file); err != nil {
+	if err := w.header.Read(w.file); err != nil {
 		logger.Error("Failed to read unified header: %v", err)
 		return err
 	}
 	logger.Debug("Read unified header: EntityCount=%d, FileSize=%d, WALSequence=%d", 
-		w.unifiedHeader.EntityCount, w.unifiedHeader.FileSize, w.unifiedHeader.WALSequence)
+		w.header.EntityCount, w.header.FileSize, w.header.WALSequence)
 	
 	// Read tag dictionary if present
-	if w.unifiedHeader.TagDictSize > 0 {
-		logger.Debug("Reading tag dictionary from offset %d", w.unifiedHeader.TagDictOffset)
-		if _, err := w.file.Seek(int64(w.unifiedHeader.TagDictOffset), os.SEEK_SET); err != nil {
+	if w.header.TagDictSize > 0 {
+		logger.Debug("Reading tag dictionary from offset %d", w.header.TagDictOffset)
+		if _, err := w.file.Seek(int64(w.header.TagDictOffset), os.SEEK_SET); err != nil {
 			return err
 		}
 		if err := w.tagDict.Read(w.file); err != nil {
@@ -1169,15 +982,15 @@ func (w *Writer) readExistingUnified() error {
 	}
 	
 	// Read index if present
-	if w.unifiedHeader.EntityIndexSize > 0 {
+	if w.header.EntityIndexSize > 0 {
 		logger.Debug("Reading index from offset %d, expecting %d entries", 
-			w.unifiedHeader.EntityIndexOffset, w.unifiedHeader.EntityCount)
-		if _, err := w.file.Seek(int64(w.unifiedHeader.EntityIndexOffset), os.SEEK_SET); err != nil {
+			w.header.EntityIndexOffset, w.header.EntityCount)
+		if _, err := w.file.Seek(int64(w.header.EntityIndexOffset), os.SEEK_SET); err != nil {
 			return err
 		}
 		
 		w.index = make(map[string]*IndexEntry)
-		for i := uint64(0); i < w.unifiedHeader.EntityCount; i++ {
+		for i := uint64(0); i < w.header.EntityCount; i++ {
 			entry := &IndexEntry{}
 			if err := binary.Read(w.file, binary.LittleEndian, &entry.EntityID); err != nil {
 				logger.Error("Failed to read index entry %d: %v", i, err)
@@ -1209,10 +1022,10 @@ func (w *Writer) readExistingUnified() error {
 	}
 	
 	// Restore WAL sequence
-	w.walSequence = w.unifiedHeader.WALSequence
+	w.walSequence = w.header.WALSequence
 	
 	// Seek to data end for appending
-	dataEnd := w.unifiedHeader.DataOffset + w.unifiedHeader.DataSize
+	dataEnd := w.header.DataOffset + w.header.DataSize
 	if _, err := w.file.Seek(int64(dataEnd), os.SEEK_SET); err != nil {
 		return err
 	}
@@ -1222,10 +1035,10 @@ func (w *Writer) readExistingUnified() error {
 
 // initializeWALSection creates an empty WAL section in the unified file.
 func (w *Writer) initializeWALSection() error {
-	logger.Debug("Initializing WAL section at offset %d", w.unifiedHeader.WALOffset)
+	logger.Debug("Initializing WAL section at offset %d", w.header.WALOffset)
 	
 	// Seek to WAL offset
-	if _, err := w.file.Seek(int64(w.unifiedHeader.WALOffset), os.SEEK_SET); err != nil {
+	if _, err := w.file.Seek(int64(w.header.WALOffset), os.SEEK_SET); err != nil {
 		return err
 	}
 	
@@ -1247,7 +1060,7 @@ func (w *Writer) writeWALEntry(opType byte, entityID string, entity *models.Enti
 	logger.TraceIf("wal", "Writing WAL entry: opType=%d, entityID=%s", opType, entityID)
 	
 	// Seek to WAL section
-	if _, err := w.file.Seek(int64(w.unifiedHeader.WALOffset), os.SEEK_SET); err != nil {
+	if _, err := w.file.Seek(int64(w.header.WALOffset), os.SEEK_SET); err != nil {
 		return err
 	}
 	
@@ -1264,7 +1077,7 @@ func (w *Writer) writeWALEntry(opType byte, entityID string, entity *models.Enti
 	entryCount++
 	
 	// Write updated header
-	if _, err := w.file.Seek(int64(w.unifiedHeader.WALOffset), os.SEEK_SET); err != nil {
+	if _, err := w.file.Seek(int64(w.header.WALOffset), os.SEEK_SET); err != nil {
 		return err
 	}
 	binary.LittleEndian.PutUint64(buf[0:8], w.walSequence)
@@ -1274,7 +1087,7 @@ func (w *Writer) writeWALEntry(opType byte, entityID string, entity *models.Enti
 	}
 	
 	// Seek to end of WAL section for new entry
-	entryOffset := w.unifiedHeader.WALOffset + 16 // Skip WAL header
+	entryOffset := w.header.WALOffset + 16 // Skip WAL header
 	if _, err := w.file.Seek(int64(entryOffset), os.SEEK_END); err != nil {
 		return err
 	}
@@ -1312,7 +1125,7 @@ func (w *Writer) writeWALEntry(opType byte, entityID string, entity *models.Enti
 	}
 	
 	// Update unified header with new WAL sequence
-	w.unifiedHeader.WALSequence = w.walSequence
+	w.header.WALSequence = w.walSequence
 	
 	logger.TraceIf("wal", "WAL entry written: sequence=%d, size=%d bytes", w.walSequence, entryBuf.Len())
 	return nil

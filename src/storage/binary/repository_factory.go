@@ -23,7 +23,7 @@ func (f *RepositoryFactory) CreateRepository(cfg *config.Config) (models.EntityR
 	enableWALOnly := os.Getenv("ENTITYDB_WAL_ONLY") == "true" // New WAL-only mode
 	enableCache := os.Getenv("ENTITYDB_ENABLE_CACHE") != "false" // Cache by default
 	enableDataset := os.Getenv("ENTITYDB_ENABLE_DATASET") == "true" // Dataset isolation
-	enableUnified := os.Getenv("ENTITYDB_ENABLE_UNIFIED") == "true" // Unified format
+	// Unified format is now the only supported format
 	
 	// Determine cache settings
 	cacheTTL := 5 * time.Minute
@@ -34,12 +34,8 @@ func (f *RepositoryFactory) CreateRepository(cfg *config.Config) (models.EntityR
 	}
 	
 	// Create the EntityRepository with appropriate feature configuration
-	// All variants now merged into unified EntityRepository
+	// All variants now use unified file format by default
 	switch {
-	case enableUnified:
-		logger.Info("Creating EntityRepository with unified file format")
-		baseRepo, err = NewUnifiedRepositoryWithConfig(cfg)
-		
 	case enableDataset:
 		logger.Info("Creating EntityRepository with dataset isolation features")
 		baseRepo, err = NewDatasetRepositoryWithConfig(cfg)
@@ -65,8 +61,8 @@ func (f *RepositoryFactory) CreateRepository(cfg *config.Config) (models.EntityR
 		baseRepo, err = NewTemporalRepositoryWithConfig(cfg)
 		
 	default:
-		logger.Info("Creating EntityRepository with high-performance features (default)")
-		baseRepo, err = NewHighPerformanceRepositoryWithConfig(cfg)
+		logger.Info("Creating EntityRepository with unified format (default)")
+		baseRepo, err = NewEntityRepositoryWithConfig(cfg)
 	}
 	
 	if err != nil {

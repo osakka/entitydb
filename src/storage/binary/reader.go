@@ -25,8 +25,7 @@ var (
 // It loads the file's index and tag dictionary into memory for fast lookups,
 // while reading entity data on-demand to minimize memory usage.
 //
-// The Reader supports both legacy EBF format and unified format files,
-// automatically detecting the format and using appropriate section readers.
+// The Reader supports the unified format with embedded WAL and sections.
 //
 // The Reader is designed for concurrent use - multiple goroutines can safely
 // call ReadEntity simultaneously. The underlying file is opened in read-only
@@ -52,13 +51,13 @@ var (
 //   }
 type Reader struct {
 	file            *os.File                // Read-only file handle
-	header          *Header                 // Legacy file header with metadata
-	unifiedHeader   *UnifiedHeader          // Unified file header with metadata
+	header          *Header                 // Unified file header with metadata
 	tagDict         *TagDictionary          // Tag ID to string mapping
 	index           map[string]*IndexEntry  // Entity ID to file location mapping
 	indexMu         sync.RWMutex            // SURGICAL FIX: Protects index from concurrent access corruption
 	corruptionCount int                     // Track corruption instances for recovery triggers
-	isUnified       bool                    // Whether file uses unified format
+	filename        string                  // File path for reopening
+	legacyReader    *LegacyReader          // TEMPORARY: Legacy format delegation
 }
 
 // NewReader creates a new Reader instance for the specified binary file.
@@ -101,77 +100,51 @@ func NewReader(filename string) (*Reader, error) {
 	logger.TraceIf("storage", "File size: %d bytes", stat.Size())
 	
 	r := &Reader{
-		file:    file,
-		tagDict: NewTagDictionary(),
-		index:   make(map[string]*IndexEntry),
+		file:     file,
+		tagDict:  NewTagDictionary(),
+		index:    make(map[string]*IndexEntry),
+		filename: filename,
 	}
 	
 	// Detect file format
 	logger.TraceIf("storage", "Detecting file format")
-	if _, err := file.Seek(0, os.SEEK_SET); err != nil {
-		return nil, err
-	}
-	
-	magic, version, isUnified, err := DetectFileFormat(file)
+	format, err := DetectFileFormat(filename)
 	if err != nil {
 		logger.Error("Failed to detect file format: %v", err)
 		return nil, err
 	}
 	
-	r.isUnified = isUnified
-	logger.TraceIf("storage", "Detected format: magic=%x, version=%d, unified=%v", magic, version, isUnified)
+	// TEMPORARY: Support both legacy and unified formats during migration
+	if format == FormatLegacy {
+		logger.Info("Loading legacy EBF format file (migration support)")
+		legacyReader, err := NewLegacyReader(filename)
+		if err != nil {
+			return nil, err
+		}
+		// Convert legacy reader to unified reader interface
+		return NewReaderFromLegacy(legacyReader)
+	}
 	
-	// Reset file position and read appropriate header
-	if _, err := file.Seek(0, os.SEEK_SET); err != nil {
+	// Read unified header
+	r.header = &Header{}
+	logger.TraceIf("storage", "Reading unified header")
+	if err := r.header.Read(file); err != nil {
+		logger.Error("Failed to read unified header: %v", err)
 		return nil, err
 	}
 	
-	if isUnified {
-		// Read unified header
-		r.unifiedHeader = &UnifiedHeader{}
-		logger.TraceIf("storage", "Reading unified header")
-		if err := r.unifiedHeader.Read(file); err != nil {
-			logger.Error("Failed to read unified header: %v", err)
-			return nil, err
-		}
-		
-		logger.TraceIf("storage", "Unified header read successfully: Magic=%x, Version=%d, EntityCount=%d, FileSize=%d",
-			r.unifiedHeader.Magic, r.unifiedHeader.Version, r.unifiedHeader.EntityCount, r.unifiedHeader.FileSize)
-		logger.TraceIf("storage", "WALOffset=%d, WALSize=%d, DataOffset=%d, DataSize=%d", 
-			r.unifiedHeader.WALOffset, r.unifiedHeader.WALSize, r.unifiedHeader.DataOffset, r.unifiedHeader.DataSize)
-		logger.TraceIf("storage", "TagDictOffset=%d, TagDictSize=%d, EntityIndexOffset=%d, EntityIndexSize=%d", 
-			r.unifiedHeader.TagDictOffset, r.unifiedHeader.TagDictSize, r.unifiedHeader.EntityIndexOffset, r.unifiedHeader.EntityIndexSize)
-	} else {
-		// Read legacy header
-		r.header = &Header{}
-		logger.TraceIf("storage", "Reading legacy header")
-		if err := r.header.Read(file); err != nil {
-			logger.Error("Failed to read legacy header: %v", err)
-			return nil, err
-		}
-		
-		logger.TraceIf("storage", "Legacy header read successfully: Magic=%x, Version=%d, EntityCount=%d, FileSize=%d",
-			r.header.Magic, r.header.Version, r.header.EntityCount, r.header.FileSize)
-		logger.TraceIf("storage", "TagDictOffset=%d, TagDictSize=%d", r.header.TagDictOffset, r.header.TagDictSize)
-		logger.TraceIf("storage", "EntityIndexOffset=%d, EntityIndexSize=%d", r.header.EntityIndexOffset, r.header.EntityIndexSize)
-	}
+	logger.TraceIf("storage", "Unified header read successfully: Magic=%x, Version=%d, EntityCount=%d, FileSize=%d",
+		r.header.Magic, r.header.Version, r.header.EntityCount, r.header.FileSize)
+	logger.TraceIf("storage", "WALOffset=%d, WALSize=%d, DataOffset=%d, DataSize=%d", 
+		r.header.WALOffset, r.header.WALSize, r.header.DataOffset, r.header.DataSize)
+	logger.TraceIf("storage", "TagDictOffset=%d, TagDictSize=%d, EntityIndexOffset=%d, EntityIndexSize=%d", 
+		r.header.TagDictOffset, r.header.TagDictSize, r.header.EntityIndexOffset, r.header.EntityIndexSize)
 	
-	// Get entity count and offsets based on format
-	var entityCount uint64
-	var tagDictOffset, tagDictSize uint64
-	var entityIndexOffset uint64
-	
-	if isUnified {
-		entityCount = r.unifiedHeader.EntityCount
-		tagDictOffset = r.unifiedHeader.TagDictOffset
-		tagDictSize = r.unifiedHeader.TagDictSize
-		entityIndexOffset = r.unifiedHeader.EntityIndexOffset
-	} else {
-		entityCount = r.header.EntityCount
-		tagDictOffset = r.header.TagDictOffset
-		tagDictSize = r.header.TagDictSize
-		entityIndexOffset = r.header.EntityIndexOffset
-	}
+	// Get entity count and offsets
+	entityCount := r.header.EntityCount
+	tagDictOffset := r.header.TagDictOffset
+	tagDictSize := r.header.TagDictSize
+	entityIndexOffset := r.header.EntityIndexOffset
 	
 	// Skip dictionary and index if no entities
 	if entityCount == 0 {
@@ -349,23 +322,6 @@ func NewReader(filename string) (*Reader, error) {
 //
 // Example:
 //   reader, err := NewUnifiedReader("/var/lib/entitydb/entities.unified")
-//   if err != nil {
-//       log.Fatal(err)
-//   }
-//   defer reader.Close()
-func NewUnifiedReader(filename string) (*Reader, error) {
-	reader, err := NewReader(filename)
-	if err != nil {
-		return nil, err
-	}
-	
-	if !reader.isUnified {
-		reader.Close()
-		return nil, fmt.Errorf("file %s is not in unified format", filename)
-	}
-	
-	return reader, nil
-}
 
 // GetEntity reads a single entity by its ID from the binary file.
 // This is the primary method for retrieving entities.
@@ -394,6 +350,11 @@ func NewUnifiedReader(filename string) (*Reader, error) {
 //   Multiple goroutines can call this method concurrently.
 //   File reads use pread-style operations (seek + read).
 func (r *Reader) GetEntity(id string) (*models.Entity, error) {
+	// TEMPORARY: Delegate to legacy reader if available
+	if r.legacyReader != nil {
+		return r.legacyReader.GetByID(id)
+	}
+	
 	// Start operation tracking for observability
 	op := models.StartOperation(models.OpTypeRead, id, map[string]interface{}{
 		"index_size": len(r.index),
@@ -485,6 +446,11 @@ func (r *Reader) GetEntity(id string) (*models.Entity, error) {
 //   Safe for concurrent use, but may cause contention
 //   if called simultaneously from multiple goroutines.
 func (r *Reader) GetAllEntities() ([]*models.Entity, error) {
+	// TEMPORARY: Delegate to legacy reader if available
+	if r.legacyReader != nil {
+		return r.legacyReader.GetAll()
+	}
+	
 	logger.Trace("GetAllEntities called, index has %d entries, header says %d entities", len(r.index), r.header.EntityCount)
 	entities := make([]*models.Entity, 0, r.header.EntityCount)
 	
