@@ -1,5 +1,9 @@
 # EntityDB
 
+<div align="center">
+  <img src="./share/resources/logo_black.svg" alt="EntityDB Logo" width="400" height="120" />
+</div>
+
 > **A high-performance temporal database with nanosecond-precision timestamps, unified file format, and world-class logging standards**
 
 [![Version](https://img.shields.io/badge/version-v2.32.7%20⚡%20Logging%20Excellence-blue)](./CLAUDE.md)
