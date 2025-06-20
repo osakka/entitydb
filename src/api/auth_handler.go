@@ -276,7 +276,7 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 // @Failure 500 {object} ErrorResponse
 // @Router /api/v1/auth/refresh [post]
 func (h *AuthHandler) RefreshToken(w http.ResponseWriter, r *http.Request) {
-	logger.Info("RefreshToken: Method called from IP %s", r.RemoteAddr)
+	logger.TraceIf("auth", "token refresh request from %s", r.RemoteAddr)
 	
 	// Get security context (v2.32.0+ modern RBAC - token already validated by SecurityMiddleware)
 	securityCtx, ok := GetSecurityContext(r)
@@ -301,9 +301,9 @@ func (h *AuthHandler) RefreshToken(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get user information from the session
-	logger.Info("RefreshToken: Attempting to get user entity for UserID: %s", newSession.UserID)
+	logger.TraceIf("auth", "fetching user entity for session UserID: %s", newSession.UserID)
 	if newSession.UserID == "" {
-		logger.Error("RefreshToken: UserID is empty in refreshed session")
+		logger.Error("token refresh failed: session missing user ID")
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(AuthErrorResponse{Error: "Session missing user information"})
@@ -312,13 +312,13 @@ func (h *AuthHandler) RefreshToken(w http.ResponseWriter, r *http.Request) {
 	
 	userEntity, err := h.securityManager.GetEntityRepo().GetByID(newSession.UserID)
 	if err != nil {
-		logger.Error("failed to get user entity for session (UserID: %s): %v", newSession.UserID, err)
+		logger.Error("token refresh failed to get user entity (UserID: %s): %v", newSession.UserID, err)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(AuthErrorResponse{Error: "Failed to get user information"})
 		return
 	}
-	logger.Info("RefreshToken: Successfully got user entity with %d tags", len(userEntity.Tags))
+	logger.TraceIf("auth", "got user entity with %d tags", len(userEntity.Tags))
 
 	// Extract user information from entity
 	username := ""
@@ -326,28 +326,29 @@ func (h *AuthHandler) RefreshToken(w http.ResponseWriter, r *http.Request) {
 	var roles []string
 	
 	cleanTags := userEntity.GetTagsWithoutTimestamp()
-	logger.Info("RefreshToken: Clean user entity tags: %v", cleanTags)
+	logger.TraceIf("auth", "processing %d clean tags for user data extraction", len(cleanTags))
 	
 	for _, tag := range cleanTags {
 		if strings.HasPrefix(tag, "identity:username:") {
 			username = strings.TrimPrefix(tag, "identity:username:")
-			logger.Info("RefreshToken: Extracted username: %s", username)
+			logger.TraceIf("auth", "extracted username: %s", username)
 		} else if strings.HasPrefix(tag, "profile:email:") {
 			email = strings.TrimPrefix(tag, "profile:email:")
-			logger.Info("RefreshToken: Extracted email: %s", email)
+			logger.TraceIf("auth", "extracted email: %s", email)
 		} else if strings.HasPrefix(tag, "rbac:role:") {
 			role := strings.TrimPrefix(tag, "rbac:role:")
 			roles = append(roles, role)
-			logger.Info("RefreshToken: Extracted role: %s", role)
+			logger.TraceIf("auth", "extracted role: %s", role)
 		}
 	}
 	
 	// If we didn't extract any user data, there might be an issue with tag format
 	if username == "" && email == "" {
-		logger.Warn("RefreshToken: No user data extracted from %d clean tags. Raw tags: %v", len(cleanTags), cleanTags)
+		logger.Warn("token refresh failed: no user data in entity tags")
+		logger.Debug("user data extraction failed from %d tags: %v", len(cleanTags), cleanTags)
 	}
 	
-	logger.Info("RefreshToken: Final extracted data - Username: %s, Email: %s, Roles: %v", username, email, roles)
+	logger.Debug("token refresh extracted data - username: %s, email: %s, roles: %v", username, email, roles)
 
 	// Create response with refreshed session
 	response := AuthLoginResponse{

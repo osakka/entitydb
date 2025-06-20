@@ -74,6 +74,12 @@ Each ADR follows the template:
 | [026](./026-unified-file-format-architecture.md) | Unified File Format Architecture | Accepted | 2025-06-20 | `ebd945b`, `3157f1b` |
 | [027](./027-complete-database-file-unification.md) | Complete Database File Unification | Accepted | 2025-06-20 | `81cf44a`, `3157f1b`, `ebd945b` |
 
+### Observability & Standards (June 2025)
+
+| ADR | Title | Status | Date | Git Commits |
+|-----|-------|--------|------|-------------|
+| [028](./028-logging-standards-compliance.md) | Logging Standards Compliance and Audience Optimization | Accepted | 2025-06-20 | `pending commit` |
+
 ### Comprehensive Documentation
 
 | ADR | Title | Status | Date | Git Commits |

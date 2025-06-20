@@ -331,12 +331,12 @@ func (sm *SecurityManager) CreateSession(user *SecurityUser, ipAddress, userAgen
 	sessionEntity.Content = nil
 	
 	// Create session entity with relationship tags
-	logger.Info("About to create session entity: %s with tags: %v", sessionEntity.ID, sessionEntity.Tags)
+	logger.TraceIf("auth", "creating session entity %s with %d tags", sessionEntity.ID, len(sessionEntity.Tags))
 	if err := sm.entityRepo.Create(sessionEntity); err != nil {
 		logger.Error("Failed to create session entity: %v", err)
 		return nil, fmt.Errorf("failed to create session entity: %v", err)
 	}
-	logger.Info("Created session entity with user relationship: %s -> %s", sessionEntity.ID, user.ID)
+	logger.Debug("session created for user %s", user.Username)
 	
 	// Session is now created without triggering immediate verification
 	// This prevents the indexing race condition that caused recovery attempts
@@ -710,20 +710,19 @@ func (sm *SecurityManager) InvalidateSession(token string) error {
 
 // RefreshSession extends the expiration time of an existing session
 func (sm *SecurityManager) RefreshSession(token string) (*SecuritySession, error) {
-	logger.Info("RefreshSession: Looking for session with token: %s", token[:8])
+	logger.TraceIf("auth", "refreshing session with token prefix: %s", token[:8])
 	
 	// Find session by token tag
-	logger.Info("RefreshSession: Calling ListByTag for token: %s", token[:8])
 	searchTag := "token:" + token
-	logger.Info("RefreshSession: Searching for tag: %s", searchTag)
+	logger.TraceIf("auth", "searching for session tag: %s", searchTag)
 	sessionEntities, err := sm.entityRepo.ListByTag(searchTag)
 	if err != nil {
-		logger.Error("RefreshSession: Error finding session: %v", err)
+		logger.Error("session refresh failed to find session: %v", err)
 		return nil, fmt.Errorf("failed to find session: %v", err)
 	}
-	logger.Info("RefreshSession: ListByTag returned %d entities", len(sessionEntities))
+	logger.TraceIf("auth", "found %d session entities", len(sessionEntities))
 	if len(sessionEntities) == 0 {
-		logger.Info("RefreshSession: No session found with token: %s", token[:8])
+		logger.Warn("session refresh failed: session not found")
 		return nil, fmt.Errorf("session not found")
 	}
 	
