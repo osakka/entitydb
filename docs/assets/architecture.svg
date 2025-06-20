@@ -50,10 +50,10 @@
     <text x="920" y="65" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#be185d">Monitoring Systems</text>
   </g>
   
-  <!-- Layer 2: API Gateway & Security -->
+  <!-- Layer 2: API Gateway and Security -->
   <g transform="translate(50, 220)">
     <rect x="0" y="0" width="1100" height="90" fill="url(#layerGradient)" stroke="#cbd5e1" stroke-width="2" rx="8" filter="url(#shadow)"/>
-    <text x="20" y="25" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#1e293b">API Gateway & Security</text>
+    <text x="20" y="25" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#1e293b">API Gateway &amp; Security</text>
     
     <!-- REST API -->
     <rect x="50" y="35" width="180" height="40" fill="#dbeafe" stroke="#3b82f6" stroke-width="1" rx="4"/>
@@ -73,7 +73,7 @@
     
     <!-- Metrics -->
     <rect x="760" y="35" width="120" height="40" fill="#e1ecf4" stroke="#6c757d" stroke-width="1" rx="4"/>
-    <text x="820" y="58" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#495057">Metrics & Health</text>
+    <text x="820" y="58" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#495057">Metrics &amp; Health</text>
     
     <!-- CORS -->
     <rect x="900" y="35" width="100" height="40" fill="#f8d7da" stroke="#dc3545" stroke-width="1" rx="4"/>
