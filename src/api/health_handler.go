@@ -2,6 +2,7 @@ package api
 
 import (
 	"entitydb/models"
+	"entitydb/config"
 	"entitydb/logger"
 	"net/http"
 	"os"
@@ -12,13 +13,15 @@ import (
 // HealthHandler handles health check requests
 type HealthHandler struct {
 	entityRepo *models.RepositoryQueryWrapper
+	config     *config.Config
 	startTime  time.Time
 }
 
 // NewHealthHandler creates a new health handler
-func NewHealthHandler(entityRepo models.EntityRepository) *HealthHandler {
+func NewHealthHandler(entityRepo models.EntityRepository, cfg *config.Config) *HealthHandler {
 	return &HealthHandler{
 		entityRepo: models.NewRepositoryQueryWrapper(entityRepo),
+		config:     cfg,
 		startTime:  time.Now(),
 	}
 }
@@ -95,13 +98,13 @@ func (h *HealthHandler) Health(w http.ResponseWriter, r *http.Request) {
 	
 	// Get database file size (including WAL and index files)
 	var dbSize int64
-	if stat, err := os.Stat("/opt/entitydb/var/entities.db"); err == nil {
+	if stat, err := os.Stat(h.config.DatabaseFilename); err == nil {
 		dbSize += stat.Size()
 	}
-	if stat, err := os.Stat("/opt/entitydb/var/entitydb.wal"); err == nil {
+	if stat, err := os.Stat(h.config.WALFilename); err == nil {
 		dbSize += stat.Size()
 	}
-	if stat, err := os.Stat("/opt/entitydb/var/entities.db.idx"); err == nil {
+	if stat, err := os.Stat(h.config.IndexFilename); err == nil {
 		dbSize += stat.Size()
 	}
 	

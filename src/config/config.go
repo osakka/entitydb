@@ -86,8 +86,8 @@ type Config struct {
 	
 	// DatabaseFilename is the full path to the main database file.
 	// Environment: ENTITYDB_DATABASE_FILE
-	// Default: "./var/entities.db"
-	// Used for the main entity storage file
+	// Default: "./var/entities.edb"
+	// Used for the main entity storage file (unified format)
 	DatabaseFilename string
 	
 	// WALFilename is the full path to the Write-Ahead Log file.
@@ -98,7 +98,7 @@ type Config struct {
 	
 	// IndexFilename is the full path to the tag index file.
 	// Environment: ENTITYDB_INDEX_FILE
-	// Default: "./var/entities.db.idx"
+	// Default: "./var/entities.edb" (embedded in unified file)
 	// Used for fast tag-based queries
 	IndexFilename string
 	
@@ -108,11 +108,6 @@ type Config struct {
 	// Used for metrics persistence
 	MetricsFilename string
 	
-	// UnifiedFilename is the full path to the unified database file.
-	// Environment: ENTITYDB_UNIFIED_FILE
-	// Default: "./var/entities.unified"
-	// Used for the unified file format (WAL + data + index in single file)
-	UnifiedFilename string
 	
 	// Security Configuration
 	// ======================
@@ -377,22 +372,17 @@ type Config struct {
 	// File and Path Configuration
 	// ===========================
 	
-	// DatabaseBaseFilename is the main database file name (legacy).
-	// Environment: ENTITYDB_DATABASE_FILENAME
-	// Default: "entities.db"
-	// Used in database path construction (deprecated - use DatabaseFilename)
-	DatabaseBaseFilename string
 	
 	// WALSuffix is the suffix appended to database path for WAL files.
 	// Environment: ENTITYDB_WAL_SUFFIX
-	// Default: ".wal"
-	// Example: entities.db.wal
+	// Default: "" (embedded in unified file)
+	// Example: entities.edb (unified format)
 	WALSuffix string
 	
 	// IndexSuffix is the suffix for index files.
 	// Environment: ENTITYDB_INDEX_SUFFIX
-	// Default: ".idx"
-	// Example: entities.db.idx
+	// Default: "" (embedded in unified file)
+	// Example: entities.edb (unified format)
 	IndexSuffix string
 	
 	// BackupPath is the directory for database backups.
@@ -490,11 +480,10 @@ func Load() *Config {
 		StaticDir:        getEnv("ENTITYDB_STATIC_DIR", "./share/htdocs"),
 		
 		// Specific file paths - binary uses these literally
-		DatabaseFilename: getEnv("ENTITYDB_DATABASE_FILE", "./var/entities.db"),
+		DatabaseFilename: getEnv("ENTITYDB_DATABASE_FILE", "./var/entities.edb"),
 		WALFilename:      getEnv("ENTITYDB_WAL_FILE", "./var/entitydb.wal"),
-		IndexFilename:    getEnv("ENTITYDB_INDEX_FILE", "./var/entities.db.idx"),
+		IndexFilename:    getEnv("ENTITYDB_INDEX_FILE", "./var/entities.edb.idx"),
 		MetricsFilename:  getEnv("ENTITYDB_METRICS_FILE", "./var/metrics.json"),
-		UnifiedFilename:  getEnv("ENTITYDB_UNIFIED_FILE", "./var/entities.unified"),
 		
 		// Security
 		TokenSecret:      getEnv("ENTITYDB_TOKEN_SECRET", "entitydb-secret-key"),
@@ -558,7 +547,6 @@ func Load() *Config {
 		BcryptCost:      getEnvInt("ENTITYDB_BCRYPT_COST", 10),
 		
 		// File and Path Configuration
-		DatabaseBaseFilename: getEnv("ENTITYDB_DATABASE_FILENAME", "entities.ebf"),
 		WALSuffix:        getEnv("ENTITYDB_WAL_SUFFIX", ".wal"),
 		IndexSuffix:      getEnv("ENTITYDB_INDEX_SUFFIX", ".idx"),
 		BackupPath:       getEnv("ENTITYDB_BACKUP_PATH", "./backup"),
@@ -576,48 +564,7 @@ func Load() *Config {
 	}
 }
 
-// DatabasePath returns the full path to the main EntityDB database file.
-//
-// The database file uses the custom EBF (EntityDB Binary Format) and contains
-// all entity data, relationships, and metadata. This path is constructed by
-// combining the configured DataPath with the standard database subdirectory
-// and configurable filename.
-//
-// Path Structure:
-//   {DataPath}/data/{DatabaseFilename}
-//
-// For example, with default values:
-//   ./var/data/entities.db
-//
-// The database file is accompanied by related files in the same directory:
-//   - {DatabaseFilename}           - Main database file (EBF format)
-//   - {DatabaseFilename}{WALSuffix} - Write-Ahead Log for durability
-//   - *.{IndexSuffix}              - Various index files for performance
-//
-// Returns:
-//   Complete filesystem path to the EntityDB database file.
-//
-// Note:
-//   The parent directory (DataPath/data) must exist and be writable
-//   by the EntityDB process. The server will create the database file
-//   if it doesn't exist but won't create parent directories.
-func (c *Config) DatabasePath() string {
-	return c.DataPath + "/data/" + c.DatabaseBaseFilename
-}
 
-// WALPath returns the full path to the Write-Ahead Log file.
-//
-// The WAL file is used for durability and transaction support, storing
-// uncommitted changes before they are written to the main database file.
-//
-// Returns:
-//   Complete filesystem path to the WAL file (DatabasePath + WALSuffix)
-//
-// Example:
-//   ./var/data/entities.db.wal
-func (c *Config) WALPath() string {
-	return c.DatabasePath() + c.WALSuffix
-}
 
 // BackupFullPath returns the full path to the backup directory.
 //

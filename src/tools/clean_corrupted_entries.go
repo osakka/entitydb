@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	
+	"entitydb/config"
 )
 
 type IndexEntry struct {
@@ -52,7 +54,10 @@ func main() {
 	
 	info, err := os.Stat(dataDir)
 	if err == nil && info.IsDir() {
-		ebfFile = filepath.Join(dataDir, "entities.ebf")
+		// Load configuration to get proper database file path
+		cfg := config.Load()
+		cfg.DataPath = dataDir
+		ebfFile = cfg.DatabaseFilename
 	}
 	
 	// Create backup

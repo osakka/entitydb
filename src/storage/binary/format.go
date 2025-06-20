@@ -59,11 +59,6 @@ const (
 	// Value: 0x45555446 ("EUFF" - EntityDB Unified File Format)
 	MagicNumber uint32 = 0x45555446
 	
-	// LegacyMagicNumber identifies legacy EntityDB Binary Format (EBF).
-	// Value: 0x45424446 ("EBDF" - EntityDB Binary Data Format)
-	// TEMPORARY: For backward compatibility during migration
-	LegacyMagicNumber uint32 = 0x45424446
-	
 	// FormatVersion indicates the unified format version.
 	// Version 2: Unified file format with embedded WAL and sections
 	FormatVersion uint32 = 2
@@ -130,31 +125,18 @@ type Header struct {
 	Reserved           [16]byte // Reserved for future sections
 }
 
-// LegacyHeader represents the legacy EBF format header for backward compatibility.
-// TEMPORARY: Used during migration period only.
-type LegacyHeader struct {
-	Magic            uint32  // File format identifier (0x45424446)
-	Version          uint32  // Format version (1)
-	FileSize         uint64  // Total file size in bytes
-	TagDictOffset    uint64  // Offset to tag dictionary
-	TagDictSize      uint64  // Size of tag dictionary in bytes
-	EntityIndexOffset uint64 // Offset to entity index
-	EntityIndexSize  uint64  // Size of entity index in bytes
-	EntityCount      uint64  // Number of entities in the file
-	LastModified     int64   // Unix timestamp of last modification
-}
+// LegacyHeader removed - single source of truth: unified format only
 
 // FileFormat represents the detected file format type
 type FileFormat int
 
 const (
 	FormatUnknown FileFormat = iota
-	FormatLegacy              // Legacy EBF format
 	FormatUnified             // Unified EUFF format
 )
 
 // DetectFileFormat determines the file format by reading the magic number.
-// TEMPORARY: For backward compatibility during migration period.
+// Single source of truth: only unified format supported.
 func DetectFileFormat(filename string) (FileFormat, error) {
 	file, err := os.Open(filename)
 	if err != nil {
@@ -168,14 +150,11 @@ func DetectFileFormat(filename string) (FileFormat, error) {
 		return FormatUnknown, err
 	}
 	
-	switch magic {
-	case LegacyMagicNumber:
-		return FormatLegacy, nil
-	case MagicNumber:
+	if magic == MagicNumber {
 		return FormatUnified, nil
-	default:
-		return FormatUnknown, ErrUnknownFormat
 	}
+	
+	return FormatUnknown, ErrUnknownFormat
 }
 
 // Write serializes the unified header to the provided writer.

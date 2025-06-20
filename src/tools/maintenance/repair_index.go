@@ -10,12 +10,12 @@ import (
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Println("Usage: fix_index <data_directory>")
+		fmt.Println("Usage: fix_index <database_file>")
+		fmt.Println("Example: fix_index /opt/entitydb/var/entities.edb")
 		os.Exit(1)
 	}
 
-	dataDir := os.Args[1]
-	ebfFile := filepath.Join(dataDir, "entities.ebf")
+	ebfFile := os.Args[1]
 	
 	// Open the file
 	file, err := os.Open(ebfFile)

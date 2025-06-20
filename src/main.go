@@ -393,11 +393,11 @@ func main() {
 	apiRouter.HandleFunc("/admin/health", server.securityMiddleware.RequirePermission("admin", "health")(adminHandler.HealthCheckHandler)).Methods("GET")
 	
 	// Health endpoint (no authentication required)
-	healthHandler := api.NewHealthHandler(server.entityRepo)
+	healthHandler := api.NewHealthHandler(server.entityRepo, cfg)
 	router.HandleFunc("/health", healthHandler.Health).Methods("GET")
 	
 	// Metrics endpoint (Prometheus format, no authentication required)
-	metricsHandler := api.NewMetricsHandler(server.entityRepo)
+	metricsHandler := api.NewMetricsHandler(server.entityRepo, cfg)
 	router.HandleFunc("/metrics", metricsHandler.PrometheusMetrics).Methods("GET")
 	
 	// Temporal metrics collection endpoints with modern SecurityMiddleware
@@ -424,7 +424,7 @@ func main() {
 	logger.Info("Metrics collection interval set to %v", cfg.MetricsInterval)
 	
 	// Enable background metrics collection now that race conditions are fixed
-	backgroundCollector := api.NewBackgroundMetricsCollector(server.entityRepo, cfg.MetricsInterval, cfg.MetricsGentlePauseMs)
+	backgroundCollector := api.NewBackgroundMetricsCollector(server.entityRepo, cfg, cfg.MetricsInterval, cfg.MetricsGentlePauseMs)
 	backgroundCollector.Start()
 	defer backgroundCollector.Stop()
 	
@@ -466,7 +466,7 @@ func main() {
 	apiRouter.HandleFunc("/application/metrics", server.securityMiddleware.RequirePermission("metrics", "read")(applicationMetricsHandler.GetApplicationMetrics)).Methods("GET")
 	
 	// System metrics endpoint (EntityDB-specific, no authentication required)
-	systemMetricsHandler := api.NewSystemMetricsHandler(server.entityRepo)
+	systemMetricsHandler := api.NewSystemMetricsHandler(server.entityRepo, cfg)
 	apiRouter.HandleFunc("/system/metrics", systemMetricsHandler.SystemMetrics).Methods("GET")
 	
 	// RBAC metrics endpoints

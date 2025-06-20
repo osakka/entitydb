@@ -57,7 +57,7 @@ type Reader struct {
 	indexMu         sync.RWMutex            // SURGICAL FIX: Protects index from concurrent access corruption
 	corruptionCount int                     // Track corruption instances for recovery triggers
 	filename        string                  // File path for reopening
-	legacyReader    *LegacyReader          // TEMPORARY: Legacy format delegation
+	// legacyReader removed - single source of truth: unified format only
 }
 
 // NewReader creates a new Reader instance for the specified binary file.
@@ -114,15 +114,9 @@ func NewReader(filename string) (*Reader, error) {
 		return nil, err
 	}
 	
-	// TEMPORARY: Support both legacy and unified formats during migration
-	if format == FormatLegacy {
-		logger.Info("Loading legacy EBF format file (migration support)")
-		legacyReader, err := NewLegacyReader(filename)
-		if err != nil {
-			return nil, err
-		}
-		// Convert legacy reader to unified reader interface
-		return NewReaderFromLegacy(legacyReader)
+	// Single source of truth: only unified format supported
+	if format != FormatUnified {
+		return nil, fmt.Errorf("unsupported file format - only unified format supported")
 	}
 	
 	// Read unified header
@@ -350,10 +344,7 @@ func NewReader(filename string) (*Reader, error) {
 //   Multiple goroutines can call this method concurrently.
 //   File reads use pread-style operations (seek + read).
 func (r *Reader) GetEntity(id string) (*models.Entity, error) {
-	// TEMPORARY: Delegate to legacy reader if available
-	if r.legacyReader != nil {
-		return r.legacyReader.GetByID(id)
-	}
+	// Single source of truth: unified format only
 	
 	// Start operation tracking for observability
 	op := models.StartOperation(models.OpTypeRead, id, map[string]interface{}{
@@ -446,10 +437,7 @@ func (r *Reader) GetEntity(id string) (*models.Entity, error) {
 //   Safe for concurrent use, but may cause contention
 //   if called simultaneously from multiple goroutines.
 func (r *Reader) GetAllEntities() ([]*models.Entity, error) {
-	// TEMPORARY: Delegate to legacy reader if available
-	if r.legacyReader != nil {
-		return r.legacyReader.GetAll()
-	}
+	// Single source of truth: unified format only
 	
 	logger.Trace("GetAllEntities called, index has %d entries, header says %d entities", len(r.index), r.header.EntityCount)
 	entities := make([]*models.Entity, 0, r.header.EntityCount)

@@ -12,7 +12,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"sync"
 	"time"
 )
@@ -78,32 +77,74 @@ type WAL struct {
 	walSize    uint64         // Size of WAL section in unified file
 }
 
-// NewWAL creates a new write-ahead log instance for the given data directory.
-// The WAL file is created as "entitydb.wal" in the specified directory.
+// NewWAL creates a new write-ahead log instance for the given unified database file.
+// This version uses the embedded WAL section within the unified file format instead
+// of creating a separate WAL file.
 //
 // Initialization process:
-//   1. Opens or creates the WAL file with append mode
-//   2. Reads the last sequence number for continuity
-//   3. Positions file pointer at end for new writes
+//   1. Opens the unified database file
+//   2. Reads the header to get WAL section offset and size
+//   3. Creates a unified WAL instance for the embedded section
 //
 // Parameters:
-//   - dataPath: Directory where the WAL file will be stored
+//   - unifiedFilePath: Path to the unified .edb database file
 //
 // Returns:
-//   - *WAL: Initialized WAL ready for logging operations
-//   - error: File creation or initialization errors
+//   - *WAL: Initialized WAL ready for logging operations (embedded)
+//   - error: File opening or header parsing errors
 //
 // Example:
-//   wal, err := NewWAL("/var/lib/entitydb")
+//   wal, err := NewWAL("/var/lib/entitydb/entities.edb")
 //   if err != nil {
 //       log.Fatal(err)
 //   }
 //   defer wal.Close()
-func NewWAL(dataPath string) (*WAL, error) {
-	walPath := filepath.Join(dataPath, "entitydb.wal")
-	logger.TraceIf("storage", "Creating WAL with dataPath: %s, resulting walPath: %s", dataPath, walPath)
+func NewWAL(unifiedFilePath string) (*WAL, error) {
+	logger.TraceIf("storage", "Creating embedded WAL for unified file: %s", unifiedFilePath)
 	
-	return NewWALWithPath(walPath)
+	return NewWALFromUnifiedFile(unifiedFilePath)
+}
+
+// NewWALFromUnifiedFile creates a WAL instance that uses the embedded WAL section
+// within a unified EntityDB file format (.edb). This function reads the header
+// to determine the WAL section location and creates the appropriate WAL instance.
+//
+// If the unified file doesn't exist yet, this returns a deferred WAL that will
+// be initialized when the file is created by the writer.
+//
+// Parameters:
+//   - unifiedFilePath: Complete path to the unified .edb database file
+//
+// Returns:
+//   - *WAL: Initialized WAL for the embedded section (or deferred WAL)
+//   - error: File access or header parsing errors
+func NewWALFromUnifiedFile(unifiedFilePath string) (*WAL, error) {
+	// Check if unified file exists
+	if _, err := os.Stat(unifiedFilePath); os.IsNotExist(err) {
+		logger.TraceIf("wal", "Unified file doesn't exist yet, creating deferred WAL: %s", unifiedFilePath)
+		// Return a deferred WAL that will be initialized when the file is created
+		return &WAL{
+			path:      unifiedFilePath,
+			isUnified: true,
+			sequence:  1, // Start at sequence 1
+		}, nil
+	}
+	
+	// Open the unified file
+	file, err := os.OpenFile(unifiedFilePath, os.O_RDWR, 0644)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open unified file %s: %w", unifiedFilePath, err)
+	}
+	
+	// Read the header to get WAL section information
+	header := &Header{}
+	if err := header.Read(file); err != nil {
+		file.Close()
+		return nil, fmt.Errorf("failed to read unified file header: %w", err)
+	}
+	
+	// Create unified WAL instance with the embedded section
+	return NewUnifiedWAL(file, header.WALOffset, header.WALSize)
 }
 
 // NewWALWithPath creates a new WAL with the complete file path specified
@@ -337,6 +378,13 @@ func (w *WAL) LogCheckpoint() error {
 func (w *WAL) logEntry(entry WALEntry) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
+	
+	// Initialize connection to unified file if needed (deferred WAL)
+	if w.file == nil && w.isUnified {
+		if err := w.initializeUnifiedConnection(); err != nil {
+			return fmt.Errorf("failed to initialize unified WAL connection: %w", err)
+		}
+	}
 	
 	// Serialize the entry
 	data, err := w.serializeEntry(entry)
@@ -646,6 +694,45 @@ func (w *WAL) deserializeEntry(data []byte) (*WALEntry, error) {
 	}
 	
 	return entry, nil
+}
+
+// initializeUnifiedConnection establishes a connection to the unified file's WAL section.
+// This is used for deferred WAL initialization when the unified file is created after
+// the WAL instance is constructed.
+func (w *WAL) initializeUnifiedConnection() error {
+	logger.TraceIf("wal", "Initializing deferred unified WAL connection: %s", w.path)
+	
+	// Wait for the unified file to exist (it should be created by the writer)
+	if _, err := os.Stat(w.path); os.IsNotExist(err) {
+		// File still doesn't exist, this might be a timing issue
+		return fmt.Errorf("unified file %s not found when initializing WAL connection", w.path)
+	}
+	
+	// Open the unified file
+	file, err := os.OpenFile(w.path, os.O_RDWR, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to open unified file: %w", err)
+	}
+	
+	// Read header to get WAL section info
+	header := &Header{}
+	if err := header.Read(file); err != nil {
+		file.Close()
+		return fmt.Errorf("failed to read unified file header: %w", err)
+	}
+	
+	// Set up WAL properties
+	w.file = file
+	w.walOffset = header.WALOffset
+	w.walSize = header.WALSize
+	
+	// Read current sequence number from WAL section
+	if err := w.readUnifiedSequence(); err != nil {
+		return fmt.Errorf("failed to read WAL sequence: %w", err)
+	}
+	
+	logger.TraceIf("wal", "Unified WAL connection initialized at offset %d, size %d", w.walOffset, w.walSize)
+	return nil
 }
 
 // Truncate removes all entries from the WAL file after a successful checkpoint.

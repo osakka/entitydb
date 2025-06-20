@@ -10,18 +10,13 @@ import (
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Println("Usage: check_corrupted_entities <data_directory>")
+		fmt.Println("Usage: check_corrupted_entities <database_file>")
+		fmt.Println("Example: check_corrupted_entities /opt/entitydb/var/entities.edb")
 		os.Exit(1)
 	}
 
-	dataDir := os.Args[1]
-	ebfFile := dataDir
-	
-	// Check if directory or file was provided
-	info, err := os.Stat(dataDir)
-	if err == nil && info.IsDir() {
-		ebfFile = filepath.Join(dataDir, "entities.ebf")
-	}
+	// Accept database file path directly
+	ebfFile := os.Args[1]
 	
 	// Open the file
 	file, err := os.Open(ebfFile)

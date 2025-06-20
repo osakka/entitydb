@@ -19,7 +19,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
 	"runtime"
 	"sort"
 	"strconv"
@@ -544,11 +543,11 @@ func NewEntityRepositoryWithConfig(cfg *config.Config) (*EntityRepository, error
 	// Default to true for improved write throughput
 	useBatchWrites := os.Getenv("ENTITYDB_USE_BATCH_WRITES") != "false"
 	
-	// Use unified filename for unified file format
-	databasePath := cfg.UnifiedFilename
+	// Use database filename for unified file format
+	databasePath := cfg.DatabaseFilename
 	
 	repo := &EntityRepository{
-		dataPath:        cfg.UnifiedFilename, // Use unified file path
+		dataPath:        cfg.DatabaseFilename, // Use database file path
 		contentIndex:    make(map[string][]string),
 		entities:        make(map[string]*models.Entity),
 		lockManager:     NewLockManager(),
@@ -611,10 +610,10 @@ func NewEntityRepositoryWithConfig(cfg *config.Config) (*EntityRepository, error
 		},
 	}
 	
-	// Initialize WAL with complete path from configuration
-	wal, err := NewWALWithPath(cfg.WALFilename)
+	// Initialize embedded WAL from unified database file  
+	wal, err := NewWAL(cfg.DatabaseFilename)
 	if err != nil {
-		return nil, fmt.Errorf("error creating WAL: %w", err)
+		return nil, fmt.Errorf("error creating embedded WAL: %w", err)
 	}
 	repo.wal = wal
 	
@@ -790,22 +789,14 @@ func (r *EntityRepository) Close() error {
 
 // getDataFile returns the path to the current data file
 func (r *EntityRepository) getDataFile() string {
-	if r.config != nil {
-		// Use complete database path literally from configuration
-		return r.config.DatabaseFilename
-	}
-	// Fallback for legacy compatibility
-	return filepath.Join(r.dataPath, "entities.ebf")
+	// Use complete database path from configuration (single source of truth)
+	return r.config.DatabaseFilename
 }
 
 // getWALFile returns the path to the WAL file
 func (r *EntityRepository) getWALFile() string {
-	if r.config != nil {
-		// Use complete WAL path literally from configuration
-		return r.config.WALFilename
-	}
-	// Fallback for legacy compatibility
-	return filepath.Join(r.dataPath, "entitydb.wal")
+	// Use complete WAL path from configuration (single source of truth)
+	return r.config.WALFilename
 }
 
 // buildIndexes reads the entire file and builds in-memory indexes with parallel processing

@@ -73,7 +73,7 @@ func main() {
 	}
 
 	// Connect to database using configured path
-	dbPath := cfg.DatabasePath()
+	dbPath := cfg.DatabaseFilename
 	db, err := sql.Open("sqlite3", dbPath)
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)

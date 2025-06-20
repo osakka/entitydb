@@ -2,6 +2,7 @@ package api
 
 import (
 	"entitydb/models"
+	"entitydb/config"
 	"entitydb/logger"
 	"fmt"
 	"net/http"
@@ -14,13 +15,15 @@ import (
 // MetricsHandler handles Prometheus-style metrics requests
 type MetricsHandler struct {
 	entityRepo *models.RepositoryQueryWrapper
+	config     *config.Config
 	startTime  time.Time
 }
 
 // NewMetricsHandler creates a new metrics handler
-func NewMetricsHandler(entityRepo models.EntityRepository) *MetricsHandler {
+func NewMetricsHandler(entityRepo models.EntityRepository, cfg *config.Config) *MetricsHandler {
 	return &MetricsHandler{
 		entityRepo: models.NewRepositoryQueryWrapper(entityRepo),
+		config:     cfg,
 		startTime:  time.Now(),
 	}
 }
@@ -88,7 +91,7 @@ func (h *MetricsHandler) PrometheusMetrics(w http.ResponseWriter, r *http.Reques
 	
 	// Database size
 	var dbSize int64
-	if stat, err := os.Stat("/opt/entitydb/var/entities.ebf"); err == nil {
+	if stat, err := os.Stat(h.config.DatabaseFilename); err == nil {
 		dbSize = stat.Size()
 	}
 	
@@ -130,7 +133,7 @@ func (h *MetricsHandler) PrometheusMetrics(w http.ResponseWriter, r *http.Reques
 	
 	// WAL file size (if exists)
 	var walSize int64
-	if stat, err := os.Stat("/opt/entitydb/var/entitydb.wal"); err == nil {
+	if stat, err := os.Stat(h.config.WALFilename); err == nil {
 		walSize = stat.Size()
 	}
 	

@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"entitydb/models"
+	"entitydb/config"
 	"entitydb/logger"
 	"entitydb/storage/binary"
 	"fmt"
@@ -17,6 +18,7 @@ import (
 type BackgroundMetricsCollector struct {
 	collector  *MetricsCollector
 	repo       models.EntityRepository
+	config     *config.Config
 	interval   time.Duration
 	gentlePause time.Duration      // Configurable pause between metric collection blocks
 	ctx        context.Context
@@ -26,11 +28,12 @@ type BackgroundMetricsCollector struct {
 }
 
 // NewBackgroundMetricsCollector creates a new background metrics collector
-func NewBackgroundMetricsCollector(repo models.EntityRepository, interval time.Duration, gentlePause time.Duration) *BackgroundMetricsCollector {
+func NewBackgroundMetricsCollector(repo models.EntityRepository, cfg *config.Config, interval time.Duration, gentlePause time.Duration) *BackgroundMetricsCollector {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &BackgroundMetricsCollector{
 		collector:   NewMetricsCollector(repo),
 		repo:        repo,
+		config:      cfg,
 		interval:    interval,
 		gentlePause: gentlePause,
 		ctx:         ctx,
@@ -121,21 +124,13 @@ func (b *BackgroundMetricsCollector) collectMetrics() {
 
 // collectDatabaseMetrics collects database-specific metrics
 func (b *BackgroundMetricsCollector) collectDatabaseMetrics() {
-	// Get database file stats
-	storagePath := os.Getenv("ENTITYDB_STORAGE_PATH")
-	if storagePath == "" {
-		storagePath = "/opt/entitydb/var"
-	}
-	
-	// Main database file
-	dbPath := filepath.Join(storagePath, "entities.ebf")
-	if info, err := os.Stat(dbPath); err == nil {
+	// Main database file - use configuration (single source of truth)
+	if info, err := os.Stat(b.config.DatabaseFilename); err == nil {
 		b.storeMetric("database_size", float64(info.Size()), "bytes", "Database file size")
 	}
 	
-	// WAL file - CRITICAL METRIC
-	walPath := filepath.Join(storagePath, "entities.wal")
-	if info, err := os.Stat(walPath); err == nil {
+	// WAL file - CRITICAL METRIC - use configuration (single source of truth)
+	if info, err := os.Stat(b.config.WALFilename); err == nil {
 		walSize := float64(info.Size())
 		b.storeMetric("wal_size", walSize, "bytes", "WAL file size")
 		
@@ -153,9 +148,9 @@ func (b *BackgroundMetricsCollector) collectDatabaseMetrics() {
 		}
 	}
 	
-	// Index files
+	// Index files - use configuration data path
 	var indexSize int64
-	indexPattern := filepath.Join(storagePath, "*.idx")
+	indexPattern := filepath.Join(b.config.DataPath, "*.idx")
 	if matches, err := filepath.Glob(indexPattern); err == nil {
 		for _, match := range matches {
 			if info, err := os.Stat(match); err == nil {

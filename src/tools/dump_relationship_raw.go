@@ -2,9 +2,12 @@
 package main
 
 import (
+	"path/filepath"
+	"os"
+	
+	"entitydb/config"
 	"entitydb/logger"
 	"entitydb/storage/binary"
-	"os"
 )
 
 func main() {
@@ -16,7 +19,12 @@ func main() {
 	}
 	
 	// Use NewReader directly to bypass any caching/indexing
-	reader, err := binary.NewReader(dataDir + "/entities.ebf")
+	// Load configuration to get proper database file path
+	cfg := config.Load()
+	cfg.DataPath = dataDir
+	cfg.DatabaseFilename = filepath.Join(dataDir, "entities.edb")
+	
+	reader, err := binary.NewReader(cfg.DatabaseFilename)
 	if err != nil {
 		logger.Error("Failed to create reader: %v", err)
 		os.Exit(1)

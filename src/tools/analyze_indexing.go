@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	
+	"entitydb/config"
 	"entitydb/storage/binary"
 )
 
@@ -22,8 +23,17 @@ func main() {
 	fmt.Printf("=== EntityDB Index Analysis ===\n")
 	fmt.Printf("Data path: %s\n\n", dataPath)
 	
-	// Create a reader to count entities in the data file
-	reader, err := binary.NewReader(filepath.Join(dataPath, "entities.ebf"))
+	// Load configuration to get proper database file path
+	cfg := config.Load()
+	if dataPath != "." {
+		// Override the data path if provided
+		cfg.DataPath = dataPath
+		// Update database filename to use provided path
+		cfg.DatabaseFilename = filepath.Join(dataPath, "entities.edb")
+	}
+	
+	// Create a reader using configured database file
+	reader, err := binary.NewReader(cfg.DatabaseFilename)
 	if err != nil {
 		log.Fatalf("Failed to create reader: %v", err)
 	}

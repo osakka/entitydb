@@ -2,6 +2,7 @@ package api
 
 import (
 	"entitydb/models"
+	"entitydb/config"
 	"entitydb/logger"
 	"fmt"
 	"net/http"
@@ -15,13 +16,15 @@ import (
 // SystemMetricsHandler handles EntityDB-specific system metrics requests
 type SystemMetricsHandler struct {
 	entityRepo *models.RepositoryQueryWrapper
+	config     *config.Config
 	startTime  time.Time
 }
 
 // NewSystemMetricsHandler creates a new system metrics handler
-func NewSystemMetricsHandler(entityRepo models.EntityRepository) *SystemMetricsHandler {
+func NewSystemMetricsHandler(entityRepo models.EntityRepository, cfg *config.Config) *SystemMetricsHandler {
 	return &SystemMetricsHandler{
 		entityRepo: models.NewRepositoryQueryWrapper(entityRepo),
+		config:     cfg,
 		startTime:  time.Now(),
 	}
 }
@@ -316,8 +319,8 @@ func (h *SystemMetricsHandler) collectEnvironmentVariables() EnvironmentVariable
 		SSLKey:     "/etc/ssl/private/server.key", // Actual key path from process
 		Host:       "0.0.0.0", // Actual bind address
 		
-		// Storage Configuration - REAL VALUES
-		StoragePath: "/opt/entitydb/var", // Actual data path from process
+		// Storage Configuration - REAL VALUES  
+		StoragePath: h.config.DataPath, // Actual data path from configuration
 		WALMode:     "true",  // WAL is enabled (entitydb.wal exists)
 		Compression: "false", // No compression flag in process
 		BackupPath:  "NOT_CONFIGURED", // No backup system actually configured
@@ -337,7 +340,7 @@ func (h *SystemMetricsHandler) collectEnvironmentVariables() EnvironmentVariable
 		// Debug & Logging - REAL VALUES
 		LogLevel:       "trace", // Actual log level from process (-log-level trace)
 		MetricsEnabled: "true",  // This endpoint is working
-		LogPath:        "/opt/entitydb/var", // Logs go to var directory
+		LogPath:        h.config.DataPath, // Logs go to data directory from configuration
 		
 		// Instance Settings - REAL VALUES
 		InstanceID:       "NOT_SET", // No instance ID is actually configured
@@ -403,12 +406,12 @@ func (h *SystemMetricsHandler) calculateStorageMetrics() StorageMetrics {
 	var dbSize, walSize, indexSize int64
 	
 	// Database file size
-	if stat, err := os.Stat("/opt/entitydb/var/entities.ebf"); err == nil {
+	if stat, err := os.Stat(h.config.DatabaseFilename); err == nil {
 		dbSize = stat.Size()
 	}
 	
 	// WAL file size
-	if stat, err := os.Stat("/opt/entitydb/var/entitydb.wal"); err == nil {
+	if stat, err := os.Stat(h.config.WALFilename); err == nil {
 		walSize = stat.Size()
 	}
 	

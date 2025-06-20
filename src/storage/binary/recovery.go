@@ -68,7 +68,7 @@ func (rm *RecoveryManager) RecoverCorruptedEntity(repo *EntityRepository, entity
 	logger.Info("attempting to recover corrupted entity: %s", entityID)
 	
 	// Try to read from WAL first
-	walPath := rm.config.WALPath()
+	walPath := rm.config.WALFilename
 	if entity, err := rm.recoverFromWAL(walPath, entityID); err == nil {
 		logger.Info("successfully recovered entity %s from wal", entityID)
 		op.SetMetadata("recovery_source", "wal")
@@ -299,7 +299,7 @@ func (rm *RecoveryManager) RepairWAL() error {
 	
 	logger.Info("starting wal repair")
 	
-	walPath := rm.config.WALPath()
+	walPath := rm.config.WALFilename
 	backupPath := walPath + ".backup"
 	
 	// Create backup of current WAL

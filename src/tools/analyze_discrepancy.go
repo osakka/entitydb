@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	
+	"entitydb/config"
 	"entitydb/storage/binary"
 	"entitydb/models"
 )
@@ -31,7 +32,12 @@ func main() {
 	defer repo.Close()
 	
 	// Now let's manually check what's in the data file vs memory
-	reader, err := binary.NewReader(filepath.Join(dataPath, "entities.ebf"))
+	// Load configuration to get proper database file path
+	cfg := config.Load()
+	cfg.DataPath = dataPath
+	cfg.DatabaseFilename = filepath.Join(dataPath, "entities.edb")
+	
+	reader, err := binary.NewReader(cfg.DatabaseFilename)
 	if err != nil {
 		log.Fatalf("Failed to create reader: %v", err)
 	}
