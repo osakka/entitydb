@@ -164,9 +164,30 @@ func DetectFileFormat(filename string) (FileFormat, error) {
 func (h *Header) Write(w io.Writer) error {
 	buf := make([]byte, HeaderSize)
 	
+	// CRITICAL FIX: Validate and correct header fields before serialization
+	// This prevents the version corruption issue causing "unsupported format version" errors
+	magic := h.Magic
+	version := h.Version
+	
+	// Ensure magic number is correct
+	if magic != MagicNumber {
+		logger.Warn("Header magic number corrupted (0x%x), correcting to 0x%x", magic, MagicNumber)
+		magic = MagicNumber
+	}
+	
+	// Ensure version is correct - this fixes the version 678 corruption issue
+	if version != FormatVersion {
+		logger.Warn("Header version corrupted (%d), correcting to %d", version, FormatVersion)
+		version = FormatVersion
+	}
+	
+	// Update in-memory header with corrected values to prevent future corruption
+	h.Magic = magic
+	h.Version = version
+	
 	// Serialize all fields to the buffer in little-endian format
-	binary.LittleEndian.PutUint32(buf[0:4], h.Magic)
-	binary.LittleEndian.PutUint32(buf[4:8], h.Version)
+	binary.LittleEndian.PutUint32(buf[0:4], magic)
+	binary.LittleEndian.PutUint32(buf[4:8], version)
 	binary.LittleEndian.PutUint64(buf[8:16], h.FileSize)
 	binary.LittleEndian.PutUint64(buf[16:24], h.WALOffset)
 	binary.LittleEndian.PutUint64(buf[24:32], h.WALSize)

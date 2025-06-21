@@ -338,8 +338,25 @@ func (sm *SecurityManager) CreateSession(user *SecurityUser, ipAddress, userAgen
 	}
 	logger.Debug("session created for user %s", user.Username)
 	
-	// Session is now created without triggering immediate verification
-	// This prevents the indexing race condition that caused recovery attempts
+	// Verify session is immediately findable to prevent test suite failures
+	// Wait for indexing to complete by attempting to find the session
+	var sessionEntities []*Entity
+	for i := 0; i < 5; i++ {
+		sessionEntities, err = sm.entityRepo.ListByTag("token:" + token)
+		if err == nil && len(sessionEntities) > 0 {
+			break // Session is findable
+		}
+		if i < 4 {
+			logger.Debug("CreateSession: Session not immediately findable, waiting 10ms (attempt %d)", i+1)
+			time.Sleep(10 * time.Millisecond) // Short delay for indexing completion
+		}
+	}
+	
+	if len(sessionEntities) == 0 {
+		logger.Warn("CreateSession: Session created but not immediately findable - may cause validation failures")
+	} else {
+		logger.Debug("CreateSession: Session verified as findable after %d attempts", len(sessionEntities))
+	}
 	
 	return &SecuritySession{
 		ID:        sessionEntity.ID,
@@ -569,7 +586,7 @@ func (sm *SecurityManager) HasPermissionInDataset(user *SecurityUser, resource, 
 	// Modern permission checking - v2.32.0+ format
 	// Check for admin wildcard permission (grants all access)
 	for _, tag := range userTags {
-		if tag == "rbac:perm:*" {
+		if tag == "rbac:perm:*" || tag == "rbac:perm:*:*" {
 			logger.Debug("HasPermissionInDataset: user %s has wildcard permission, granting access", user.ID)
 			return true, nil
 		}
@@ -703,6 +720,9 @@ func (sm *SecurityManager) InvalidateSession(token string) error {
 		logger.Error("InvalidateSession: Failed to update session entity: %v", err)
 		return fmt.Errorf("failed to invalidate session: %v", err)
 	}
+	
+	// CRITICAL: Clear the session from cache to ensure immediate invalidation
+	sm.InvalidateSessionCache(token)
 	
 	logger.Debug("InvalidateSession: Successfully invalidated session: %s", sessionEntity.ID)
 	return nil

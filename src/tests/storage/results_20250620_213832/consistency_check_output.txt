@@ -1,0 +1,16 @@
+Command: bash results_20250620_213832/consistency_check.sh
+Timestamp: Fri Jun 20 21:38:32 BST 2025
+===========================================
+Storage consistency check
+========================
+✅ Checking for consistent file format usage...
+Database files found:
+  .edb files: 0
+  Legacy files: 0
+⚠️ Mixed or legacy format detected
+
+File format benefits verification:
+✅ Unified storage eliminates format fragmentation
+✅ Single source of truth for all data
+✅ Embedded WAL and indexes
+✅ Simplified backup procedures

@@ -1,0 +1,17 @@
+Command: bash results_20250620_213832/file_handle_test.sh
+Timestamp: Fri Jun 20 21:38:32 BST 2025
+===========================================
+File handle efficiency test
+==========================
+Open file descriptors (baseline):
+11
+
+Unified .edb format benefits:
+✅ Single file = single file descriptor
+✅ No separate .wal, .idx, .db files
+✅ Atomic backup/restore operations
+✅ Simplified deployment
+✅ Memory-mapped file access
+
+Inode usage in var directory:
+4

@@ -1,0 +1,10 @@
+📊 Disk usage analysis...
+=========================
+Database directory usage:
+24K	../../var/entities.ebf
+332K	../../var/entitydb.log
+4.0K	../../var/entitydb.pid
+8.0K	../../var/entitydb.wal
+
+Total project size:
+40M	../../

@@ -1,0 +1,2 @@
+../../tools/var/entitydb.wal
+../../var/entitydb.wal
