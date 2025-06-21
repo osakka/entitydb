@@ -80,6 +80,14 @@ Each ADR follows the template:
 |-----|-------|--------|------|-------------|
 | [028](./028-logging-standards-compliance.md) | Logging Standards Compliance and Audience Optimization | Accepted | 2025-06-20 | `pending commit` |
 
+### Historical Context & Evolution
+
+| ADR | Title | Status | Date | Git Commits |
+|-----|-------|--------|------|-------------|
+| [032](./032-migration-from-sqlite-to-binary-format.md) | Migration from SQLite to Custom Binary Format | Accepted | 2025-05-15 | Based on old repository analysis |
+| [033](./033-evolution-from-specialized-to-unified-entity-api.md) | Evolution from Specialized APIs to Unified Entity Architecture | Accepted | 2025-05-11 | Based on old repository analysis |
+| [034](./034-security-architecture-evolution.md) | Security Architecture Evolution from Component-Based to Unified Model | Accepted | 2025-06-08 | Based on old repository analysis |
+
 ### Comprehensive Documentation
 
 | ADR | Title | Status | Date | Git Commits |
