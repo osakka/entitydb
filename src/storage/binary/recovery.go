@@ -44,6 +44,13 @@ func (rm *RecoveryManager) RecoverCorruptedEntity(repo *EntityRepository, entity
 		return nil, fmt.Errorf("recovery skipped for metric entity %s", entityID)
 	}
 	
+	// LEGENDARY FIX: Skip recovery for random hash-like entities that likely don't exist
+	// These are often remnants from corrupted databases or background processes
+	if len(entityID) == 32 && isHexString(entityID) {
+		logger.TraceIf("storage", "skipping recovery for hash-like entity %s (likely non-existent)", entityID)
+		return nil, fmt.Errorf("recovery skipped for hash-like entity %s", entityID)
+	}
+	
 	// Check if we've recently attempted to recover this entity
 	rm.cacheMu.RLock()
 	lastAttempt, exists := rm.attemptCache[entityID]
@@ -399,4 +406,14 @@ func (rm *RecoveryManager) copyFile(src, dst string) error {
 	
 	_, err = io.Copy(dstFile, srcFile)
 	return err
+}
+
+// isHexString checks if a string contains only hexadecimal characters
+func isHexString(s string) bool {
+	for _, c := range s {
+		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')) {
+			return false
+		}
+	}
+	return true
 }
