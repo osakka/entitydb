@@ -37,7 +37,7 @@ import (
 )
 
 // @title EntityDB API
-// @version 2.32.5
+// @version 2.34.0
 // @description A temporal database with pure entity-based architecture
 // @termsOfService https://github.com/osakka/entitydb
 
