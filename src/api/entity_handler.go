@@ -304,6 +304,12 @@ type CreateEntityRequest struct {
 // @Success 201 {object} models.Entity
 // @Router /api/v1/entities/create [post]
 func (h *EntityHandler) CreateEntity(w http.ResponseWriter, r *http.Request) {
+	startTime := time.Now()
+	perfMonitor := models.GetPerfectionMonitor()
+	defer func() {
+		duration := time.Since(startTime)
+		perfMonitor.TrackOperation("create_entity", duration, 0)
+	}()
 	// Check if timestamps should be included in response
 	includeTimestamps := r.URL.Query().Get("include_timestamps") == "true"
 	

@@ -459,8 +459,7 @@ func (sm *SecurityManager) ValidateSession(token string) (*SecurityUser, error) 
 	var expirationStr string
 	var isInvalidated bool
 	
-	// DEBUG: Log all session tags for diagnosis
-	logger.Debug("ValidateSession: Session tags for %s: %v", sessionEntity.ID, sessionTags)
+	logger.Trace("auth", "ValidateSession: Processing session %s with %d tags", sessionEntity.ID, len(sessionTags))
 	
 	for _, tag := range sessionTags {
 		if strings.HasPrefix(tag, "expires:") {
