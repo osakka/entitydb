@@ -53,6 +53,7 @@ type RelationshipTestSuite struct {
 	client     *http.Client
 	results    []TestResult
 	baseURL    string
+	adminToken string                // Shared token for all tests
 	testEntities map[string]string // name -> entity_id mapping
 }
 
@@ -101,6 +102,36 @@ func (s *RelationshipTestSuite) makeRequest(method, endpoint string, body interf
 	return s.client.Do(req)
 }
 
+// makeAuthenticatedRequest automatically handles token refresh if needed
+func (s *RelationshipTestSuite) makeAuthenticatedRequest(method, endpoint string, body interface{}) (*http.Response, error) {
+	maxRetries := 2
+	
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		// Ensure we have a valid token
+		if s.adminToken == "" {
+			if err := s.initializeAuth(); err != nil {
+				return nil, fmt.Errorf("failed to initialize auth: %v", err)
+			}
+		}
+		
+		resp, err := s.makeRequest(method, endpoint, body, s.adminToken)
+		if err != nil {
+			return nil, err
+		}
+		
+		// If we get 401/403, try refreshing the token once
+		if (resp.StatusCode == 401 || resp.StatusCode == 403) && attempt == 0 {
+			resp.Body.Close()
+			s.adminToken = "" // Force token refresh
+			continue
+		}
+		
+		return resp, nil
+	}
+	
+	return nil, fmt.Errorf("authentication failed after retries")
+}
+
 func (s *RelationshipTestSuite) addResult(testName string, success bool, duration time.Duration, err error, details map[string]interface{}) {
 	result := TestResult{
 		TestName: testName,
@@ -127,7 +158,8 @@ func (s *RelationshipTestSuite) getAuthToken() (string, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		return "", fmt.Errorf("login failed with status %d", resp.StatusCode)
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("login failed with status %d: %s", resp.StatusCode, string(bodyBytes))
 	}
 
 	var loginResp LoginResponse
@@ -138,7 +170,53 @@ func (s *RelationshipTestSuite) getAuthToken() (string, error) {
 	return loginResp.Token, nil
 }
 
-func (s *RelationshipTestSuite) createTestEntity(name, entityType string, additionalTags []string, token string) (string, error) {
+func (s *RelationshipTestSuite) initializeAuth() error {
+	if s.adminToken == "" {
+		token, err := s.getAuthTokenWithRetry()
+		if err != nil {
+			return err
+		}
+		s.adminToken = token
+	}
+	return nil
+}
+
+// getAuthTokenWithRetry implements robust authentication with retry logic
+func (s *RelationshipTestSuite) getAuthTokenWithRetry() (string, error) {
+	maxRetries := 3
+	baseDelay := 500 * time.Millisecond
+	
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		token, err := s.getAuthToken()
+		if err == nil && token != "" {
+			// Validate token immediately to ensure it's usable
+			if s.validateToken(token) {
+				return token, nil
+			}
+		}
+		
+		if attempt < maxRetries-1 {
+			// Exponential backoff with jitter
+			delay := baseDelay * time.Duration(1<<attempt)
+			time.Sleep(delay)
+		}
+	}
+	
+	return "", fmt.Errorf("failed to obtain valid token after %d attempts", maxRetries)
+}
+
+// validateToken checks if a token is immediately usable
+func (s *RelationshipTestSuite) validateToken(token string) bool {
+	// Test token with a lightweight endpoint
+	resp, err := s.makeRequest("GET", "/api/v1/dashboard/stats", nil, token)
+	if err != nil {
+		return false
+	}
+	defer resp.Body.Close()
+	return resp.StatusCode == 200
+}
+
+func (s *RelationshipTestSuite) createTestEntity(name, entityType string, additionalTags []string) (string, error) {
 	tags := []string{
 		"name:" + name,
 		"type:" + entityType,
@@ -152,7 +230,7 @@ func (s *RelationshipTestSuite) createTestEntity(name, entityType string, additi
 		"content": fmt.Sprintf("Test entity for relationship testing: %s", name),
 	}
 
-	resp, err := s.makeRequest("POST", "/api/v1/entities/create", entityData, token)
+	resp, err := s.makeAuthenticatedRequest("POST", "/api/v1/entities/create", entityData)
 	if err != nil {
 		return "", err
 	}
@@ -177,8 +255,7 @@ func (s *RelationshipTestSuite) testSetupTestEntities() {
 	start := time.Now()
 	testName := "Setup Test Entities"
 
-	token, err := s.getAuthToken()
-	if err != nil {
+	if err := s.initializeAuth(); err != nil {
 		s.addResult(testName, false, time.Since(start), err, nil)
 		return
 	}
@@ -195,7 +272,7 @@ func (s *RelationshipTestSuite) testSetupTestEntities() {
 
 	createdCount := 0
 	for entityName, additionalTags := range testEntities {
-		if _, err := s.createTestEntity(entityName, "test", additionalTags, token); err != nil {
+		if _, err := s.createTestEntity(entityName, "test", additionalTags); err != nil {
 			s.addResult(testName, false, time.Since(start), fmt.Errorf("failed to create %s: %v", entityName, err), nil)
 			return
 		}
@@ -225,9 +302,8 @@ func (s *RelationshipTestSuite) testCreateBasicRelationships() {
 	start := time.Now()
 	testName := "Create Basic Relationships"
 
-	token, err := s.getAuthToken()
-	if err != nil {
-		s.addResult(testName, false, time.Since(start), err, nil)
+	if s.adminToken == "" {
+		s.addResult(testName, false, time.Since(start), fmt.Errorf("no admin token available"), nil)
 		return
 	}
 
@@ -263,7 +339,7 @@ func (s *RelationshipTestSuite) testCreateBasicRelationships() {
 			"tags": []string{relationshipTag},
 		}
 
-		resp, err := s.makeRequest("PUT", "/api/v1/entities/update", updateData, token)
+		resp, err := s.makeRequest("PUT", "/api/v1/entities/update", updateData, s.adminToken)
 		if err != nil {
 			continue
 		}
@@ -289,9 +365,8 @@ func (s *RelationshipTestSuite) testQueryRelationshipsByType() {
 	start := time.Now()
 	testName := "Query Relationships by Type"
 
-	token, err := s.getAuthToken()
-	if err != nil {
-		s.addResult(testName, false, time.Since(start), err, nil)
+	if s.adminToken == "" {
+		s.addResult(testName, false, time.Since(start), fmt.Errorf("no admin token available"), nil)
 		return
 	}
 
@@ -300,16 +375,19 @@ func (s *RelationshipTestSuite) testQueryRelationshipsByType() {
 	queryResults := make(map[string]int)
 
 	for _, relType := range relationshipTypes {
-		resp, err := s.makeRequest("GET", "/api/v1/entities/query?tag="+relType+":*&limit=10", nil, token)
+		resp, err := s.makeRequest("GET", "/api/v1/entities/query?tag="+relType+":*&limit=10", nil, s.adminToken)
 		if err != nil {
 			continue
 		}
 		defer resp.Body.Close()
 
 		if resp.StatusCode == 200 {
-			var entities []Entity
-			if err := json.NewDecoder(resp.Body).Decode(&entities); err == nil {
-				queryResults[relType] = len(entities)
+			var response struct {
+				Entities []Entity `json:"entities"`
+				Total    int      `json:"total"`
+			}
+			if err := json.NewDecoder(resp.Body).Decode(&response); err == nil {
+				queryResults[relType] = len(response.Entities)
 			}
 		}
 	}
@@ -337,9 +415,8 @@ func (s *RelationshipTestSuite) testQuerySpecificRelationships() {
 	start := time.Now()
 	testName := "Query Specific Relationships"
 
-	token, err := s.getAuthToken()
-	if err != nil {
-		s.addResult(testName, false, time.Since(start), err, nil)
+	if s.adminToken == "" {
+		s.addResult(testName, false, time.Since(start), fmt.Errorf("no admin token available"), nil)
 		return
 	}
 
@@ -351,7 +428,7 @@ func (s *RelationshipTestSuite) testQuerySpecificRelationships() {
 	}
 
 	// Find all entities that belong to project-alpha
-	resp, err := s.makeRequest("GET", "/api/v1/entities/query?tag=belongs_to:"+projectAlphaID, nil, token)
+	resp, err := s.makeRequest("GET", "/api/v1/entities/query?tag=belongs_to:"+projectAlphaID, nil, s.adminToken)
 	if err != nil {
 		s.addResult(testName, false, time.Since(start), err, nil)
 		return
@@ -364,11 +441,15 @@ func (s *RelationshipTestSuite) testQuerySpecificRelationships() {
 		return
 	}
 
-	var entities []Entity
-	if err := json.NewDecoder(resp.Body).Decode(&entities); err != nil {
+	var response struct {
+		Entities []Entity `json:"entities"`
+		Total    int      `json:"total"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
 		s.addResult(testName, false, time.Since(start), err, nil)
 		return
 	}
+	entities := response.Entities
 
 	details := map[string]interface{}{
 		"target_entity":      "project-alpha",
@@ -394,9 +475,8 @@ func (s *RelationshipTestSuite) testBidirectionalRelationships() {
 	start := time.Now()
 	testName := "Bidirectional Relationships"
 
-	token, err := s.getAuthToken()
-	if err != nil {
-		s.addResult(testName, false, time.Since(start), err, nil)
+	if s.adminToken == "" {
+		s.addResult(testName, false, time.Since(start), fmt.Errorf("no admin token available"), nil)
 		return
 	}
 
@@ -423,7 +503,7 @@ func (s *RelationshipTestSuite) testBidirectionalRelationships() {
 			"tags": []string{update.tag},
 		}
 
-		resp, err := s.makeRequest("PUT", "/api/v1/entities/update", updateData, token)
+		resp, err := s.makeRequest("PUT", "/api/v1/entities/update", updateData, s.adminToken)
 		if err != nil {
 			continue
 		}
@@ -442,15 +522,18 @@ func (s *RelationshipTestSuite) testBidirectionalRelationships() {
 
 	verifiedCount := 0
 	for _, query := range verificationQueries {
-		resp, err := s.makeRequest("GET", "/api/v1/entities/query?tag="+query, nil, token)
+		resp, err := s.makeRequest("GET", "/api/v1/entities/query?tag="+query, nil, s.adminToken)
 		if err != nil {
 			continue
 		}
 		defer resp.Body.Close()
 
 		if resp.StatusCode == 200 {
-			var entities []Entity
-			if err := json.NewDecoder(resp.Body).Decode(&entities); err == nil && len(entities) > 0 {
+			var response struct {
+				Entities []Entity `json:"entities"`
+				Total    int      `json:"total"`
+			}
+			if err := json.NewDecoder(resp.Body).Decode(&response); err == nil && len(response.Entities) > 0 {
 				verifiedCount++
 			}
 		}
@@ -472,9 +555,8 @@ func (s *RelationshipTestSuite) testComplexRelationshipQueries() {
 	start := time.Now()
 	testName := "Complex Multi-Tag Queries"
 
-	token, err := s.getAuthToken()
-	if err != nil {
-		s.addResult(testName, false, time.Since(start), err, nil)
+	if s.adminToken == "" {
+		s.addResult(testName, false, time.Since(start), fmt.Errorf("no admin token available"), nil)
 		return
 	}
 
@@ -488,7 +570,7 @@ func (s *RelationshipTestSuite) testComplexRelationshipQueries() {
 	projectAlphaID := s.testEntities["project-alpha"]
 	complexQuery := fmt.Sprintf("assigned_to:%s&tag=belongs_to:%s", userJohnID, projectAlphaID)
 
-	resp, err := s.makeRequest("GET", "/api/v1/entities/query?tag="+complexQuery, nil, token)
+	resp, err := s.makeRequest("GET", "/api/v1/entities/query?tag="+complexQuery, nil, s.adminToken)
 	if err != nil {
 		s.addResult(testName, false, time.Since(start), err, nil)
 		return
@@ -497,7 +579,13 @@ func (s *RelationshipTestSuite) testComplexRelationshipQueries() {
 
 	var entities []Entity
 	if resp.StatusCode == 200 {
-		json.NewDecoder(resp.Body).Decode(&entities)
+		var response struct {
+			Entities []Entity `json:"entities"`
+			Total    int      `json:"total"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&response); err == nil {
+			entities = response.Entities
+		}
 	}
 
 	// Also test wildcard queries
@@ -509,16 +597,19 @@ func (s *RelationshipTestSuite) testComplexRelationshipQueries() {
 
 	wildcardResults := make(map[string]int)
 	for _, query := range wildcardQueries {
-		resp, err := s.makeRequest("GET", "/api/v1/entities/query?tag="+query+"&limit=5", nil, token)
+		resp, err := s.makeRequest("GET", "/api/v1/entities/query?tag="+query+"&limit=5", nil, s.adminToken)
 		if err != nil {
 			continue
 		}
 		defer resp.Body.Close()
 
 		if resp.StatusCode == 200 {
-			var wildcardEntities []Entity
-			if err := json.NewDecoder(resp.Body).Decode(&wildcardEntities); err == nil {
-				wildcardResults[query] = len(wildcardEntities)
+			var response struct {
+				Entities []Entity `json:"entities"`
+				Total    int      `json:"total"`
+			}
+			if err := json.NewDecoder(resp.Body).Decode(&response); err == nil {
+				wildcardResults[query] = len(response.Entities)
 			}
 		}
 	}
@@ -538,9 +629,8 @@ func (s *RelationshipTestSuite) testRelationshipTagValuesDiscovery() {
 	start := time.Now()
 	testName := "Relationship Tag Values Discovery"
 
-	token, err := s.getAuthToken()
-	if err != nil {
-		s.addResult(testName, false, time.Since(start), err, nil)
+	if s.adminToken == "" {
+		s.addResult(testName, false, time.Since(start), fmt.Errorf("no admin token available"), nil)
 		return
 	}
 
@@ -549,16 +639,20 @@ func (s *RelationshipTestSuite) testRelationshipTagValuesDiscovery() {
 	discoveredValues := make(map[string][]string)
 
 	for _, namespace := range relationshipNamespaces {
-		resp, err := s.makeRequest("GET", "/api/v1/tags/values?namespace="+namespace, nil, token)
+		resp, err := s.makeAuthenticatedRequest("GET", "/api/v1/tags/values?namespace="+namespace, nil)
 		if err != nil {
 			continue
 		}
 		defer resp.Body.Close()
 
 		if resp.StatusCode == 200 {
-			var values []string
-			if err := json.NewDecoder(resp.Body).Decode(&values); err == nil {
-				discoveredValues[namespace] = values
+			// The endpoint returns a structured response, not just an array
+			var response struct {
+				Values []string `json:"values"`
+				Count  int      `json:"count"`
+			}
+			if err := json.NewDecoder(resp.Body).Decode(&response); err == nil {
+				discoveredValues[namespace] = response.Values
 			}
 		}
 	}
@@ -589,9 +683,8 @@ func (s *RelationshipTestSuite) testTemporalRelationshipHistory() {
 	start := time.Now()
 	testName := "Temporal Relationship History"
 
-	token, err := s.getAuthToken()
-	if err != nil {
-		s.addResult(testName, false, time.Since(start), err, nil)
+	if s.adminToken == "" {
+		s.addResult(testName, false, time.Since(start), fmt.Errorf("no admin token available"), nil)
 		return
 	}
 
@@ -602,7 +695,7 @@ func (s *RelationshipTestSuite) testTemporalRelationshipHistory() {
 	}
 
 	// Get history of relationship changes for task-1
-	resp, err := s.makeRequest("GET", "/api/v1/entities/history?id="+task1ID, nil, token)
+	resp, err := s.makeRequest("GET", "/api/v1/entities/history?id="+task1ID, nil, s.adminToken)
 	if err != nil {
 		s.addResult(testName, false, time.Since(start), err, nil)
 		return
@@ -623,7 +716,7 @@ func (s *RelationshipTestSuite) testTemporalRelationshipHistory() {
 
 	// Also test as-of query for a specific timestamp
 	timestamp := time.Now().Add(-5 * time.Minute).Format(time.RFC3339)
-	asOfResp, err := s.makeRequest("GET", "/api/v1/entities/as-of?id="+task1ID+"&timestamp="+timestamp, nil, token)
+	asOfResp, err := s.makeRequest("GET", "/api/v1/entities/as-of?id="+task1ID+"&timestamp="+timestamp, nil, s.adminToken)
 	asOfStatus := 0
 	if err == nil {
 		asOfStatus = asOfResp.StatusCode
@@ -646,9 +739,8 @@ func (s *RelationshipTestSuite) testRelationshipModification() {
 	start := time.Now()
 	testName := "Relationship Modification"
 
-	token, err := s.getAuthToken()
-	if err != nil {
-		s.addResult(testName, false, time.Since(start), err, nil)
+	if s.adminToken == "" {
+		s.addResult(testName, false, time.Since(start), fmt.Errorf("no admin token available"), nil)
 		return
 	}
 
@@ -666,7 +758,7 @@ func (s *RelationshipTestSuite) testRelationshipModification() {
 		"tags": []string{"assigned_to:" + userJohnID, "status:reassigned"},
 	}
 
-	resp, err := s.makeRequest("PUT", "/api/v1/entities/update", updateData, token)
+	resp, err := s.makeRequest("PUT", "/api/v1/entities/update", updateData, s.adminToken)
 	if err != nil {
 		s.addResult(testName, false, time.Since(start), err, nil)
 		return
@@ -676,7 +768,7 @@ func (s *RelationshipTestSuite) testRelationshipModification() {
 	updateSuccess := resp.StatusCode == 200
 
 	// Verify the relationship change
-	verifyResp, err := s.makeRequest("GET", "/api/v1/entities/get?id="+task2ID, nil, token)
+	verifyResp, err := s.makeRequest("GET", "/api/v1/entities/get?id="+task2ID, nil, s.adminToken)
 	var verifyEntity Entity
 	verifySuccess := false
 	if err == nil && verifyResp.StatusCode == 200 {
@@ -710,9 +802,8 @@ func (s *RelationshipTestSuite) testRelationshipPerformance() {
 	start := time.Now()
 	testName := "Relationship Performance"
 
-	token, err := s.getAuthToken()
-	if err != nil {
-		s.addResult(testName, false, time.Since(start), err, nil)
+	if s.adminToken == "" {
+		s.addResult(testName, false, time.Since(start), fmt.Errorf("no admin token available"), nil)
 		return
 	}
 
@@ -720,7 +811,7 @@ func (s *RelationshipTestSuite) testRelationshipPerformance() {
 	performanceEntities := make([]string, 0)
 	for i := 0; i < 5; i++ {
 		entityName := fmt.Sprintf("perf-entity-%d", i)
-		entityID, err := s.createTestEntity(entityName, "performance", []string{"category:performance-test"}, token)
+		entityID, err := s.createTestEntity(entityName, "performance", []string{"category:performance-test"})
 		if err != nil {
 			continue
 		}
@@ -739,7 +830,7 @@ func (s *RelationshipTestSuite) testRelationshipPerformance() {
 					"tags": []string{fmt.Sprintf("perf_relates_to:%s", targetID)},
 				}
 				
-				resp, err := s.makeRequest("PUT", "/api/v1/entities/update", updateData, token)
+				resp, err := s.makeRequest("PUT", "/api/v1/entities/update", updateData, s.adminToken)
 				if err == nil && resp.StatusCode == 200 {
 					relationshipCount++
 				}
@@ -754,12 +845,18 @@ func (s *RelationshipTestSuite) testRelationshipPerformance() {
 
 	// Test query performance
 	queryStartTime = time.Now()
-	resp, err := s.makeRequest("GET", "/api/v1/entities/query?tag=perf_relates_to:*&limit=20", nil, token)
+	resp, err := s.makeRequest("GET", "/api/v1/entities/query?tag=perf_relates_to:*&limit=20", nil, s.adminToken)
 	queryTime := time.Since(queryStartTime)
 	
 	var queryResults []Entity
 	if err == nil && resp.StatusCode == 200 {
-		json.NewDecoder(resp.Body).Decode(&queryResults)
+		var response struct {
+			Entities []Entity `json:"entities"`
+			Total    int      `json:"total"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&response); err == nil {
+			queryResults = response.Entities
+		}
 		resp.Body.Close()
 	}
 
