@@ -1,3 +1,6 @@
+//go:build validator
+// +build validator
+
 package main
 
 import (

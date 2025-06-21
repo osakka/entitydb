@@ -1,3 +1,6 @@
+//go:build datasettest
+// +build datasettest
+
 package main
 
 import (
@@ -11,34 +14,8 @@ import (
 	"time"
 )
 
-// Test configuration
-const (
-	BaseURL = "https://localhost:8085"
-	TestUsername = "admin"
-	TestPassword = "admin"
-	TestTimeout = 30 * time.Second
-)
 
 // Response structures
-type LoginResponse struct {
-	Token     string    `json:"token"`
-	ExpiresAt time.Time `json:"expires_at"`
-	UserID    string    `json:"user_id"`
-	User      struct {
-		ID       string   `json:"id"`
-		Username string   `json:"username"`
-		Email    string   `json:"email"`
-		Roles    []string `json:"roles"`
-	} `json:"user"`
-}
-
-type Entity struct {
-	ID       string   `json:"id"`
-	Tags     []string `json:"tags"`
-	Content  string   `json:"content"`
-	CreatedAt int64   `json:"created_at"`
-	UpdatedAt int64   `json:"updated_at"`
-}
 
 type QueryEntityResponse struct {
 	Entities []*Entity `json:"entities"`
@@ -47,13 +24,6 @@ type QueryEntityResponse struct {
 	Limit    int       `json:"limit"`
 }
 
-type TestResult struct {
-	TestName string
-	Success  bool
-	Duration time.Duration
-	Error    string
-	Details  map[string]interface{}
-}
 
 type DatasetOperationsTestSuite struct {
 	client       *http.Client

@@ -532,7 +532,7 @@ func Load() *Config {
 		
 		// Application Info
 		AppName:          getEnv("ENTITYDB_APP_NAME", "EntityDB Server"),
-		AppVersion:       getEnv("ENTITYDB_APP_VERSION", "2.32.5"),
+		AppVersion:       getEnv("ENTITYDB_APP_VERSION", "2.33.0"),
 		
 		// Default Admin User Configuration
 		DefaultAdminUsername: getEnv("ENTITYDB_DEFAULT_ADMIN_USERNAME", "admin"),

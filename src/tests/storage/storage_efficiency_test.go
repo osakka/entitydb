@@ -1,3 +1,6 @@
+//go:build storagetest
+// +build storagetest
+
 package main
 
 import (

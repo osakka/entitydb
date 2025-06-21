@@ -80,7 +80,7 @@ var (
 	// Default: "2.32.5" (current development version)
 	// Build override: -ldflags "-X main.Version=x.y.z"
 	// Used in: version command output, API responses, swagger documentation
-	Version = "2.32.5"
+	Version = "2.33.0"
 	
 	// BuildDate is the date when the binary was compiled.
 	// Default: "unknown" (for development builds)

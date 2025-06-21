@@ -1,3 +1,6 @@
+//go:build configtest
+// +build configtest
+
 package main
 
 import (
@@ -11,26 +14,8 @@ import (
 	"time"
 )
 
-// Test configuration
-const (
-	BaseURL = "https://localhost:8085"
-	TestUsername = "admin"
-	TestPassword = "admin"
-	TestTimeout = 30 * time.Second
-)
 
 // Response structures
-type LoginResponse struct {
-	Token     string    `json:"token"`
-	ExpiresAt time.Time `json:"expires_at"`
-	UserID    string    `json:"user_id"`
-	User      struct {
-		ID       string   `json:"id"`
-		Username string   `json:"username"`
-		Email    string   `json:"email"`
-		Roles    []string `json:"roles"`
-	} `json:"user"`
-}
 
 type ConfigValue struct {
 	Key       string      `json:"key"`
@@ -46,13 +31,6 @@ type FeatureFlag struct {
 	Description string      `json:"description,omitempty"`
 }
 
-type TestResult struct {
-	TestName string
-	Success  bool
-	Duration time.Duration
-	Error    string
-	Details  map[string]interface{}
-}
 
 type ConfigManagementTestSuite struct {
 	client     *http.Client
