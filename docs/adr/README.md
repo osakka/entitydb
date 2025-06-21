@@ -17,19 +17,19 @@ Each ADR follows the template:
 
 | ADR | Title | Status | Date | Git Commits |
 |-----|-------|--------|------|-------------|
-| [001](./001-temporal-tag-storage.md) | Temporal Tag Storage with Nanosecond Precision | Accepted | 2025-05-08 | `08c1ce08`, `975a561a` |
-| [002](./002-binary-storage-format.md) | Custom Binary Format (EBF) over SQLite | Accepted | 2025-05-15 | `709f865c`, `87a08fa4` |
-| [003](./003-unified-sharded-indexing.md) | Unified Sharded Indexing Architecture | Accepted | 2025-06-16 | `6d76c26d`, `56f393e0` |
-| [004](./004-tag-based-rbac.md) | Tag-Based RBAC System | Accepted | 2025-04-15 | `a22193d7`, `70a5b86f` |
-| [005](./005-application-agnostic-design.md) | Application-Agnostic Platform Design | Accepted | 2025-06-02 | `30ca7981`, `224eac3e` |
+| [001](./001-temporal-tag-storage.md) | Temporal Tag Storage with Nanosecond Precision | Accepted | 2025-06-17 | `975afa5a`, `de9cd28c` |
+| [002](./002-binary-storage-format.md) | Custom Binary Format (EBF) over SQLite | Accepted | 2025-06-17 | `de9cd28c`, `139c7ec9` |
+| [003](./003-unified-sharded-indexing.md) | Unified Sharded Indexing Architecture | Accepted | 2025-06-19 | `02c251a8`, `5a9fa9d2` |
+| [004](./004-tag-based-rbac.md) | Tag-Based RBAC System | Accepted | 2025-06-18 | `e03ae658`, `d7111b3d` |
+| [005](./005-application-agnostic-design.md) | Application-Agnostic Platform Design | Accepted | 2025-06-18 | `201eb2e`, `64fec17` |
 
 ### Implementation Decisions
 
 | ADR | Title | Status | Date | Git Commits |
 |-----|-------|--------|------|-------------|
-| [006](./006-credential-storage-in-entities.md) | User Credentials in Entity Content | Accepted | 2025-06-08 | `e3b50904`, `7fed6868` |
-| [007](./007-memory-mapped-file-access.md) | Memory-Mapped File Access Pattern | Accepted | 2025-05-15 | `87a08fa4`, `0ed28c89` |
-| [008](./008-three-tier-configuration.md) | Three-Tier Configuration Hierarchy | Accepted | 2025-06-07 | `bf001189`, `041cb238` |
+| [006](./006-credential-storage-in-entities.md) | User Credentials in Entity Content | Accepted | 2025-06-21 | `91af26b`, `69e95eb` |
+| [007](./007-memory-mapped-file-access.md) | Memory-Mapped File Access Pattern | Accepted | 2025-06-18 | `7464c52b`, `9669144` |
+| [008](./008-three-tier-configuration.md) | Three-Tier Configuration Hierarchy | Accepted | 2025-06-20 | `2ad75c7`, `b5dfd94` |
 
 ### Performance & Optimization Decisions
 
@@ -84,15 +84,16 @@ Each ADR follows the template:
 
 | ADR | Title | Status | Date | Git Commits |
 |-----|-------|--------|------|-------------|
-| [032](./032-migration-from-sqlite-to-binary-format.md) | Migration from SQLite to Custom Binary Format | Accepted | 2025-05-15 | Based on old repository analysis |
-| [033](./033-evolution-from-specialized-to-unified-entity-api.md) | Evolution from Specialized APIs to Unified Entity Architecture | Accepted | 2025-05-11 | Based on old repository analysis |
-| [034](./034-security-architecture-evolution.md) | Security Architecture Evolution from Component-Based to Unified Model | Accepted | 2025-06-08 | Based on old repository analysis |
+| [032](./032-migration-from-sqlite-to-binary-format.md) | Migration from SQLite to Custom Binary Format | Accepted | 2025-06-17 | Based on old repository analysis |
+| [033](./033-evolution-from-specialized-to-unified-entity-api.md) | Evolution from Specialized APIs to Unified Entity Architecture | Accepted | 2025-06-18 | Based on old repository analysis |
+| [034](./034-security-architecture-evolution.md) | Security Architecture Evolution from Component-Based to Unified Model | Accepted | 2025-06-21 | Based on old repository analysis |
 
-### Comprehensive Documentation
+### Comprehensive Documentation & Timeline
 
 | ADR | Title | Status | Date | Git Commits |
 |-----|-------|--------|------|-------------|
 | [020](./020-comprehensive-architectural-timeline.md) | Comprehensive Architectural Decision Timeline | Accepted | 2025-06-18 | `verification commits` |
+| [035](./035-consolidated-architectural-timeline.md) | Consolidated Architectural Timeline (replaces root-level file) | Accepted | 2025-06-20 | `consolidation commit` |
 
 ## Decision Verification Status
 

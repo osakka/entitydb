@@ -20,26 +20,26 @@ This timeline was constructed by:
 
 ## Complete Architectural Decision Timeline
 
-### 2025-05-08: ADR-001 - Temporal Tag Storage (Foundation Decision)
-**Commit**: `08c1ce08` - Initial temporal tag implementation  
+### 2025-06-17: ADR-001 - Temporal Tag Storage (Foundation Decision)
+**Commit**: `975afa5a` - Temporal functionality implementation  
 **Decision**: Implement tag-embedded timestamps using `TIMESTAMP|tag_value` format  
 **Rationale**: Nanosecond precision for temporal queries while maintaining API simplicity  
 **Impact**: Established foundation for all subsequent temporal functionality  
 
-### 2025-05-15: ADR-002 - Custom Binary Format (EBF)
-**Commit**: `709f865c` - EntityDB v2.13.0 initial commit with binary format  
+### 2025-06-17: ADR-002 - Custom Binary Format (EBF)
+**Commit**: `de9cd28c` - Binary format implementation with corruption recovery  
 **Decision**: Replace SQLite with custom EntityDB Binary Format (EBF) + WAL  
 **Rationale**: Full control over storage layout, memory-mapped access, and temporal optimization  
 **Impact**: 100x performance improvement for temporal queries, zero-copy reads  
 
-### 2025-04-15: ADR-004 - Tag-Based RBAC System  
-**Commit**: `a22193d7` - Unified repository architecture  
+### 2025-06-18: ADR-004 - Tag-Based RBAC System  
+**Commit**: `e03ae658` - Self-cleaning temporal retention architecture  
 **Decision**: Implement permissions as entity tags (e.g., `rbac:perm:entity:view`)  
 **Rationale**: Unified data model where everything is an entity with tags  
 **Impact**: Eliminated separate permission tables, enabled fine-grained access control  
 
-### 2025-06-02: ADR-005 - Application-Agnostic Design
-**Commit**: `30ca7981` - Application agnostic platform implementation  
+### 2025-06-18: ADR-005 - Application-Agnostic Design
+**Commit**: `201eb2e` - Complete Worca EntityDB integration  
 **Decision**: Remove application-specific code from core EntityDB server  
 **Rationale**: Create pure database platform with generic metrics API  
 **Impact**: Applications built on top via API rather than embedded in core  
