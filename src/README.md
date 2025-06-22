@@ -2,7 +2,33 @@
 
 This directory contains the source code for the EntityDB platform. This document provides an overview of the source code structure and development guidelines.
 
-## Latest Changes (v2.33.0) ✅ Audited
+## Latest Changes (v2.34.2) ✅ Audited
+
+- **Critical Entity Deletion Tracking Fix**: Proper deletion index integration ensuring deleted entities are hidden
+  - **Deletion Index Usage**: Delete() method now properly adds entries to deletion index for tracking
+  - **Query Filtering**: GetByID() checks deletion index and returns 'not found' for deleted entities
+  - **List Operations**: List() and ListByTag() filter out deleted entities from their results
+  - **Complete Index Cleanup**: All indexes (sharded, temporal, variant cache) cleaned on deletion
+  - **Lifecycle Support**: Full support for soft_deleted, archived, and purged entity states
+  - **Zero Regressions**: All existing functionality preserved with surgical precision implementation
+
+## Previous Changes (v2.34.1) ✅ Audited
+
+- **Enterprise Configuration Management**: Zero hardcoded values with comprehensive flag coverage
+  - **67 CLI Flags**: Complete coverage using --entitydb-* naming convention
+  - **Tool Compliance**: All maintenance tools updated to use centralized configuration
+  - **Three-Tier Hierarchy**: Database config > CLI flags > Environment variables
+  - **Documentation**: Comprehensive configuration reference with security guidance
+
+## Previous Changes (v2.34.0) ✅ Audited
+
+- **WAL Corruption Prevention System**: Comprehensive integrity protection with self-healing
+  - **Pre-write Validation**: Prevents astronomical corruption with >1GB entry detection
+  - **Health Monitoring**: Continuous background monitoring with proper context management
+  - **Self-healing Recovery**: Automatic backup creation and corruption recovery
+  - **Production Stability**: Resolves crashes from corrupted WAL entries
+
+## Previous Changes (v2.33.0) ✅ Audited
 
 - **Comprehensive Code Audit & Build System Excellence**: Zero ambiguity, single source of truth architecture
   - **100% E2E Test Success**: Surgical precision session management achieving complete relationship testing success

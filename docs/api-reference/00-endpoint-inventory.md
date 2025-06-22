@@ -1,8 +1,8 @@
-# EntityDB API Endpoint Inventory - VERIFIED v2.34.1
+# EntityDB API Endpoint Inventory - VERIFIED v2.34.2
 
-> **Version**: v2.34.1 | **Last Verified**: 2025-06-22 | **Status**: AUTHORITATIVE
+> **Version**: v2.34.2 | **Last Verified**: 2025-06-22 | **Status**: AUTHORITATIVE
 >
-> **Complete inventory of all API endpoints in EntityDB v2.34.1, verified against actual codebase (`src/main.go`).**
+> **Complete inventory of all API endpoints in EntityDB v2.34.2, verified against actual codebase (`src/main.go`).**
 
 ## Endpoint Summary
 

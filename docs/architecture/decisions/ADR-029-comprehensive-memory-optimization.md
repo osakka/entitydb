@@ -2,7 +2,7 @@
 
 **Date**: 2025-06-22  
 **Status**: Accepted  
-**Context**: EntityDB v2.34.1 Memory Management Architecture
+**Context**: EntityDB v2.34.2 Memory Management Architecture
 
 ## Context
 

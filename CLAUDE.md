@@ -21,7 +21,7 @@
 > - **📊 Production Verified**: Server operates normally under all load conditions with comprehensive validation and error handling (ADR-031)
 
 > [!EXCELLENCE]
-> **PRODUCTION-READY MEMORY OPTIMIZATION RELEASE (v2.34.1)**  
+> **PRODUCTION-READY MEMORY OPTIMIZATION RELEASE (v2.34.2)**  
 > Comprehensive memory management architecture enabling 1GB RAM deployment with 97% memory reduction and automatic protection systems.
 > - **🛡️ Memory Guardian Protection**: Automatic server protection at 80% memory threshold with graceful shutdown and continuous monitoring
 > - **🔒 WAL Corruption Defense**: 100MB entry size validation prevents memory exhaustion attacks from corrupted data
@@ -260,7 +260,7 @@ The server automatically creates a default admin user if none exists:
 
 > **Note**: All temporal features (history, as-of, diff, changes) are now FULLY IMPLEMENTED as of v2.32.0! EntityDB delivers complete temporal database functionality with nanosecond precision timestamps.
 
-## Recent Changes (v2.34.1)
+## Recent Changes (v2.34.2)
 
 - **🔧 Critical WAL Replay Fix**: Fixed server crash during WAL replay in unified file format
   - **Root Cause**: WAL replay was seeking to position 0 instead of WAL section offset in unified files

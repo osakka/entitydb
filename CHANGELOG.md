@@ -5,6 +5,22 @@ All notable changes to the EntityDB Platform will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.34.2] - 2025-06-22
+
+### Fixed
+
+#### Critical Entity Deletion Tracking (2025-06-22)
+
+**Proper deletion index tracking ensuring deleted entities are hidden from all queries**
+
+- **Deletion Index Integration**: Delete() method now properly adds entries to deletion index
+- **Query Filtering**: GetByID() checks deletion index and returns 'not found' for deleted entities
+- **List Operations**: List() and ListByTag() filter out deleted entities from results
+- **Index Cleanup**: All indexes properly cleaned on deletion (sharded, temporal, variant cache)
+- **Lifecycle Management**: Complete support for soft_deleted, archived, and purged states
+- **Zero Regressions**: All existing functionality preserved with surgical precision
+- **Architecture Documentation**: ADR-032 documents the deletion tracking implementation
+
 ## [2.34.1] - 2025-06-22
 
 ### Added
@@ -43,7 +59,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **Comprehensive documentation audit with factual accuracy verification**
 
-- **Version Updates**: Updated all version references from v2.34.0 to v2.34.1
+- **Version Updates**: Updated all version references from v2.34.0 to v2.34.2
 - **Link Corrections**: Fixed broken ADR references in root README.md
 - **Architecture Documentation**: Corrected file counts and directory references
 - **Single Source of Truth**: Identified and documented critical structural issues

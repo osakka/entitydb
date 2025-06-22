@@ -12,7 +12,7 @@
 > **Learn more**: [https://github.com/osakka/xvc](https://github.com/osakka/xvc)  
 > **XVC Philosophy**: High-velocity development with extreme attention to detail, surgical precision, and world-class quality standards.
 
-[![Version](https://img.shields.io/badge/version-v2.34.1-blue)](./CLAUDE.md)
+[![Version](https://img.shields.io/badge/version-v2.34.2-blue)](./CLAUDE.md)
 [![XVC](https://img.shields.io/badge/XVC-Extreme%20Vibe%20Coding-ff6b35)](https://github.com/osakka/xvc)
 [![License](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
 [![Documentation](https://img.shields.io/badge/docs-world--class-brightgreen)](./docs/README.md)
@@ -24,7 +24,7 @@
 
 EntityDB is a high-performance temporal database that stores everything as entities with nanosecond-precision timestamps. Built with a unified binary format (EUFF), embedded Write-Ahead Logging, and enterprise-grade features, it provides complete time-travel capabilities, tag-based RBAC, and production-ready reliability.
 
-### Latest Release (v2.34.1) - Configuration Management Excellence Patch
+### Latest Release (v2.34.2) - Configuration Management Excellence Patch
 
 **WAL Integrity System**: Comprehensive corruption prevention with pre-write validation, astronomical size detection, and self-healing recovery. Prevents database crashes from corrupted entries while maintaining unified file architecture performance.
 

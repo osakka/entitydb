@@ -1,7 +1,7 @@
 # Comprehensive Memory Optimization Fix
 
 **Date**: 2025-06-22  
-**Version**: v2.34.1  
+**Version**: v2.34.2  
 **Type**: Critical Memory Management Fix  
 **Components**: WAL, UI, Memory Guardian
 
