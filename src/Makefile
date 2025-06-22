@@ -2,7 +2,7 @@
 
 # Variables
 NAME := entitydb
-VERSION := 2.34.2
+VERSION := 2.34.3
 BUILD_DIR := ../bin
 BIN_DIR := $(shell realpath ../bin)
 SHARE_DIR := $(shell realpath ../share)

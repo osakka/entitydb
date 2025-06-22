@@ -2776,6 +2776,12 @@ func (r *EntityRepository) AddTag(entityID, tag string) error {
 
 // checkAndPerformCheckpoint checks if checkpoint is needed and performs it
 func (r *EntityRepository) checkAndPerformCheckpoint() {
+	// CRITICAL: Skip checkpoint for metrics operations to prevent feedback loop
+	if isMetricsOperation() {
+		logger.Trace("Skipping checkpoint check during metrics operation")
+		return
+	}
+	
 	r.checkpointMu.Lock()
 	defer r.checkpointMu.Unlock()
 	
@@ -2872,6 +2878,12 @@ func (r *EntityRepository) checkAndPerformCheckpoint() {
 
 // storeCheckpointMetric stores WAL checkpoint metrics using async collection
 func (r *EntityRepository) storeCheckpointMetric(status string, duration time.Duration, sizeBefore, sizeAfter int64, reason string) {
+	// CRITICAL: Prevent metrics feedback loop
+	if ShouldSkipMetrics("metric_wal_checkpoint") {
+		logger.Trace("Skipping checkpoint metrics to prevent feedback loop")
+		return
+	}
+	
 	// Use async metrics system to prevent deadlocks and use UUIDs
 	if globalAsyncCollector := GetGlobalAsyncCollector(); globalAsyncCollector != nil {
 		// 1. Checkpoint count metric

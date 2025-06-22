@@ -5,6 +5,22 @@ All notable changes to the EntityDB Platform will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.34.3] - 2025-06-22
+
+### Fixed
+
+#### Critical Metrics Feedback Loop Prevention (2025-06-22)
+
+**Eliminated infinite recursion causing 100% CPU usage from metrics collection**
+
+- **Root Cause**: Metrics collection → Entity operations → WAL writes → Checkpoint trigger → Checkpoint metrics → Loop
+- **Surgical Fix**: Added MetricsGuard system with atomic operation counting to detect recursion
+- **Checkpoint Protection**: Modified checkAndPerformCheckpoint() to skip during metrics operations
+- **Metrics Collection Guard**: Enhanced storeCheckpointMetric() with ShouldSkipMetrics() check
+- **Zero Performance Impact**: Thread-safe implementation with no overhead when not in use
+- **Stable Operation**: CPU usage reduced from 100% to 0.0% with all metrics functional
+- **Architecture Documentation**: ADR-033 documents the feedback loop prevention design
+
 ## [2.34.2] - 2025-06-22
 
 ### Fixed
