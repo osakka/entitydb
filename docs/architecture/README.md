@@ -4,6 +4,15 @@
 
 This section provides comprehensive technical documentation of EntityDB's architecture, design decisions, and internal systems. Essential reading for developers, system architects, and anyone needing deep technical understanding.
 
+## 🏛️ Master Architectural Timeline
+
+### [ADR-000: Master Architectural Timeline](./ADR-000-MASTER-TIMELINE.md)
+**Complete chronological record of all architectural decisions**
+- 47 major architectural decisions from v2.13.0 to v2.34.0
+- Technical decision path integrity and single source of truth
+- Evolutionary enhancements and breaking changes documentation
+- Future decision guidelines and architectural principles
+
 ## 📋 Contents
 
 ### [System Overview](./01-system-overview.md)
