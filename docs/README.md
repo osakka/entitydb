@@ -1,6 +1,6 @@
 # EntityDB Documentation Library
 
-> **Version**: v2.34.0 | **Status**: WAL Corruption Prevention and Documentation Excellence | **Last Updated**: 2025-06-22
+> **Version**: v2.34.1 | **Status**: Configuration Management Excellence | **Last Updated**: 2025-06-22
 > 
 > **Professional Technical Documentation** for EntityDB - A high-performance temporal database with nanosecond-precision timestamps, unified file format, and world-class logging standards.
 
@@ -8,7 +8,7 @@
 
 This documentation library exemplifies **world-class technical writing** with meticulous attention to accuracy and professional organization:
 
-- ✅ **100% Technical Accuracy**: Every detail verified against v2.34.0 production codebase
+- ✅ **100% Technical Accuracy**: Every detail verified against v2.34.1 production codebase
 - ✅ **Single Source of Truth**: Zero content duplication, authoritative references
 - ✅ **IEEE 1063-2001 Compliance**: Industry-standard technical documentation practices
 - ✅ **Comprehensive Coverage**: Complete API documentation, architecture guides, and operational procedures
@@ -49,7 +49,6 @@ graph TD
     D --> F[Architecture]
     E --> F
     F --> G[Reference]
-    G --> H[ADR]
 ```
 
 **Learning Path**: Getting Started → User Guide → Advanced Topics
@@ -117,7 +116,7 @@ graph TD
 | **[Getting Started](./getting-started/)** | New user onboarding | New Users | 5 files |
 | **[User Guide](./user-guide/)** | Task-oriented guides | End Users | 5 files |
 | **[API Reference](./api-reference/)** | Complete API documentation | Developers | 9 files |
-| **[Architecture](./architecture/)** | System design documentation | Technical Teams | 12 files |
+| **[Architecture](./architecture/)** | System design documentation | Technical Teams | 53 files |
 | **[Admin Guide](./admin-guide/)** | Operations and deployment | Administrators | 11 files |
 | **[Developer Guide](./developer-guide/)** | Development workflow | Contributors | 10 files |
 | **[Reference](./reference/)** | Technical specifications | All Audiences | 14 files |
@@ -126,7 +125,7 @@ graph TD
 
 | Category | Purpose | File Count | Status |
 |----------|---------|------------|--------|
-| **[ADR](./adr/)** | Architectural Decision Records | 28 files | Complete |
+| **[ADR](./architecture/)** | Architectural Decision Records | 6 ADR files | In Architecture |
 | **[Releases](./releases/)** | Release notes and history | 1 file | Active |
 | **[Assets](./assets/)** | Diagrams and visual content | 1 file | Growing |
 

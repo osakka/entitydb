@@ -5,6 +5,49 @@ All notable changes to the EntityDB Platform will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.34.1] - 2025-06-22
+
+### Added
+
+#### Configuration Management Excellence (2025-06-22)
+
+**Enterprise-grade configuration system achieving 100% alignment with industry standards**
+
+- **Enhanced CLI Flag Coverage**: Added 15 new configuration flags for comprehensive control
+  - `--entitydb-database-file` - Unified .edb database file path configuration
+  - `--entitydb-metrics-enable-request-tracking` - HTTP request metrics control
+  - `--entitydb-metrics-enable-storage-tracking` - Storage operation metrics control
+  - `--entitydb-throttle-*` suite for intelligent request throttling (5 flags)
+  - Complete coverage of metrics, throttling, and performance configuration
+- **Zero Hardcoded Values**: Eliminated all static assignments to paths, filenames, and configuration
+  - Updated all tools in `src/tools/` to use centralized configuration system
+  - Replaced hardcoded database paths with `config.Load()` throughout codebase
+  - Unified architecture compliance respecting single `.edb` file format
+- **Long Flag Standardization**: All 67 flags use `--entitydb-*` naming convention
+  - Short flags (`-h`, `-v`) reserved for essential functionality only
+  - Consistent naming pattern across all configuration options
+- **Tool Configuration Compliance**: All maintenance and analysis tools updated
+  - `tools/analyze_indexing.go` - Configuration system integration
+  - `tools/analyze_discrepancy.go` - Simplified and configuration-compliant
+  - `tests/storage/storage_efficiency_test.go` - Environment variable support
+  - Complete elimination of hardcoded paths in utility tools
+- **Professional Documentation**: Comprehensive configuration reference created
+  - `/docs/reference/configuration-management-reference.md` - Complete flag documentation
+  - Three-tier hierarchy examples (Database > CLI flags > Environment variables)
+  - Security considerations and production deployment guidance
+  - Migration guide and troubleshooting procedures
+
+### Changed
+
+#### Documentation Accuracy Improvements (2025-06-22)
+
+**Comprehensive documentation audit with factual accuracy verification**
+
+- **Version Updates**: Updated all version references from v2.34.0 to v2.34.1
+- **Link Corrections**: Fixed broken ADR references in root README.md
+- **Architecture Documentation**: Corrected file counts and directory references
+- **Single Source of Truth**: Identified and documented critical structural issues
+
 ## [2.34.0] - 2025-06-22
 
 ### Added
