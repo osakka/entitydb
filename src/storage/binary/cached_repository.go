@@ -302,3 +302,44 @@ func (r *CachedRepository) Close() error {
 func (r *CachedRepository) GetUnderlying() models.EntityRepository {
 	return r.EntityRepository
 }
+
+// TriggerCachePressureCleanup performs cache cleanup under memory pressure
+func (r *CachedRepository) TriggerCachePressureCleanup(pressure float64) {
+	// Clean tag cache based on pressure level
+	if pressure > 0.7 {
+		// Count current cache entries
+		entryCount := 0
+		r.tagCache.Range(func(key, value interface{}) bool {
+			entryCount++
+			return true
+		})
+		
+		// Calculate how many to remove
+		targetRemoval := int(float64(entryCount) * pressure * 0.5) // Remove up to 50% under high pressure
+		if targetRemoval < 10 {
+			targetRemoval = 10 // Minimum cleanup
+		}
+		
+		removed := 0
+		r.tagCache.Range(func(key, value interface{}) bool {
+			if removed >= targetRemoval {
+				return false // Stop iteration
+			}
+			
+			cr := value.(*cachedTagResult)
+			// Remove older entries first, or all entries under critical pressure
+			if pressure > 0.9 || time.Since(cr.timestamp) > r.cacheTTL/2 {
+				r.tagCache.Delete(key)
+				removed++
+			}
+			return true
+		})
+		
+		logger.Debug("CachedRepository: cleaned %d cache entries under %.1f%% memory pressure", removed, pressure*100)
+	}
+	
+	// If underlying repository supports pressure cleanup, delegate to it
+	if binaryRepo, ok := r.EntityRepository.(*EntityRepository); ok {
+		binaryRepo.TriggerCachePressureCleanup(pressure)
+	}
+}

@@ -537,10 +537,16 @@ func (w *WAL) Replay(callback func(entry WALEntry) error) error {
 	
 	logger.Info("Starting WAL replay from %s", w.path)
 	
-	// Seek to the beginning
-	if _, err := w.file.Seek(0, io.SeekStart); err != nil {
+	// Seek to the beginning of WAL section
+	seekPos := int64(0)
+	if w.isUnified {
+		seekPos = int64(w.walOffset)
+		logger.Debug("Seeking to WAL section at offset %d in unified file", seekPos)
+	}
+	
+	if _, err := w.file.Seek(seekPos, io.SeekStart); err != nil {
 		op.Fail(err)
-		logger.Error("Failed to seek to beginning: %v", err)
+		logger.Error("Failed to seek to WAL position %d: %v", seekPos, err)
 		return err
 	}
 	
@@ -557,6 +563,25 @@ func (w *WAL) Replay(callback func(entry WALEntry) error) error {
 			op.Fail(err)
 			logger.Error("Failed to read entry length: %v", err)
 			return err
+		}
+		
+		// Validate length to prevent memory exhaustion
+		const maxEntrySize = 100 * 1024 * 1024 // 100MB max per entry
+		if length > maxEntrySize {
+			entriesFailed++
+			logger.Error("WAL entry too large (%d bytes), skipping corrupted entry", length)
+			// Skip this corrupted entry by seeking past it
+			if _, err := w.file.Seek(int64(length), io.SeekCurrent); err != nil {
+				logger.Error("Failed to skip corrupted entry: %v", err)
+				return err
+			}
+			continue
+		}
+		
+		if length == 0 {
+			entriesFailed++
+			logger.Error("WAL entry has zero length, skipping")
+			continue
 		}
 		
 		// Read data

@@ -208,7 +208,7 @@ func isMetricEntity(entity *models.Entity) bool {
 		return false
 	}
 	
-	// Check if entity has type:metric tag (more precise detection)
+	// Enhanced detection: check multiple patterns to catch all metric-related entities
 	for _, tag := range entity.Tags {
 		// Handle both timestamped and non-timestamped tags
 		actualTag := tag
@@ -219,16 +219,36 @@ func isMetricEntity(entity *models.Entity) bool {
 			}
 		}
 		
-		// Only flag entities that explicitly have type:metric
-		if actualTag == "type:metric" {
+		// Check multiple patterns for metric entities
+		if actualTag == "type:metric" ||
+		   strings.HasPrefix(actualTag, "name:metric_") ||
+		   strings.HasPrefix(actualTag, "name:storage_") ||
+		   strings.HasPrefix(actualTag, "name:entity_") ||
+		   strings.HasPrefix(actualTag, "name:request_") ||
+		   strings.HasPrefix(actualTag, "name:system_") ||
+		   actualTag == "dataset:system" && strings.Contains(entity.ID, "metric") {
 			return true
 		}
 	}
+	
+	// Also check entity ID patterns for metric entities
+	if strings.HasPrefix(entity.ID, "metric_") || 
+	   strings.Contains(entity.ID, "_metric_") ||
+	   (len(entity.ID) == 32 && isAllHex(entity.ID)) { // UUID format metrics
+		return true
+	}
+	
 	return false
 }
 
 // storeMetric stores a metric value with labels using async collection
 func (m *StorageMetrics) storeMetric(name string, value float64, unit string, description string, labels map[string]string) {
+	// Emergency check: prevent any metrics recursion
+	if IsMetricsOperation() {
+		logger.Trace("StorageMetrics.storeMetric: aborting %s - metrics operation in progress", name)
+		return
+	}
+	
 	// Use async collector if available
 	if m.asyncCollector != nil {
 		m.asyncCollector.CollectMetric(name, value, unit, description, labels)

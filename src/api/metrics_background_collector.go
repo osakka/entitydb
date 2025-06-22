@@ -223,6 +223,12 @@ func (b *BackgroundMetricsCollector) collectEntityMetrics() {
 
 // storeMetric stores a metric value using time-series optimized storage pattern
 func (b *BackgroundMetricsCollector) storeMetric(name string, value float64, unit string, description string) {
+	// Emergency check: if we're already in a metrics operation, abort immediately
+	if binary.IsMetricsOperation() {
+		logger.Trace("Aborting metric storage for %s - already in metrics operation", name)
+		return
+	}
+	
 	// Mark this goroutine as performing metrics operations to prevent recursion
 	binary.SetMetricsOperation(true)
 	defer binary.SetMetricsOperation(false)

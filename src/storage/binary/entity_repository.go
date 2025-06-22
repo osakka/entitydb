@@ -19,30 +19,29 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"runtime"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
 // Thread-local context to prevent metrics collection recursion
+// Using a more reliable approach with atomic operations and thread-local storage
 var (
-	metricsOperationContext = make(map[int64]bool)
-	metricsContextMu        sync.RWMutex
+	metricsOperationDepth int64 // Global atomic counter for recursion depth
+	metricsDisabledGlobally int64 // Global atomic flag to disable all metrics
 )
 
 // setMetricsOperation marks the current goroutine as performing metrics operations
 func setMetricsOperation(active bool) {
-	metricsContextMu.Lock()
-	defer metricsContextMu.Unlock()
-	
-	goroutineID := getGoroutineID()
 	if active {
-		metricsOperationContext[goroutineID] = true
+		atomic.AddInt64(&metricsOperationDepth, 1)
 	} else {
-		delete(metricsOperationContext, goroutineID)
+		if atomic.LoadInt64(&metricsOperationDepth) > 0 {
+			atomic.AddInt64(&metricsOperationDepth, -1)
+		}
 	}
 }
 
@@ -51,30 +50,24 @@ func SetMetricsOperation(active bool) {
 	setMetricsOperation(active)
 }
 
-// isMetricsOperation checks if current goroutine is performing metrics operations
+// isMetricsOperation checks if any metrics operations are in progress
 func isMetricsOperation() bool {
-	metricsContextMu.RLock()
-	defer metricsContextMu.RUnlock()
-	
-	goroutineID := getGoroutineID()
-	return metricsOperationContext[goroutineID]
+	return atomic.LoadInt64(&metricsOperationDepth) > 0 || atomic.LoadInt64(&metricsDisabledGlobally) > 0
 }
 
-// IsMetricsOperation checks if current goroutine is performing metrics operations (exported)
+// IsMetricsOperation checks if any metrics operations are in progress (exported)
 func IsMetricsOperation() bool {
 	return isMetricsOperation()
 }
 
-// getGoroutineID returns a simple goroutine identifier (hash-based)
-func getGoroutineID() int64 {
-	// Simple hash of stack pointer for goroutine identification
-	var buf [64]byte
-	n := runtime.Stack(buf[:], false)
-	hash := int64(0)
-	for i := 0; i < n; i++ {
-		hash = hash*31 + int64(buf[i])
-	}
-	return hash
+// DisableMetricsGlobally completely disables metrics collection (for emergency)
+func DisableMetricsGlobally() {
+	atomic.StoreInt64(&metricsDisabledGlobally, 1)
+}
+
+// EnableMetricsGlobally re-enables metrics collection
+func EnableMetricsGlobally() {
+	atomic.StoreInt64(&metricsDisabledGlobally, 0)
 }
 
 // shouldAttemptEntityRecovery determines if an entity is critical enough to warrant expensive recovery
@@ -138,8 +131,8 @@ type EntityRepository struct {
 	batchWriter     *BatchWriter
 	useBatchWrites  bool // Feature flag for batched write operations
 	
-	// In-memory entity storage
-	entities     map[string]*models.Entity // id -> entity
+	// In-memory entity storage with bounded caching
+	entityCache  *BoundedEntityCache // Bounded LRU cache for entities
 	
 	// Locking and transaction support
 	lockManager *LockManager
@@ -186,6 +179,9 @@ type EntityRepository struct {
 	
 	// Temporal retention manager for automatic cleanup
 	temporalRetention *TemporalRetentionManager
+	
+	// Track entity count for index building
+	loadedEntityCount int
 	
 	// Circuit breaker for update operations
 	updateCircuitBreaker *UpdateCircuitBreaker
@@ -294,6 +290,51 @@ func contains(slice []string, item string) bool {
 		}
 	}
 	return false
+}
+
+// TriggerPressureCleanup performs aggressive cleanup under memory pressure
+func (tvc *TagVariantCache) TriggerPressureCleanup(pressure float64) {
+	tvc.mu.Lock()
+	defer tvc.mu.Unlock()
+	
+	// Calculate how much to clean based on pressure
+	tagCount := len(tvc.tagToVariants)
+	
+	if pressure > 0.8 {
+		// Under high pressure, clear variants with few entities
+		minEntityCount := int(pressure * 10) // Higher pressure = higher threshold
+		
+		cleaned := 0
+		for cleanTag, entities := range tvc.variantToTag {
+			if len(entities) <= minEntityCount {
+				delete(tvc.variantToTag, cleanTag)
+				cleaned++
+			}
+		}
+		
+		// Also clean old temporal tag mappings
+		if pressure > 0.9 && tagCount > 1000 {
+			// Keep only most recent 50% of temporal tags
+			// This is a simplified approach - in production might use timestamps
+			keepCount := tagCount / 2
+			if keepCount < 100 {
+				keepCount = 100
+			}
+			
+			// Clear excess temporal mappings (simplified - could be improved with actual LRU)
+			count := 0
+			for temporalTag := range tvc.tagToVariants {
+				if count > keepCount {
+					delete(tvc.tagToVariants, temporalTag)
+				}
+				count++
+			}
+		}
+		
+		if cleaned > 0 {
+			logger.Debug("TagVariantCache: cleaned %d variants under %.1f%% memory pressure", cleaned, pressure*100)
+		}
+	}
 }
 
 // BatchWriter handles batched write operations for improved throughput
@@ -514,7 +555,7 @@ func (bw *BatchWriter) executeBatch(ops []batchOperation, entities map[string]*m
 	// Process AddTag operations
 	for _, op := range ops {
 		if op.opType == "addtag" {
-			if entity, exists := bw.repo.entities[op.entityID]; exists {
+			if entity, exists := bw.repo.entityCache.Get(op.entityID); exists {
 				// Add the tag to the entity
 				entity.Tags = append(entity.Tags, op.tag)
 				entity.UpdatedAt = models.Now()
@@ -526,7 +567,7 @@ func (bw *BatchWriter) executeBatch(ops []batchOperation, entities map[string]*m
 	// Update indexes for all entities
 	for _, entity := range entities {
 		bw.repo.updateIndexes(entity)
-		bw.repo.entities[entity.ID] = entity
+		bw.repo.entityCache.Put(entity.ID, entity)
 	}
 	bw.repo.mu.Unlock()
 	
@@ -593,7 +634,7 @@ func NewEntityRepositoryWithConfig(cfg *config.Config) (*EntityRepository, error
 	repo := &EntityRepository{
 		dataPath:        cfg.DatabaseFilename, // Use database file path
 		contentIndex:    make(map[string][]string),
-		entities:        make(map[string]*models.Entity),
+		entityCache:     NewBoundedEntityCache(cfg.EntityCacheSize, cfg.EntityCacheMemoryLimit),
 		lockManager:     NewLockManager(),
 		writerManager:   NewWriterManager(databasePath), // Uses unified format
 		cache:           cache.NewQueryCache(1000, 5*time.Minute), // Cache up to 1000 queries for 5 minutes
@@ -615,6 +656,8 @@ func NewEntityRepositoryWithConfig(cfg *config.Config) (*EntityRepository, error
 	}
 	
 	logger.Info("Using unified file format with sharded tag index for improved concurrency")
+	logger.Info("Entity cache initialized with size limit %d and memory limit %d MB", 
+		cfg.EntityCacheSize, cfg.EntityCacheMemoryLimit/(1024*1024))
 	
 	if useVariants {
 		logger.Info("Using tag variant cache for optimized temporal tag lookups")
@@ -713,8 +756,8 @@ func NewEntityRepositoryWithConfig(cfg *config.Config) (*EntityRepository, error
 	}
 	
 	// Log entity count after building indexes
-	logger.Info("Initialized: %d entities, %d tag index entries", 
-		len(repo.entities), repo.shardedTagIndex.GetEntryCount())
+	logger.Info("Initialized: %d entities cached, %d tag index entries", 
+		repo.entityCache.Stats().Size, repo.shardedTagIndex.GetEntryCount())
 	
 	return repo, nil
 }
@@ -849,7 +892,7 @@ func (r *EntityRepository) buildIndexes() error {
 	defer r.mu.Unlock()
 	
 	// Check if entities are already loaded (e.g., from WAL replay)
-	entitiesAlreadyLoaded := len(r.entities) > 0
+	entitiesAlreadyLoaded := r.loadedEntityCount > 0
 	
 	// Only clear existing indexes if no entities are loaded
 	// This preserves indexes populated during WAL replay
@@ -860,7 +903,7 @@ func (r *EntityRepository) buildIndexes() error {
 		r.temporalIndex = NewTemporalIndex()
 		r.namespaceIndex = NewNamespaceIndex()
 	} else {
-		logger.Debug("Preserving existing indexes - %d entities already loaded (likely from WAL replay)", len(r.entities))
+		logger.Debug("Preserving existing indexes - %d entities already loaded (likely from WAL replay)", r.loadedEntityCount)
 	}
 	
 	// AUTOMATIC INDEX CORRUPTION RECOVERY
@@ -897,12 +940,13 @@ func (r *EntityRepository) buildIndexes() error {
 	
 	if entitiesAlreadyLoaded {
 		// Use entities already loaded in memory (from WAL replay)
-		logger.Debug("Using entities already loaded in memory: %d entities", len(r.entities))
-		entities = make([]*models.Entity, 0, len(r.entities))
-		for _, entity := range r.entities {
-			entities = append(entities, entity)
-		}
-	} else {
+		logger.Debug("Using entities already loaded in memory: %d entities", r.loadedEntityCount)
+		// For now, we'll need to read from disk anyway since we can't iterate the cache
+		// This is a limitation of the bounded cache design
+		entitiesAlreadyLoaded = false
+	}
+	
+	if !entitiesAlreadyLoaded {
 		// Read entities from disk
 		logger.Debug("Building indexes from entities on disk")
 		
@@ -1077,7 +1121,8 @@ func (r *EntityRepository) buildIndexesParallel(entities []*models.Entity, entit
 		for _, entity := range entities {
 			// Add to entity cache (only if not already loaded)
 			if !entitiesAlreadyLoaded {
-				r.entities[entity.ID] = entity
+				r.entityCache.Put(entity.ID, entity)
+				r.loadedEntityCount++
 			}
 			entityChan <- entity
 		}
@@ -1129,7 +1174,8 @@ func (r *EntityRepository) buildIndexesSequential(entities []*models.Entity, ent
 	for _, entity := range entities {
 		// Add to entity cache (only if not already loaded)
 		if !entitiesAlreadyLoaded {
-			r.entities[entity.ID] = entity
+			r.entityCache.Put(entity.ID, entity)
+			r.loadedEntityCount++
 		}
 		
 		// Log entity details for debugging
@@ -1209,7 +1255,7 @@ func (r *EntityRepository) updateIndexes(entity *models.Entity) {
 
 	// CRITICAL: First remove all existing index entries for this entity
 	// This prevents duplicate entries when updating
-	if existingEntity, exists := r.entities[entity.ID]; exists {
+	if existingEntity, exists := r.entityCache.Get(entity.ID); exists {
 		// Remove entity from tag variant cache first
 		if r.useVariantCache {
 			r.tagVariantCache.RemoveEntityFromVariant(entity.ID)
@@ -1336,14 +1382,14 @@ func (r *EntityRepository) Create(entity *models.Entity) error {
 	r.mu.Lock()
 	r.updateIndexes(entity)
 	// Store entity in-memory as well
-	r.entities[entity.ID] = entity
+	r.entityCache.Put(entity.ID, entity)
 	r.mu.Unlock()
 	
 	// Write entity using WriterManager (which handles checkpoints)
 	if err := r.writerManager.WriteEntity(entity); err != nil {
 		// Rollback index changes on write failure
 		r.mu.Lock()
-		delete(r.entities, entity.ID)
+		r.entityCache.Delete(entity.ID)
 		// Remove from all indexes
 		for _, tag := range entity.Tags {
 			r.removeFromTagIndex(tag, entity.ID)
@@ -1424,10 +1470,7 @@ func (r *EntityRepository) GetByID(id string) (*models.Entity, error) {
 	logger.Trace("GetByID: %s", id)
 	
 	// First check in-memory cache for the entity
-	r.mu.RLock()
-	entity, exists := r.entities[id]
-	r.mu.RUnlock()
-	
+	entity, exists := r.entityCache.Get(id)
 	if exists {
 		logger.Trace("Found in memory cache: %s", id)
 		// Skip metrics for metric entities to avoid recursion
@@ -1510,7 +1553,8 @@ func (r *EntityRepository) GetByID(id string) (*models.Entity, error) {
 				logger.Info("Successfully recovered entity %s", id)
 				// Store recovered entity
 				r.mu.Lock()
-				r.entities[id] = recoveredEntity
+				r.entityCache.Put(id, recoveredEntity)
+				r.loadedEntityCount++
 				r.mu.Unlock()
 				
 				// Track overall operation time including recovery (skip metric entities to avoid recursion)
@@ -1533,7 +1577,8 @@ func (r *EntityRepository) GetByID(id string) (*models.Entity, error) {
 			
 			// Store in memory for future fast access
 			r.mu.Lock()
-			r.entities[id] = entity
+			r.entityCache.Put(id, entity)
+			r.loadedEntityCount++
 			r.mu.Unlock()
 		}
 		return entity, nil
@@ -1557,7 +1602,8 @@ func (r *EntityRepository) GetByID(id string) (*models.Entity, error) {
 				logger.Info("Successfully recovered critical entity %s", id)
 				// Store recovered entity
 				r.mu.Lock()
-				r.entities[id] = recoveredEntity
+				r.entityCache.Put(id, recoveredEntity)
+				r.loadedEntityCount++
 				r.mu.Unlock()
 				return recoveredEntity, nil
 			} else {
@@ -1576,7 +1622,8 @@ func (r *EntityRepository) GetByID(id string) (*models.Entity, error) {
 		
 		// Store in memory for future fast access
 		r.mu.Lock()
-		r.entities[id] = entity
+		r.entityCache.Put(id, entity)
+		r.loadedEntityCount++
 		r.mu.Unlock()
 	} else {
 		logger.Trace("Entity %s not found", id)
@@ -1655,7 +1702,7 @@ func (r *EntityRepository) Update(entity *models.Entity) error {
 	
 	// Update in-memory entity storage
 	r.mu.Lock()
-	r.entities[entity.ID] = entity
+	r.entityCache.Put(entity.ID, entity)
 	
 	// Update indexes incrementally (no full rebuild)
 	r.updateIndexes(entity)
@@ -2101,16 +2148,14 @@ func (r *EntityRepository) fetchEntitiesWithReader(reader *Reader, entityIDs []s
 	remainingIDs := make([]string, 0, len(entityIDs))
 	
 	// First pass: check memory cache for all entities
-	r.mu.RLock()
 	for _, id := range entityIDs {
-		if entity, exists := r.entities[id]; exists {
+		if entity, exists := r.entityCache.Get(id); exists {
 			entities = append(entities, entity)
 			logger.Debug("fetchEntitiesWithReader: Found in memory cache: %s", id)
 		} else {
 			remainingIDs = append(remainingIDs, id)
 		}
 	}
-	r.mu.RUnlock()
 	
 	// If all entities found in memory, return immediately
 	if len(remainingIDs) == 0 {
@@ -2630,9 +2675,10 @@ func (r *EntityRepository) AddTag(entityID, tag string) error {
 	
 	// Update in-memory entity
 	r.mu.Lock()
-	if cachedEntity, exists := r.entities[entityID]; exists {
+	if cachedEntity, exists := r.entityCache.Get(entityID); exists {
 		cachedEntity.Tags = append(cachedEntity.Tags, timestampedTag)
 		cachedEntity.UpdatedAt = entity.UpdatedAt
+		r.entityCache.Put(entityID, cachedEntity)
 	}
 	r.mu.Unlock()
 	
@@ -3245,7 +3291,7 @@ func (r *EntityRepository) ReindexTags() error {
 	r.contentIndex = make(map[string][]string)
 	r.temporalIndex = NewTemporalIndex()
 	r.namespaceIndex = NewNamespaceIndex()
-	r.entities = make(map[string]*models.Entity)
+	r.entityCache.Clear()
 	
 	logger.Trace("Cleared existing indexes")
 	
@@ -3269,7 +3315,7 @@ func (r *EntityRepository) ReindexTags() error {
 	// Rebuild indexes for each entity
 	for i, entity := range entities {
 		// Store entity in memory cache
-		r.entities[entity.ID] = entity
+		r.entityCache.Put(entity.ID, entity)
 		
 		// Update tag index
 		for _, tag := range entity.Tags {
@@ -3328,7 +3374,8 @@ func (r *EntityRepository) replayWAL() error {
 			if entry.Entity != nil {
 				// Add to in-memory cache
 				r.mu.Lock()
-				r.entities[entry.EntityID] = entry.Entity
+				r.entityCache.Put(entry.EntityID, entry.Entity)
+				r.loadedEntityCount++
 				
 				// Update tag index - use the updateIndexes method for consistency
 				r.updateIndexes(entry.Entity)
@@ -3340,14 +3387,15 @@ func (r *EntityRepository) replayWAL() error {
 		case WALOpDelete:
 			// Remove from indexes
 			r.mu.Lock()
-			if entity, exists := r.entities[entry.EntityID]; exists {
+			if entity, exists := r.entityCache.Get(entry.EntityID); exists {
 				// Remove from tag index
 				for _, tag := range entity.Tags {
 					r.shardedTagIndex.RemoveTag(tag, entry.EntityID)
 				}
 				
 				// Remove from cache
-				delete(r.entities, entry.EntityID)
+				r.entityCache.Delete(entry.EntityID)
+				r.loadedEntityCount--
 			}
 			r.mu.Unlock()
 		}
@@ -3420,7 +3468,7 @@ func (r *EntityRepository) persistWALEntries() error {
 		
 		// Get the current in-memory state with all accumulated tags
 		r.mu.RLock()
-		currentEntity, exists := r.entities[entityID]
+		currentEntity, exists := r.entityCache.Get(entityID)
 		r.mu.RUnlock()
 		
 		if !exists {
@@ -3466,39 +3514,25 @@ func (r *EntityRepository) VerifyIndexHealth() error {
 	}
 	
 	// Count entities in repository
-	entityCount := len(r.entities)
+	entityCount := r.loadedEntityCount
 	indexCount := len(indexedEntities)
 	
 	logger.Info("Index health: %d entities, %d in tag index, %d tag entries", 
 		entityCount, indexCount, totalTagEntries)
 		
-	// Debug: Show first few entities in memory
-	debugCount := 0
-	for id := range r.entities {
-		if debugCount < 5 {
-			logger.Trace("Entity in memory: %s", id)
-			debugCount++
-		} else {
-			break
-		}
-	}
+	// Note: Can't iterate cache entities for debug output anymore
 	
 	if entityCount != indexCount {
 		logger.Error("Index mismatch: %d entities, %d in index", entityCount, indexCount)
 		
-		// Find entities that are missing from index
-		missingFromIndex := 0
-		for entityID := range r.entities {
-			if _, exists := indexedEntities[entityID]; !exists {
-				logger.Error("Entity %s not in tag index", entityID)
-				missingFromIndex++
-			}
-		}
+		// With bounded cache, we can't iterate to find missing entities
+		// We can only report the count mismatch
+		missingFromIndex := entityCount - indexCount
 		
 		// Find entities in index but not in repository
 		missingFromRepo := 0
 		for entityID := range indexedEntities {
-			if _, exists := r.entities[entityID]; !exists {
+			if _, exists := r.entityCache.Get(entityID); !exists {
 				logger.Error("Entity %s in index but not in repository", entityID)
 				missingFromRepo++
 			}
@@ -3525,7 +3559,22 @@ func (r *EntityRepository) RepairIndexes() error {
 	r.temporalIndex = NewTemporalIndex()
 	r.namespaceIndex = NewNamespaceIndex()
 	
-	// Rebuild from entities in memory
+	// Note: With bounded cache, we need to rebuild from disk instead
+	// This is actually better as it ensures consistency with persistent storage
+	logger.Info("Rebuilding indexes from disk")
+	
+	// Use buildIndexes which reads from disk
+	if err := r.buildIndexes(); err != nil {
+		return fmt.Errorf("failed to rebuild indexes: %w", err)
+	}
+	
+	return nil
+}
+
+// Legacy code - keeping for reference but not using
+func (r *EntityRepository) rebuildAllIndexesLegacy() error {
+	// This was the old implementation that iterated over in-memory entities
+	/*
 	for entityID, entity := range r.entities {
 		logger.Trace("Re-indexing entity %s", entityID)
 		
@@ -3569,6 +3618,7 @@ func (r *EntityRepository) RepairIndexes() error {
 	}
 	
 	logger.Info("Index repair completed: %d entities re-indexed", len(r.entities))
+	*/
 	return nil
 }
 
@@ -3596,7 +3646,8 @@ func (r *EntityRepository) detectAndFixIndexCorruption(entityID string) error {
 	defer r.mu.Unlock()
 	
 	// Add entity to memory cache
-	r.entities[entityID] = entity
+	r.entityCache.Put(entityID, entity)
+	r.loadedEntityCount++
 	
 	// Re-index the entity
 	for _, tag := range entity.Tags {
@@ -3689,6 +3740,11 @@ func (r *EntityRepository) SaveTagIndexIfNeeded() error {
 
 // saveEntities writes all entities to disk - exposed for WALOnlyRepository
 func (r *EntityRepository) saveEntities() error {
+	// With bounded cache, we can't iterate over all entities
+	// This method should not be used with the new architecture
+	return fmt.Errorf("saveEntities not supported with bounded cache - use WAL checkpointing instead")
+	
+	/* Legacy implementation for reference:
 	dataFile := r.getDataFile()
 	tempFile := dataFile + ".tmp"
 	writer, err := NewWriter(tempFile)
@@ -3718,6 +3774,7 @@ func (r *EntityRepository) saveEntities() error {
 	}
 	
 	return nil
+	*/
 }
 
 // addToTagIndex adds an entity ID to a tag's index (legacy helper - now uses sharded index)
@@ -3836,6 +3893,20 @@ func (r *EntityRepository) performAutomaticRecovery() error {
 	
 	logger.Debug("Using in-memory sharded indexing - no external index corruption checks needed")
 	return nil
+}
+
+// TriggerCachePressureCleanup performs cache cleanup under memory pressure
+func (r *EntityRepository) TriggerCachePressureCleanup(pressure float64) {
+	if r.entityCache != nil {
+		r.entityCache.TriggerPressureCleanup(pressure)
+		logger.Debug("EntityRepository: triggered cache pressure cleanup at %.1f%%", pressure*100)
+	}
+	
+	// Also trigger cleanup in tag variant cache if available
+	if r.tagVariantCache != nil {
+		r.tagVariantCache.TriggerPressureCleanup(pressure)
+		logger.Debug("EntityRepository: triggered tag variant cache pressure cleanup at %.1f%%", pressure*100)
+	}
 }
 
 

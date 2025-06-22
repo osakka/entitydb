@@ -3,6 +3,7 @@ package binary
 import (
 	"entitydb/logger"
 	"entitydb/models"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -223,8 +224,20 @@ func (trm *TemporalRetentionManager) CleanupByAge(entity *models.Entity) error {
 	// Get retention policy for this entity type
 	policy := trm.getRetentionPolicy(entity)
 	
-	// Calculate cutoff time
-	cutoffTime := time.Now().Add(-policy.MaxAge)
+	// Calculate cutoff time - be more aggressive under memory pressure
+	memPressure := trm.getMemoryPressure()
+	maxAge := policy.MaxAge
+	
+	// Under memory pressure, reduce retention time
+	if memPressure > 0.8 {
+		maxAge = time.Duration(float64(maxAge) * 0.5) // Keep half the normal time
+		logger.Debug("High memory pressure (%.1f%%), reducing retention from %v to %v", 
+			memPressure*100, policy.MaxAge, maxAge)
+	} else if memPressure > 0.6 {
+		maxAge = time.Duration(float64(maxAge) * 0.75) // Keep 75% of normal time
+	}
+	
+	cutoffTime := time.Now().Add(-maxAge)
 	cutoffNanos := cutoffTime.UnixNano()
 	
 	// Filter out old temporal tags
@@ -275,5 +288,42 @@ func (trm *TemporalRetentionManager) ShouldApplyRetention(entity *models.Entity)
 	
 	// Check if entity has temporal tags
 	temporalTags := extractTemporalTags(entity.Tags)
-	return len(temporalTags) > 0
+	if len(temporalTags) == 0 {
+		return false
+	}
+	
+	// Under memory pressure, be more aggressive about retention
+	memPressure := trm.getMemoryPressure()
+	policy := trm.getRetentionPolicy(entity)
+	
+	// Apply retention if:
+	// 1. Too many temporal tags (always)
+	// 2. Under memory pressure (more frequent cleanup)
+	// 3. Periodic cleanup based on memory pressure
+	return len(temporalTags) > policy.MaxTags ||
+		   memPressure > 0.7 || // High memory pressure
+		   (memPressure > 0.5 && len(temporalTags) > policy.MaxTags/2) // Medium pressure
+}
+
+// getMemoryPressure returns a value between 0.0 and 1.0 indicating memory pressure
+func (trm *TemporalRetentionManager) getMemoryPressure() float64 {
+	var mem runtime.MemStats
+	runtime.ReadMemStats(&mem)
+	
+	// Calculate pressure based on heap usage vs available memory
+	// This is a heuristic - in production you might want more sophisticated metrics
+	heapMB := float64(mem.HeapInuse) / (1024 * 1024)
+	sysMB := float64(mem.Sys) / (1024 * 1024)
+	
+	// Pressure increases as heap approaches system memory
+	if sysMB == 0 {
+		return 0.0
+	}
+	
+	pressure := heapMB / sysMB
+	if pressure > 1.0 {
+		pressure = 1.0
+	}
+	
+	return pressure
 }

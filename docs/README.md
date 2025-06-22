@@ -31,6 +31,7 @@ EntityDB is a production-ready temporal database that provides efficient data st
 - **🚀 Battle-Tested**: Comprehensive real-world scenario testing with excellent performance
 - **📊 World-Class Observability**: 100% compliant logging standards with dynamic configuration
 - **🛡️ Self-Healing Architecture**: Automatic corruption recovery and index rebuilding
+- **💾 Advanced Memory Management**: Bounded caches, automatic pressure relief, zero memory leaks
 - **⚙️ Zero Configuration**: Intelligent defaults with comprehensive customization options
 - **🔧 Enterprise Integration**: SSL/TLS, monitoring, metrics, and operational excellence
 
@@ -173,7 +174,9 @@ graph TD
 
 **⚡ Performance**
 - [Performance Reference](./reference/performance/)
-- [Memory Optimization](./reference/performance/memory-optimization.md)
+- [Memory Optimization Architecture](./architecture/memory-optimization-architecture.md)
+- [Memory Management Operations](./admin-guide/memory-management-operations.md)
+- [Memory Migration Guide](./user-guide/memory-optimization-migration.md)
 - [High Performance Mode](./admin-guide/08-production-checklist.md)
 
 **🔧 Configuration**

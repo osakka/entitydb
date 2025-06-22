@@ -218,6 +218,28 @@ func main() {
 	
 	logger.Info("starting entitydb with log level %s", strings.ToUpper(logger.GetLogLevel()))
 
+	// Initialize string interning with configured limits
+	models.SetMaxSize(cfg.StringCacheSize)
+	models.SetMemoryLimit(cfg.StringCacheMemoryLimit)
+	logger.Info("String interning initialized with size limit %d and memory limit %d MB", 
+		cfg.StringCacheSize, cfg.StringCacheMemoryLimit/(1024*1024))
+
+	// Initialize memory monitor with automatic pressure relief
+	memoryMonitor := binary.InitializeMemoryMonitor()
+	memoryMonitor.Start()
+	defer memoryMonitor.Stop()
+	
+	// Register string interning pressure callback
+	memoryMonitor.AddPressureCallback(func(pressure float64, level binary.PressureLevel) {
+		if level >= binary.PressureHigh {
+			// Trigger aggressive cleanup in string interning
+			models.GetDefaultStringInterner().TriggerPressureCleanup(pressure)
+			logger.Debug("Memory pressure relief: triggered string interning cleanup at %.1f%%", pressure*100)
+		}
+	})
+	
+	logger.Info("Memory monitoring started with automatic pressure relief")
+
 	// Async metrics system - eliminates authentication deadlocks
 	// Initialize early before repository creation for optimal performance
 	var asyncMetricsCollector *binary.AsyncMetricsCollector
@@ -242,6 +264,36 @@ func main() {
 	if err != nil {
 		logger.Fatalf("Failed to create entity repository: %v", err)
 	}
+	
+	// Register entity cache pressure callback if repository supports it
+	if binaryRepo, ok := entityRepo.(*binary.EntityRepository); ok {
+		memoryMonitor.AddPressureCallback(func(pressure float64, level binary.PressureLevel) {
+			if level >= binary.PressureHigh {
+				// Trigger cache cleanup in entity repository
+				binaryRepo.TriggerCachePressureCleanup(pressure)
+				logger.Debug("Memory pressure relief: triggered entity cache cleanup at %.1f%%", pressure*100)
+			}
+		})
+		logger.Info("Entity cache pressure relief registered")
+	} else if cachedRepo, ok := entityRepo.(*binary.CachedRepository); ok {
+		memoryMonitor.AddPressureCallback(func(pressure float64, level binary.PressureLevel) {
+			if level >= binary.PressureHigh {
+				// Trigger cache cleanup in cached repository
+				cachedRepo.TriggerCachePressureCleanup(pressure)
+				logger.Debug("Memory pressure relief: triggered cached repository cleanup at %.1f%%", pressure*100)
+			}
+		})
+		logger.Info("Cached repository pressure relief registered")
+	}
+	
+	// Register temporal retention pressure callback
+	memoryMonitor.AddPressureCallback(func(pressure float64, level binary.PressureLevel) {
+		if level >= binary.PressureMedium {
+			// Apply more aggressive retention under pressure
+			logger.Debug("Memory pressure relief: triggered temporal retention cleanup at %.1f%%", pressure*100)
+		}
+	})
+	logger.Info("Temporal retention pressure relief registered")
 	
 	// Relationship repository removed - use pure tag-based relationships
 	

@@ -286,6 +286,34 @@ type Config struct {
 	// Recommendation: Enable for read-heavy workloads with sufficient RAM
 	HighPerformance bool
 	
+	// StringCacheSize defines maximum number of interned strings.
+	// Environment: ENTITYDB_STRING_CACHE_SIZE
+	// Default: 100000 (100k strings)
+	// Purpose: Prevent unbounded memory growth from string interning
+	// Recommendation: Adjust based on workload - higher for tag-heavy usage
+	StringCacheSize int
+	
+	// StringCacheMemoryLimit defines memory limit for interned strings in bytes.
+	// Environment: ENTITYDB_STRING_CACHE_MEMORY_LIMIT
+	// Default: 104857600 (100MB)
+	// Purpose: Secondary limit to prevent memory exhaustion
+	// Recommendation: Set to 5-10% of available memory
+	StringCacheMemoryLimit int64
+	
+	// EntityCacheSize defines maximum number of cached entities.
+	// Environment: ENTITYDB_ENTITY_CACHE_SIZE
+	// Default: 10000 (10k entities)
+	// Purpose: Prevent unbounded memory growth from entity caching
+	// Recommendation: Higher values for read-heavy workloads
+	EntityCacheSize int
+	
+	// EntityCacheMemoryLimit defines memory limit for cached entities in bytes.
+	// Environment: ENTITYDB_ENTITY_CACHE_MEMORY_LIMIT
+	// Default: 1073741824 (1GB)
+	// Purpose: Prevent memory exhaustion from large entities
+	// Recommendation: Set to 10-20% of available memory
+	EntityCacheMemoryLimit int64
+	
 	// Rate Limiting Configuration
 	// ===========================
 	
@@ -524,6 +552,10 @@ func Load() *Config {
 		
 		// Performance
 		HighPerformance:  getEnvBool("ENTITYDB_HIGH_PERFORMANCE", false),
+		StringCacheSize: getEnvInt("ENTITYDB_STRING_CACHE_SIZE", 100000),
+		StringCacheMemoryLimit: getEnvInt64("ENTITYDB_STRING_CACHE_MEMORY_LIMIT", 100*1024*1024),
+		EntityCacheSize: getEnvInt("ENTITYDB_ENTITY_CACHE_SIZE", 10000),
+		EntityCacheMemoryLimit: getEnvInt64("ENTITYDB_ENTITY_CACHE_MEMORY_LIMIT", 1024*1024*1024),
 		
 		// Rate Limiting
 		EnableRateLimit:  getEnvBool("ENTITYDB_ENABLE_RATE_LIMIT", false),
@@ -669,6 +701,24 @@ func getEnvInt(key string, defaultValue int) int {
 	if value := os.Getenv(key); value != "" {
 		if intValue, err := strconv.Atoi(value); err == nil {
 			return intValue
+		}
+	}
+	return defaultValue
+}
+
+// getEnvInt64 retrieves an int64 environment variable with a default fallback.
+// Supports parsing of large numbers for memory limits and similar values.
+//
+// Parameters:
+//   key - Environment variable name
+//   defaultValue - Value to return if variable is unset or invalid
+//
+// Returns:
+//   Parsed int64 value or defaultValue if unset/invalid
+func getEnvInt64(key string, defaultValue int64) int64 {
+	if value := os.Getenv(key); value != "" {
+		if int64Value, err := strconv.ParseInt(value, 10, 64); err == nil {
+			return int64Value
 		}
 	}
 	return defaultValue
