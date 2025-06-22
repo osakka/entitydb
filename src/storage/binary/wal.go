@@ -644,6 +644,12 @@ func (w *WAL) deserializeEntry(data []byte) (*WALEntry, error) {
 	// Read entity ID
 	entry.EntityID = string(data[11 : 11+idLen])
 	
+	// CRITICAL: Validate EntityID for corruption before proceeding
+	// Corrupted EntityIDs containing binary data cause 100% CPU usage in index operations
+	if !isValidEntityID(entry.EntityID) {
+		return nil, fmt.Errorf("corrupted EntityID detected: contains invalid characters")
+	}
+	
 	pos := 11 + int(idLen)
 	
 	// Read checksum if present
@@ -709,6 +715,12 @@ func (w *WAL) deserializeEntry(data []byte) (*WALEntry, error) {
 				if contentLen > 0 && entityPos+int(contentLen) <= len(entityData) {
 					entity.Content = entityData[entityPos : entityPos+int(contentLen)]
 				}
+			}
+			
+			// CRITICAL: Validate entity data for corruption before proceeding
+			// Corrupted tag data causes 100% CPU usage in index operations
+			if !isValidEntity(entity) {
+				return nil, fmt.Errorf("corrupted entity data detected: invalid tags or content")
 			}
 			
 			entry.Entity = entity
@@ -846,4 +858,75 @@ func (w *WAL) readSequence() error {
 	
 	w.sequence = count
 	return nil
+}
+
+// isValidEntityID validates that an EntityID contains only valid characters
+// and prevents corrupted binary data from reaching the index system
+func isValidEntityID(id string) bool {
+	// EntityIDs should be reasonable length (max 256 chars for safety)
+	if len(id) == 0 || len(id) > 256 {
+		return false
+	}
+	
+	// EntityIDs should contain only printable ASCII characters, hyphens, and underscores
+	// This prevents binary garbage from causing CPU spikes in index operations
+	for _, char := range id {
+		if !((char >= 'a' && char <= 'z') || 
+			 (char >= 'A' && char <= 'Z') || 
+			 (char >= '0' && char <= '9') || 
+			 char == '-' || char == '_' || char == '.') {
+			return false
+		}
+	}
+	
+	return true
+}
+
+// isValidEntity validates that an entity contains only valid tag data
+// and prevents corrupted entities from reaching the index system
+func isValidEntity(entity *models.Entity) bool {
+	if entity == nil {
+		return false
+	}
+	
+	// Already validated EntityID in isValidEntityID, but double-check
+	if !isValidEntityID(entity.ID) {
+		return false
+	}
+	
+	// Validate tags for corruption
+	for _, tag := range entity.Tags {
+		// Tags should be reasonable length (max 1024 chars for safety)
+		if len(tag) > 1024 {
+			return false
+		}
+		
+		// Tags should not contain null bytes or other control characters
+		// Allow printable ASCII, UTF-8, and common punctuation
+		for _, char := range tag {
+			// Allow null bytes to pass through as they might be legitimate in some contexts
+			// but check for excessive binary garbage
+			if char < 32 && char != 0 && char != 9 && char != 10 && char != 13 {
+				return false // Control characters except tab, newline, carriage return
+			}
+		}
+		
+		// Check for excessive binary data (more than 10% non-printable chars)
+		nonPrintableCount := 0
+		for _, char := range tag {
+			if char < 32 || char > 126 {
+				nonPrintableCount++
+			}
+		}
+		if len(tag) > 0 && float64(nonPrintableCount)/float64(len(tag)) > 0.1 {
+			return false // More than 10% non-printable characters
+		}
+	}
+	
+	// Validate content size is reasonable (max 100MB for single entity)
+	if len(entity.Content) > 100*1024*1024 {
+		return false
+	}
+	
+	return true
 }
