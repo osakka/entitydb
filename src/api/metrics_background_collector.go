@@ -16,29 +16,40 @@ import (
 
 // BackgroundMetricsCollector collects system metrics periodically
 type BackgroundMetricsCollector struct {
-	collector  *MetricsCollector
-	repo       models.EntityRepository
-	config     *config.Config
-	interval   time.Duration
-	gentlePause time.Duration      // Configurable pause between metric collection blocks
-	ctx        context.Context
-	cancel     context.CancelFunc
-	lastValues map[string]float64 // Track last values for change detection
-	mu         sync.RWMutex       // Protect lastValues map
+	collector    *MetricsCollector
+	repo         models.EntityRepository
+	config       *config.Config
+	interval     time.Duration
+	gentlePause  time.Duration      // Configurable pause between metric collection blocks
+	ctx          context.Context
+	cancel       context.CancelFunc
+	lastValues   map[string]float64 // Track last values for change detection
+	mu           sync.RWMutex       // Protect lastValues map
+	
+	// LEGENDARY FIX: Metric entity cache to prevent lookup storms
+	metricCache  map[string]string  // metric name -> entity ID cache
+	cacheMu      sync.RWMutex       // Protect metric cache
+	
+	// BAR-RAISING SOLUTION: Circuit breaker to prevent feedback loops
+	failureCount    int           // Count of consecutive failures
+	circuitOpen     bool          // True when circuit is open (metrics collection disabled)
+	lastFailure     time.Time     // Time of last failure
+	circuitMu       sync.RWMutex  // Protect circuit breaker state
 }
 
 // NewBackgroundMetricsCollector creates a new background metrics collector
 func NewBackgroundMetricsCollector(repo models.EntityRepository, cfg *config.Config, interval time.Duration, gentlePause time.Duration) *BackgroundMetricsCollector {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &BackgroundMetricsCollector{
-		collector:   NewMetricsCollector(repo),
-		repo:        repo,
-		config:      cfg,
-		interval:    interval,
-		gentlePause: gentlePause,
-		ctx:         ctx,
-		cancel:      cancel,
-		lastValues:  make(map[string]float64),
+		collector:    NewMetricsCollector(repo),
+		repo:         repo,
+		config:       cfg,
+		interval:     interval,
+		gentlePause:  gentlePause,
+		ctx:          ctx,
+		cancel:       cancel,
+		lastValues:   make(map[string]float64),
+		metricCache:  make(map[string]string), // Initialize cache
 	}
 }
 
@@ -80,6 +91,12 @@ func (b *BackgroundMetricsCollector) Stop() {
 
 // collectMetrics collects all system metrics with gentle pacing to reduce CPU spikes
 func (b *BackgroundMetricsCollector) collectMetrics() {
+	// BAR-RAISING SOLUTION: Check circuit breaker first
+	if b.isCircuitOpen() {
+		logger.Trace("Metrics collection circuit is open - skipping collection to prevent feedback loops")
+		return
+	}
+	
 	logger.Trace("Collecting system metrics with gentle pacing...")
 	
 	// Memory metrics block
@@ -236,17 +253,24 @@ func (b *BackgroundMetricsCollector) storeMetric(name string, value float64, uni
 		"retention:period:3600", // Keep for 1 hour
 	}
 	
-	// Try to find existing metric entity first by searching for name tag
-	existingEntities, err := b.repo.ListByTag(fmt.Sprintf("name:%s", name))
+	// LEGENDARY FIX: Use cached metric lookup to prevent database lookup storms
+	// Check cache first to avoid expensive ListByTag operations
+	metricID, exists := b.getMetricFromCache(name)
 	var metricEntity *models.Entity
-	var metricID string
 	
-	if err == nil && len(existingEntities) > 0 {
-		// Use existing metric entity
-		metricEntity = existingEntities[0]
-		metricID = metricEntity.ID
-		logger.Trace("Found existing metric entity: %s for metric %s", metricID, name)
-	} else {
+	if exists {
+		// Get cached metric entity
+		if cachedEntity, err := b.repo.GetByID(metricID); err == nil {
+			metricEntity = cachedEntity
+			logger.Trace("Found cached metric entity: %s for metric %s", metricID, name)
+		} else {
+			// Cache is stale, remove and create new
+			b.removeMetricFromCache(name)
+			exists = false
+		}
+	}
+	
+	if !exists {
 		// Create new metric entity using UUID architecture
 		newEntity, err := models.NewEntityWithMandatoryTags(
 			"metric",                    // entityType
@@ -261,12 +285,16 @@ func (b *BackgroundMetricsCollector) storeMetric(name string, value float64, uni
 		
 		if err := b.repo.Create(newEntity); err != nil {
 			logger.Error("Failed to store metric entity %s: %v", newEntity.ID, err)
+			b.recordFailure() // BAR-RAISING: Track failures for circuit breaker
 			return
 		}
 		
 		metricEntity = newEntity
 		metricID = newEntity.ID
-		logger.Debug("Created metric entity with UUID: %s for metric %s", metricID, name)
+		
+		// Cache the new metric entity to prevent future lookup storms
+		b.cacheMetric(name, metricID)
+		logger.Debug("Created and cached metric entity with UUID: %s for metric %s", metricID, name)
 	}
 	
 	// ATOMIC TAG FIX: Add temporal value tag with explicit timestamp to prevent explosion
@@ -278,8 +306,87 @@ func (b *BackgroundMetricsCollector) storeMetric(name string, value float64, uni
 	metricEntity.Tags = append(metricEntity.Tags, timestampedValueTag)
 	if err := b.repo.Update(metricEntity); err != nil {
 		logger.Error("Failed to update metric entity %s: %v", metricID, err)
+		b.recordFailure() // BAR-RAISING: Track failures for circuit breaker
 		return
 	}
 	
+	// BAR-RAISING: Record successful operation to reset failure count
+	b.recordSuccess()
 	logger.Trace("Stored metric %s with value: %.2f %s (entity: %s)", name, value, unit, metricID)
+}
+
+// LEGENDARY FIX: Metric cache methods to prevent database lookup storms
+
+// getMetricFromCache retrieves a cached metric entity ID by name
+func (b *BackgroundMetricsCollector) getMetricFromCache(name string) (string, bool) {
+	b.cacheMu.RLock()
+	defer b.cacheMu.RUnlock()
+	entityID, exists := b.metricCache[name]
+	return entityID, exists
+}
+
+// cacheMetric stores a metric entity ID in cache by name
+func (b *BackgroundMetricsCollector) cacheMetric(name, entityID string) {
+	b.cacheMu.Lock()
+	defer b.cacheMu.Unlock()
+	b.metricCache[name] = entityID
+	logger.Trace("Cached metric %s -> entity %s", name, entityID)
+}
+
+// removeMetricFromCache removes a stale metric from cache
+func (b *BackgroundMetricsCollector) removeMetricFromCache(name string) {
+	b.cacheMu.Lock()
+	defer b.cacheMu.Unlock()
+	delete(b.metricCache, name)
+	logger.Trace("Removed stale metric cache for %s", name)
+}
+
+// BAR-RAISING SOLUTION: Circuit breaker methods to prevent feedback loops
+
+// isCircuitOpen checks if the circuit breaker is open (metrics collection disabled)
+func (b *BackgroundMetricsCollector) isCircuitOpen() bool {
+	b.circuitMu.RLock()
+	defer b.circuitMu.RUnlock()
+	
+	// Circuit is open if we have too many failures
+	if b.failureCount >= 5 {
+		// Auto-recovery after 5 minutes
+		if time.Since(b.lastFailure) > 5*time.Minute {
+			b.circuitMu.RUnlock()
+			b.circuitMu.Lock()
+			b.failureCount = 0
+			b.circuitOpen = false
+			b.circuitMu.Unlock()
+			logger.Info("Circuit breaker auto-recovery: reopening metrics collection after 5 minutes")
+			b.circuitMu.RLock()
+		}
+	}
+	
+	return b.circuitOpen
+}
+
+// recordFailure increments failure count and may open the circuit
+func (b *BackgroundMetricsCollector) recordFailure() {
+	b.circuitMu.Lock()
+	defer b.circuitMu.Unlock()
+	
+	b.failureCount++
+	b.lastFailure = time.Now()
+	
+	if b.failureCount >= 5 && !b.circuitOpen {
+		b.circuitOpen = true
+		logger.Warn("CIRCUIT BREAKER OPENED: Disabling metrics collection after %d consecutive failures to prevent feedback loops", b.failureCount)
+	}
+}
+
+// recordSuccess resets failure count and closes circuit if open
+func (b *BackgroundMetricsCollector) recordSuccess() {
+	b.circuitMu.Lock()
+	defer b.circuitMu.Unlock()
+	
+	if b.failureCount > 0 || b.circuitOpen {
+		logger.Info("Circuit breaker: Successful operation - resetting failure count (was %d)", b.failureCount)
+		b.failureCount = 0
+		b.circuitOpen = false
+	}
 }

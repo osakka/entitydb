@@ -20,6 +20,12 @@ type RequestMetricsMiddleware struct {
 	workerPool *MetricsWorkerPool
 	lastValues map[string]float64 // Track last values for change detection
 	mu         sync.RWMutex       // Protect lastValues map
+	
+	// BAR-RAISING SOLUTION: Circuit breaker to prevent feedback loops
+	failureCount    int           // Count of consecutive failures
+	circuitOpen     bool          // True when circuit is open (metrics collection disabled)
+	lastFailure     time.Time     // Time of last failure
+	circuitMu       sync.RWMutex  // Protect circuit breaker state
 }
 
 // NewRequestMetricsMiddleware creates a new request metrics middleware
@@ -54,6 +60,13 @@ func (rw *responseWriter) Write(data []byte) (int, error) {
 // Middleware returns the HTTP middleware function
 func (m *RequestMetricsMiddleware) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// BAR-RAISING SOLUTION: Check circuit breaker first
+		if m.isCircuitOpen() {
+			logger.Trace("Request metrics circuit is open - skipping metrics collection to prevent feedback loops")
+			next.ServeHTTP(w, r)
+			return
+		}
+		
 		// Skip metrics endpoint to avoid recursion
 		if strings.HasPrefix(r.URL.Path, "/api/v1/metrics") || 
 		   strings.HasPrefix(r.URL.Path, "/api/v1/system/metrics") ||
@@ -387,8 +400,12 @@ func (m *RequestMetricsMiddleware) storeMetric(name string, value float64, unit 
 	entity.Tags = append(entity.Tags, timestampedValueTag)
 	if updateErr := m.repo.Update(entity); updateErr != nil {
 		logger.Error("Failed to update request metric %s: %v", metricID, updateErr)
+		m.recordFailure() // BAR-RAISING: Track failures for circuit breaker
+		return
 	}
 	
+	// BAR-RAISING: Record successful operation to reset failure count
+	m.recordSuccess()
 	logger.Trace("Stored request metric %s with value: %.2f %s (entity: %s)", metricKey, value, unit, metricID)
 }
 // Shutdown gracefully stops the metrics worker pool
@@ -396,5 +413,55 @@ func (m *RequestMetricsMiddleware) Shutdown() {
 	if m.workerPool != nil {
 		logger.Info("Shutting down metrics worker pool...")
 		m.workerPool.Shutdown()
+	}
+}
+
+// BAR-RAISING SOLUTION: Circuit breaker methods to prevent feedback loops
+
+// isCircuitOpen checks if the circuit breaker is open (metrics collection disabled)
+func (m *RequestMetricsMiddleware) isCircuitOpen() bool {
+	m.circuitMu.RLock()
+	defer m.circuitMu.RUnlock()
+	
+	// Circuit is open if we have too many failures
+	if m.failureCount >= 5 {
+		// Auto-recovery after 5 minutes
+		if time.Since(m.lastFailure) > 5*time.Minute {
+			m.circuitMu.RUnlock()
+			m.circuitMu.Lock()
+			m.failureCount = 0
+			m.circuitOpen = false
+			m.circuitMu.Unlock()
+			logger.Info("Request metrics circuit breaker auto-recovery: reopening after 5 minutes")
+			m.circuitMu.RLock()
+		}
+	}
+	
+	return m.circuitOpen
+}
+
+// recordFailure increments failure count and may open the circuit
+func (m *RequestMetricsMiddleware) recordFailure() {
+	m.circuitMu.Lock()
+	defer m.circuitMu.Unlock()
+	
+	m.failureCount++
+	m.lastFailure = time.Now()
+	
+	if m.failureCount >= 5 && !m.circuitOpen {
+		m.circuitOpen = true
+		logger.Warn("REQUEST METRICS CIRCUIT BREAKER OPENED: Disabling request metrics after %d consecutive failures", m.failureCount)
+	}
+}
+
+// recordSuccess resets failure count and closes circuit if open
+func (m *RequestMetricsMiddleware) recordSuccess() {
+	m.circuitMu.Lock()
+	defer m.circuitMu.Unlock()
+	
+	if m.failureCount > 0 || m.circuitOpen {
+		logger.Info("Request metrics circuit breaker: Successful operation - resetting failure count (was %d)", m.failureCount)
+		m.failureCount = 0
+		m.circuitOpen = false
 	}
 }
