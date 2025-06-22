@@ -19,6 +19,7 @@ package binary
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
@@ -36,6 +37,10 @@ import (
 // It manages the file structure, maintains indexes for fast lookups,
 // and ensures data integrity through checksums and atomic operations.
 //
+// BAR-RAISING ENHANCEMENT: Integrated WAL corruption prevention system
+// with comprehensive integrity monitoring, self-healing capabilities,
+// and astronomical size detection to prevent database corruption.
+//
 // The Writer is safe for concurrent use through internal mutex locking.
 // However, only one Writer instance should be active per file to prevent
 // corruption. Use WriterManager for safe concurrent access patterns.
@@ -48,6 +53,8 @@ import (
 //   - O(1) index updates through in-memory map
 //   - Compression reduces I/O for large content
 //   - Memory pools minimize allocation overhead
+//   - BAR-RAISING: Pre-write validation prevents corruption
+//   - BAR-RAISING: Self-healing recovers from corruption automatically
 //   - Embedded WAL reduces syscalls and improves atomicity
 type Writer struct {
 	file        *os.File                // Underlying file handle
@@ -56,6 +63,11 @@ type Writer struct {
 	index       map[string]*IndexEntry  // Entity ID to file location mapping
 	mu          sync.Mutex              // Protects concurrent access
 	walSequence uint64                  // Current WAL sequence number
+	
+	// BAR-RAISING: Comprehensive corruption prevention system
+	integritySystem *WALIntegritySystem  // WAL corruption prevention and self-healing
+	healthCtx       context.Context      // Context for health monitoring
+	healthCancel    context.CancelFunc   // Cancel function for health monitoring
 }
 
 // getFilePosition returns the current file position for tracking write operations.
@@ -95,12 +107,19 @@ func NewWriter(filename string) (*Writer, error) {
 		return nil, err
 	}
 	
+	// BAR-RAISING: Initialize comprehensive WAL integrity system
+	integritySystem := NewWALIntegritySystem(filename)
+	healthCtx, healthCancel := context.WithCancel(context.Background())
+	
 	w := &Writer{
-		file:        file,
-		header:      &Header{Magic: MagicNumber, Version: FormatVersion},
-		tagDict:     NewTagDictionary(),
-		index:       make(map[string]*IndexEntry),
-		walSequence: 1,
+		file:            file,
+		header:          &Header{Magic: MagicNumber, Version: FormatVersion},
+		tagDict:         NewTagDictionary(),
+		index:           make(map[string]*IndexEntry),
+		walSequence:     1,
+		integritySystem: integritySystem,
+		healthCtx:       healthCtx,
+		healthCancel:    healthCancel,
 	}
 	
 	// Try to read existing file
@@ -124,6 +143,10 @@ func NewWriter(filename string) (*Writer, error) {
 			return nil, err
 		}
 	}
+	
+	// BAR-RAISING: Start continuous health monitoring
+	go w.integritySystem.StartHealthMonitoring(w.healthCtx)
+	logger.Info("WAL integrity system initialized with continuous health monitoring")
 	
 	return w, nil
 }
@@ -187,6 +210,15 @@ func (w *Writer) WriteEntity(entity *models.Entity) error {
 	// Acquire exclusive lock for thread safety
 	w.mu.Lock()
 	defer w.mu.Unlock()
+	
+	// BAR-RAISING: Pre-write corruption prevention validation
+	// Calculate estimated WAL entry length to prevent astronomical sizes
+	estimatedWALLength := int64(len(entity.ID) + len(entity.Content) + (len(entity.Tags) * 50)) // Conservative estimate
+	if err := w.integritySystem.ValidateBeforeWrite(entity.ID, entity.Content, estimatedWALLength); err != nil {
+		op.Fail(err)
+		logger.Error("CORRUPTION PREVENTION: WAL integrity validation failed for entity %s: %v", entity.ID, err)
+		return fmt.Errorf("WAL integrity validation failed: %w", err)
+	}
 	
 	// Write to WAL first
 	if err := w.writeWALEntry(1, entity.ID, entity); err != nil { // OpType 1 = create/update
@@ -803,6 +835,12 @@ func (w *Writer) Close() error {
 	
 	logger.Debug("Close completed successfully")
 	
+	// BAR-RAISING: Shut down health monitoring gracefully
+	if w.healthCancel != nil {
+		w.healthCancel()
+		logger.Info("WAL integrity system health monitoring shut down")
+	}
+	
 	// Don't close the file if used as singleton
 	return nil
 }
@@ -1118,6 +1156,18 @@ func (w *Writer) writeWALEntry(opType byte, entityID string, entity *models.Enti
 		entryBuf.Write(entityData.Bytes())
 	} else {
 		binary.Write(entryBuf, binary.LittleEndian, uint32(0)) // No entity data
+	}
+	
+	// BAR-RAISING: Emergency corruption detection before writing to disk
+	// This is the last line of defense against astronomical WAL entry sizes
+	walEntrySize := int64(entryBuf.Len())
+	if walEntrySize > 1000000000 { // 1GB astronomical threshold
+		logger.Error("CRITICAL CORRUPTION BLOCKED: WAL entry size %d exceeds astronomical threshold, aborting write for entity %s", walEntrySize, entityID)
+		// Trigger emergency mode in integrity system
+		if w.integritySystem != nil {
+			w.integritySystem.EnableEmergencyMode()
+		}
+		return fmt.Errorf("astronomical WAL entry size %d blocked (entity: %s)", walEntrySize, entityID)
 	}
 	
 	if _, err := w.file.Write(entryBuf.Bytes()); err != nil {
