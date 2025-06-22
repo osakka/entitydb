@@ -64,11 +64,16 @@ func main() {
 func analyzeStorageEfficiency() StorageMetrics {
 	fmt.Println("\n📊 Analyzing storage efficiency...")
 	
-	// Check database file
-	dbPath := "../../var/entities.edb"
+	// Check database file using configuration system
+	// Try environment variable first, then fallback to search
+	dbPath := os.Getenv("ENTITYDB_DATABASE_FILE")
+	if dbPath == "" {
+		dbPath = "./var/entities.edb" // default relative path
+	}
+	
 	fileInfo, err := os.Stat(dbPath)
 	if err != nil {
-		log.Printf("Warning: Could not access database file: %v", err)
+		log.Printf("Warning: Could not access configured database file %s: %v", dbPath, err)
 		dbPath = findDatabaseFile()
 		if dbPath == "" {
 			log.Fatal("No database file found")
@@ -103,7 +108,17 @@ func analyzeStorageEfficiency() StorageMetrics {
 }
 
 func findDatabaseFile() string {
-	// Search common locations for .edb files
+	// First try the configuration system
+	// This will respect all configuration sources (env, flags, database)
+	// Note: Can't use full config manager here as we're in a test, but we can check env vars
+	if envPath := os.Getenv("ENTITYDB_DATABASE_FILE"); envPath != "" {
+		if _, err := os.Stat(envPath); err == nil {
+			fmt.Printf("Found database file via ENTITYDB_DATABASE_FILE: %s\n", envPath)
+			return envPath
+		}
+	}
+	
+	// Search common relative locations for .edb files
 	searchPaths := []string{
 		"../../var/entities.edb",
 		"../var/entities.edb", 

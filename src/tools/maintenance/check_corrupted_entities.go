@@ -11,7 +11,8 @@ import (
 func main() {
 	if len(os.Args) < 2 {
 		fmt.Println("Usage: check_corrupted_entities <database_file>")
-		fmt.Println("Example: check_corrupted_entities /opt/entitydb/var/entities.edb")
+		fmt.Println("Example: check_corrupted_entities $ENTITYDB_DATABASE_FILE")
+		fmt.Println("         check_corrupted_entities ./var/entities.edb")
 		os.Exit(1)
 	}
 

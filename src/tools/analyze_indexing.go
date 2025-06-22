@@ -14,23 +14,19 @@ import (
 
 func main() {
 	
-	// Get data path
-	dataPath := os.Getenv("ENTITYDB_DATA_PATH")
-	if dataPath == "" {
-		dataPath = "var"
-	}
-	
 	fmt.Printf("=== EntityDB Index Analysis ===\n")
-	fmt.Printf("Data path: %s\n\n", dataPath)
 	
-	// Load configuration to get proper database file path
+	// Load configuration using proper configuration system
 	cfg := config.Load()
-	if dataPath != "." {
-		// Override the data path if provided
-		cfg.DataPath = dataPath
-		// Update database filename to use provided path
-		cfg.DatabaseFilename = filepath.Join(dataPath, "entities.edb")
+	
+	// Allow override via environment variable
+	if envDataPath := os.Getenv("ENTITYDB_DATA_PATH"); envDataPath != "" {
+		cfg.DataPath = envDataPath
+		// Reconstruct database filename for the new data path
+		cfg.DatabaseFilename = filepath.Join(cfg.DataPath, "entities.edb")
 	}
+	
+	fmt.Printf("Database file: %s\n\n", cfg.DatabaseFilename)
 	
 	// Create a reader using configured database file
 	reader, err := binary.NewReader(cfg.DatabaseFilename)
@@ -88,35 +84,8 @@ func main() {
 	fmt.Printf("Credential entities: %v\n", credentialEntities)
 	fmt.Printf("Relationship entities (first 5): %v\n", relationshipEntities[:min(5, len(relationshipEntities))])
 	
-	// Check WAL
-	walPath := filepath.Join(dataPath, "entitydb.wal")
-	if stat, err := os.Stat(walPath); err == nil {
-		fmt.Printf("\nWAL file size: %d bytes\n", stat.Size())
-		
-		// Create WAL reader
-		wal, err := binary.NewWAL(dataPath)
-		if err != nil {
-			log.Printf("Failed to create WAL: %v", err)
-		} else {
-			// Count entries in WAL
-			walCount := 0
-			err = wal.Replay(func(entry binary.WALEntry) error {
-				walCount++
-				if walCount <= 5 {
-					fmt.Printf("WAL entry %d: EntityID=%s\n", walCount, entry.EntityID)
-				}
-				return nil
-			})
-			
-			if err != nil {
-				log.Printf("Failed to replay WAL: %v", err)
-			} else {
-				fmt.Printf("Total WAL entries: %d\n", walCount)
-			}
-		}
-	} else {
-		fmt.Printf("\nNo WAL file found\n")
-	}
+	// Note: WAL is embedded in unified .edb file format
+	fmt.Printf("\nUnified database format: WAL embedded in %s\n", cfg.DatabaseFilename)
 }
 
 func min(a, b int) int {

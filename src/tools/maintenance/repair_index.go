@@ -11,7 +11,8 @@ import (
 func main() {
 	if len(os.Args) < 2 {
 		fmt.Println("Usage: fix_index <database_file>")
-		fmt.Println("Example: fix_index /opt/entitydb/var/entities.edb")
+		fmt.Println("Example: fix_index $ENTITYDB_DATABASE_FILE")
+		fmt.Println("         fix_index ./var/entities.edb")
 		os.Exit(1)
 	}
 

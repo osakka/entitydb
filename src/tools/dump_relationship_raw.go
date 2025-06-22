@@ -13,16 +13,17 @@ import (
 func main() {
 	logger.Info("=== Dump Raw Relationship Data ===")
 	
-	dataDir := "var/"
+	// Load configuration using proper configuration system
+	cfg := config.Load()
+	
+	// Allow override via command line argument
 	if len(os.Args) > 1 {
-		dataDir = os.Args[1]
+		cfg.DataPath = os.Args[1]
+		// Reconstruct database filename for the new data path
+		cfg.DatabaseFilename = filepath.Join(cfg.DataPath, "entities.edb")
 	}
 	
-	// Use NewReader directly to bypass any caching/indexing
-	// Load configuration to get proper database file path
-	cfg := config.Load()
-	cfg.DataPath = dataDir
-	cfg.DatabaseFilename = filepath.Join(dataDir, "entities.edb")
+	logger.Info("Using database file: %s", cfg.DatabaseFilename)
 	
 	reader, err := binary.NewReader(cfg.DatabaseFilename)
 	if err != nil {

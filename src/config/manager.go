@@ -153,6 +153,12 @@ func (cm *ConfigManager) RegisterFlags() {
 		"Data directory path")
 	flag.StringVar(&cm.config.StaticDir, "entitydb-static-dir", cm.config.StaticDir,
 		"Static files directory")
+	
+	// Database File - unified format only (single source of truth)
+	flag.StringVar(&cm.config.DatabaseFilename, "entitydb-database-file", cm.config.DatabaseFilename,
+		"Database file path (unified .edb format with embedded WAL and indexes)")
+	flag.StringVar(&cm.config.MetricsFilename, "entitydb-metrics-file", cm.config.MetricsFilename,
+		"Metrics storage file path")
 
 	// Security - all long flags
 	flag.StringVar(&cm.config.TokenSecret, "entitydb-token-secret", cm.config.TokenSecret,
@@ -183,6 +189,22 @@ func (cm *ConfigManager) RegisterFlags() {
 		"Metrics collection interval")
 	flag.DurationVar(&cm.config.AggregationInterval, "entitydb-metrics-aggregation-interval", cm.config.AggregationInterval,
 		"Metrics aggregation interval")
+	flag.BoolVar(&cm.config.MetricsEnableRequestTracking, "entitydb-metrics-enable-request-tracking", cm.config.MetricsEnableRequestTracking,
+		"Enable HTTP request metrics collection")
+	flag.BoolVar(&cm.config.MetricsEnableStorageTracking, "entitydb-metrics-enable-storage-tracking", cm.config.MetricsEnableStorageTracking,
+		"Enable storage operation metrics collection")
+	
+	// Throttling Configuration - all long flags
+	flag.BoolVar(&cm.config.ThrottleEnabled, "entitydb-throttle-enabled", cm.config.ThrottleEnabled,
+		"Enable intelligent request throttling")
+	flag.IntVar(&cm.config.ThrottleRequestsPerMinute, "entitydb-throttle-requests-per-minute", cm.config.ThrottleRequestsPerMinute,
+		"Baseline requests per minute before throttling")
+	flag.IntVar(&cm.config.ThrottlePollingThreshold, "entitydb-throttle-polling-threshold", cm.config.ThrottlePollingThreshold,
+		"Repeated requests threshold for polling detection")
+	flag.DurationVar(&cm.config.ThrottleMaxDelayMs, "entitydb-throttle-max-delay", cm.config.ThrottleMaxDelayMs,
+		"Maximum delay for throttled requests")
+	flag.DurationVar(&cm.config.ThrottleCacheDuration, "entitydb-throttle-cache-duration", cm.config.ThrottleCacheDuration,
+		"Cache duration for repeated requests")
 
 	// API - all long flags
 	flag.StringVar(&cm.config.SwaggerHost, "entitydb-swagger-host", cm.config.SwaggerHost,
@@ -276,6 +298,10 @@ func (cm *ConfigManager) applyFlags() {
 			cm.config.DataPath = f.Value.String()
 		case "entitydb-static-dir":
 			cm.config.StaticDir = f.Value.String()
+		case "entitydb-database-file":
+			cm.config.DatabaseFilename = f.Value.String()
+		case "entitydb-metrics-file":
+			cm.config.MetricsFilename = f.Value.String()
 		case "entitydb-token-secret":
 			cm.config.TokenSecret = f.Value.String()
 		case "entitydb-session-ttl-hours":
@@ -298,6 +324,20 @@ func (cm *ConfigManager) applyFlags() {
 			}
 		case "entitydb-swagger-host":
 			cm.config.SwaggerHost = f.Value.String()
+		case "entitydb-metrics-enable-request-tracking":
+			cm.config.MetricsEnableRequestTracking = f.Value.String() == "true"
+		case "entitydb-metrics-enable-storage-tracking":
+			cm.config.MetricsEnableStorageTracking = f.Value.String() == "true"
+		case "entitydb-throttle-enabled":
+			cm.config.ThrottleEnabled = f.Value.String() == "true"
+		case "entitydb-throttle-requests-per-minute":
+			if v, err := strconv.Atoi(f.Value.String()); err == nil {
+				cm.config.ThrottleRequestsPerMinute = v
+			}
+		case "entitydb-throttle-polling-threshold":
+			if v, err := strconv.Atoi(f.Value.String()); err == nil {
+				cm.config.ThrottlePollingThreshold = v
+			}
 		
 		// File and Path Configuration
 		case "entitydb-wal-suffix":

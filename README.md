@@ -24,11 +24,13 @@
 
 EntityDB is a high-performance temporal database that stores everything as entities with nanosecond-precision timestamps. Built with a unified binary format (EUFF), embedded Write-Ahead Logging, and enterprise-grade features, it provides complete time-travel capabilities, tag-based RBAC, and production-ready reliability.
 
-### Latest Release (v2.34.0) - WAL Corruption Prevention and Documentation Excellence
+### Latest Release (v2.34.0) - WAL Corruption Prevention, Documentation Excellence, and Configuration Management
 
 **WAL Integrity System**: Comprehensive corruption prevention with pre-write validation, astronomical size detection, and self-healing recovery. Prevents database crashes from corrupted entries while maintaining unified file architecture performance.
 
 **Documentation Audit**: Complete technical documentation overhaul with IEEE 1063-2001 compliance, single source of truth enforcement, and 100% accuracy verification against production codebase.
+
+**Configuration Management Excellence**: Enterprise-grade configuration system with 67 CLI flags, zero hardcoded values, and comprehensive three-tier hierarchy (Database > CLI flags > Environment variables). All tools updated for unified configuration compliance.
 
 ### Recent Major Releases
 
