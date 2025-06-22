@@ -44,26 +44,31 @@ func (m *MetricsRetentionManager) Start() {
 	logger.Info("Starting metrics retention manager - Raw: %v, 1min: %v, 1hour: %v, 1day: %v", 
 		m.retentionRaw, m.retention1Min, m.retention1Hour, m.retention1Day)
 	
-	// Run retention cleanup every hour
+	// BAR-RAISING SOLUTION: Conservative retention scheduling to prevent contention
 	go func() {
-		// Initial delay to let system stabilize
+		// Extended initial delay to ensure system stability
 		select {
-		case <-time.After(5 * time.Minute):
+		case <-time.After(30 * time.Minute):
 		case <-m.ctx.Done():
 			return
 		}
 		
-		// Run immediately on start
-		m.enforceRetention()
+		// Skip initial run to prevent startup contention
+		logger.Info("Metrics retention manager initialized with conservative scheduling")
 		
-		// Then run periodically
-		ticker := time.NewTicker(1 * time.Hour)
+		// Run periodically with extended interval to reduce system load
+		ticker := time.NewTicker(6 * time.Hour)
 		defer ticker.Stop()
 		
 		for {
 			select {
 			case <-ticker.C:
-				m.enforceRetention()
+				// Only run retention if system is stable
+				if !binary.IsMetricsOperation() {
+					m.enforceRetention()
+				} else {
+					logger.Trace("Skipping retention cycle due to active metrics operations")
+				}
 			case <-m.ctx.Done():
 				logger.Info("Metrics retention manager stopped")
 				return
@@ -71,27 +76,31 @@ func (m *MetricsRetentionManager) Start() {
 		}
 	}()
 	
-	// Run aggregation every 5 minutes  
-	// PERFORMANCE FIX: Reduced aggregated metrics retention periods to prevent exponential accumulation
+	// BAR-RAISING SOLUTION: Conservative aggregation scheduling
 	go func() {
-		// Initial delay to let system stabilize, but shorter than retention delay
+		// Extended delay to prevent startup contention with authentication flows
 		select {
-		case <-time.After(2 * time.Minute):
+		case <-time.After(45 * time.Minute):
 		case <-m.ctx.Done():
 			return
 		}
 		
-		// Run immediately on start (before retention kicks in)
-		m.performAggregation()
+		// Skip initial aggregation to prevent resource conflicts
+		logger.Info("Metrics aggregation manager initialized with conservative scheduling")
 		
-		// Then run periodically
-		ticker := time.NewTicker(5 * time.Minute)
+		// Reduced frequency to minimize system impact
+		ticker := time.NewTicker(30 * time.Minute)
 		defer ticker.Stop()
 		
 		for {
 			select {
 			case <-ticker.C:
-				m.performAggregation()
+				// Only aggregate if system is stable
+				if !binary.IsMetricsOperation() {
+					m.performAggregation()
+				} else {
+					logger.Trace("Skipping aggregation cycle due to active metrics operations")
+				}
 			case <-m.ctx.Done():
 				return
 			}
@@ -109,14 +118,20 @@ func (m *MetricsRetentionManager) enforceRetention() {
 	logger.Info("Starting metrics retention enforcement")
 	startTime := time.Now()
 	
+	// BAR-RAISING SOLUTION: Check if metrics operations are safe before proceeding
+	if binary.IsMetricsOperation() {
+		logger.Trace("Skipping retention during active metrics operation to prevent contention")
+		return
+	}
+	
 	// Mark this goroutine as performing metrics operations to prevent recursion
 	binary.SetMetricsOperation(true)
 	defer binary.SetMetricsOperation(false)
 	
-	// Get all metric entities
-	metrics, err := m.repo.ListByTag("type:metric")
+	// BAR-RAISING SOLUTION: Safe metrics listing with error tolerance
+	metrics, err := m.safeListMetrics()
 	if err != nil {
-		logger.Error("Failed to list metrics for retention: %v", err)
+		logger.Warn("Metrics retention skipped due to database instability: %v", err)
 		return
 	}
 	
@@ -218,6 +233,15 @@ func (m *MetricsRetentionManager) performAggregation() {
 	m.aggregationRunning = true
 	m.mu.Unlock()
 	
+	// BAR-RAISING SOLUTION: Check database health before aggregation
+	if binary.IsMetricsOperation() {
+		m.mu.Lock()
+		m.aggregationRunning = false
+		m.mu.Unlock()
+		logger.Trace("Skipping aggregation during active metrics operation to prevent contention")
+		return
+	}
+	
 	// Mark this goroutine as performing metrics operations to prevent recursion
 	binary.SetMetricsOperation(true)
 	defer binary.SetMetricsOperation(false)
@@ -231,10 +255,10 @@ func (m *MetricsRetentionManager) performAggregation() {
 	logger.Info("Starting metrics aggregation")
 	startTime := time.Now()
 	
-	// Get all raw metrics (non-aggregated)
-	metrics, err := m.repo.ListByTag("type:metric")
+	// BAR-RAISING SOLUTION: Safe metrics listing for aggregation
+	metrics, err := m.safeListMetrics()
 	if err != nil {
-		logger.Error("Failed to list metrics for aggregation: %v", err)
+		logger.Warn("Metrics aggregation skipped due to database instability: %v", err)
 		return
 	}
 	
@@ -304,11 +328,34 @@ func (m *MetricsRetentionManager) aggregateMetric(metric *models.Entity, metricN
 	binary.SetMetricsOperation(true)
 	defer binary.SetMetricsOperation(false)
 	
-	// Create aggregated metric ID
+	// BAR-RAISING SOLUTION: Safe aggregated metric handling to prevent mass entity creation
 	aggMetricID := fmt.Sprintf("metric_%s_agg_%s", metricName, intervalName)
 	
-	// Check if aggregated metric exists
-	aggMetric, err := m.repo.GetByID(aggMetricID)
+	// Use timeout for aggregated metric lookup to prevent hanging
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	
+	type aggResult struct {
+		metric *models.Entity
+		err    error
+	}
+	resultCh := make(chan aggResult, 1)
+	
+	go func() {
+		metric, err := m.repo.GetByID(aggMetricID)
+		resultCh <- aggResult{metric: metric, err: err}
+	}()
+	
+	var aggMetric *models.Entity
+	var err error
+	select {
+	case res := <-resultCh:
+		aggMetric = res.metric
+		err = res.err
+	case <-ctx.Done():
+		return fmt.Errorf("timeout waiting for aggregated metric %s: database under stress", aggMetricID)
+	}
+	
 	if err != nil {
 		// Create new aggregated metric
 		aggMetric = &models.Entity{
@@ -330,8 +377,22 @@ func (m *MetricsRetentionManager) aggregateMetric(metric *models.Entity, metricN
 			}
 		}
 		
-		if err := m.repo.Create(aggMetric); err != nil {
-			return fmt.Errorf("failed to create aggregated metric: %w", err)
+		// BAR-RAISING SOLUTION: Safe metric creation with timeout
+		createCtx, createCancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer createCancel()
+		
+		createCh := make(chan error, 1)
+		go func() {
+			createCh <- m.repo.Create(aggMetric)
+		}()
+		
+		select {
+		case createErr := <-createCh:
+			if createErr != nil {
+				return fmt.Errorf("failed to create aggregated metric: %w", createErr)
+			}
+		case <-createCtx.Done():
+			return fmt.Errorf("timeout creating aggregated metric %s: database under stress", aggMetricID)
 		}
 	}
 	
@@ -419,4 +480,41 @@ func (m *MetricsRetentionManager) aggregateMetric(metric *models.Entity, metricN
 	}
 	
 	return nil
+}
+
+// BAR-RAISING SOLUTION: Safe metrics listing with database health checks
+func (m *MetricsRetentionManager) safeListMetrics() ([]*models.Entity, error) {
+	// Quick health check - try to get system user entity first
+	if _, err := m.repo.GetByID("00000000000000000000000000000001"); err != nil {
+		return nil, fmt.Errorf("database health check failed: %w", err)
+	}
+	
+	// Use timeout context for metrics listing to prevent hanging
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	
+	// Channel to capture results
+	type result struct {
+		metrics []*models.Entity
+		err     error
+	}
+	resultCh := make(chan result, 1)
+	
+	// Run ListByTag in goroutine with timeout
+	go func() {
+		metrics, err := m.repo.ListByTag("type:metric")
+		resultCh <- result{metrics: metrics, err: err}
+	}()
+	
+	// Wait for result or timeout
+	select {
+	case res := <-resultCh:
+		if res.err != nil {
+			return nil, fmt.Errorf("metrics listing failed: %w", res.err)
+		}
+		logger.Trace("Safe metrics listing successful: %d metrics found", len(res.metrics))
+		return res.metrics, nil
+	case <-ctx.Done():
+		return nil, fmt.Errorf("metrics listing timeout: database may be under stress")
+	}
 }

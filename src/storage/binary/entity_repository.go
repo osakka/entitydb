@@ -60,6 +60,11 @@ func isMetricsOperation() bool {
 	return metricsOperationContext[goroutineID]
 }
 
+// IsMetricsOperation checks if current goroutine is performing metrics operations (exported)
+func IsMetricsOperation() bool {
+	return isMetricsOperation()
+}
+
 // getGoroutineID returns a simple goroutine identifier (hash-based)
 func getGoroutineID() int64 {
 	// Simple hash of stack pointer for goroutine identification
