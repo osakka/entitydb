@@ -74,7 +74,7 @@ graph TD
 2. [Authentication](./api-reference/02-authentication.md) - Secure API access with JWT
 3. [Entity Operations](./api-reference/03-entities.md) - CRUD operations and examples
 4. [Temporal Queries](./api-reference/04-queries.md) - Time-travel and advanced querying
-5. [Complete API Reference](./api-reference/README.md) - All 58+ endpoints documented
+5. [Complete API Reference](./api-reference/README.md) - All 56 endpoints documented
 ```
 
 ### 🛠️ **Production Deployment?**

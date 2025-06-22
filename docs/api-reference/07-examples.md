@@ -34,7 +34,7 @@ The two key concepts in the entity architecture are:
 **Using the HTTP API:**
 
 ```bash
-curl -X POST http://localhost:8085/api/v1/entities \
+curl -X POST http://localhost:8085/api/v1/entities/create \
   -H "Authorization: Bearer <your_token>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -67,7 +67,7 @@ curl -X POST http://localhost:8085/api/v1/entities \
 **Using the HTTP API:**
 
 ```bash
-curl -X POST http://localhost:8085/api/v1/entities \
+curl -X POST http://localhost:8085/api/v1/entities/create \
   -H "Authorization: Bearer <your_token>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -100,7 +100,7 @@ curl -X POST http://localhost:8085/api/v1/entities \
 **Using the HTTP API:**
 
 ```bash
-curl -X POST http://localhost:8085/api/v1/entities \
+curl -X POST http://localhost:8085/api/v1/entities/create \
   -H "Authorization: Bearer <your_token>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -461,7 +461,7 @@ ISSUE_ID=$(./bin/entitydbc.sh entity list --type=issue --tags="title:Implement l
 You can add any custom tags to entities for advanced categorization and filtering:
 
 ```bash
-curl -X POST http://localhost:8085/api/v1/entities \
+curl -X POST http://localhost:8085/api/v1/entities/create \
   -H "Authorization: Bearer <your_token>" \
   -H "Content-Type: application/json" \
   -d '{

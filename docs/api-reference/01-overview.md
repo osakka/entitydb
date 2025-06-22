@@ -192,8 +192,8 @@ Permissions use hierarchical tag format: `rbac:perm:resource:action`
 ## 🚀 Performance & Limits
 
 ### Request Limits
-- **Rate Limiting**: 1000 requests/hour per token
-- **Burst Capacity**: 100 requests/minute
+- **Rate Limiting**: Configurable (disabled by default) - Enable with `ENTITYDB_ENABLE_RATE_LIMIT=true`
+- **Default Rate Limit**: 100 requests per minute when enabled
 - **Payload Size**: 10MB maximum request size
 - **Timeout**: 60 seconds for all requests
 

@@ -48,7 +48,7 @@ curl http://localhost:8085/api/v1/entities/list \
   -H "Authorization: Bearer $TOKEN"
 
 # Create a new entity
-curl -X POST http://localhost:8085/api/v1/entities \
+curl -X POST http://localhost:8085/api/v1/entities/create \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $TOKEN" \
   -d '{

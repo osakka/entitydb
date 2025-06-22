@@ -1,14 +1,14 @@
-# EntityDB API Endpoint Inventory - VERIFIED v2.34.0
+# EntityDB API Endpoint Inventory - VERIFIED v2.34.1
 
-> **Version**: v2.34.0 | **Last Verified**: 2025-06-22 | **Status**: AUTHORITATIVE
+> **Version**: v2.34.1 | **Last Verified**: 2025-06-22 | **Status**: AUTHORITATIVE
 >
-> **Complete inventory of all API endpoints in EntityDB v2.34.0, verified against actual codebase (`src/main.go`).**
+> **Complete inventory of all API endpoints in EntityDB v2.34.1, verified against actual codebase (`src/main.go`).**
 
 ## Endpoint Summary
 
-**Total Endpoints**: 38 verified endpoints  
+**Total Endpoints**: 56 verified endpoints  
 **Authentication Model**: JWT Bearer tokens  
-**Base URL**: `https://localhost:8085` (SSL enabled by default)  
+**Base URL**: `http://localhost:8085` (SSL disabled by default)  
 **API Base Path**: `/api/v1/`
 
 ---

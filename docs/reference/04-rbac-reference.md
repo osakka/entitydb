@@ -207,7 +207,7 @@ Simply clears the token on the client side.
 
 All other endpoints require a valid JWT token with appropriate permissions:
 - `GET /api/v1/entities/list` - Requires `permission:read:entity`
-- `POST /api/v1/entities` - Requires `permission:create:entity`
+- `POST /api/v1/entities/create` - Requires `permission:create:entity`
 - `PUT /api/v1/entities/:id` - Requires `permission:update:entity`
 - `DELETE /api/v1/entities/:id` - Requires `permission:delete:entity`
 
@@ -232,7 +232,7 @@ All other endpoints require a valid JWT token with appropriate permissions:
 ### Creating a Custom User
 
 ```bash
-curl -X POST http://localhost:8085/api/v1/entities \
+curl -X POST http://localhost:8085/api/v1/entities/create \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $ADMIN_TOKEN" \
   -d '{
