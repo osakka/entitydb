@@ -1,5 +1,5 @@
 # Developer Guide
-> **Version**: v2.32.5 | **Last Updated**: 2025-06-18 | **Status**: AUTHORITATIVE
+> **Version**: v2.34.0 | **Last Updated**: 2025-06-22 | **Status**: AUTHORITATIVE
 
 Welcome to the EntityDB Developer Guide. This section provides comprehensive development and contribution guidelines for building with and contributing to EntityDB.
 

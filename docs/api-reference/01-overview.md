@@ -1,10 +1,10 @@
 # EntityDB API Overview
 
-> **Version**: v2.32.6 | **Last Updated**: 2025-06-20 | **Status**: 100% ACCURATE
+> **Version**: v2.34.0 | **Last Updated**: 2025-06-22 | **Status**: 100% ACCURATE
 > 
 > Complete overview of EntityDB's REST API - verified against actual implementation.
 > 
-> **Major Change**: v2.32.6 introduces unified database file format (single `.edb` files only)
+> **Major Change**: v2.34.0 introduces WAL corruption prevention system and comprehensive documentation audit
 
 ## 🎯 API Fundamentals
 

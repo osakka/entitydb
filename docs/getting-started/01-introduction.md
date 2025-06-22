@@ -1,7 +1,7 @@
 # EntityDB Introduction
 
 > **Category**: Getting Started | **Target Audience**: All Users | **Technical Level**: Beginner
-> **Version**: v2.32.5 | **Last Updated**: 2025-06-18 | **Status**: AUTHORITATIVE
+> **Version**: v2.34.0 | **Last Updated**: 2025-06-22 | **Status**: AUTHORITATIVE
 
 ## System Overview
 

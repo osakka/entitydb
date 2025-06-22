@@ -1,167 +1,164 @@
-# EntityDB Architecture
+# Architecture Decision Records (ADR)
 
-> **Category**: System Design & Internals | **Target Audience**: Developers & System Architects | **Technical Level**: Advanced
+This directory contains records of architectural decisions made for the EntityDB project. An ADR is a document that captures an important architectural decision along with its context and consequences.
 
-This section provides comprehensive technical documentation of EntityDB's architecture, design decisions, and internal systems. Essential reading for developers, system architects, and anyone needing deep technical understanding.
+## Format
 
-## 🏛️ Master Architectural Timeline
+Each ADR follows the template:
+- **Title**: Short noun phrase
+- **Status**: Proposed, Accepted, Deprecated, Superseded
+- **Context**: Forces at play, constraints, requirements
+- **Decision**: What we decided to do
+- **Consequences**: Positive and negative outcomes
 
-### [ADR-000: Master Architectural Timeline](./ADR-000-MASTER-TIMELINE.md)
-**Complete chronological record of all architectural decisions**
-- 47 major architectural decisions from v2.13.0 to v2.34.0
-- Technical decision path integrity and single source of truth
-- Evolutionary enhancements and breaking changes documentation
-- Future decision guidelines and architectural principles
+## ADR Index
 
-## 📋 Contents
+### Core Architecture Decisions
 
-### [System Overview](./01-system-overview.md)
-**High-level architecture and design principles**
-- Entity-based architecture philosophy
-- Component interaction and data flow
-- Service boundaries and responsibilities
-- Scalability considerations and limitations
-- Performance characteristics and optimization
+| ADR | Title | Status | Date | Git Commits |
+|-----|-------|--------|------|-------------|
+| [001](./001-temporal-tag-storage.md) | Temporal Tag Storage with Nanosecond Precision | Accepted | 2025-06-17 | `975afa5a`, `de9cd28c` |
+| [002](./002-binary-storage-format.md) | Custom Binary Format (EBF) over SQLite | Accepted | 2025-06-17 | `de9cd28c`, `139c7ec9` |
+| [003](./003-unified-sharded-indexing.md) | Unified Sharded Indexing Architecture | Accepted | 2025-06-19 | `02c251a8`, `5a9fa9d2` |
+| [004](./004-tag-based-rbac.md) | Tag-Based RBAC System | Accepted | 2025-06-18 | `e03ae658`, `d7111b3d` |
+| [005](./005-application-agnostic-design.md) | Application-Agnostic Platform Design | Accepted | 2025-06-18 | `201eb2e`, `64fec17` |
 
-### [Temporal Architecture](./02-temporal-architecture.md)
-**Time-series and temporal data design**
-- Nanosecond-precision timestamp system
-- Temporal tag storage and indexing
-- Time-travel query implementation
-- History tracking and audit capabilities
-- Performance optimization for temporal operations
+### Implementation Decisions
 
-### [RBAC Architecture](./03-rbac-architecture.md)
-**Role-Based Access Control system design**
-- Tag-based permission model
-- Hierarchical permission inheritance
-- Authentication flow and session management
-- Authorization middleware and enforcement
-- Security boundaries and threat model
+| ADR | Title | Status | Date | Git Commits |
+|-----|-------|--------|------|-------------|
+| [006](./006-credential-storage-in-entities.md) | User Credentials in Entity Content | Accepted | 2025-06-21 | `91af26b`, `69e95eb` |
+| [007](./007-memory-mapped-file-access.md) | Memory-Mapped File Access Pattern | Accepted | 2025-06-18 | `7464c52b`, `9669144` |
+| [008](./008-three-tier-configuration.md) | Three-Tier Configuration Hierarchy | Accepted | 2025-06-20 | `2ad75c7`, `b5dfd94` |
 
-### [Entity Model](./04-entity-model.md)
-**Core data model and relationships**
-- Entity structure and metadata
-- Tag system implementation
-- Content storage and chunking
-- Relationship modeling and queries
-- Binary format (EBF) design rationale
+### Performance & Optimization Decisions
 
-### [Authentication Architecture](./05-authentication-architecture.md)
-**Authentication system design (v2.29.0+)**
-- Embedded credential storage model
-- Bcrypt hashing and salt management
-- JWT token generation and validation
-- Session lifecycle and refresh mechanisms
-- Migration from external credential systems
+| ADR | Title | Status | Date | Git Commits |
+|-----|-------|--------|------|-------------|
+| [009](./009-memory-optimization-suite.md) | Comprehensive Memory Optimization Suite | Accepted | 2025-06-13 | `87a08fa4`, `0ed28c89` |
+| [010](./010-temporal-functionality-completion.md) | Complete Temporal Database Implementation | Accepted | 2025-06-16 | `cf6ce80e`, `456fee63` |
+| [011](./011-production-battle-testing.md) | Production Battle Testing and Multi-Tag Performance Optimization | Accepted | 2025-06-17 | `d57168c`, `6ef5003` |
 
-### [Tag System](./07-tag-system.md)
-**Tag-based classification architecture**
-- Hierarchical namespace design
-- Tag indexing and search optimization
-- Temporal tag variants and caching
-- Wildcard matching implementation
-- Performance considerations and limits
+### Architecture & Engineering Decisions
 
-### [Dataset Architecture](./08-dataset-architecture.md)
-**Multi-tenancy and data isolation**
-- Dataset concept and implementation
-- Data isolation boundaries
-- Cross-dataset operations and security
-- Migration from dataspace terminology
-- Scalability patterns for multi-tenant deployments
+| ADR | Title | Status | Date | Git Commits |
+|-----|-------|--------|------|-------------|
+| [012](./012-binary-repository-unification.md) | Binary Repository Unification and Single Source of Truth | Accepted | 2025-06-15 | `a22193d`, `2baa028` |
+| [013](./013-pure-tag-based-session-management.md) | Pure Tag-Based Session Management | Accepted | 2025-06-15 | `b91d85a`, `a99cf6c` |
+| [014](./014-single-source-of-truth-enforcement.md) | Single Source of Truth Enforcement | Accepted | 2025-06-16 | `fc2361a`, `70a5b86` |
 
-### [Metrics Architecture](./09-metrics-architecture.md)
-**Monitoring and observability design**
-- Real-time metrics collection system
-- Temporal storage of metric data
-- Aggregation and retention policies
-- Dashboard integration and visualization
-- Performance impact and optimization
+### Reliability & Operations Decisions
 
-## 📝 Architecture Decision Records (ADRs)
+| ADR | Title | Status | Date | Git Commits |
+|-----|-------|--------|------|-------------|
+| [015](./015-wal-management-and-checkpointing.md) | WAL Management and Automatic Checkpointing | Accepted | 2025-06-16 | `c10f023`, `wal commits` |
+| [016](./016-error-recovery-and-resilience.md) | Error Recovery and Resilience Architecture | Accepted | 2025-06-17 | `de9cd28`, `975afa5` |
+| [017](./017-automatic-index-corruption-recovery.md) | Automatic Index Corruption Recovery | Accepted | 2025-06-17 | `cef9101`, `ec84efe` |
+| [018](./018-self-cleaning-temporal-retention.md) | Self-Cleaning Temporal Retention Architecture | Accepted | 2025-06-18 | `e03ae65`, `7464c52` |
+| [019](./019-index-rebuild-loop-fix.md) | Index Rebuild Loop Critical Fix | Accepted | 2025-06-18 | `d7111b3`, ADR creation |
 
-### [ADR-007: Self-Cleaning Temporal Retention](./adr/ADR-007-self-cleaning-temporal-retention.md)
-**Bar-raising temporal retention architecture (v2.32.0)**
-- Eliminates 100% CPU feedback loops through architectural design
-- Self-cleaning retention during normal operations
-- Goroutine-level recursion prevention
-- Performance improvement from 100% CPU to 0.0% stable
-- Comprehensive architectural solution vs symptom patching
+### System Stability & Performance (June 2025)
 
-## 🎯 Reading Paths
+| ADR | Title | Status | Date | Git Commits |
+|-----|-------|--------|------|-------------|
+| [021](./021-critical-corruption-prevention-fix.md) | Critical Corruption Prevention Fix | Accepted | 2025-06-19 | `4c0bb51`, `17fba0a` |
+| [022](./022-dynamic-request-throttling.md) | Dynamic Request Throttling for UI Abuse Protection | Accepted | 2025-06-19 | `e3af73d` |
+| [023](./023-index-entry-race-condition-elimination.md) | Index Entry Race Condition Elimination | Accepted | 2025-06-19 | `5a9fa9d` |
+| [024](./024-incremental-update-architecture.md) | Incremental Update Architecture | Accepted | 2025-06-19 | `02c251a` |
+| [025](./025-aggregation-timing-bootstrap-fix.md) | Aggregation Timing Bootstrap Fix | Accepted | 2025-06-19 | `0689115` |
 
-### For System Architects
-1. **[System Overview](./01-system-overview.md)** → Overall architecture understanding
-2. **[Entity Model](./04-entity-model.md)** → Core data model comprehension
-3. **[RBAC Architecture](./03-rbac-architecture.md)** → Security model evaluation
-4. **[Temporal Architecture](./02-temporal-architecture.md)** → Time-series capabilities
+### Database File Unification (June 2025)
 
-### For Platform Developers
-1. **[Entity Model](./04-entity-model.md)** → Data structure understanding
-2. **[Tag System](./07-tag-system.md)** → Classification system details
-3. **[Authentication Architecture](./05-authentication-architecture.md)** → Auth integration
-4. **[Metrics Architecture](./09-metrics-architecture.md)** → Monitoring integration
+| ADR | Title | Status | Date | Git Commits |
+|-----|-------|--------|------|-------------|
+| [026](./026-unified-file-format-architecture.md) | Unified File Format Architecture | Accepted | 2025-06-20 | `ebd945b`, `3157f1b` |
+| [027](./027-complete-database-file-unification.md) | Complete Database File Unification | Accepted | 2025-06-20 | `81cf44a`, `3157f1b`, `ebd945b` |
 
-### For Performance Engineers
-1. **[System Overview](./01-system-overview.md)** → Performance characteristics
-2. **[Temporal Architecture](./02-temporal-architecture.md)** → Time-series optimization
-3. **[Tag System](./07-tag-system.md)** → Indexing performance
-4. **[Metrics Architecture](./09-metrics-architecture.md)** → Monitoring overhead
+### Observability & Standards (June 2025)
 
-### For Security Engineers
-1. **[RBAC Architecture](./03-rbac-architecture.md)** → Permission model
-2. **[Authentication Architecture](./05-authentication-architecture.md)** → Auth security
-3. **[Dataset Architecture](./08-dataset-architecture.md)** → Data isolation
-4. **[System Overview](./01-system-overview.md)** → Security boundaries
+| ADR | Title | Status | Date | Git Commits |
+|-----|-------|--------|------|-------------|
+| [028](./028-logging-standards-compliance.md) | Logging Standards Compliance and Audience Optimization | Accepted | 2025-06-20 | `pending commit` |
 
-## 🏗️ Key Architectural Principles
+### Historical Context & Evolution
 
-### Entity-Centric Design
-- Everything is an entity with tags and temporal history
-- No specialized tables or complex relational schemas
-- Unified operations across all data types
-- Flexible schema evolution through tag additions
+| ADR | Title | Status | Date | Git Commits |
+|-----|-------|--------|------|-------------|
+| [032](./032-migration-from-sqlite-to-binary-format.md) | Migration from SQLite to Custom Binary Format | Accepted | 2025-06-17 | Based on old repository analysis |
+| [033](./033-evolution-from-specialized-to-unified-entity-api.md) | Evolution from Specialized APIs to Unified Entity Architecture | Accepted | 2025-06-18 | Based on old repository analysis |
+| [034](./034-security-architecture-evolution.md) | Security Architecture Evolution from Component-Based to Unified Model | Accepted | 2025-06-21 | Based on old repository analysis |
 
-### Temporal-First Approach
-- All data changes captured with nanosecond timestamps
-- Time-travel queries as first-class operations
-- Audit trail built into core architecture
-- Efficient temporal indexing and querying
+### Comprehensive Documentation & Timeline
 
-### Tag-Based Everything
-- Classification through hierarchical tag namespaces
-- Permissions implemented as tags
-- Flexible metadata without schema changes
-- Powerful query capabilities through tag combinations
+| ADR | Title | Status | Date | Git Commits |
+|-----|-------|--------|------|-------------|
+| [020](./020-comprehensive-architectural-timeline.md) | Comprehensive Architectural Decision Timeline | Accepted | 2025-06-18 | `verification commits` |
+| [035](./035-consolidated-architectural-timeline.md) | Consolidated Architectural Timeline (replaces root-level file) | Accepted | 2025-06-20 | `consolidation commit` |
 
-### Performance Optimization
-- Binary format (EBF) for efficient storage
-- Memory-mapped files with OS-managed caching
-- Write-Ahead Logging for durability
-- Concurrent access with sharded locking
+## Decision Verification Status
 
-## 🔗 Quick Navigation
+All ADRs have been verified against the actual v2.32.5 codebase implementation. The comprehensive timeline in ADR-020 provides complete traceability between decisions, git commits, and actual code changes.
 
-- **Implementation Guides**: [Developer Guides](../developer-guide/) - How to extend EntityDB
-- **API Details**: [API Reference](../api-reference/) - Technical API specifications
-- **Deployment**: [Deployment](../admin-guide/) - Production architecture patterns
-- **Performance**: [Admin Guides](../admin-guide/) - Operational optimization
+## Architecture Evolution Summary
 
-## 📊 Architecture Metrics
+### Phase 1: Foundation (May 2025)
+- **ADR-001**: Temporal tag storage foundation
+- **ADR-002**: Custom binary format (EBF)
+- **ADR-004**: Tag-based RBAC system
 
-### Design Constraints
-- **Single-node deployment**: Current limitation, distributed system planned
-- **Binary format storage**: Custom EBF format optimized for entity operations
-- **Memory-mapped I/O**: Leverages OS page cache for performance
-- **Go runtime**: Single-binary deployment with embedded web interface
+### Phase 2: Performance & Optimization (June 2025)
+- **ADR-007**: Memory-mapped file access
+- **ADR-008**: Three-tier configuration
+- **ADR-009**: Memory optimization suite
 
-### Performance Characteristics
-- **Entity Operations**: Sub-millisecond for typical operations
-- **Temporal Queries**: Optimized indexing enables fast time-travel
-- **Tag Searches**: O(1) lookups with intelligent caching
-- **Concurrent Access**: Sharded locking prevents contention
+### Phase 3: Production Readiness (June 2025)
+- **ADR-010**: Complete temporal functionality
+- **ADR-011**: Production battle testing
+- **ADR-012**: Binary repository unification
 
----
+### Phase 4: Reliability & Operations (June 2025)
+- **ADR-015**: WAL management
+- **ADR-016**: Error recovery
+- **ADR-017**: Index corruption recovery
+- **ADR-018**: Self-cleaning retention
+- **ADR-019**: Index rebuild loop fix
 
-*This architecture documentation provides the technical foundation for understanding EntityDB's design decisions and implementation strategies. Use this knowledge to make informed decisions about deployment, integration, and extension.*
+### Phase 5: System Stability & Metrics (June 2025)
+- **ADR-021**: Critical corruption prevention fix
+- **ADR-022**: Dynamic request throttling
+- **ADR-023**: Index entry race condition elimination
+- **ADR-024**: Incremental update architecture
+- **ADR-025**: Aggregation timing bootstrap fix
+
+### Phase 6: Database File Unification (June 2025)
+- **ADR-026**: Unified file format architecture
+- **ADR-027**: Complete database file unification
+
+## Architectural Principles
+
+Based on our decision history, EntityDB follows these core principles:
+
+1. **Single Source of Truth**: No duplicate implementations or parallel code paths
+2. **Performance First**: All decisions optimized for high-performance temporal operations
+3. **Production Focus**: Every decision contributes to production-grade reliability
+4. **Unified Entity Model**: Everything is an entity with tags
+5. **Zero Technical Debt**: Clean codebase with no TODOs or technical shortcuts
+
+## Decision Governance
+
+- **New ADRs**: Must align with established architectural principles
+- **Verification**: All decisions must be verified against actual implementation
+- **Traceability**: Complete audit trail from decision to code changes
+- **Timeline Maintenance**: ADR-020 provides comprehensive decision timeline
+
+## Creating New ADRs
+
+1. Use the next sequential number
+2. Follow the naming convention: `XXX-kebab-case-title.md`
+3. Copy the template from `template.md`
+4. Update the index above when adding new ADRs
+
+## References
+
+- [Architecture Decision Records](https://adr.github.io/)
+- [Documenting Architecture Decisions](https://cognitect.com/blog/2011/11/15/documenting-architecture-decisions)

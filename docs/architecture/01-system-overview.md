@@ -1,8 +1,8 @@
 # EntityDB Architecture Overview
 
-> **Version**: v2.32.6 | **Last Updated**: 2025-06-20 | **Status**: AUTHORITATIVE
+> **Version**: v2.34.0 | **Last Updated**: 2025-06-22 | **Status**: AUTHORITATIVE
 > 
-> **Major Update**: Unified file format consolidation - single `.edb` files only
+> **Major Update**: WAL corruption prevention system and comprehensive documentation audit
 
 ## System Architecture
 

@@ -1,6 +1,6 @@
 # EntityDB Administration Guide
 
-> **Version**: v2.32.2 | **Target Audience**: System Administrators & DevOps Engineers
+> **Version**: v2.34.0 | **Target Audience**: System Administrators & DevOps Engineers
 
 Complete guide for production deployment, security hardening, and operational management of EntityDB temporal database systems.
 
