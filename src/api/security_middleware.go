@@ -64,6 +64,8 @@ func (sm *SecurityMiddleware) RequireAuthentication(next http.HandlerFunc) http.
 
 		// Add to request context
 		ctx := context.WithValue(r.Context(), securityContextKey{}, securityCtx)
+		// Also add user entity directly for backward compatibility
+		ctx = context.WithValue(ctx, "user", user.Entity)
 		next(w, r.WithContext(ctx))
 	}
 }

@@ -1196,6 +1196,367 @@ const docTemplate = `{
                 }
             }
         },
+        "/entities/deleted": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns a paginated list of entities in various deletion states",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Entity Deletion"
+                ],
+                "summary": "List deleted entities",
+                "parameters": [
+                    {
+                        "enum": [
+                            "soft_deleted",
+                            "archived",
+                            "purged"
+                        ],
+                        "type": "string",
+                        "example": "\"soft_deleted\"",
+                        "description": "Lifecycle state filter",
+                        "name": "state",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 100,
+                        "minimum": 1,
+                        "type": "integer",
+                        "default": 25,
+                        "description": "Maximum number of entities to return",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "minimum": 0,
+                        "type": "integer",
+                        "default": 0,
+                        "description": "Number of entities to skip",
+                        "name": "offset",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "example": "\"admin\"",
+                        "description": "Filter by who deleted the entities",
+                        "name": "deleted_by",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List of deleted entities",
+                        "schema": {
+                            "$ref": "#/definitions/api.DeletionListResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request parameters",
+                        "schema": {
+                            "$ref": "#/definitions/api.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "schema": {
+                            "$ref": "#/definitions/api.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/api.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/entities/{id}/delete": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Marks an entity as soft deleted while preserving data for potential restoration",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Entity Deletion"
+                ],
+                "summary": "Soft delete an entity",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Entity ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Deletion request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.SoftDeleteRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Entity successfully soft deleted",
+                        "schema": {
+                            "$ref": "#/definitions/api.DeletionStatusResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/api.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "schema": {
+                            "$ref": "#/definitions/api.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Entity not found",
+                        "schema": {
+                            "$ref": "#/definitions/api.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Entity already deleted",
+                        "schema": {
+                            "$ref": "#/definitions/api.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/api.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/entities/{id}/deletion-status": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns detailed deletion status and audit trail for an entity",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Entity Deletion"
+                ],
+                "summary": "Get entity deletion status",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Entity ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Entity deletion status",
+                        "schema": {
+                            "$ref": "#/definitions/api.DeletionStatusResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "schema": {
+                            "$ref": "#/definitions/api.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Entity not found",
+                        "schema": {
+                            "$ref": "#/definitions/api.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/api.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/entities/{id}/purge": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Permanently and irreversibly removes an entity and all its data from the system",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Entity Deletion"
+                ],
+                "summary": "Permanently purge an entity",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Entity ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Purge request with confirmation",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.PurgeRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Entity successfully purged",
+                        "schema": {
+                            "$ref": "#/definitions/api.SuccessResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request or confirmation",
+                        "schema": {
+                            "$ref": "#/definitions/api.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "schema": {
+                            "$ref": "#/definitions/api.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Entity not found",
+                        "schema": {
+                            "$ref": "#/definitions/api.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Entity cannot be purged",
+                        "schema": {
+                            "$ref": "#/definitions/api.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/api.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/entities/{id}/restore": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Restores a soft deleted entity back to active state",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Entity Deletion"
+                ],
+                "summary": "Restore a deleted entity",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Entity ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Restoration request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.RestoreRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Entity successfully restored",
+                        "schema": {
+                            "$ref": "#/definitions/api.DeletionStatusResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/api.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "schema": {
+                            "$ref": "#/definitions/api.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Entity not found",
+                        "schema": {
+                            "$ref": "#/definitions/api.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Entity cannot be restored",
+                        "schema": {
+                            "$ref": "#/definitions/api.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/api.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/health": {
             "get": {
                 "description": "Get system health status and basic metrics",
@@ -1401,6 +1762,104 @@ const docTemplate = `{
                 },
                 "total_entities": {
                     "type": "integer"
+                }
+            }
+        },
+        "api.DeletionListResponse": {
+            "description": "Response containing a list of deleted entities with pagination",
+            "type": "object",
+            "properties": {
+                "count": {
+                    "description": "Number of entities returned in this response",
+                    "type": "integer",
+                    "example": 25
+                },
+                "entities": {
+                    "description": "List of deleted entities",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.DeletionStatusResponse"
+                    }
+                },
+                "limit": {
+                    "description": "Limit used for pagination",
+                    "type": "integer",
+                    "example": 25
+                },
+                "offset": {
+                    "description": "Offset used for pagination",
+                    "type": "integer",
+                    "example": 0
+                },
+                "total": {
+                    "description": "Total number of deleted entities",
+                    "type": "integer",
+                    "example": 150
+                }
+            }
+        },
+        "api.DeletionStatusResponse": {
+            "description": "Response containing entity deletion status and audit trail",
+            "type": "object",
+            "properties": {
+                "archived_at": {
+                    "description": "When the entity was archived (if applicable)",
+                    "type": "string",
+                    "example": "2023-02-25T09:15:00Z"
+                },
+                "can_purge": {
+                    "description": "Whether the entity can be purged",
+                    "type": "boolean",
+                    "example": false
+                },
+                "can_restore": {
+                    "description": "Whether the entity can be restored",
+                    "type": "boolean",
+                    "example": true
+                },
+                "created_at": {
+                    "description": "When the entity was created",
+                    "type": "string",
+                    "example": "2023-01-15T10:30:00Z"
+                },
+                "delete_reason": {
+                    "description": "Reason for deletion (if applicable)",
+                    "type": "string",
+                    "example": "Data cleanup"
+                },
+                "deleted_at": {
+                    "description": "When the entity was deleted (if applicable)",
+                    "type": "string",
+                    "example": "2023-01-25T09:15:00Z"
+                },
+                "deleted_by": {
+                    "description": "Who deleted the entity (if applicable)",
+                    "type": "string",
+                    "example": "admin"
+                },
+                "entity_id": {
+                    "description": "Entity ID",
+                    "type": "string",
+                    "example": "user-123"
+                },
+                "lifecycle_state": {
+                    "description": "Current lifecycle state",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/models.EntityLifecycleState"
+                        }
+                    ],
+                    "example": "soft_deleted"
+                },
+                "retention_policy": {
+                    "description": "Retention policy applied (if applicable)",
+                    "type": "string",
+                    "example": "standard-cleanup"
+                },
+                "updated_at": {
+                    "description": "When the entity was last updated",
+                    "type": "string",
+                    "example": "2023-01-20T14:45:00Z"
                 }
             }
         },
@@ -1870,6 +2329,26 @@ const docTemplate = `{
                 }
             }
         },
+        "api.PurgeRequest": {
+            "description": "Request body for permanently purging an entity (irreversible)",
+            "type": "object",
+            "required": [
+                "confirmation",
+                "reason"
+            ],
+            "properties": {
+                "confirmation": {
+                    "description": "Confirmation string (must be \"PURGE\" to proceed)",
+                    "type": "string",
+                    "example": "PURGE"
+                },
+                "reason": {
+                    "description": "Reason for purging (required)",
+                    "type": "string",
+                    "example": "Legal requirement"
+                }
+            }
+        },
         "api.QueryEntityResponse": {
             "type": "object",
             "properties": {
@@ -1927,6 +2406,20 @@ const docTemplate = `{
                 },
                 "username": {
                     "type": "string"
+                }
+            }
+        },
+        "api.RestoreRequest": {
+            "description": "Request body for restoring a deleted entity",
+            "type": "object",
+            "required": [
+                "reason"
+            ],
+            "properties": {
+                "reason": {
+                    "description": "Reason for restoration (required)",
+                    "type": "string",
+                    "example": "Accidentally deleted"
                 }
             }
         },
@@ -2031,6 +2524,30 @@ const docTemplate = `{
                 },
                 "total_users": {
                     "type": "integer"
+                }
+            }
+        },
+        "api.SoftDeleteRequest": {
+            "description": "Request body for soft deleting an entity",
+            "type": "object",
+            "required": [
+                "reason"
+            ],
+            "properties": {
+                "force": {
+                    "description": "Force deletion even if entity has relationships (default: false)",
+                    "type": "boolean",
+                    "example": false
+                },
+                "policy": {
+                    "description": "Policy to apply (optional, uses default if not specified)",
+                    "type": "string",
+                    "example": "standard-cleanup"
+                },
+                "reason": {
+                    "description": "Reason for deletion (required)",
+                    "type": "string",
+                    "example": "No longer needed"
                 }
             }
         },
@@ -2246,6 +2763,21 @@ const docTemplate = `{
                     "type": "integer"
                 }
             }
+        },
+        "models.EntityLifecycleState": {
+            "type": "string",
+            "enum": [
+                "active",
+                "soft_deleted",
+                "archived",
+                "purged"
+            ],
+            "x-enum-varnames": [
+                "StateActive",
+                "StateSoftDeleted",
+                "StateArchived",
+                "StatePurged"
+            ]
         }
     },
     "securityDefinitions": {

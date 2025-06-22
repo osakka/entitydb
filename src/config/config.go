@@ -466,6 +466,45 @@ type Config struct {
 	// Default: "" (none enabled)
 	// Available: auth, storage, wal, chunking, metrics, locks, query, dataset, relationship, temporal
 	TraceSubsystems string
+	
+	// Deletion Collector Configuration
+	// ================================
+	
+	// DeletionCollectorEnabled controls whether the deletion collector runs.
+	// Environment: ENTITYDB_DELETION_COLLECTOR_ENABLED
+	// Default: true
+	// Purpose: Enables automatic entity lifecycle management based on retention policies
+	DeletionCollectorEnabled bool
+	
+	// DeletionCollectorInterval defines how often the collector runs.
+	// Environment: ENTITYDB_DELETION_COLLECTOR_INTERVAL (seconds)
+	// Default: 3600 seconds (1 hour)
+	// Purpose: Controls frequency of retention policy evaluation
+	DeletionCollectorInterval time.Duration
+	
+	// DeletionCollectorBatchSize limits entities processed per cycle.
+	// Environment: ENTITYDB_DELETION_COLLECTOR_BATCH_SIZE
+	// Default: 100
+	// Purpose: Controls memory usage and processing chunks
+	DeletionCollectorBatchSize int
+	
+	// DeletionCollectorMaxRuntime limits single collection cycle duration.
+	// Environment: ENTITYDB_DELETION_COLLECTOR_MAX_RUNTIME (seconds)
+	// Default: 1800 seconds (30 minutes)
+	// Purpose: Prevents collection cycles from running too long
+	DeletionCollectorMaxRuntime time.Duration
+	
+	// DeletionCollectorDryRun enables dry run mode (logs without changes).
+	// Environment: ENTITYDB_DELETION_COLLECTOR_DRY_RUN
+	// Default: false
+	// Purpose: Test retention policies without actual modifications
+	DeletionCollectorDryRun bool
+	
+	// DeletionCollectorConcurrency controls parallel entity processing.
+	// Environment: ENTITYDB_DELETION_COLLECTOR_CONCURRENCY
+	// Default: 4
+	// Purpose: Balance performance vs resource usage
+	DeletionCollectorConcurrency int
 }
 
 // Load creates a new Config instance with values loaded from environment variables.
@@ -593,6 +632,14 @@ func Load() *Config {
 		
 		// Trace Subsystems
 		TraceSubsystems:  getEnv("ENTITYDB_TRACE_SUBSYSTEMS", ""),
+		
+		// Deletion Collector
+		DeletionCollectorEnabled:     getEnvBool("ENTITYDB_DELETION_COLLECTOR_ENABLED", true),
+		DeletionCollectorInterval:    getEnvDuration("ENTITYDB_DELETION_COLLECTOR_INTERVAL", 3600),
+		DeletionCollectorBatchSize:   getEnvInt("ENTITYDB_DELETION_COLLECTOR_BATCH_SIZE", 100),
+		DeletionCollectorMaxRuntime:  getEnvDuration("ENTITYDB_DELETION_COLLECTOR_MAX_RUNTIME", 1800),
+		DeletionCollectorDryRun:      getEnvBool("ENTITYDB_DELETION_COLLECTOR_DRY_RUN", false),
+		DeletionCollectorConcurrency: getEnvInt("ENTITYDB_DELETION_COLLECTOR_CONCURRENCY", 4),
 	}
 }
 

@@ -153,6 +153,24 @@ type EntityRepository interface {
 	// VerifyIndexHealth checks index integrity and consistency.
 	// Returns an error if corruption is detected.
 	VerifyIndexHealth() error
+	
+	// Lifecycle Operations
+	
+	// ListActive returns all entities in active state.
+	// Equivalent to filtering by "status:active" tag.
+	ListActive() ([]*Entity, error)
+	
+	// ListSoftDeleted returns all entities in soft deleted state.
+	// Equivalent to filtering by "status:soft_deleted" tag.
+	ListSoftDeleted() ([]*Entity, error)
+	
+	// ListArchived returns all entities in archived state.
+	// Equivalent to filtering by "status:archived" tag.
+	ListArchived() ([]*Entity, error)
+	
+	// ListByLifecycleState returns entities in a specific lifecycle state.
+	// Provides unified access to lifecycle filtering.
+	ListByLifecycleState(state EntityLifecycleState) ([]*Entity, error)
 }
 
 // Entity represents the universal data structure in EntityDB.
@@ -784,5 +802,92 @@ func (e *Entity) GetCreatedBy() string {
 		return e.GetTagValue("created_by")
 	}
 	return mandatory.CreatedBy
+}
+
+// ===== ENTITY LIFECYCLE MANAGEMENT =====
+
+// Lifecycle returns a lifecycle manager for this entity
+func (e *Entity) Lifecycle() *EntityLifecycle {
+	return NewEntityLifecycle(e)
+}
+
+// GetLifecycleState returns the current lifecycle state of the entity
+func (e *Entity) GetLifecycleState() EntityLifecycleState {
+	return e.Lifecycle().GetCurrentState()
+}
+
+// IsActive returns true if the entity is in active state
+func (e *Entity) IsActive() bool {
+	return e.Lifecycle().IsActive()
+}
+
+// IsSoftDeleted returns true if the entity is in soft deleted state
+func (e *Entity) IsSoftDeleted() bool {
+	return e.Lifecycle().IsSoftDeleted()
+}
+
+// IsArchived returns true if the entity is in archived state
+func (e *Entity) IsArchived() bool {
+	return e.Lifecycle().IsArchived()
+}
+
+// IsPurged returns true if the entity is in purged state
+func (e *Entity) IsPurged() bool {
+	return e.Lifecycle().IsPurged()
+}
+
+// CanTransitionTo checks if a transition to the target state is valid
+func (e *Entity) CanTransitionTo(targetState EntityLifecycleState) bool {
+	return e.Lifecycle().CanTransitionTo(targetState)
+}
+
+// SoftDelete transitions entity to soft deleted state
+func (e *Entity) SoftDelete(userID, reason, policy string) error {
+	return e.Lifecycle().SoftDelete(userID, reason, policy)
+}
+
+// Undelete transitions entity back to active state
+func (e *Entity) Undelete(userID, reason string) error {
+	return e.Lifecycle().Undelete(userID, reason)
+}
+
+// Archive transitions entity to archived state
+func (e *Entity) Archive(userID, reason, policy string) error {
+	return e.Lifecycle().Archive(userID, reason, policy)
+}
+
+// Purge transitions entity to purged state
+func (e *Entity) Purge(userID, reason, policy string) error {
+	return e.Lifecycle().Purge(userID, reason, policy)
+}
+
+// GetTransitionHistory returns all lifecycle transitions for this entity
+func (e *Entity) GetTransitionHistory() []LifecycleTransition {
+	return e.Lifecycle().GetTransitionHistory()
+}
+
+// GetDeletedAt returns when the entity was deleted (if it has been deleted)
+func (e *Entity) GetDeletedAt() *time.Time {
+	return e.Lifecycle().GetDeletedAt()
+}
+
+// GetArchivedAt returns when the entity was archived (if it has been archived)
+func (e *Entity) GetArchivedAt() *time.Time {
+	return e.Lifecycle().GetArchivedAt()
+}
+
+// GetDeletionPolicy returns the deletion policy applied to this entity
+func (e *Entity) GetDeletionPolicy() string {
+	return e.Lifecycle().GetDeletionPolicy()
+}
+
+// GetDeletedBy returns who deleted the entity
+func (e *Entity) GetDeletedBy() string {
+	return e.Lifecycle().GetDeletedBy()
+}
+
+// GetDeleteReason returns why the entity was deleted
+func (e *Entity) GetDeleteReason() string {
+	return e.Lifecycle().GetDeleteReason()
 }
 

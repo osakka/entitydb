@@ -42,9 +42,38 @@ func NewDirectRepositoryWrapper(repo models.EntityRepository) DirectRepository {
 func (drw *DirectRepositoryWrapper) CreateDirect(entity *models.Entity) error {
 	logger.Trace("DirectRepositoryWrapper operating without instrumentation: CreateDirect")
 	
-	// DECOMMISSIONED: All entities now use single source of truth (main database)
-	// No more isolated metrics backend - everything goes to main repository
+	// CRITICAL: Use direct storage without checkpoints or metrics to prevent recursion
+	// This bypasses all instrumentation that could trigger more metrics collection
+	if entityRepo, ok := drw.underlying.(*EntityRepository); ok {
+		return drw.createDirectStorage(entityRepo, entity)
+	}
+	
+	// Fallback for other repository types (should not happen in production)
 	return drw.underlying.Create(entity)
+}
+
+// createDirectStorage performs direct storage operations without checkpoints or metrics
+func (drw *DirectRepositoryWrapper) createDirectStorage(repo *EntityRepository, entity *models.Entity) error {
+	// Directly write to storage without any checkpoints or metrics instrumentation
+	repo.mu.Lock()
+	defer repo.mu.Unlock()
+	
+	// Add to cache
+	repo.entityCache.Put(entity.ID, entity)
+	repo.loadedEntityCount++
+	
+	// Update indexes without metrics tracking
+	repo.updateIndexes(entity)
+	
+	// Write to storage using writer manager directly (no checkpoints)
+	if err := repo.writerManager.WriteEntity(entity); err != nil {
+		// Remove from cache on failure
+		repo.entityCache.Delete(entity.ID)
+		repo.loadedEntityCount--
+		return err
+	}
+	
+	return nil
 }
 
 // GetByIDDirect gets an entity by ID without triggering any metrics instrumentation
@@ -69,9 +98,41 @@ func (drw *DirectRepositoryWrapper) ListByTagDirect(tag string) ([]*models.Entit
 func (drw *DirectRepositoryWrapper) AddTagDirect(entityID, tag string) error {
 	logger.Trace("DirectRepositoryWrapper operating without instrumentation: AddTagDirect")
 	
-	// DECOMMISSIONED: All entities now use single source of truth (main database)
-	// No more isolated metrics backend - everything goes to main repository
+	// CRITICAL: Use direct storage without checkpoints or metrics to prevent recursion
+	// This bypasses all instrumentation that could trigger more metrics collection
+	if entityRepo, ok := drw.underlying.(*EntityRepository); ok {
+		return drw.addTagDirectStorage(entityRepo, entityID, tag)
+	}
+	
+	// Fallback for other repository types (should not happen in production)
 	return drw.underlying.AddTag(entityID, tag)
+}
+
+// addTagDirectStorage performs direct tag addition without checkpoints or metrics
+func (drw *DirectRepositoryWrapper) addTagDirectStorage(repo *EntityRepository, entityID, tag string) error {
+	// Get entity from cache or storage
+	entity, err := repo.GetByID(entityID)
+	if err != nil {
+		return err
+	}
+	
+	// Add the temporal tag directly without any instrumentation
+	temporalTag := models.FormatTemporalTag(tag)
+	entity.Tags = append(entity.Tags, temporalTag)
+	entity.UpdatedAt = models.Now()
+	
+	// Update the entity in cache and storage without checkpoints
+	repo.mu.Lock()
+	defer repo.mu.Unlock()
+	
+	// Update cache
+	repo.entityCache.Put(entity.ID, entity)
+	
+	// Update indexes without metrics tracking
+	repo.updateIndexes(entity)
+	
+	// Write to storage using writer manager directly (no checkpoints)
+	return repo.writerManager.WriteEntity(entity)
 }
 
 // isMetricsEntity checks if an entity is metrics-related

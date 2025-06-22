@@ -4,19 +4,25 @@
 // # Format Overview
 //
 // The EBF format consists of:
-//   - Fixed-size header (64 bytes) containing metadata and offsets
+//   - Fixed-size header (128 bytes) containing metadata and offsets
+//   - Write-Ahead Log for durability and concurrent access
 //   - Tag dictionary for string compression and interning
 //   - Entity index for O(1) lookups by ID
+//   - Deletion index for tracking deleted/purged entities
 //   - Entity data blocks containing tags and content
 //
 // # File Structure
 //
 //	+----------------+ 0x00
-//	|     Header     | 64 bytes
-//	+----------------+ 0x40
+//	|     Header     | 128 bytes
+//	+----------------+ 0x80
+//	|      WAL       | Variable size
+//	+----------------+
 //	| Tag Dictionary | Variable size
 //	+----------------+
 //	|  Entity Index  | EntityCount * 112 bytes
+//	+----------------+
+//	| Deletion Index | DeletionCount * 256 bytes
 //	+----------------+
 //	|  Entity Data   | Variable size blocks
 //	+----------------+
@@ -48,6 +54,7 @@ import (
 	"encoding/binary"
 	"entitydb/models"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"sync"
@@ -60,8 +67,8 @@ const (
 	MagicNumber uint32 = 0x45555446
 	
 	// FormatVersion indicates the unified format version.
-	// Version 2: Unified file format with embedded WAL and sections
-	FormatVersion uint32 = 2
+	// Version 3: Added deletion sections for temporal deletion architecture
+	FormatVersion uint32 = 3
 	
 	// HeaderSize is the fixed size of the unified file header in bytes.
 	// The unified header contains metadata and section offsets for all components.
@@ -105,7 +112,8 @@ var (
 //	0x58    8     LastModified (Unix timestamp)
 //	0x60    8     WALSequence
 //	0x68    8     CheckpointSequence
-//	0x70    16    Reserved (for future sections)
+//	0x70    8     DeletionIndexOffset
+//	0x78    8     DeletionIndexSize
 type Header struct {
 	Magic              uint32  // File format identifier (must be MagicNumber)
 	Version            uint32  // Format version (must be FormatVersion)
@@ -122,7 +130,148 @@ type Header struct {
 	LastModified       int64   // Unix timestamp of last modification
 	WALSequence        uint64  // Current WAL sequence number
 	CheckpointSequence uint64  // Last checkpoint sequence number
-	Reserved           [16]byte // Reserved for future sections
+	DeletionIndexOffset uint64  // Offset to deletion index section
+	DeletionIndexSize   uint64  // Size of deletion index in bytes
+}
+
+// DeletionEntry represents a single entry in the deletion index.
+// Each entry tracks when an entity was deleted and its lifecycle state.
+//
+// # Binary Layout (Little Endian)
+//
+//	Offset  Size  Field
+//	0x00    96    EntityID (null-terminated string)
+//	0x60    8     DeletionTimestamp (Unix nanoseconds)
+//	0x68    4     LifecycleState (0=active, 1=soft_deleted, 2=archived, 3=purged)
+//	0x6C    4     Flags (reserved for future use)
+//	0x70    32    DeletedBy (user ID who performed deletion)
+//	0x90    64    Reason (deletion reason, null-terminated)
+//	0xD0    32    Policy (retention policy name, null-terminated)
+//	0xF0    16    Reserved
+//
+// Total size: 256 bytes per entry
+const DeletionEntrySize = 256
+
+type DeletionEntry struct {
+	EntityID          [96]byte  // Entity identifier (null-terminated)
+	DeletionTimestamp int64     // When the deletion occurred (Unix nanoseconds)
+	LifecycleState    uint32    // Current lifecycle state (0-3)
+	Flags             uint32    // Reserved flags for future use
+	DeletedBy         [32]byte  // User ID who performed the deletion
+	Reason            [64]byte  // Reason for deletion (null-terminated)
+	Policy            [32]byte  // Retention policy name (null-terminated)
+	Reserved          [16]byte  // Reserved for future extensions
+}
+
+// DeletionState represents the lifecycle states in the deletion index
+type DeletionState uint32
+
+const (
+	DeletionStateActive      DeletionState = 0
+	DeletionStateSoftDeleted DeletionState = 1
+	DeletionStateArchived    DeletionState = 2
+	DeletionStatePurged      DeletionState = 3
+)
+
+// String returns the string representation of a deletion state
+func (ds DeletionState) String() string {
+	switch ds {
+	case DeletionStateActive:
+		return "active"
+	case DeletionStateSoftDeleted:
+		return "soft_deleted"
+	case DeletionStateArchived:
+		return "archived"
+	case DeletionStatePurged:
+		return "purged"
+	default:
+		return "unknown"
+	}
+}
+
+// NewDeletionEntry creates a new deletion entry from entity lifecycle data
+func NewDeletionEntry(entityID string, state models.EntityLifecycleState, deletedBy, reason, policy string, timestamp int64) *DeletionEntry {
+	entry := &DeletionEntry{
+		DeletionTimestamp: timestamp,
+		Flags:            0,
+	}
+	
+	// Copy strings with bounds checking
+	copy(entry.EntityID[:], entityID)
+	copy(entry.DeletedBy[:], deletedBy)
+	copy(entry.Reason[:], reason)
+	copy(entry.Policy[:], policy)
+	
+	// Convert lifecycle state to deletion state
+	switch state {
+	case models.StateActive:
+		entry.LifecycleState = uint32(DeletionStateActive)
+	case models.StateSoftDeleted:
+		entry.LifecycleState = uint32(DeletionStateSoftDeleted)
+	case models.StateArchived:
+		entry.LifecycleState = uint32(DeletionStateArchived)
+	case models.StatePurged:
+		entry.LifecycleState = uint32(DeletionStatePurged)
+	}
+	
+	return entry
+}
+
+// GetEntityID returns the entity ID as a string (null-terminated)
+func (de *DeletionEntry) GetEntityID() string {
+	// Find null terminator
+	for i, b := range de.EntityID {
+		if b == 0 {
+			return string(de.EntityID[:i])
+		}
+	}
+	return string(de.EntityID[:])
+}
+
+// GetDeletedBy returns the user ID who performed the deletion
+func (de *DeletionEntry) GetDeletedBy() string {
+	for i, b := range de.DeletedBy {
+		if b == 0 {
+			return string(de.DeletedBy[:i])
+		}
+	}
+	return string(de.DeletedBy[:])
+}
+
+// GetReason returns the deletion reason
+func (de *DeletionEntry) GetReason() string {
+	for i, b := range de.Reason {
+		if b == 0 {
+			return string(de.Reason[:i])
+		}
+	}
+	return string(de.Reason[:])
+}
+
+// GetPolicy returns the retention policy name
+func (de *DeletionEntry) GetPolicy() string {
+	for i, b := range de.Policy {
+		if b == 0 {
+			return string(de.Policy[:i])
+		}
+	}
+	return string(de.Policy[:])
+}
+
+// GetLifecycleState returns the lifecycle state as a models type
+func (de *DeletionEntry) GetLifecycleState() models.EntityLifecycleState {
+	switch DeletionState(de.LifecycleState) {
+	case DeletionStateActive:
+		return models.StateActive
+	case DeletionStateSoftDeleted:
+		return models.StateSoftDeleted
+	case DeletionStateArchived:
+		return models.StateArchived
+	case DeletionStatePurged:
+		return models.StatePurged
+	default:
+		return models.StateActive
+	}
 }
 
 // LegacyHeader removed - single source of truth: unified format only
@@ -201,7 +350,8 @@ func (h *Header) Write(w io.Writer) error {
 	binary.LittleEndian.PutUint64(buf[88:96], uint64(h.LastModified))
 	binary.LittleEndian.PutUint64(buf[96:104], h.WALSequence)
 	binary.LittleEndian.PutUint64(buf[104:112], h.CheckpointSequence)
-	copy(buf[112:128], h.Reserved[:])
+	binary.LittleEndian.PutUint64(buf[112:120], h.DeletionIndexOffset)
+	binary.LittleEndian.PutUint64(buf[120:128], h.DeletionIndexSize)
 	
 	logger.Debug("Header.Write - EntityCount=%d, WALSequence=%d, FileSize=%d", 
 		h.EntityCount, h.WALSequence, h.FileSize)
@@ -256,13 +406,21 @@ func (h *Header) Read(r io.Reader) error {
 	h.LastModified = int64(binary.LittleEndian.Uint64(buf[88:96]))
 	h.WALSequence = binary.LittleEndian.Uint64(buf[96:104])
 	h.CheckpointSequence = binary.LittleEndian.Uint64(buf[104:112])
-	copy(h.Reserved[:], buf[112:128])
+	h.DeletionIndexOffset = binary.LittleEndian.Uint64(buf[112:120])
+	h.DeletionIndexSize = binary.LittleEndian.Uint64(buf[120:128])
 	
 	if h.Magic != MagicNumber {
 		return ErrInvalidFormat
 	}
-	if h.Version != FormatVersion {
+	// Support both version 2 (without deletion index) and version 3 (with deletion index)
+	if h.Version != 2 && h.Version != FormatVersion {
 		return ErrVersionMismatch
+	}
+	
+	// For version 2 files, initialize deletion index fields to zero
+	if h.Version == 2 {
+		h.DeletionIndexOffset = 0
+		h.DeletionIndexSize = 0
 	}
 	
 	return nil
@@ -458,6 +616,155 @@ func (d *TagDictionary) Read(r io.Reader) error {
 		if id >= d.nextID {
 			d.nextID = id + 1
 		}
+	}
+	
+	return nil
+}
+
+// =============================================================================
+// Deletion Index Functions
+// =============================================================================
+
+// WriteDeletionEntry writes a deletion entry to the provided writer
+func (de *DeletionEntry) Write(w io.Writer) error {
+	buf := make([]byte, DeletionEntrySize)
+	
+	// Copy fixed-size fields
+	copy(buf[0:96], de.EntityID[:])
+	binary.LittleEndian.PutUint64(buf[96:104], uint64(de.DeletionTimestamp))
+	binary.LittleEndian.PutUint32(buf[104:108], de.LifecycleState)
+	binary.LittleEndian.PutUint32(buf[108:112], de.Flags)
+	copy(buf[112:144], de.DeletedBy[:])
+	copy(buf[144:208], de.Reason[:])
+	copy(buf[208:240], de.Policy[:])
+	copy(buf[240:256], de.Reserved[:])
+	
+	_, err := w.Write(buf)
+	return err
+}
+
+// ReadDeletionEntry reads a deletion entry from the provided reader
+func (de *DeletionEntry) Read(r io.Reader) error {
+	buf := make([]byte, DeletionEntrySize)
+	if _, err := io.ReadFull(r, buf); err != nil {
+		return err
+	}
+	
+	// Extract fixed-size fields
+	copy(de.EntityID[:], buf[0:96])
+	de.DeletionTimestamp = int64(binary.LittleEndian.Uint64(buf[96:104]))
+	de.LifecycleState = binary.LittleEndian.Uint32(buf[104:108])
+	de.Flags = binary.LittleEndian.Uint32(buf[108:112])
+	copy(de.DeletedBy[:], buf[112:144])
+	copy(de.Reason[:], buf[144:208])
+	copy(de.Policy[:], buf[208:240])
+	copy(de.Reserved[:], buf[240:256])
+	
+	return nil
+}
+
+// DeletionIndex manages the deletion index for tracking deleted/purged entities
+type DeletionIndex struct {
+	entries map[string]*DeletionEntry // EntityID -> DeletionEntry
+	mu      sync.RWMutex              // Protect concurrent access
+}
+
+// NewDeletionIndex creates a new deletion index
+func NewDeletionIndex() *DeletionIndex {
+	return &DeletionIndex{
+		entries: make(map[string]*DeletionEntry),
+	}
+}
+
+// AddEntry adds or updates a deletion entry
+func (di *DeletionIndex) AddEntry(entry *DeletionEntry) {
+	di.mu.Lock()
+	defer di.mu.Unlock()
+	
+	entityID := entry.GetEntityID()
+	di.entries[entityID] = entry
+}
+
+// GetEntry retrieves a deletion entry by entity ID
+func (di *DeletionIndex) GetEntry(entityID string) (*DeletionEntry, bool) {
+	di.mu.RLock()
+	defer di.mu.RUnlock()
+	
+	entry, exists := di.entries[entityID]
+	return entry, exists
+}
+
+// RemoveEntry removes a deletion entry (e.g., when entity is restored)
+func (di *DeletionIndex) RemoveEntry(entityID string) {
+	di.mu.Lock()
+	defer di.mu.Unlock()
+	
+	delete(di.entries, entityID)
+}
+
+// GetAllEntries returns all deletion entries
+func (di *DeletionIndex) GetAllEntries() []*DeletionEntry {
+	di.mu.RLock()
+	defer di.mu.RUnlock()
+	
+	entries := make([]*DeletionEntry, 0, len(di.entries))
+	for _, entry := range di.entries {
+		entries = append(entries, entry)
+	}
+	
+	return entries
+}
+
+// GetEntriesByState returns all entries in a specific lifecycle state
+func (di *DeletionIndex) GetEntriesByState(state models.EntityLifecycleState) []*DeletionEntry {
+	di.mu.RLock()
+	defer di.mu.RUnlock()
+	
+	var result []*DeletionEntry
+	for _, entry := range di.entries {
+		if entry.GetLifecycleState() == state {
+			result = append(result, entry)
+		}
+	}
+	
+	return result
+}
+
+// Count returns the number of deletion entries
+func (di *DeletionIndex) Count() int {
+	di.mu.RLock()
+	defer di.mu.RUnlock()
+	
+	return len(di.entries)
+}
+
+// WriteTo writes the entire deletion index to a writer
+func (di *DeletionIndex) WriteTo(w io.Writer) error {
+	di.mu.RLock()
+	defer di.mu.RUnlock()
+	
+	for _, entry := range di.entries {
+		if err := entry.Write(w); err != nil {
+			return fmt.Errorf("failed to write deletion entry: %w", err)
+		}
+	}
+	
+	return nil
+}
+
+// ReadFrom reads deletion entries from a reader
+func (di *DeletionIndex) ReadFrom(r io.Reader, entryCount int) error {
+	di.mu.Lock()
+	defer di.mu.Unlock()
+	
+	for i := 0; i < entryCount; i++ {
+		entry := &DeletionEntry{}
+		if err := entry.Read(r); err != nil {
+			return fmt.Errorf("failed to read deletion entry %d: %w", i, err)
+		}
+		
+		entityID := entry.GetEntityID()
+		di.entries[entityID] = entry
 	}
 	
 	return nil

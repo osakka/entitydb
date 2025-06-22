@@ -185,6 +185,9 @@ type EntityRepository struct {
 	
 	// Circuit breaker for update operations
 	updateCircuitBreaker *UpdateCircuitBreaker
+	
+	// Deletion index for tracking deleted/purged entities
+	deletionIndex *DeletionIndex
 }
 
 // PerformanceStats tracks performance metrics for the repository
@@ -653,6 +656,8 @@ func NewEntityRepositoryWithConfig(cfg *config.Config) (*EntityRepository, error
 		// Initialize WAL-only features
 		walEntities:     make(map[string]*models.Entity),
 		lastCompact:     time.Now(),
+		// Initialize deletion index
+		deletionIndex:   NewDeletionIndex(),
 	}
 	
 	logger.Info("Using unified file format with sharded tag index for improved concurrency")
@@ -1469,6 +1474,13 @@ func (r *EntityRepository) GetByID(id string) (*models.Entity, error) {
 	startTime := time.Now()
 	logger.Trace("GetByID: %s", id)
 	
+	// Check if entity is in deletion index
+	if r.deletionIndex != nil {
+		if _, deleted := r.deletionIndex.GetEntry(id); deleted {
+			return nil, fmt.Errorf("entity %s not found", id)
+		}
+	}
+	
 	// First check in-memory cache for the entity
 	entity, exists := r.entityCache.Get(id)
 	if exists {
@@ -1897,6 +1909,9 @@ func (r *EntityRepository) GetBaseRepository() *EntityRepository {
 
 // Delete deletes an entity
 func (r *EntityRepository) Delete(id string) error {
+	// In the unified format, we don't physically delete entities
+	// Instead, we mark them as purged and track in deletion index
+	
 	// Log to WAL first
 	if err := r.wal.LogDelete(id); err != nil {
 		return fmt.Errorf("error logging to WAL: %w", err)
@@ -1906,54 +1921,61 @@ func (r *EntityRepository) Delete(id string) error {
 	r.lockManager.AcquireEntityLock(id, WriteLock)
 	defer r.lockManager.ReleaseEntityLock(id, WriteLock)
 	
-	// Create temporary file
-	tempPath := r.getDataFile() + ".tmp"
-	writer, err := NewWriter(tempPath)
+	// Get the entity first
+	entity, err := r.GetByID(id)
 	if err != nil {
-		return err
-	}
-	defer writer.Close()
-	
-	// Read all entities and skip the deleted one
-	reader, err := NewReader(r.getDataFile())
-	if err != nil {
-		return err
-	}
-	defer reader.Close()
-	
-	entities, err := reader.GetAllEntities()
-	if err != nil {
-		return err
-	}
-	
-	// Write all entities except the deleted one
-	found := false
-	for _, e := range entities {
-		if e.ID == id {
-			found = true
-			continue
-		}
-		if err := writer.WriteEntity(e); err != nil {
-			return err
-		}
-	}
-	
-	if !found {
 		return fmt.Errorf("entity not found: %s", id)
 	}
 	
-	writer.Close()
-	
-	// Replace the original file
-	if err := os.Rename(tempPath, r.getDataFile()); err != nil {
-		return err
+	// Create deletion entry
+	deletionEntry := &DeletionEntry{
+		DeletionTimestamp: time.Now().UnixNano(),
+		LifecycleState:    3, // Purged state
+		Flags:             0,
 	}
 	
-	// Rebuild indexes
-	r.buildIndexes()
+	// Copy entity ID (null-terminated)
+	copy(deletionEntry.EntityID[:], []byte(id))
 	
-	// Invalidate cache
-	r.cache.Clear()
+	// Copy deleted by user ID if available
+	// Note: This would typically come from context but for now we'll use system
+	copy(deletionEntry.DeletedBy[:], []byte("system"))
+	
+	// Add to deletion index
+	if r.deletionIndex != nil {
+		r.deletionIndex.AddEntry(deletionEntry)
+	}
+	
+	// Remove from all indexes
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	
+	// Remove from cache
+	r.cache.Clear() // Clear entire cache since we don't have per-entity removal
+	r.entityCache.Delete(id)
+	
+	// Remove from tag indexes
+	for _, tag := range entity.Tags {
+		actualTag := tag
+		if parts := strings.SplitN(tag, "|", 2); len(parts) == 2 {
+			actualTag = parts[1]
+		}
+		
+		// Remove from sharded index
+		r.shardedTagIndex.RemoveTag(id, actualTag)
+		
+		// Remove from tag variant cache
+		if r.tagVariantCache != nil {
+			r.tagVariantCache.RemoveEntityFromVariant(id)
+		}
+	}
+	
+	// Remove from temporal index
+	if r.temporalIndex != nil {
+		r.temporalIndex.RemoveEntity(id)
+	}
+	
+	logger.Info("Delete.entity_repository: Successfully deleted entity %s", id)
 	
 	return nil
 }
@@ -1992,6 +2014,17 @@ func (r *EntityRepository) List() ([]*models.Entity, error) {
 	defer reader.Close()
 	
 	entities, err := reader.GetAllEntities()
+	
+	// Filter out deleted entities
+	if r.deletionIndex != nil && entities != nil {
+		filtered := make([]*models.Entity, 0, len(entities))
+		for _, entity := range entities {
+			if _, deleted := r.deletionIndex.GetEntry(entity.ID); !deleted {
+				filtered = append(filtered, entity)
+			}
+		}
+		entities = filtered
+	}
 	
 	// Track read metrics (skip if we're listing metric entities)
 	if !storageMetricsDisabled && storageMetrics != nil {
@@ -2246,6 +2279,17 @@ func (r *EntityRepository) fetchEntitiesWithReader(reader *Reader, entityIDs []s
 	
 	// Combine memory entities with disk entities
 	entities = append(entities, diskEntities...)
+	
+	// Filter out deleted entities
+	if r.deletionIndex != nil {
+		filtered := make([]*models.Entity, 0, len(entities))
+		for _, entity := range entities {
+			if _, deleted := r.deletionIndex.GetEntry(entity.ID); !deleted {
+				filtered = append(filtered, entity)
+			}
+		}
+		entities = filtered
+	}
 	
 	// Check for any errors
 	var firstError error
@@ -3907,6 +3951,86 @@ func (r *EntityRepository) TriggerCachePressureCleanup(pressure float64) {
 		r.tagVariantCache.TriggerPressureCleanup(pressure)
 		logger.Debug("EntityRepository: triggered tag variant cache pressure cleanup at %.1f%%", pressure*100)
 	}
+}
+
+// ===== ENTITY LIFECYCLE OPERATIONS =====
+
+// ListActive returns all entities in active state
+func (r *EntityRepository) ListActive() ([]*models.Entity, error) {
+	return r.ListByLifecycleState(models.StateActive)
+}
+
+// ListSoftDeleted returns all entities in soft deleted state
+func (r *EntityRepository) ListSoftDeleted() ([]*models.Entity, error) {
+	return r.ListByLifecycleState(models.StateSoftDeleted)
+}
+
+// ListArchived returns all entities in archived state
+func (r *EntityRepository) ListArchived() ([]*models.Entity, error) {
+	return r.ListByLifecycleState(models.StateArchived)
+}
+
+// ListByLifecycleState returns entities in a specific lifecycle state
+func (r *EntityRepository) ListByLifecycleState(state models.EntityLifecycleState) ([]*models.Entity, error) {
+	logger.Trace("ListByLifecycleState: %s", state)
+	
+	// Start with all entities and filter by lifecycle state
+	allEntities, err := r.List()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get all entities for lifecycle filtering: %w", err)
+	}
+	
+	var filteredEntities []*models.Entity
+	
+	for _, entity := range allEntities {
+		if entity.GetLifecycleState() == state {
+			filteredEntities = append(filteredEntities, entity)
+		}
+	}
+	
+	logger.Trace("ListByLifecycleState: found %d entities in state %s", len(filteredEntities), state)
+	return filteredEntities, nil
+}
+
+// =============================================================================
+// Deletion Index Management
+// =============================================================================
+
+// AddDeletionEntry adds an entry to the deletion index for audit trail purposes
+func (r *EntityRepository) AddDeletionEntry(entry *DeletionEntry) error {
+	if entry == nil {
+		return fmt.Errorf("deletion entry cannot be nil")
+	}
+	
+	// Add entry to in-memory deletion index
+	r.deletionIndex.AddEntry(entry)
+	
+	logger.Debug("AddDeletionEntry: added entry for entity %s (state: %s, deleted by: %s)", 
+		entry.GetEntityID(), entry.GetLifecycleState(), entry.GetDeletedBy())
+	
+	return nil
+}
+
+// GetDeletionEntry retrieves a deletion entry by entity ID
+func (r *EntityRepository) GetDeletionEntry(entityID string) (*DeletionEntry, bool) {
+	return r.deletionIndex.GetEntry(entityID)
+}
+
+// GetDeletionEntries returns all deletion entries
+func (r *EntityRepository) GetDeletionEntries() []*DeletionEntry {
+	return r.deletionIndex.GetAllEntries()
+}
+
+// GetDeletionEntriesByState returns deletion entries filtered by lifecycle state
+func (r *EntityRepository) GetDeletionEntriesByState(state models.EntityLifecycleState) []*DeletionEntry {
+	return r.deletionIndex.GetEntriesByState(state)
+}
+
+// RemoveDeletionEntry removes a deletion entry (e.g., when entity is restored)
+func (r *EntityRepository) RemoveDeletionEntry(entityID string) {
+	r.deletionIndex.RemoveEntry(entityID)
+	
+	logger.Debug("RemoveDeletionEntry: removed entry for entity %s", entityID)
 }
 
 

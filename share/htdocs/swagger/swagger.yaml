@@ -106,6 +106,80 @@ definitions:
       total_entities:
         type: integer
     type: object
+  api.DeletionListResponse:
+    description: Response containing a list of deleted entities with pagination
+    properties:
+      count:
+        description: Number of entities returned in this response
+        example: 25
+        type: integer
+      entities:
+        description: List of deleted entities
+        items:
+          $ref: '#/definitions/api.DeletionStatusResponse'
+        type: array
+      limit:
+        description: Limit used for pagination
+        example: 25
+        type: integer
+      offset:
+        description: Offset used for pagination
+        example: 0
+        type: integer
+      total:
+        description: Total number of deleted entities
+        example: 150
+        type: integer
+    type: object
+  api.DeletionStatusResponse:
+    description: Response containing entity deletion status and audit trail
+    properties:
+      archived_at:
+        description: When the entity was archived (if applicable)
+        example: "2023-02-25T09:15:00Z"
+        type: string
+      can_purge:
+        description: Whether the entity can be purged
+        example: false
+        type: boolean
+      can_restore:
+        description: Whether the entity can be restored
+        example: true
+        type: boolean
+      created_at:
+        description: When the entity was created
+        example: "2023-01-15T10:30:00Z"
+        type: string
+      delete_reason:
+        description: Reason for deletion (if applicable)
+        example: Data cleanup
+        type: string
+      deleted_at:
+        description: When the entity was deleted (if applicable)
+        example: "2023-01-25T09:15:00Z"
+        type: string
+      deleted_by:
+        description: Who deleted the entity (if applicable)
+        example: admin
+        type: string
+      entity_id:
+        description: Entity ID
+        example: user-123
+        type: string
+      lifecycle_state:
+        allOf:
+        - $ref: '#/definitions/models.EntityLifecycleState'
+        description: Current lifecycle state
+        example: soft_deleted
+      retention_policy:
+        description: Retention policy applied (if applicable)
+        example: standard-cleanup
+        type: string
+      updated_at:
+        description: When the entity was last updated
+        example: "2023-01-20T14:45:00Z"
+        type: string
+    type: object
   api.DetailedMemoryMetrics:
     description: Detailed memory usage statistics
     properties:
@@ -427,6 +501,21 @@ definitions:
       active_count:
         type: integer
     type: object
+  api.PurgeRequest:
+    description: Request body for permanently purging an entity (irreversible)
+    properties:
+      confirmation:
+        description: Confirmation string (must be "PURGE" to proceed)
+        example: PURGE
+        type: string
+      reason:
+        description: Reason for purging (required)
+        example: Legal requirement
+        type: string
+    required:
+    - confirmation
+    - reason
+    type: object
   api.QueryEntityResponse:
     properties:
       entities:
@@ -465,6 +554,16 @@ definitions:
         type: string
       username:
         type: string
+    type: object
+  api.RestoreRequest:
+    description: Request body for restoring a deleted entity
+    properties:
+      reason:
+        description: Reason for restoration (required)
+        example: Accidentally deleted
+        type: string
+    required:
+    - reason
     type: object
   api.SecurityEvent:
     properties:
@@ -532,6 +631,24 @@ definitions:
         type: integer
       total_users:
         type: integer
+    type: object
+  api.SoftDeleteRequest:
+    description: Request body for soft deleting an entity
+    properties:
+      force:
+        description: 'Force deletion even if entity has relationships (default: false)'
+        example: false
+        type: boolean
+      policy:
+        description: Policy to apply (optional, uses default if not specified)
+        example: standard-cleanup
+        type: string
+      reason:
+        description: Reason for deletion (required)
+        example: No longer needed
+        type: string
+    required:
+    - reason
     type: object
   api.StatusResponse:
     description: Status message
@@ -686,6 +803,18 @@ definitions:
           Unix epoch
         type: integer
     type: object
+  models.EntityLifecycleState:
+    enum:
+    - active
+    - soft_deleted
+    - archived
+    - purged
+    type: string
+    x-enum-varnames:
+    - StateActive
+    - StateSoftDeleted
+    - StateArchived
+    - StatePurged
 host: localhost:8085
 info:
   contact:
@@ -1455,6 +1584,243 @@ paths:
       summary: Reset user password (admin only)
       tags:
       - users
+  /entities/{id}/delete:
+    post:
+      consumes:
+      - application/json
+      description: Marks an entity as soft deleted while preserving data for potential
+        restoration
+      parameters:
+      - description: Entity ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Deletion request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.SoftDeleteRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Entity successfully soft deleted
+          schema:
+            $ref: '#/definitions/api.DeletionStatusResponse'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "403":
+          description: Insufficient permissions
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "404":
+          description: Entity not found
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "409":
+          description: Entity already deleted
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Soft delete an entity
+      tags:
+      - Entity Deletion
+  /entities/{id}/deletion-status:
+    get:
+      description: Returns detailed deletion status and audit trail for an entity
+      parameters:
+      - description: Entity ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Entity deletion status
+          schema:
+            $ref: '#/definitions/api.DeletionStatusResponse'
+        "403":
+          description: Insufficient permissions
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "404":
+          description: Entity not found
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get entity deletion status
+      tags:
+      - Entity Deletion
+  /entities/{id}/purge:
+    delete:
+      consumes:
+      - application/json
+      description: Permanently and irreversibly removes an entity and all its data
+        from the system
+      parameters:
+      - description: Entity ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Purge request with confirmation
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.PurgeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Entity successfully purged
+          schema:
+            $ref: '#/definitions/api.SuccessResponse'
+        "400":
+          description: Invalid request or confirmation
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "403":
+          description: Insufficient permissions
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "404":
+          description: Entity not found
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "409":
+          description: Entity cannot be purged
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Permanently purge an entity
+      tags:
+      - Entity Deletion
+  /entities/{id}/restore:
+    post:
+      consumes:
+      - application/json
+      description: Restores a soft deleted entity back to active state
+      parameters:
+      - description: Entity ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Restoration request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.RestoreRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Entity successfully restored
+          schema:
+            $ref: '#/definitions/api.DeletionStatusResponse'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "403":
+          description: Insufficient permissions
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "404":
+          description: Entity not found
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "409":
+          description: Entity cannot be restored
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Restore a deleted entity
+      tags:
+      - Entity Deletion
+  /entities/deleted:
+    get:
+      description: Returns a paginated list of entities in various deletion states
+      parameters:
+      - description: Lifecycle state filter
+        enum:
+        - soft_deleted
+        - archived
+        - purged
+        example: '"soft_deleted"'
+        in: query
+        name: state
+        type: string
+      - default: 25
+        description: Maximum number of entities to return
+        in: query
+        maximum: 100
+        minimum: 1
+        name: limit
+        type: integer
+      - default: 0
+        description: Number of entities to skip
+        in: query
+        minimum: 0
+        name: offset
+        type: integer
+      - description: Filter by who deleted the entities
+        example: '"admin"'
+        in: query
+        name: deleted_by
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of deleted entities
+          schema:
+            $ref: '#/definitions/api.DeletionListResponse'
+        "400":
+          description: Invalid request parameters
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "403":
+          description: Insufficient permissions
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List deleted entities
+      tags:
+      - Entity Deletion
   /health:
     get:
       consumes:

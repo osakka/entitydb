@@ -29,6 +29,7 @@ import (
 	"entitydb/api"
 	"entitydb/logger"
 	"entitydb/config"
+	"entitydb/services"
 	
 	"github.com/gorilla/mux"
 	httpSwagger "github.com/swaggo/http-swagger"
@@ -132,11 +133,13 @@ type EntityDBServer struct {
 	entityRepo       models.EntityRepository
 	securityManager  *models.SecurityManager
 	securityInit     *models.SecurityInitializer
+	deletionCollector *services.DeletionCollector
 	mu               sync.RWMutex
 	server           *http.Server
 	entityHandler    *api.EntityHandler
 	userHandler      *api.UserHandler
 	authHandler      *api.AuthHandler
+	deletionHandler  *api.DeletionHandler
 	securityMiddleware *api.SecurityMiddleware
 	config           *config.Config
 }
@@ -341,11 +344,26 @@ func main() {
 	server.securityManager = models.NewSecurityManager(entityRepo)
 	server.securityInit = models.NewSecurityInitializer(server.securityManager, entityRepo)
 	
+	// Initialize deletion collector
+	deletionConfig := services.DeletionCollectorConfig{
+		Enabled:       cfg.DeletionCollectorEnabled,
+		Interval:      cfg.DeletionCollectorInterval,
+		BatchSize:     cfg.DeletionCollectorBatchSize,
+		MaxRuntime:    cfg.DeletionCollectorMaxRuntime,
+		DryRun:        cfg.DeletionCollectorDryRun,
+		EnableMetrics: true,
+		Concurrency:   cfg.DeletionCollectorConcurrency,
+	}
+	server.deletionCollector = services.NewDeletionCollector(entityRepo, deletionConfig)
+	
+	// Create security middleware first
+	server.securityMiddleware = api.NewSecurityMiddleware(server.securityManager)
+	
 	// Create handlers
 	server.entityHandler = api.NewEntityHandler(entityRepo)
 	server.userHandler = api.NewUserHandler(entityRepo)
 	server.authHandler = api.NewAuthHandler(server.securityManager)
-	server.securityMiddleware = api.NewSecurityMiddleware(server.securityManager)
+	server.deletionHandler = api.NewDeletionHandler(entityRepo, server.deletionCollector, server.securityMiddleware)
 	
 	// Migrate legacy user_ prefixed UUIDs to pure UUIDs (one-time migration - BEFORE entity initialization)
 	if err := MigrateLegacyUUIDs(entityRepo); err != nil {
@@ -354,6 +372,13 @@ func main() {
 	
 	// Initialize with default entities (after migration)
 	server.initializeEntities()
+	
+	// Start deletion collector service
+	if err := server.deletionCollector.Start(); err != nil {
+		logger.Error("Failed to start deletion collector: %v", err)
+	} else {
+		logger.Info("Deletion collector started successfully")
+	}
 
 	// Set up HTTP server with gorilla/mux 
 	// Using gorilla/mux provides better route ordering control than standard ServeMux
@@ -393,6 +418,13 @@ func main() {
 	apiRouter.HandleFunc("/entities/history", server.securityMiddleware.RequirePermission("entity", "view")(server.entityHandler.GetEntityHistory)).Methods("GET")
 	apiRouter.HandleFunc("/entities/changes", server.securityMiddleware.RequirePermission("entity", "view")(server.entityHandler.GetRecentChanges)).Methods("GET")
 	apiRouter.HandleFunc("/entities/diff", server.securityMiddleware.RequirePermission("entity", "view")(server.entityHandler.GetEntityDiff)).Methods("GET")
+	
+	// Entity deletion operations with RBAC
+	apiRouter.HandleFunc("/entities/{id}/delete", server.securityMiddleware.RequirePermission("entity", "delete")(server.deletionHandler.SoftDeleteEntity)).Methods("POST")
+	apiRouter.HandleFunc("/entities/{id}/restore", server.securityMiddleware.RequirePermission("entity", "update")(server.deletionHandler.RestoreEntity)).Methods("POST")
+	apiRouter.HandleFunc("/entities/{id}/deletion-status", server.securityMiddleware.RequirePermission("entity", "view")(server.deletionHandler.GetDeletionStatus)).Methods("GET")
+	apiRouter.HandleFunc("/entities/{id}/purge", server.securityMiddleware.RequirePermission("entity", "purge")(server.deletionHandler.PurgeEntity)).Methods("DELETE")
+	apiRouter.HandleFunc("/entities/deleted", server.securityMiddleware.RequirePermission("entity", "view")(server.deletionHandler.ListDeletedEntities)).Methods("GET")
 	
 	// Chunking endpoints with RBAC  
 	apiRouter.HandleFunc("/entities/get-chunk", server.securityMiddleware.RequirePermission("entity", "view")(server.entityHandler.GetEntity)).Methods("GET")
@@ -728,6 +760,13 @@ func main() {
 	// Shutdown HTTP server
 	if err := server.server.Shutdown(ctx); err != nil {
 		logger.Error("HTTP server shutdown error: %v", err)
+	}
+	
+	// Stop deletion collector
+	if err := server.deletionCollector.Stop(); err != nil {
+		logger.Error("Deletion collector shutdown error: %v", err)
+	} else {
+		logger.Info("Deletion collector stopped successfully")
 	}
 	
 	// Close repositories
