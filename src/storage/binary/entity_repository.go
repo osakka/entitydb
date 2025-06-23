@@ -261,6 +261,9 @@ type EntityRepository struct {
 	// Atomic file operations for corruption prevention
 	useAtomicOperations bool // Feature flag for atomic file operations
 	
+	// Corruption detection and auto-recovery
+	corruptionDetector *CorruptionDetector
+	
 	// Track entity count for index building
 	loadedEntityCount int
 	
@@ -899,6 +902,39 @@ func NewEntityRepositoryWithConfig(cfg *config.Config) (*EntityRepository, error
 		logger.Info("Atomic file operations disabled")
 	}
 	
+	// Initialize corruption detection and auto-recovery system
+	repo.corruptionDetector = NewCorruptionDetector(repo)
+	
+	// Configure corruption detector from environment variables
+	detectionIntervalMin := int64(10) // Default 10 minutes
+	autoRecovery := true              // Default auto-recovery enabled
+	maxRecoveryAttempts := 3          // Default max 3 attempts
+	
+	if envInterval := os.Getenv("ENTITYDB_CORRUPTION_DETECTION_INTERVAL_MIN"); envInterval != "" {
+		if interval, err := strconv.ParseInt(envInterval, 10, 64); err == nil && interval > 0 {
+			detectionIntervalMin = interval
+		}
+	}
+	if envAutoRecovery := os.Getenv("ENTITYDB_AUTO_RECOVERY"); envAutoRecovery != "" {
+		autoRecovery = envAutoRecovery != "false"
+	}
+	if envMaxAttempts := os.Getenv("ENTITYDB_MAX_RECOVERY_ATTEMPTS"); envMaxAttempts != "" {
+		if attempts, err := strconv.Atoi(envMaxAttempts); err == nil && attempts > 0 {
+			maxRecoveryAttempts = attempts
+		}
+	}
+	
+	repo.corruptionDetector.Configure(detectionIntervalMin, autoRecovery, maxRecoveryAttempts)
+	
+	// Start corruption detector after all other systems are initialized
+	if err := repo.corruptionDetector.Start(); err != nil {
+		logger.Warn("Failed to start corruption detector: %v", err)
+		// Don't fail initialization - this is not critical
+	} else {
+		logger.Info("Corruption detector started (interval: %dm, auto-recovery: %v, max attempts: %d)",
+			detectionIntervalMin, autoRecovery, maxRecoveryAttempts)
+	}
+	
 	// Initialize circuit breaker for update operations
 	repo.updateCircuitBreaker = NewUpdateCircuitBreaker()
 	
@@ -1028,6 +1064,13 @@ func NewDatasetRepositoryWithConfig(cfg *config.Config) (*EntityRepository, erro
 // Close properly shuts down the repository and its resources
 func (r *EntityRepository) Close() error {
 	var errors []error
+	
+	// Stop corruption detector if running
+	if r.corruptionDetector != nil {
+		if err := r.corruptionDetector.Stop(); err != nil {
+			errors = append(errors, fmt.Errorf("error stopping corruption detector: %w", err))
+		}
+	}
 	
 	// Stop index integrity validator if running
 	if r.indexIntegrityValidator != nil {
