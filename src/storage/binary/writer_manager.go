@@ -3,23 +3,38 @@ package binary
 import (
 	"entitydb/models"
 	"fmt"
+	"os"
 	"sync"
 	"entitydb/logger"
 )
 
 // WriterManager manages a single writer instance for thread-safe access
 type WriterManager struct {
-	mu       sync.Mutex
-	writer   *Writer
-	dataFile string
-	refCount int
+	mu              sync.Mutex
+	writer          *Writer
+	dataFile        string
+	refCount        int
+	atomicFileManager *AtomicFileManager // Atomic file operations for corruption prevention
+	useAtomicOps    bool                 // Feature flag for atomic operations
 }
 
 // NewWriterManager creates a new writer manager
 func NewWriterManager(dataFile string) *WriterManager {
-	return &WriterManager{
-		dataFile: dataFile,
+	wm := &WriterManager{
+		dataFile:          dataFile,
+		atomicFileManager: NewAtomicFileManager(),
+		useAtomicOps:      true, // Default to enabled for corruption prevention
 	}
+	
+	// Start atomic file manager
+	if err := wm.atomicFileManager.Start(); err != nil {
+		logger.Warn("Failed to start atomic file manager: %v", err)
+		wm.useAtomicOps = false
+	} else {
+		logger.Debug("Atomic file manager started for corruption prevention")
+	}
+	
+	return wm
 }
 
 // GetWriter gets the singleton writer instance
@@ -148,10 +163,108 @@ func (wm *WriterManager) Checkpoint() error {
 	return nil
 }
 
+// WriteEntityAtomic writes an entity using atomic file operations for corruption prevention
+func (wm *WriterManager) WriteEntityAtomic(entity *models.Entity) error {
+	if !wm.useAtomicOps || wm.atomicFileManager == nil {
+		// Fallback to regular write if atomic operations not available
+		return wm.WriteEntity(entity)
+	}
+	
+	logger.Debug("WriteEntityAtomic called for entity %s", entity.ID)
+	
+	// Get current file data
+	currentData, err := os.ReadFile(wm.dataFile)
+	if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("failed to read current data: %w", err)
+	}
+	
+	// Create a temporary writer to build the new file content
+	tempFile := wm.dataFile + ".atomic.tmp"
+	writer, err := NewWriter(tempFile)
+	if err != nil {
+		return fmt.Errorf("failed to create temporary writer: %w", err)
+	}
+	
+	// If we have existing data, we need to read existing entities and add the new one
+	if len(currentData) > 0 {
+		// Read existing entities
+		reader, err := NewReader(wm.dataFile)
+		if err != nil {
+			writer.Close()
+			os.Remove(tempFile)
+			return fmt.Errorf("failed to create reader: %w", err)
+		}
+		
+		existingEntities, err := reader.GetAllEntities()
+		reader.Close()
+		if err != nil {
+			writer.Close()
+			os.Remove(tempFile)
+			return fmt.Errorf("failed to read existing entities: %w", err)
+		}
+		
+		// Write all existing entities
+		for _, existingEntity := range existingEntities {
+			if err := writer.WriteEntity(existingEntity); err != nil {
+				writer.Close()
+				os.Remove(tempFile)
+				return fmt.Errorf("failed to write existing entity: %w", err)
+			}
+		}
+	}
+	
+	// Write the new entity
+	if err := writer.WriteEntity(entity); err != nil {
+		writer.Close()
+		os.Remove(tempFile)
+		return fmt.Errorf("failed to write new entity: %w", err)
+	}
+	
+	// Close the temporary writer to finalize the file
+	if err := writer.Close(); err != nil {
+		os.Remove(tempFile)
+		return fmt.Errorf("failed to close temporary writer: %w", err)
+	}
+	
+	// Read the completed temporary file
+	newData, err := os.ReadFile(tempFile)
+	if err != nil {
+		os.Remove(tempFile)
+		return fmt.Errorf("failed to read temporary file: %w", err)
+	}
+	
+	// Atomically update the main file
+	if err := wm.atomicFileManager.AtomicUpdate(wm.dataFile, newData); err != nil {
+		os.Remove(tempFile)
+		return fmt.Errorf("atomic update failed: %w", err)
+	}
+	
+	// Clean up temporary file
+	os.Remove(tempFile)
+	
+	// Invalidate our writer instance so it gets recreated
+	wm.mu.Lock()
+	if wm.writer != nil {
+		wm.writer.Close()
+		wm.writer = nil
+	}
+	wm.mu.Unlock()
+	
+	logger.Debug("WriteEntityAtomic completed for entity %s", entity.ID)
+	return nil
+}
+
 // Close closes the writer manager
 func (wm *WriterManager) Close() error {
 	wm.mu.Lock()
 	defer wm.mu.Unlock()
+	
+	// Stop atomic file manager
+	if wm.atomicFileManager != nil {
+		if err := wm.atomicFileManager.Stop(); err != nil {
+			logger.Warn("Failed to stop atomic file manager: %v", err)
+		}
+	}
 	
 	if wm.writer != nil {
 		// First close the indexes and flush data

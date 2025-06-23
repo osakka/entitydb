@@ -258,6 +258,9 @@ type EntityRepository struct {
 	// Index integrity validator for corruption detection
 	indexIntegrityValidator *IndexIntegrityValidator
 	
+	// Atomic file operations for corruption prevention
+	useAtomicOperations bool // Feature flag for atomic file operations
+	
 	// Track entity count for index building
 	loadedEntityCount int
 	
@@ -885,6 +888,15 @@ func NewEntityRepositoryWithConfig(cfg *config.Config) (*EntityRepository, error
 	} else {
 		logger.Info("Index integrity validator started (interval: %dm, repair: %v, max repairs: %d)",
 			validationIntervalMin, repairEnabled, maxRepairs)
+	}
+	
+	// Configure atomic file operations for corruption prevention
+	useAtomicOps := os.Getenv("ENTITYDB_USE_ATOMIC_OPERATIONS") != "false"
+	repo.useAtomicOperations = useAtomicOps
+	if useAtomicOps {
+		logger.Info("Atomic file operations enabled for corruption prevention")
+	} else {
+		logger.Info("Atomic file operations disabled")
 	}
 	
 	// Initialize circuit breaker for update operations
@@ -1603,8 +1615,15 @@ func (r *EntityRepository) createInternal(entity *models.Entity) error {
 	r.entityCache.Put(entity.ID, entity)
 	r.mu.Unlock()
 	
-	// Write entity using WriterManager (which handles checkpoints)
-	if err := r.writerManager.WriteEntity(entity); err != nil {
+	// Write entity using WriterManager with atomic operations if enabled
+	var writeErr error
+	if r.useAtomicOperations {
+		writeErr = r.writerManager.WriteEntityAtomic(entity)
+	} else {
+		writeErr = r.writerManager.WriteEntity(entity)
+	}
+	
+	if writeErr != nil {
 		// Rollback index changes on write failure
 		r.mu.Lock()
 		r.entityCache.Delete(entity.ID)
@@ -1620,7 +1639,7 @@ func (r *EntityRepository) createInternal(entity *models.Entity) error {
 			}
 		}
 		r.mu.Unlock()
-		return err
+		return writeErr
 	}
 	
 	// Invalidate cache
