@@ -1055,14 +1055,36 @@
                     const health = await this.apiCall('/health');
                     const users = await this.apiCall('/api/v1/rbac/metrics/public');
 
-                    document.getElementById('totalEntities').textContent = entities.length || 0;
-                    document.getElementById('activeUsers').textContent = users.active_users || 0;
-                    document.getElementById('activeSessions').textContent = users.sessions?.active_count || 0;
-                    document.getElementById('systemHealth').textContent = health.status === 'healthy' ? '100%' : '50%';
+                    // Update dashboard metrics with safety checks
+                    const totalEntitiesEl = document.getElementById('totalEntities');
+                    if (totalEntitiesEl) {
+                        totalEntitiesEl.textContent = entities.length || 0;
+                    } else {
+                        console.warn('totalEntities element not found');
+                    }
+                    
+                    const activeUsersEl = document.getElementById('activeUsers');
+                    if (activeUsersEl) {
+                        activeUsersEl.textContent = users.active_users || 0;
+                    } else {
+                        console.warn('activeUsers element not found');
+                    }
+                    
+                    const activeSessionsEl = document.getElementById('activeSessions');
+                    if (activeSessionsEl) {
+                        activeSessionsEl.textContent = users.sessions?.active_count || 0;
+                    } else {
+                        console.warn('activeSessions element not found');
+                    }
+                    
+                    const systemHealthEl = document.getElementById('systemHealth');
+                    if (systemHealthEl) {
+                        systemHealthEl.textContent = health.status === 'healthy' ? '100%' : '50%';
+                    } else {
+                        console.warn('systemHealth element not found');
+                    }
 
-                    // Update current user
-                    const userEntities = entities.filter(e => e.tags?.some(t => t.includes('type:user')));
-                    document.getElementById('currentUser').textContent = 'Admin User';
+                    // User info is now displayed in header via userDisplay element
 
                 } catch (error) {
                     console.error('Error loading dashboard data:', error);
