@@ -63,8 +63,8 @@ import (
 
 const (
 	// MagicNumber identifies EntityDB Unified File Format (EUFF).
-	// Value: 0x45555446 ("EUFF" - EntityDB Unified File Format)
-	MagicNumber uint32 = 0x45555446
+	// Value: 0x46465545 ("EUFF" - EntityDB Unified File Format when written in little-endian)
+	MagicNumber uint32 = 0x46465545
 	
 	// FormatVersion indicates the unified format version.
 	// Version 3: Added deletion sections for temporal deletion architecture

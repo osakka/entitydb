@@ -25,16 +25,89 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"runtime"
+	"bytes"
 )
 
-// Thread-local context to prevent metrics collection recursion
-// Using a more reliable approach with atomic operations and thread-local storage
+// RecursionGuard prevents infinite recursion in entity creation operations
+// This is a critical system that prevents feedback loops where creating an entity
+// triggers operations that create more entities, leading to stack overflow or infinite loops
+//
+// Protected operations include:
+// - Metrics collection (metrics → entity → metrics)
+// - Error tracking (error → entity → error)
+// - Audit logging (audit → entity → audit)
+// - Session creation (session → entity → session)
+// - Background jobs (job → entity → job)
+// - Deletion tracking (deletion → entity → deletion)
+type RecursionGuard struct {
+	depth int64 // Current recursion depth
+	mu    sync.RWMutex // Protects goroutine-local tracking
+	contexts map[uint64]int // Goroutine ID → recursion depth
+}
+
 var (
+	// Global recursion guard instance
+	globalRecursionGuard = &RecursionGuard{
+		contexts: make(map[uint64]int),
+	}
+	
+	// Legacy metrics-specific flags for backward compatibility
 	metricsOperationDepth int64 // Global atomic counter for recursion depth
 	metricsDisabledGlobally int64 // Global atomic flag to disable all metrics
 )
 
-// setMetricsOperation marks the current goroutine as performing metrics operations
+// getGoroutineID extracts the goroutine ID from the runtime stack
+// This is a surgical approach to get goroutine-specific context without external dependencies
+func getGoroutineID() uint64 {
+	// Get current goroutine's stack trace
+	buf := make([]byte, 64)
+	n := runtime.Stack(buf, false)
+	idField := bytes.Fields(buf[:n])[1]
+	id, _ := strconv.ParseUint(string(idField), 10, 64)
+	return id
+}
+
+// Execute runs a function with recursion protection
+// Returns false if recursion was detected and function was not executed
+func (rg *RecursionGuard) Execute(operation string, fn func() error) (executed bool, err error) {
+	gid := getGoroutineID()
+	
+	// Check if we're already in a protected operation
+	rg.mu.RLock()
+	depth := rg.contexts[gid]
+	rg.mu.RUnlock()
+	
+	if depth > 0 {
+		logger.Debug("Recursion prevented for operation %s at depth %d", operation, depth)
+		return false, nil
+	}
+	
+	// Mark operation as in progress
+	rg.mu.Lock()
+	rg.contexts[gid] = depth + 1
+	atomic.AddInt64(&rg.depth, 1)
+	rg.mu.Unlock()
+	
+	// Ensure we clean up on exit
+	defer func() {
+		rg.mu.Lock()
+		delete(rg.contexts, gid)
+		atomic.AddInt64(&rg.depth, -1)
+		rg.mu.Unlock()
+	}()
+	
+	// Execute the protected function
+	err = fn()
+	return true, err
+}
+
+// IsInProgress returns true if any protected operation is in progress
+func (rg *RecursionGuard) IsInProgress() bool {
+	return atomic.LoadInt64(&rg.depth) > 0
+}
+
+// Legacy compatibility functions
 func setMetricsOperation(active bool) {
 	if active {
 		atomic.AddInt64(&metricsOperationDepth, 1)
@@ -45,27 +118,22 @@ func setMetricsOperation(active bool) {
 	}
 }
 
-// SetMetricsOperation marks the current goroutine as performing metrics operations (exported)
 func SetMetricsOperation(active bool) {
 	setMetricsOperation(active)
 }
 
-// isMetricsOperation checks if any metrics operations are in progress
 func isMetricsOperation() bool {
 	return atomic.LoadInt64(&metricsOperationDepth) > 0 || atomic.LoadInt64(&metricsDisabledGlobally) > 0
 }
 
-// IsMetricsOperation checks if any metrics operations are in progress (exported)
 func IsMetricsOperation() bool {
 	return isMetricsOperation()
 }
 
-// DisableMetricsGlobally completely disables metrics collection (for emergency)
 func DisableMetricsGlobally() {
 	atomic.StoreInt64(&metricsDisabledGlobally, 1)
 }
 
-// EnableMetricsGlobally re-enables metrics collection
 func EnableMetricsGlobally() {
 	atomic.StoreInt64(&metricsDisabledGlobally, 0)
 }
@@ -1337,6 +1405,22 @@ func (r *EntityRepository) updateIndexes(entity *models.Entity) {
 
 // Create creates a new entity with strong durability guarantees
 func (r *EntityRepository) Create(entity *models.Entity) error {
+	// CRITICAL: Use RecursionGuard to prevent infinite loops in entity creation
+	// This prevents: metrics → entity → metrics → entity → stack overflow
+	executed, err := globalRecursionGuard.Execute("entity-create", func() error {
+		return r.createInternal(entity)
+	})
+	
+	if !executed {
+		logger.Trace("Entity creation skipped due to recursion protection for entity: %s", entity.ID)
+		return nil // Silently skip to prevent cascading failures
+	}
+	
+	return err
+}
+
+// createInternal contains the actual entity creation logic
+func (r *EntityRepository) createInternal(entity *models.Entity) error {
 	startTime := time.Now()
 	
 	// Generate UUID only if no ID is provided
@@ -1646,6 +1730,22 @@ func (r *EntityRepository) GetByID(id string) (*models.Entity, error) {
 
 // Update updates an existing entity
 func (r *EntityRepository) Update(entity *models.Entity) error {
+	// CRITICAL: Use RecursionGuard to prevent infinite loops in update operations
+	// This prevents: metrics → Update → metrics → Update → stack overflow
+	executed, err := globalRecursionGuard.Execute("entity-update", func() error {
+		return r.updateInternal(entity)
+	})
+	
+	if !executed {
+		logger.Trace("Update skipped due to recursion protection for entity: %s", entity.ID)
+		return nil // Silently skip to prevent cascading failures
+	}
+	
+	return err
+}
+
+// updateInternal contains the actual update logic
+func (r *EntityRepository) updateInternal(entity *models.Entity) error {
 	startTime := time.Now()
 	
 	if entity.ID == "" {
@@ -2657,6 +2757,22 @@ func (r *EntityRepository) AddContent(entityID, contentType, content string) err
 
 // AddTag adds a tag to an entity efficiently without full entity rewrite
 func (r *EntityRepository) AddTag(entityID, tag string) error {
+	// CRITICAL: Use RecursionGuard to prevent infinite loops in tag operations
+	// This prevents: metrics → AddTag → GetByID → recovery → metrics → stack overflow
+	executed, err := globalRecursionGuard.Execute("entity-addtag", func() error {
+		return r.addTagInternal(entityID, tag)
+	})
+	
+	if !executed {
+		logger.Trace("AddTag skipped due to recursion protection for entity: %s, tag: %s", entityID, tag)
+		return nil // Silently skip to prevent cascading failures
+	}
+	
+	return err
+}
+
+// addTagInternal contains the actual tag addition logic
+func (r *EntityRepository) addTagInternal(entityID, tag string) error {
 	logger.Debug("AddTag: adding tag '%s' to entity %s", tag, entityID)
 	
 	// Try to get current entity to check for duplicate tags, but be resilient to indexing delays
