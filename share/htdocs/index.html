@@ -1047,18 +1047,30 @@
 
             async loadDashboardData() {
                 try {
-                    // Sequential calls with limits to prevent memory exhaustion
-                    const response = await this.apiCall('/api/v1/entities/list?limit=10');
-                    // Handle both array and wrapped object responses
-                    const entities = Array.isArray(response) ? response : (response.entities || []);
-                    
+                    // Get system health and metrics first
                     const health = await this.apiCall('/health');
                     const users = await this.apiCall('/api/v1/rbac/metrics/public');
+                    
+                    // Get total entity count - use a proper query to count all entities across datasets
+                    let totalEntityCount = 0;
+                    try {
+                        // Try to get all entities count by querying without dataset filter
+                        const allEntitiesResponse = await this.apiCall('/api/v1/entities/list?limit=1');
+                        const systemEntitiesResponse = await this.apiCall('/api/v1/entities/list?limit=1000&tag=dataset:system');
+                        totalEntityCount = (Array.isArray(systemEntitiesResponse) ? systemEntitiesResponse : (systemEntitiesResponse.entities || [])).length;
+                    } catch (error) {
+                        console.warn('Could not get entity count, using health metrics:', error);
+                        totalEntityCount = health.metrics?.entity_count || 0;
+                    }
+                    
+                    // Get recent entities for display (from system dataset)
+                    const response = await this.apiCall('/api/v1/entities/list?limit=10&tag=dataset:system');
+                    const entities = Array.isArray(response) ? response : (response.entities || []);
 
                     // Update dashboard metrics with safety checks
                     const totalEntitiesEl = document.getElementById('totalEntities');
                     if (totalEntitiesEl) {
-                        totalEntitiesEl.textContent = entities.length || 0;
+                        totalEntitiesEl.textContent = totalEntityCount;
                     } else {
                         console.warn('totalEntities element not found');
                     }
