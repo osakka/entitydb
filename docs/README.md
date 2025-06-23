@@ -1,6 +1,6 @@
 # EntityDB Documentation Library
 
-> **Version**: v2.34.2 | **Status**: Configuration Management Excellence | **Last Updated**: 2025-06-22
+> **Version**: v2.34.3 | **Status**: Production Certified with Complete Technical Documentation | **Last Updated**: 2025-06-23
 > 
 > **Professional Technical Documentation** for EntityDB - A high-performance temporal database with nanosecond-precision timestamps, unified file format, and world-class logging standards.
 
@@ -117,16 +117,25 @@ graph TD
 | **[Getting Started](./getting-started/)** | New user onboarding | New Users | 5 files |
 | **[User Guide](./user-guide/)** | Task-oriented guides | End Users | 5 files |
 | **[API Reference](./api-reference/)** | Complete API documentation | Developers | 9 files |
-| **[Architecture](./architecture/)** | System design documentation | Technical Teams | 53 files |
+| **[Architecture](./architecture/)** | System design documentation | Technical Teams | 11 ADRs + Overview |
 | **[Admin Guide](./admin-guide/)** | Operations and deployment | Administrators | 11 files |
-| **[Developer Guide](./developer-guide/)** | Development workflow | Contributors | 10 files |
-| **[Reference](./reference/)** | Technical specifications | All Audiences | 14 files |
+| **[Developer Guide](./developer-guide/)** | Development workflow | Contributors | 15+ files |
+| **[Reference](./reference/)** | Technical specifications | All Audiences | 20+ files |
+
+### 📋 **Enhanced Technical Documentation** (NEW)
+
+| Category | Purpose | Audience | Content |
+|----------|---------|----------|---------|
+| **[Technical Specs](./reference/technical-specs/)** | Detailed specifications | Developers/Ops | Binary formats, memory architecture |
+| **[Implementation](./developer-guide/implementation/)** | Implementation guides | Contributors | RBAC, temporal, authentication |
+| **[Testing Guides](./developer-guide/testing/)** | Testing methodologies | QA/Developers | Battle testing, E2E, performance |
+| **[Architecture Evolution](./architecture/evolution/)** | Historical context | Architects | System evolution and decisions |
 
 ### 🏛️ **Governance Documentation**
 
 | Category | Purpose | File Count | Status |
 |----------|---------|------------|--------|
-| **[ADR](./architecture/)** | Architectural Decision Records | 6 ADR files | In Architecture |
+| **[ADR](./architecture/adr/)** | Architectural Decision Records | 10 ADRs + Timeline | Active |
 | **[Releases](./releases/)** | Release notes and history | 1 file | Active |
 | **[Assets](./assets/)** | Diagrams and visual content | 1 file | Growing |
 
