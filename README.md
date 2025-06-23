@@ -1,7 +1,7 @@
 # EntityDB
 
 <div align="center">
-  <img src="./share/resources/logo_black.svg" alt="EntityDB Logo" width="400" height="120" />
+  <img src="./share/resources/logo_white.svg" alt="EntityDB Logo" width="400" height="120" />
 </div>
 
 > **A high-performance temporal database with nanosecond-precision timestamps, unified file format, and world-class logging standards**
