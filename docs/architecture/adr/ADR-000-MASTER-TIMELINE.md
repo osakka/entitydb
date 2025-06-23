@@ -287,6 +287,24 @@ EntityDB represents the **New Industry Standard** with:
 ---
 
 **Maintainers**: Architecture Team  
-**Last Updated**: 2025-06-22  
-**Next Review**: 2025-12-22 (6 months)  
-**Total Architectural Decisions**: 47 major decisions tracked
+**2025-06-23 | Metrics Feedback Loop Surgical Elimination**
+- **Decision**: Surgical elimination of metrics feedback loop with safe defaults
+- **Commit**: `ba41984` - Fix surgical elimination of metrics feedback loop with safe defaults
+- **Impact**: Changed metric tracking defaults to false, preventing infinite recursion loops
+
+**2025-06-23 | Production Readiness Certification**  
+- **Decision**: Comprehensive E2E production readiness test suite & certification
+- **Commit**: `58a4177` - Comprehensive E2E production readiness test suite & certification (v2.34.3)
+- **Impact**: Complete validation of EntityDB for production deployment with 100% success rate
+
+**2025-06-23 | Development Status & Usage Notification License**
+- **Decision**: Add development disclaimer and usage notification license  
+- **Commit**: `4bae4b1` - Add development disclaimer and usage notification license
+- **Impact**: Users must notify licensing@itdlabs.co.uk when using in production environments
+
+---
+
+**Maintainers**: Architecture Team  
+**Last Updated**: 2025-06-23  
+**Next Review**: 2025-12-23 (6 months)  
+**Total Architectural Decisions**: 50 major decisions tracked

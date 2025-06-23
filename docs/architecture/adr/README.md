@@ -15,12 +15,16 @@ Architectural Decision Records (ADRs) are documents that capture important archi
 
 | ADR | Title | Status | Date |
 |-----|-------|---------|------|
-| [ADR-000](./ADR-000-MASTER-TIMELINE.md) | Master Timeline | Accepted | 2025-06-20 |
+| [ADR-000](./ADR-000-MASTER-TIMELINE.md) | Master Timeline | Accepted | 2025-06-23 |
 | [ADR-022](./ADR-022-database-file-unification.md) | Database File Unification | Accepted | 2025-06-20 |
 | [ADR-028](./ADR-028-wal-corruption-prevention.md) | WAL Corruption Prevention | Accepted | 2025-06-22 |
 | [ADR-029](./ADR-029-intelligent-recovery-system.md) | Intelligent Recovery System | Accepted | 2025-06-22 |
 | [ADR-030](./ADR-030-circuit-breaker-feedback-loop-prevention.md) | Circuit Breaker Feedback Loop Prevention | Accepted | 2025-06-22 |
 | [ADR-031](./ADR-031-bar-raising-metrics-retention-contention-fix.md) | Bar-Raising Metrics Retention Contention Fix | Accepted | 2025-06-22 |
+| [ADR-032](./ADR-032-entity-deletion-index-tracking.md) | Entity Deletion Index Tracking | Accepted | 2025-06-22 |
+| [ADR-033](./ADR-033-metrics-feedback-loop-prevention.md) | Metrics Feedback Loop Prevention | Accepted | 2025-06-23 |
+| [ADR-034](./ADR-034-production-readiness-certification.md) | Production Readiness Certification | Accepted | 2025-06-23 |
+| [ADR-035](./ADR-035-development-status-usage-notification.md) | Development Status & Usage Notification | Accepted | 2025-06-23 |
 
 ## ADR Template
 

@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-#### Critical Metrics Feedback Loop Prevention (2025-06-22)
+#### Critical Metrics Feedback Loop Prevention (2025-06-23)
 
 **Eliminated infinite recursion causing 100% CPU usage from metrics collection**
 
@@ -19,7 +19,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Metrics Collection Guard**: Enhanced storeCheckpointMetric() with ShouldSkipMetrics() check
 - **Zero Performance Impact**: Thread-safe implementation with no overhead when not in use
 - **Stable Operation**: CPU usage reduced from 100% to 0.0% with all metrics functional
-- **Architecture Documentation**: ADR-033 documents the feedback loop prevention design
+- **Final Implementation**: Surgical elimination with safe defaults (commit `ba41984`)
+  - Changed metric tracking defaults to false in config.go
+  - Conditional background collector initialization in main.go  
+  - Query metrics protection preventing initialization when disabled
+  - Server logs confirm: "Background metrics collector disabled" and "Query metrics tracking disabled"
+- **Architecture Documentation**: ADR-033 documents the complete feedback loop prevention design
 
 ### Added
 
@@ -50,6 +55,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Stable memory usage under 1GB constraint
   - CPU usage stable at 0.0% idle
   - All temporal features fully functional
+- **Architecture Documentation**: ADR-034 documents production readiness certification methodology
+
+#### Development Status Disclaimer & Usage Notification License (2025-06-23)
+
+**Transparent communication and community building through licensing innovation**
+
+- **Development Status Disclaimer**: Added prominent disclaimer to README.md
+  - Clear communication that codebase is under heavy development
+  - Honest disclosure that it has not been tested in production environments
+  - Encourages use for development, testing, and evaluation purposes
+  - Sets appropriate expectations while maintaining user trust
+- **Usage Notification License**: Created "MIT License with Usage Notification"
+  - Maintains MIT permissive licensing foundation for wide adoption
+  - Requires users to notify licensing@itdlabs.co.uk when using in production
+  - Enables community building and collaboration opportunities
+  - Provides feedback mechanism for real-world usage patterns
+- **License Contact Information**: 
+  - Email: licensing@itdlabs.co.uk
+  - Includes brief use case description and contact information requirements
+  - Clear purpose: community building, support, collaboration opportunities
+- **Documentation Updates**: Updated badges and references throughout documentation
+- **Architecture Documentation**: ADR-035 documents licensing strategy and community building approach
 
 ## [2.34.2] - 2025-06-22
 
