@@ -255,6 +255,9 @@ type EntityRepository struct {
 	// WAL rotation manager for bounded growth
 	walRotationManager *WALRotationManager
 	
+	// Index integrity validator for corruption detection
+	indexIntegrityValidator *IndexIntegrityValidator
+	
 	// Track entity count for index building
 	loadedEntityCount int
 	
@@ -851,6 +854,39 @@ func NewEntityRepositoryWithConfig(cfg *config.Config) (*EntityRepository, error
 		logger.Info("WAL rotation manager started (max: %dMB, age: %dm)", walMaxSizeMB, walMaxAgeMin)
 	}
 	
+	// Initialize index integrity validator for corruption detection
+	repo.indexIntegrityValidator = NewIndexIntegrityValidator(repo)
+	
+	// Configure index integrity validator from environment variables
+	validationIntervalMin := int64(30) // Default 30 minutes
+	repairEnabled := true              // Default auto-repair enabled
+	maxRepairs := 100                  // Default max 100 repairs per run
+	
+	if envInterval := os.Getenv("ENTITYDB_INDEX_VALIDATION_INTERVAL_MIN"); envInterval != "" {
+		if interval, err := strconv.ParseInt(envInterval, 10, 64); err == nil && interval > 0 {
+			validationIntervalMin = interval
+		}
+	}
+	if envRepair := os.Getenv("ENTITYDB_INDEX_AUTO_REPAIR"); envRepair != "" {
+		repairEnabled = envRepair != "false"
+	}
+	if envMaxRepairs := os.Getenv("ENTITYDB_INDEX_MAX_REPAIRS"); envMaxRepairs != "" {
+		if repairs, err := strconv.Atoi(envMaxRepairs); err == nil && repairs > 0 {
+			maxRepairs = repairs
+		}
+	}
+	
+	repo.indexIntegrityValidator.Configure(validationIntervalMin, repairEnabled, maxRepairs)
+	
+	// Start index integrity validator after initial setup
+	if err := repo.indexIntegrityValidator.Start(); err != nil {
+		logger.Warn("Failed to start index integrity validator: %v", err)
+		// Don't fail initialization - this is not critical
+	} else {
+		logger.Info("Index integrity validator started (interval: %dm, repair: %v, max repairs: %d)",
+			validationIntervalMin, repairEnabled, maxRepairs)
+	}
+	
 	// Initialize circuit breaker for update operations
 	repo.updateCircuitBreaker = NewUpdateCircuitBreaker()
 	
@@ -980,6 +1016,13 @@ func NewDatasetRepositoryWithConfig(cfg *config.Config) (*EntityRepository, erro
 // Close properly shuts down the repository and its resources
 func (r *EntityRepository) Close() error {
 	var errors []error
+	
+	// Stop index integrity validator if running
+	if r.indexIntegrityValidator != nil {
+		if err := r.indexIntegrityValidator.Stop(); err != nil {
+			errors = append(errors, fmt.Errorf("error stopping index integrity validator: %w", err))
+		}
+	}
 	
 	// Stop WAL rotation manager if running
 	if r.walRotationManager != nil {
