@@ -3,9 +3,14 @@ package binary
 import (
 	"context"
 	"crypto/sha256"
+	"entitydb/config"
 	"entitydb/logger"
 	"fmt"
+	"io/ioutil"
 	"os"
+	"path/filepath"
+	"sort"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -15,6 +20,7 @@ import (
 type WALIntegritySystem struct {
 	filePath        string
 	backupPath      string
+	config          *config.Config
 	checksumCache   map[int64][]byte
 	sizeValidator   *SizeValidator
 	seekValidator   *SeekValidator
@@ -67,17 +73,17 @@ const (
 	MIN_DISK_SPACE      = 1024 * 1024 * 1024 // 1GB minimum
 	MAX_FILE_DESC       = 1000               // Max file descriptors
 	HEALTH_CHECK_INTERVAL = 30 * time.Second // Health check frequency
-	BACKUP_INTERVAL     = 5 * time.Minute    // Backup frequency
 	ASTRONOMICAL_THRESHOLD = 1000000000      // 1GB - flag astronomical sizes
 )
 
 // NewWALIntegritySystem creates a comprehensive WAL protection system
-func NewWALIntegritySystem(filePath string) *WALIntegritySystem {
+func NewWALIntegritySystem(filePath string, cfg *config.Config) *WALIntegritySystem {
 	backupPath := filePath + ".backup"
 	
 	return &WALIntegritySystem{
 		filePath:       filePath,
 		backupPath:     backupPath,
+		config:         cfg,
 		checksumCache:  make(map[int64][]byte),
 		sizeValidator:  &SizeValidator{
 			maxEntitySize:  MAX_ENTITY_SIZE,
@@ -439,12 +445,21 @@ func (w *WALIntegritySystem) performHealthCheck() {
 		}
 	}
 
-	// Perform routine backup
-	if time.Since(w.healingManager.lastBackup) > BACKUP_INTERVAL {
+	// Perform routine backup using configured interval
+	backupInterval := time.Duration(w.config.BackupInterval) * time.Second
+	if backupInterval == 0 {
+		backupInterval = time.Hour // Default to 1 hour if not configured
+	}
+	
+	if time.Since(w.healingManager.lastBackup) > backupInterval {
 		if err := w.createRoutineBackup(); err != nil {
 			logger.Warn("Routine backup failed: %v", err)
 		} else {
 			w.healingManager.lastBackup = time.Now()
+			// Clean up old backups after creating new one
+			if err := w.cleanupOldBackups(); err != nil {
+				logger.Warn("Backup cleanup failed: %v", err)
+			}
 		}
 	}
 
@@ -456,6 +471,145 @@ func (w *WALIntegritySystem) createRoutineBackup() error {
 	routineBackup := fmt.Sprintf("%s.routine-%s", w.backupPath, timestamp)
 	
 	return copyFileForWAL(w.filePath, routineBackup)
+}
+
+// cleanupOldBackups implements intelligent backup retention based on configuration
+func (w *WALIntegritySystem) cleanupOldBackups() error {
+	// Get backup directory
+	backupDir := filepath.Dir(w.backupPath)
+	backupPrefix := filepath.Base(w.backupPath) + ".routine-"
+	
+	// List all backup files
+	files, err := ioutil.ReadDir(backupDir)
+	if err != nil {
+		return fmt.Errorf("failed to read backup directory: %w", err)
+	}
+	
+	// Filter and sort routine backup files
+	var backups []os.FileInfo
+	for _, file := range files {
+		if strings.HasPrefix(file.Name(), backupPrefix) && !file.IsDir() {
+			backups = append(backups, file)
+		}
+	}
+	
+	if len(backups) == 0 {
+		return nil // No backups to clean
+	}
+	
+	// Sort by modification time (newest first)
+	sort.Slice(backups, func(i, j int) bool {
+		return backups[i].ModTime().After(backups[j].ModTime())
+	})
+	
+	// Apply retention policies
+	toDelete := w.applyRetentionPolicies(backups)
+	
+	// Check size limits
+	if w.config.BackupMaxSizeMB > 0 {
+		toDelete = w.applySizeLimits(backups, toDelete)
+	}
+	
+	// Delete marked backups
+	deleted := 0
+	for _, backup := range toDelete {
+		backupPath := filepath.Join(backupDir, backup.Name())
+		if err := os.Remove(backupPath); err != nil {
+			logger.Warn("Failed to delete old backup %s: %v", backup.Name(), err)
+		} else {
+			deleted++
+			logger.Debug("Deleted old backup: %s", backup.Name())
+		}
+	}
+	
+	if deleted > 0 {
+		logger.Info("Cleaned up %d old backup files", deleted)
+	}
+	
+	return nil
+}
+
+// applyRetentionPolicies determines which backups to keep based on time-based retention
+func (w *WALIntegritySystem) applyRetentionPolicies(backups []os.FileInfo) []os.FileInfo {
+	now := time.Now()
+	var toDelete []os.FileInfo
+	
+	// Maps to track kept backups by period
+	hourlyKept := 0
+	dailyKept := make(map[string]bool)
+	weeklyKept := make(map[string]bool)
+	
+	for _, backup := range backups {
+		age := now.Sub(backup.ModTime())
+		keep := false
+		
+		// Keep recent hourly backups
+		if age < time.Duration(w.config.BackupRetentionHours)*time.Hour && 
+		   hourlyKept < w.config.BackupRetentionHours {
+			keep = true
+			hourlyKept++
+		}
+		
+		// Keep daily backups
+		dayKey := backup.ModTime().Format("2006-01-02")
+		if age < time.Duration(w.config.BackupRetentionDays)*24*time.Hour && 
+		   !dailyKept[dayKey] && len(dailyKept) < w.config.BackupRetentionDays {
+			keep = true
+			dailyKept[dayKey] = true
+		}
+		
+		// Keep weekly backups
+		year, week := backup.ModTime().ISOWeek()
+		weekKey := fmt.Sprintf("%d-%02d", year, week)
+		if age < time.Duration(w.config.BackupRetentionWeeks)*7*24*time.Hour && 
+		   !weeklyKept[weekKey] && len(weeklyKept) < w.config.BackupRetentionWeeks {
+			keep = true
+			weeklyKept[weekKey] = true
+		}
+		
+		// Always keep backups created during emergency/corruption events
+		if w.healingManager.emergencyMode && age < 24*time.Hour {
+			keep = true
+		}
+		
+		if !keep {
+			toDelete = append(toDelete, backup)
+		}
+	}
+	
+	return toDelete
+}
+
+// applySizeLimits ensures total backup size doesn't exceed configured limit
+func (w *WALIntegritySystem) applySizeLimits(backups []os.FileInfo, toDelete []os.FileInfo) []os.FileInfo {
+	maxSize := w.config.BackupMaxSizeMB * 1024 * 1024 // Convert to bytes
+	
+	// Calculate current total size
+	var totalSize int64
+	deleteMap := make(map[string]bool)
+	for _, backup := range toDelete {
+		deleteMap[backup.Name()] = true
+	}
+	
+	// Calculate size of backups we're keeping
+	for _, backup := range backups {
+		if !deleteMap[backup.Name()] {
+			totalSize += backup.Size()
+		}
+	}
+	
+	// If still over limit, delete oldest backups first (they're sorted newest first)
+	for i := len(backups) - 1; i >= 0 && totalSize > maxSize; i-- {
+		backup := backups[i]
+		if !deleteMap[backup.Name()] {
+			toDelete = append(toDelete, backup)
+			totalSize -= backup.Size()
+			logger.Debug("Marking backup for deletion due to size limit: %s (size: %d bytes)", 
+				backup.Name(), backup.Size())
+		}
+	}
+	
+	return toDelete
 }
 
 // Utility function for file copying in WAL integrity system

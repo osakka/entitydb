@@ -723,7 +723,7 @@ func NewEntityRepositoryWithConfig(cfg *config.Config) (*EntityRepository, error
 		contentIndex:    make(map[string][]string),
 		entityCache:     NewBoundedEntityCache(cfg.EntityCacheSize, cfg.EntityCacheMemoryLimit),
 		lockManager:     NewLockManager(),
-		writerManager:   NewWriterManager(databasePath), // Uses unified format
+		writerManager:   NewWriterManager(databasePath, cfg), // Uses unified format
 		cache:           cache.NewQueryCache(1000, 5*time.Minute), // Cache up to 1000 queries for 5 minutes
 		temporalIndex:   NewTemporalIndex(),
 		namespaceIndex:  NewNamespaceIndex(),
@@ -1596,8 +1596,8 @@ func (r *EntityRepository) Create(entity *models.Entity) error {
 	})
 	
 	if !executed {
-		logger.Trace("Entity creation skipped due to recursion protection for entity: %s", entity.ID)
-		return nil // Silently skip to prevent cascading failures
+		logger.Debug("Entity creation prevented by recursion guard for entity: %s", entity.ID)
+		return fmt.Errorf("recursion guard: entity creation blocked to prevent infinite loops")
 	}
 	
 	return err
@@ -1932,8 +1932,8 @@ func (r *EntityRepository) Update(entity *models.Entity) error {
 	})
 	
 	if !executed {
-		logger.Trace("Update skipped due to recursion protection for entity: %s", entity.ID)
-		return nil // Silently skip to prevent cascading failures
+		logger.Debug("Entity update prevented by recursion guard for entity: %s", entity.ID)
+		return fmt.Errorf("recursion guard: entity update blocked to prevent infinite loops")
 	}
 	
 	return err
@@ -2138,7 +2138,7 @@ func (r *EntityRepository) RebuildIndex() error {
 	
 	// Create a new temporary file
 	tempPath := r.getDataFile() + ".rebuild"
-	newWriter, err := NewWriter(tempPath)
+	newWriter, err := NewWriter(tempPath, r.config)
 	if err != nil {
 		return fmt.Errorf("failed to create temp writer: %v", err)
 	}
@@ -2963,8 +2963,8 @@ func (r *EntityRepository) AddTag(entityID, tag string) error {
 	})
 	
 	if !executed {
-		logger.Trace("AddTag skipped due to recursion protection for entity: %s, tag: %s", entityID, tag)
-		return nil // Silently skip to prevent cascading failures
+		logger.Debug("AddTag prevented by recursion guard for entity: %s, tag: %s", entityID, tag)
+		return fmt.Errorf("recursion guard: tag addition blocked to prevent infinite loops")
 	}
 	
 	return err
@@ -3584,7 +3584,7 @@ func (r *EntityRepository) ReplayWAL() error {
 			// Reconstruct entity and write it
 			if entry.Entity != nil {
 				// Get the writer
-				writer, err := NewWriter(r.getDataFile())
+				writer, err := NewWriter(r.getDataFile(), r.config)
 				if err != nil {
 					return err
 				}
@@ -4118,7 +4118,7 @@ func (r *EntityRepository) saveEntities() error {
 	/* Legacy implementation for reference:
 	dataFile := r.getDataFile()
 	tempFile := dataFile + ".tmp"
-	writer, err := NewWriter(tempFile)
+	writer, err := NewWriter(tempFile, r.config)
 	if err != nil {
 		return err
 	}

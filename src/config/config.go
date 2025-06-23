@@ -421,6 +421,33 @@ type Config struct {
 	// Relative to DataPath or absolute path
 	BackupPath string
 	
+	// BackupInterval defines how often routine backups are created.
+	// Environment: ENTITYDB_BACKUP_INTERVAL
+	// Default: 1h (1 hour)
+	// Examples: 5m, 30m, 1h, 2h, 24h
+	BackupInterval time.Duration
+	
+	// BackupRetentionHours defines how many hourly backups to keep.
+	// Environment: ENTITYDB_BACKUP_RETENTION_HOURS
+	// Default: 24 (keep last 24 hourly backups)
+	BackupRetentionHours int
+	
+	// BackupRetentionDays defines how many daily backups to keep.
+	// Environment: ENTITYDB_BACKUP_RETENTION_DAYS
+	// Default: 7 (keep last 7 daily backups)
+	BackupRetentionDays int
+	
+	// BackupRetentionWeeks defines how many weekly backups to keep.
+	// Environment: ENTITYDB_BACKUP_RETENTION_WEEKS
+	// Default: 4 (keep last 4 weekly backups)
+	BackupRetentionWeeks int
+	
+	// BackupMaxSize defines maximum total size of all backups in MB.
+	// Environment: ENTITYDB_BACKUP_MAX_SIZE_MB
+	// Default: 1000 (1GB)
+	// When exceeded, oldest backups are removed
+	BackupMaxSizeMB int64
+	
 	// TempPath is the directory for temporary files.
 	// Environment: ENTITYDB_TEMP_PATH
 	// Default: "./tmp"
@@ -623,6 +650,11 @@ func Load() *Config {
 		WALSuffix:        getEnv("ENTITYDB_WAL_SUFFIX", ".wal"),
 		IndexSuffix:      getEnv("ENTITYDB_INDEX_SUFFIX", ".idx"),
 		BackupPath:       getEnv("ENTITYDB_BACKUP_PATH", "./backup"),
+		BackupInterval:   getEnvDuration("ENTITYDB_BACKUP_INTERVAL", 3600), // 1 hour
+		BackupRetentionHours: getEnvInt("ENTITYDB_BACKUP_RETENTION_HOURS", 24),
+		BackupRetentionDays:  getEnvInt("ENTITYDB_BACKUP_RETENTION_DAYS", 7),
+		BackupRetentionWeeks: getEnvInt("ENTITYDB_BACKUP_RETENTION_WEEKS", 4),
+		BackupMaxSizeMB:      getEnvInt64("ENTITYDB_BACKUP_MAX_SIZE_MB", 1000),
 		TempPath:         getEnv("ENTITYDB_TEMP_PATH", "./tmp"),
 		PIDFile:          getEnv("ENTITYDB_PID_FILE", "./var/entitydb.pid"),
 		LogFile:          getEnv("ENTITYDB_LOG_FILE", "./var/entitydb.log"),

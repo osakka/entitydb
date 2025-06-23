@@ -5,10 +5,11 @@ import (
 	"entitydb/models"
 	"entitydb/config"
 	"entitydb/logger"
-	"entitydb/storage/binary"
 	"fmt"
 	"runtime"
+	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 	"os"
 	"path/filepath"
@@ -31,9 +32,10 @@ type BackgroundMetricsCollector struct {
 	cacheMu      sync.RWMutex       // Protect metric cache
 	
 	// BAR-RAISING SOLUTION: Circuit breaker to prevent feedback loops
-	failureCount    int           // Count of consecutive failures
-	circuitOpen     bool          // True when circuit is open (metrics collection disabled)
-	lastFailure     time.Time     // Time of last failure
+	failureCount      int         // Count of consecutive failures
+	circuitOpen       bool        // True when circuit is open (metrics collection disabled)
+	lastFailure       time.Time   // Time of last failure
+	metricsInProgress int32       // Atomic flag to prevent recursion
 	circuitMu       sync.RWMutex  // Protect circuit breaker state
 }
 
@@ -223,15 +225,13 @@ func (b *BackgroundMetricsCollector) collectEntityMetrics() {
 
 // storeMetric stores a metric value using time-series optimized storage pattern
 func (b *BackgroundMetricsCollector) storeMetric(name string, value float64, unit string, description string) {
-	// Emergency check: if we're already in a metrics operation, abort immediately
-	if binary.IsMetricsOperation() {
+	// Emergency check: prevent metrics feedback loops causing WAL corruption
+	// Use atomic flag to detect if we're already storing metrics
+	if !atomic.CompareAndSwapInt32(&b.metricsInProgress, 0, 1) {
 		logger.Trace("Aborting metric storage for %s - already in metrics operation", name)
 		return
 	}
-	
-	// Mark this goroutine as performing metrics operations to prevent recursion
-	binary.SetMetricsOperation(true)
-	defer binary.SetMetricsOperation(false)
+	defer atomic.StoreInt32(&b.metricsInProgress, 0)
 	// Check if value has changed using change detection
 	b.mu.RLock()
 	lastValue, exists := b.lastValues[name]
@@ -290,8 +290,14 @@ func (b *BackgroundMetricsCollector) storeMetric(name string, value float64, uni
 		}
 		
 		if err := b.repo.Create(newEntity); err != nil {
+			// BAR-RAISING: Detect recursion guard errors and circuit break immediately
+			if strings.Contains(err.Error(), "recursion guard") {
+				logger.Warn("Metrics collection blocked by recursion guard - opening circuit breaker: %v", err)
+				b.forceCircuitOpen()
+				return
+			}
 			logger.Error("Failed to store metric entity %s: %v", newEntity.ID, err)
-			b.recordFailure() // BAR-RAISING: Track failures for circuit breaker
+			b.recordFailure() // Track failures for circuit breaker
 			return
 		}
 		
@@ -311,8 +317,14 @@ func (b *BackgroundMetricsCollector) storeMetric(name string, value float64, uni
 	// Add to existing tags atomically
 	metricEntity.Tags = append(metricEntity.Tags, timestampedValueTag)
 	if err := b.repo.Update(metricEntity); err != nil {
+		// BAR-RAISING: Detect recursion guard errors and circuit break immediately
+		if strings.Contains(err.Error(), "recursion guard") {
+			logger.Warn("Metrics update blocked by recursion guard - opening circuit breaker: %v", err)
+			b.forceCircuitOpen()
+			return
+		}
 		logger.Error("Failed to update metric entity %s: %v", metricID, err)
-		b.recordFailure() // BAR-RAISING: Track failures for circuit breaker
+		b.recordFailure() // Track failures for circuit breaker
 		return
 	}
 	
@@ -395,4 +407,15 @@ func (b *BackgroundMetricsCollector) recordSuccess() {
 		b.failureCount = 0
 		b.circuitOpen = false
 	}
+}
+
+// forceCircuitOpen immediately opens the circuit breaker to prevent further metrics collection
+func (b *BackgroundMetricsCollector) forceCircuitOpen() {
+	b.circuitMu.Lock()
+	defer b.circuitMu.Unlock()
+	
+	b.circuitOpen = true
+	b.failureCount = 10 // Set high failure count to keep circuit open longer
+	b.lastFailure = time.Now()
+	logger.Error("CIRCUIT BREAKER FORCE OPENED: Metrics collection disabled due to recursion guard protection")
 }

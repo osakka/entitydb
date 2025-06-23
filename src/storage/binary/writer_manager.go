@@ -1,6 +1,7 @@
 package binary
 
 import (
+	"entitydb/config"
 	"entitydb/models"
 	"fmt"
 	"os"
@@ -13,15 +14,17 @@ type WriterManager struct {
 	mu              sync.Mutex
 	writer          *Writer
 	dataFile        string
+	config          *config.Config
 	refCount        int
 	atomicFileManager *AtomicFileManager // Atomic file operations for corruption prevention
 	useAtomicOps    bool                 // Feature flag for atomic operations
 }
 
 // NewWriterManager creates a new writer manager
-func NewWriterManager(dataFile string) *WriterManager {
+func NewWriterManager(dataFile string, cfg *config.Config) *WriterManager {
 	wm := &WriterManager{
 		dataFile:          dataFile,
+		config:            cfg,
 		atomicFileManager: NewAtomicFileManager(),
 		useAtomicOps:      true, // Default to enabled for corruption prevention
 	}
@@ -43,7 +46,7 @@ func (wm *WriterManager) GetWriter() (*Writer, error) {
 	defer wm.mu.Unlock()
 	
 	if wm.writer == nil {
-		writer, err := NewWriter(wm.dataFile)
+		writer, err := NewWriter(wm.dataFile, wm.config)
 		if err != nil {
 			return nil, err
 		}
@@ -149,7 +152,7 @@ func (wm *WriterManager) Checkpoint() error {
 		
 		// Reopen the writer
 		logger.Debug("Reopening writer")
-		writer, err := NewWriter(wm.dataFile)
+		writer, err := NewWriter(wm.dataFile, wm.config)
 		if err != nil {
 			logger.Error("Failed to reopen writer: %v", err)
 			return err
@@ -180,7 +183,7 @@ func (wm *WriterManager) WriteEntityAtomic(entity *models.Entity) error {
 	
 	// Create a temporary writer to build the new file content
 	tempFile := wm.dataFile + ".atomic.tmp"
-	writer, err := NewWriter(tempFile)
+	writer, err := NewWriter(tempFile, wm.config)
 	if err != nil {
 		return fmt.Errorf("failed to create temporary writer: %w", err)
 	}

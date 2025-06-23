@@ -23,6 +23,7 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
+	"entitydb/config"
 	"entitydb/models"
 	"fmt"
 	"os"
@@ -101,14 +102,14 @@ func (w *Writer) getFilePosition() int64 {
 //       log.Fatal(err)
 //   }
 //   defer writer.Close()
-func NewWriter(filename string) (*Writer, error) {
+func NewWriter(filename string, cfg *config.Config) (*Writer, error) {
 	file, err := os.OpenFile(filename, os.O_CREATE|os.O_RDWR, 0644)
 	if err != nil {
 		return nil, err
 	}
 	
 	// BAR-RAISING: Initialize comprehensive WAL integrity system
-	integritySystem := NewWALIntegritySystem(filename)
+	integritySystem := NewWALIntegritySystem(filename, cfg)
 	healthCtx, healthCancel := context.WithCancel(context.Background())
 	
 	w := &Writer{
