@@ -543,12 +543,14 @@
                         <option value="">Loading datasets...</option>
                     </select>
                 </div>
-                <div class="status-indicator">
+                <div id="userDisplay" style="margin-right: 15px; font-size: 0.9rem; color: #4a5568;">
+                    <!-- Username will be displayed here -->
+                </div>
+                <button class="btn btn-secondary" onclick="app.logout()" style="padding: 6px 12px; font-size: 0.85rem;">Logout</button>
+                <div class="status-indicator" style="margin-left: 15px;">
                     <div class="status-dot"></div>
                     <span id="connectionStatus">Connected</span>
                 </div>
-                <span id="currentUser">Loading...</span>
-                <button class="btn btn-secondary btn-sm" onclick="app.logout()">Logout</button>
             </div>
         </div>
 
@@ -909,6 +911,16 @@
 
             async init() {
                 console.log('Initializing Enhanced EntityDB Admin...');
+                
+                // Display username
+                const username = localStorage.getItem('entitydb_username');
+                if (username) {
+                    const userDisplay = document.getElementById('userDisplay');
+                    if (userDisplay) {
+                        userDisplay.innerHTML = `<strong>User:</strong> ${username}`;
+                    }
+                }
+                
                 await this.loadDatasetSelector();
                 await this.refreshData();
                 this.startAutoRefresh();
@@ -956,6 +968,7 @@
                     if (response.ok) {
                         this.token = data.token;
                         localStorage.setItem('entitydb_token', this.token);
+                        localStorage.setItem('entitydb_username', username);
                         location.reload();
                     } else {
                         document.getElementById('loginError').innerHTML = 
@@ -967,8 +980,18 @@
                 }
             }
 
-            logout() {
+            async logout() {
+                try {
+                    // Call server logout endpoint to invalidate session
+                    await this.apiCall('/api/v1/auth/logout', 'POST');
+                } catch (error) {
+                    // Continue with local logout even if server call fails
+                    console.error('Server logout failed:', error);
+                }
+                
+                // Clear local storage
                 localStorage.removeItem('entitydb_token');
+                localStorage.removeItem('entitydb_username');
                 location.reload();
             }
 
@@ -1025,7 +1048,10 @@
             async loadDashboardData() {
                 try {
                     // Sequential calls with limits to prevent memory exhaustion
-                    const entities = await this.apiCall('/api/v1/entities/list?limit=10');
+                    const response = await this.apiCall('/api/v1/entities/list?limit=10');
+                    // Handle both array and wrapped object responses
+                    const entities = Array.isArray(response) ? response : (response.entities || []);
+                    
                     const health = await this.apiCall('/health');
                     const users = await this.apiCall('/api/v1/rbac/metrics/public');
 
@@ -1052,35 +1078,10 @@
                         `/api/v1/entities/list?limit=${limit}&offset=${offset}`;
                     const entities = await this.apiCall(endpoint);
                     
-                    const tableHTML = `
-                        <table class="table">
-                            <thead>
-                                <tr>
-                                    <th>ID</th>
-                                    <th>Type</th>
-                                    <th>Created</th>
-                                    <th>Tags</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${entities.map(entity => `
-                                    <tr>
-                                        <td>${entity.id.substring(0, 12)}...</td>
-                                        <td>${this.getEntityType(entity)}</td>
-                                        <td>${this.formatDate(entity.created_at)}</td>
-                                        <td>${entity.tags?.length || 0} tags</td>
-                                        <td>
-                                            <button class="btn btn-sm btn-primary" onclick="app.viewEntity('${entity.id}')">View</button>
-                                            <button class="btn btn-sm btn-secondary" onclick="app.editEntity('${entity.id}')">Edit</button>
-                                        </td>
-                                    </tr>
-                                `).join('')}
-                            </tbody>
-                        </table>
-                    `;
+                    // Use the shared displayEntities function
+                    this.displayEntities(entities);
                     
-                    // Add pagination controls
+                    // Add pagination controls after the table
                     const paginationHTML = `
                         <div style="margin: 20px 0; display: flex; justify-content: space-between; align-items: center;">
                             <div>
@@ -1094,7 +1095,8 @@
                         </div>
                     `;
                     
-                    document.getElementById('entitiesTable').innerHTML = paginationHTML + tableHTML;
+                    // Append pagination to the existing table content
+                    document.getElementById('entitiesTable').innerHTML += paginationHTML;
                 } catch (error) {
                     document.getElementById('entitiesTable').innerHTML = `<div class="alert alert-error">Error loading entities: ${error.message}</div>`;
                 }
@@ -1710,7 +1712,7 @@
                 }
                 
                 try {
-                    await this.apiCall(`/api/v1/entities/delete?id=${entityId}`, 'DELETE');
+                    await this.apiCall(`/api/v1/entities/${entityId}/delete`, 'POST');
                     this.showAlert('Entity deleted successfully!', 'success');
                     this.closeModal('entityModal');
                     await this.loadEntities(); // Refresh entity list
@@ -1805,14 +1807,66 @@
                 }
             }
 
-            searchEntities() {
-                const searchTerm = document.getElementById('entitySearch').value.toLowerCase();
-                const tableRows = document.querySelectorAll('#entitiesTable tbody tr');
+            displayEntities(entities) {
+                const tableHTML = `
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Type</th>
+                                <th>Created</th>
+                                <th>Tags</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${entities.map(entity => `
+                                <tr>
+                                    <td>${entity.id.substring(0, 12)}...</td>
+                                    <td>${this.getEntityType(entity)}</td>
+                                    <td>${this.formatDate(entity.created_at)}</td>
+                                    <td>${entity.tags?.length || 0} tags</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-primary" onclick="app.viewEntity('${entity.id}')">View</button>
+                                        <button class="btn btn-sm btn-secondary" onclick="app.editEntity('${entity.id}')">Edit</button>
+                                        <button class="btn btn-sm btn-danger" onclick="app.deleteEntity('${entity.id}')">Delete</button>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                    ${entities.length === 0 ? '<p style="text-align: center; color: #718096;">No entities found.</p>' : ''}
+                `;
                 
-                tableRows.forEach(row => {
-                    const text = row.textContent.toLowerCase();
-                    row.style.display = text.includes(searchTerm) ? '' : 'none';
-                });
+                document.getElementById('entitiesTable').innerHTML = tableHTML;
+            }
+
+            async searchEntities() {
+                const searchTerm = document.getElementById('entitySearch').value.trim();
+                
+                if (!searchTerm) {
+                    // If search is empty, reload all entities
+                    await this.loadEntities();
+                    return;
+                }
+                
+                try {
+                    // Use the query endpoint for server-side search
+                    const endpoint = this.currentDataset ? 
+                        `/api/v1/datasets/${this.currentDataset}/entities/query?search=${encodeURIComponent(searchTerm)}` :
+                        `/api/v1/entities/query?search=${encodeURIComponent(searchTerm)}`;
+                    
+                    const entities = await this.apiCall(endpoint);
+                    this.displayEntities(entities);
+                } catch (error) {
+                    console.error('Search error:', error);
+                    // Fallback to client-side filtering
+                    const tableRows = document.querySelectorAll('#entitiesTable tbody tr');
+                    tableRows.forEach(row => {
+                        const text = row.textContent.toLowerCase();
+                        row.style.display = text.includes(searchTerm.toLowerCase()) ? '' : 'none';
+                    });
+                }
             }
 
 
