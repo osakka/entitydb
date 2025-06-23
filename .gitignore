@@ -1,5 +1,9 @@
 # Binaries for programs and plugins
 /bin/entitydb
+bin/*
+!bin/*.sh
+src/bin/*
+!src/bin/.gitkeep
 
 # Database files
 /var/*.ebf
@@ -9,6 +13,10 @@
 
 # Log files
 /var/*.log
+*.log
+entitydb.log
+server.log
+trace.log
 
 # PID files
 /var/*.pid
@@ -55,3 +63,34 @@ coverage.txt
 *.out
 go.worktest_persistent_index/
 var/
+
+# Trash directory - should never be in git
+trash/
+
+# Test results and artifacts
+test-results/
+test_artifacts*/
+*_test_results/
+
+# Debug binaries and tools
+*_debug
+*_patched
+*_fixed
+debug_*
+fix_*
+
+# Core dumps
+core
+core.*
+*.core
+
+# Database runtime files
+*.edb
+*.ebf
+*.idx
+*.wal-shm
+
+# Large trace files
+*.trace
+*.prof
+*.pprof
