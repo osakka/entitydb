@@ -248,6 +248,10 @@ type EntityRepository struct {
 	// Temporal retention manager for automatic cleanup
 	temporalRetention *TemporalRetentionManager
 	
+	// Single writer queue for corruption prevention
+	writerQueue *SingleWriterQueue
+	useSingleWriter bool // Feature flag for single writer mode
+	
 	// Track entity count for index building
 	loadedEntityCount int
 	
@@ -783,6 +787,24 @@ func NewEntityRepositoryWithConfig(cfg *config.Config) (*EntityRepository, error
 	// Initialize temporal retention manager for automatic cleanup
 	repo.temporalRetention = NewTemporalRetentionManager(repo)
 	
+	// Initialize single writer queue for corruption prevention
+	// Default to enabled for maximum data integrity
+	useSingleWriter := os.Getenv("ENTITYDB_USE_SINGLE_WRITER") != "false"
+	if useSingleWriter {
+		queueSize := 1000 // Default queue size
+		if envSize := os.Getenv("ENTITYDB_WRITER_QUEUE_SIZE"); envSize != "" {
+			if size, err := strconv.Atoi(envSize); err == nil && size > 0 {
+				queueSize = size
+			}
+		}
+		repo.writerQueue = NewSingleWriterQueue(repo, queueSize)
+		repo.useSingleWriter = true
+		if err := repo.writerQueue.Start(); err != nil {
+			return nil, fmt.Errorf("failed to start single writer queue: %w", err)
+		}
+		logger.Info("Single writer queue initialized with size %d for corruption prevention", queueSize)
+	}
+	
 	// Initialize circuit breaker for update operations
 	repo.updateCircuitBreaker = NewUpdateCircuitBreaker()
 	
@@ -912,6 +934,13 @@ func NewDatasetRepositoryWithConfig(cfg *config.Config) (*EntityRepository, erro
 // Close properly shuts down the repository and its resources
 func (r *EntityRepository) Close() error {
 	var errors []error
+	
+	// Stop single writer queue if running
+	if r.useSingleWriter && r.writerQueue != nil {
+		if err := r.writerQueue.Stop(); err != nil {
+			errors = append(errors, fmt.Errorf("error stopping writer queue: %w", err))
+		}
+	}
 	
 	// Stop batch writer if running
 	if r.useBatchWrites && r.batchWriter != nil {
@@ -1408,6 +1437,10 @@ func (r *EntityRepository) Create(entity *models.Entity) error {
 	// CRITICAL: Use RecursionGuard to prevent infinite loops in entity creation
 	// This prevents: metrics → entity → metrics → entity → stack overflow
 	executed, err := globalRecursionGuard.Execute("entity-create", func() error {
+		// Use single writer queue if enabled for additional corruption prevention
+		if r.useSingleWriter && r.writerQueue != nil && r.writerQueue.IsRunning() {
+			return r.writerQueue.CreateEntity(entity)
+		}
 		return r.createInternal(entity)
 	})
 	
@@ -1733,6 +1766,10 @@ func (r *EntityRepository) Update(entity *models.Entity) error {
 	// CRITICAL: Use RecursionGuard to prevent infinite loops in update operations
 	// This prevents: metrics → Update → metrics → Update → stack overflow
 	executed, err := globalRecursionGuard.Execute("entity-update", func() error {
+		// Use single writer queue if enabled for additional corruption prevention
+		if r.useSingleWriter && r.writerQueue != nil && r.writerQueue.IsRunning() {
+			return r.writerQueue.UpdateEntity(entity)
+		}
 		return r.updateInternal(entity)
 	})
 	
@@ -2760,6 +2797,10 @@ func (r *EntityRepository) AddTag(entityID, tag string) error {
 	// CRITICAL: Use RecursionGuard to prevent infinite loops in tag operations
 	// This prevents: metrics → AddTag → GetByID → recovery → metrics → stack overflow
 	executed, err := globalRecursionGuard.Execute("entity-addtag", func() error {
+		// Use single writer queue if enabled for additional corruption prevention
+		if r.useSingleWriter && r.writerQueue != nil && r.writerQueue.IsRunning() {
+			return r.writerQueue.AddTag(entityID, tag)
+		}
 		return r.addTagInternal(entityID, tag)
 	})
 	
