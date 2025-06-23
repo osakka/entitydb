@@ -507,10 +507,16 @@ func main() {
 	// should efficiently handle entities with 100s or 1000s of tags (this is normal for temporal data)
 	logger.Info("Metrics collection interval set to %v", cfg.MetricsInterval)
 	
-	// Enable background metrics collection now that race conditions are fixed
-	backgroundCollector := api.NewBackgroundMetricsCollector(server.entityRepo, cfg, cfg.MetricsInterval, cfg.MetricsGentlePauseMs)
-	backgroundCollector.Start()
-	defer backgroundCollector.Stop()
+	// Enable background metrics collection only if metrics tracking is enabled
+	var backgroundCollector *api.BackgroundMetricsCollector
+	if cfg.MetricsEnableRequestTracking || cfg.MetricsEnableStorageTracking {
+		logger.Info("Starting background metrics collector (metrics tracking enabled)")
+		backgroundCollector = api.NewBackgroundMetricsCollector(server.entityRepo, cfg, cfg.MetricsInterval, cfg.MetricsGentlePauseMs)
+		backgroundCollector.Start()
+		defer backgroundCollector.Stop()
+	} else {
+		logger.Info("Background metrics collector disabled (metrics tracking disabled)")
+	}
 	
 	// FIXED: Metrics retention manager - now uses incremental Update() method
 	// The Update() method has been fixed to use incremental updates instead of rebuilding 
@@ -528,8 +534,13 @@ func main() {
 		logger.Info("Metrics retention manager started")
 	}
 	
-	// Initialize query metrics collector
-	api.InitQueryMetrics(server.entityRepo)
+	// Initialize query metrics collector only if request tracking is enabled
+	if cfg.MetricsEnableRequestTracking {
+		api.InitQueryMetrics(server.entityRepo)
+		logger.Info("Query metrics tracking enabled")
+	} else {
+		logger.Info("Query metrics tracking disabled")
+	}
 	
 	// Storage metrics already initialized early, no need to reinitialize
 	

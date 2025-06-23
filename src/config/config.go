@@ -245,14 +245,16 @@ type Config struct {
 	
 	// MetricsEnableRequestTracking enables HTTP request metrics collection.
 	// Environment: ENTITYDB_METRICS_ENABLE_REQUEST_TRACKING
-	// Default: true
-	// Impact: Minimal performance overhead (<1%)
+	// Default: false (disabled to prevent feedback loops)
+	// Impact: When enabled, minimal performance overhead (<1%)
+	// Security: Can create entity storage loops if misconfigured
 	MetricsEnableRequestTracking bool
 	
 	// MetricsEnableStorageTracking enables storage operation metrics collection.
 	// Environment: ENTITYDB_METRICS_ENABLE_STORAGE_TRACKING
-	// Default: true
-	// Impact: Minimal performance overhead (<2%)
+	// Default: false (disabled to prevent feedback loops)
+	// Impact: When enabled, minimal performance overhead (<2%)
+	// Security: Can create metric recursion if misconfigured
 	MetricsEnableStorageTracking bool
 	
 	// API Documentation Configuration
@@ -580,8 +582,8 @@ func Load() *Config {
 		MetricsRetention1Hour:  getEnvDuration("ENTITYDB_METRICS_RETENTION_1HOUR", 24*60), // 24 hours in minutes (was 30 days - performance fix)
 		MetricsRetention1Day:   getEnvDuration("ENTITYDB_METRICS_RETENTION_1DAY", 7*24*60), // 7 days in minutes (was 365 days - performance fix)
 		MetricsHistogramBuckets: getEnvFloatSlice("ENTITYDB_METRICS_HISTOGRAM_BUCKETS", []float64{0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1, 5, 10}),
-		MetricsEnableRequestTracking: getEnvBool("ENTITYDB_METRICS_ENABLE_REQUEST_TRACKING", true),
-		MetricsEnableStorageTracking: getEnvBool("ENTITYDB_METRICS_ENABLE_STORAGE_TRACKING", true),
+		MetricsEnableRequestTracking: getEnvBool("ENTITYDB_METRICS_ENABLE_REQUEST_TRACKING", false),
+		MetricsEnableStorageTracking: getEnvBool("ENTITYDB_METRICS_ENABLE_STORAGE_TRACKING", false),
 		
 		// API
 		SwaggerHost:      getEnv("ENTITYDB_SWAGGER_HOST", "localhost:8085"),
