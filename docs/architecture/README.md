@@ -1,100 +1,111 @@
 # EntityDB Architecture Documentation
 
-This directory contains comprehensive architecture documentation for EntityDB, including system design decisions, architectural patterns, and formal decision records.
+This directory contains the formal architectural decision records and architecture overview for EntityDB.
 
-## Documentation Organization
+## 📋 **Architectural Decision Records (ADRs)**
 
-### 📋 **Architectural Decision Records (ADRs)**
 **Location**: `./adr/`  
-**Purpose**: Formal documentation of architectural decisions  
-**Format**: ADR-XXX-title.md  
-**Count**: 6 formal ADRs  
-**[View ADR Index](./adr/README.md)**
+**Purpose**: Formal documentation of architectural decisions made during EntityDB development  
+**Format**: `ADR-XXX-title.md`  
+**Count**: 10 formal ADRs (ADR-000 through ADR-035)
 
-### 🏗️ **Architecture Decisions**
-**Location**: `./` (numbered files 001-035)  
-**Purpose**: Detailed technical architecture documentation  
-**Format**: XXX-title.md  
-**Count**: 35+ architecture documents
+**[🔗 View Complete ADR Index](./adr/README.md)**
 
-### 📊 **System Overview**
-**Location**: High-level architecture files  
-**Purpose**: System-wide architectural patterns and designs
+### Current ADR Status
 
-## Core Architecture Components
+| ADR | Title | Status | Date | Impact |
+|-----|-------|---------|------|--------|
+| [ADR-000](./adr/ADR-000-MASTER-TIMELINE.md) | Master Timeline | Accepted | 2025-06-23 | Project timeline foundation |
+| [ADR-022](./adr/ADR-022-database-file-unification.md) | Database File Unification | Accepted | 2025-06-20 | **BREAKING** - Single .edb format |
+| [ADR-028](./adr/ADR-028-wal-corruption-prevention.md) | WAL Corruption Prevention | Accepted | 2025-06-22 | Multi-layer defense system |
+| [ADR-029](./adr/ADR-029-intelligent-recovery-system.md) | Intelligent Recovery System | Accepted | 2025-06-22 | Automatic corruption recovery |
+| [ADR-030](./adr/ADR-030-circuit-breaker-feedback-loop-prevention.md) | Circuit Breaker Architecture | Accepted | 2025-06-22 | CPU feedback loop prevention |
+| [ADR-031](./adr/ADR-031-bar-raising-metrics-retention-contention-fix.md) | Metrics Retention Fix | Accepted | 2025-06-22 | Authentication delay elimination |
+| [ADR-032](./adr/ADR-032-entity-deletion-index-tracking.md) | Entity Deletion Tracking | Accepted | 2025-06-22 | Proper deletion index management |
+| [ADR-033](./adr/ADR-033-metrics-feedback-loop-prevention.md) | Metrics Feedback Loop Prevention | Accepted | 2025-06-23 | Final surgical precision fix |
+| [ADR-034](./adr/ADR-034-production-readiness-certification.md) | Production Readiness Certification | Accepted | 2025-06-23 | E2E testing and validation |
+| [ADR-035](./adr/ADR-035-development-status-usage-notification.md) | Development Status & Usage Notification | Accepted | 2025-06-23 | Licensing and community building |
 
-### Temporal Database Architecture
-- [001 - Temporal Tag Storage](./001-temporal-tag-storage.md) - Nanosecond-precision timestamp system
-- [002 - Binary Storage Format](./002-binary-storage-format.md) - Custom EBF format design
-- [010 - Temporal Functionality Completion](./010-temporal-functionality-completion.md) - Complete temporal query system
+## 🏗️ **Architecture Overview**
 
-### Storage and Performance
-- [003 - Unified Sharded Indexing](./003-unified-sharded-indexing.md) - 256-shard concurrent indexing
-- [026 - Unified File Format Architecture](./026-unified-file-format-architecture.md) - Single .edb file format
-- [027 - Complete Database File Unification](./027-complete-database-file-unification.md) - Elimination of separate files
+EntityDB follows a unified temporal database architecture with these core principles:
 
-### Security Architecture
-- [004 - Tag-Based RBAC](./004-tag-based-rbac.md) - Role-based access control system
-- [006 - Credential Storage in Entities](./006-credential-storage-in-entities.md) - Authentication architecture
-- [034 - Security Architecture Evolution](./034-security-architecture-evolution.md) - Security system evolution
+### **Single Source of Truth**
+- All data stored in unified `.edb` files (ADR-022)
+- No separate database, WAL, or index files
+- Elimination of parallel implementations
 
-### Platform Design
-- [005 - Application-Agnostic Design](./005-application-agnostic-design.md) - Platform architecture
-- [008 - Three-Tier Configuration](./008-three-tier-configuration.md) - Configuration management
-- [014 - Single Source of Truth Enforcement](./014-single-source-of-truth-enforcement.md) - Architectural principles
+### **Temporal Excellence**
+- Nanosecond-precision timestamps for all operations
+- Complete temporal query functionality (as-of, history, diff, changes)
+- Immutable audit trail with time-travel capabilities
 
-## Formal ADR Records
+### **Production Readiness**
+- Comprehensive corruption prevention (ADR-028, ADR-029, ADR-030)
+- Metrics feedback loop elimination (ADR-033)
+- End-to-end production validation (ADR-034)
+- Memory optimization for 1GB RAM deployments
 
-| ADR | Title | Status | Focus Area |
-|-----|-------|---------|------------|
-| [ADR-000](./adr/ADR-000-MASTER-TIMELINE.md) | Master Timeline | Accepted | Project Timeline |
-| [ADR-022](./adr/ADR-022-database-file-unification.md) | Database File Unification | Accepted | Storage Architecture |
-| [ADR-028](./adr/ADR-028-wal-corruption-prevention.md) | WAL Corruption Prevention | Accepted | Data Integrity |
-| [ADR-029](./adr/ADR-029-intelligent-recovery-system.md) | Intelligent Recovery System | Accepted | System Resilience |
-| [ADR-030](./adr/ADR-030-circuit-breaker-feedback-loop-prevention.md) | Circuit Breaker Feedback Loop Prevention | Accepted | Performance |
-| [ADR-031](./adr/ADR-031-bar-raising-metrics-retention-contention-fix.md) | Metrics Retention Contention Fix | Accepted | Observability |
+### **Security Architecture**
+- Tag-based RBAC with fine-grained permissions
+- JWT authentication with embedded credentials
+- Comprehensive input validation and sanitization
 
-## Recent Architecture Evolution
+## 📚 **Related Documentation**
 
-### v2.34.x Series
-- **WAL Corruption Prevention**: Revolutionary multi-layer defense system
-- **Configuration Management Excellence**: Enterprise-grade three-tier hierarchy
-- **Documentation Excellence**: IEEE 1063-2001 compliant architecture documentation
+### **System Overview**
+- **[System Architecture](../assets/architecture.svg)** - Visual architecture diagram
+- **[API Reference](../api-reference/README.md)** - Complete API documentation
+- **[Getting Started](../getting-started/README.md)** - Installation and setup guides
 
-### v2.32.x Series
-- **Database File Unification**: Single `.edb` format eliminates complexity
-- **Production Battle Testing**: Comprehensive real-world validation
-- **Temporal Features Completion**: All temporal query capabilities implemented
+### **Technical Specifications**
+- **[Configuration Reference](../reference/01-configuration-reference.md)** - Complete configuration options
+- **[Binary Format Specification](../reference/03-binary-format-spec.md)** - EntityDB Unified File Format (EUFF)
+- **[RBAC Reference](../reference/04-rbac-reference.md)** - Permission system details
 
-### v2.31.x Series
-- **Performance Optimization Suite**: O(1) tag caching and memory optimization
-- **Session Management**: Pure tag-based authentication architecture
-- **Comprehensive Logging**: Enterprise-grade logging standards
+### **Historical Documentation**
+- **[Numbered Architecture Docs](../archive/numbered-architecture/)** - Historical architecture documentation
+- **[Legacy ADRs](../archive/legacy-adrs/)** - Superseded decision records
 
-## Architecture Principles
+## 🔄 **ADR Process**
 
-1. **Single Source of Truth**: Every concept has one authoritative implementation
-2. **Unified Entity Model**: Everything is an entity with tags
-3. **Temporal by Design**: All data stored with nanosecond-precision timestamps
-4. **Performance Excellence**: Sub-millisecond query performance with intelligent caching
-5. **Enterprise Security**: Tag-based RBAC with comprehensive audit trails
-6. **Production Ready**: Battle-tested reliability with self-healing capabilities
+### **Creating New ADRs**
+1. Use the next sequential number (ADR-036, ADR-037, etc.)
+2. Follow the [ADR template](./template.md)
+3. Update the [ADR index](./adr/README.md)
+4. Reference the [master timeline](./adr/ADR-000-MASTER-TIMELINE.md)
 
-## Related Documentation
+### **ADR Lifecycle**
+- **Proposed**: Under discussion
+- **Accepted**: Implemented and active
+- **Deprecated**: No longer recommended
+- **Superseded**: Replaced by newer ADR
 
-- [System Overview](./01-system-overview.md) - High-level system architecture
-- [Technical Reference](../reference/technical-specifications.md) - Detailed technical specifications
-- [Developer Guide](../developer-guide/README.md) - Development architecture patterns
-- [API Reference](../api-reference/README.md) - API architecture and design
+### **Architectural Principles**
+- **Never reverse decisions** without explicit ADR
+- **Document all architectural changes**
+- **Maintain single source of truth**
+- **Follow surgical precision implementation**
 
-## Contributing to Architecture
+## 📈 **Current Architecture Status**
+
+**Version**: v2.34.3 (Production Certified)  
+**Status**: Production Ready  
+**Last Major Decision**: ADR-035 (Usage Notification License)  
+**Total Decisions**: 50+ architectural decisions tracked  
+**Breaking Changes**: 2 (Authentication v2.29.0, File Unification v2.32.6)
+
+## 🤝 **Contributing**
 
 When proposing architectural changes:
+1. **Check existing ADRs** to avoid conflicts
+2. **Follow the decision template** for consistency
+3. **Reference the master timeline** for context
+4. **Consider impact** on existing decisions
+5. **Update all related documentation**
 
-1. **Review existing decisions** in this directory
-2. **Create new ADR** for significant architectural changes
-3. **Update relevant architecture documents** to reflect changes
-4. **Ensure consistency** with established architectural principles
-5. **Document in appropriate category** (ADR for decisions, numbered docs for detailed architecture)
+---
 
-For questions about EntityDB architecture, refer to the [Developer Guide](../developer-guide/README.md) or create an issue for clarification.
+**Maintainers**: Architecture Team  
+**Last Updated**: 2025-06-23  
+**Next Review**: 2025-12-23
