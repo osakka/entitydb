@@ -6,6 +6,12 @@
 
 > **A high-performance temporal database with nanosecond-precision timestamps, unified file format, and world-class logging standards**
 
+## ⚠️ DEVELOPMENT STATUS DISCLAIMER
+
+> **🚧 UNDER HEAVY DEVELOPMENT**: This codebase is under active development and **has not been tested in production environments**.  
+> **Use at your own risk** - suitable for development, testing, and evaluation purposes only.  
+> **Production deployment is not recommended** without thorough testing and validation in your specific environment.
+
 ## ⚡ Development Methodology Disclaimer
 
 > **🚀 EXTREME VIBE CODING (XVC)**: This entire codebase has been developed using **Extreme Vibe Coding** methodology.  
@@ -14,7 +20,7 @@
 
 [![Version](https://img.shields.io/badge/version-v2.34.3-blue)](./CLAUDE.md)
 [![XVC](https://img.shields.io/badge/XVC-Extreme%20Vibe%20Coding-ff6b35)](https://github.com/osakka/xvc)
-[![License](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
+[![License](https://img.shields.io/badge/license-MIT%20with%20Usage%20Notification-green)](./LICENSE)
 [![Documentation](https://img.shields.io/badge/docs-world--class-brightgreen)](./docs/README.md)
 [![API Coverage](https://img.shields.io/badge/API%20docs-100%25%20accurate-brightgreen)](./docs/api-reference/README.md)
 [![Build Status](https://img.shields.io/badge/build-passing-success)](./src)
