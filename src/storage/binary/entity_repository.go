@@ -252,6 +252,9 @@ type EntityRepository struct {
 	writerQueue *SingleWriterQueue
 	useSingleWriter bool // Feature flag for single writer mode
 	
+	// WAL rotation manager for bounded growth
+	walRotationManager *WALRotationManager
+	
 	// Track entity count for index building
 	loadedEntityCount int
 	
@@ -805,6 +808,49 @@ func NewEntityRepositoryWithConfig(cfg *config.Config) (*EntityRepository, error
 		logger.Info("Single writer queue initialized with size %d for corruption prevention", queueSize)
 	}
 	
+	// Initialize WAL rotation manager for bounded growth
+	repo.walRotationManager = NewWALRotationManager(repo.wal)
+	
+	// Configure WAL rotation from environment variables
+	walMaxSizeMB := int64(100) // Default 100MB
+	walMaxAgeMin := int64(60)  // Default 60 minutes
+	walCheckMin := int64(5)    // Default 5 minutes
+	
+	if envSize := os.Getenv("ENTITYDB_WAL_MAX_SIZE_MB"); envSize != "" {
+		if size, err := strconv.ParseInt(envSize, 10, 64); err == nil && size > 0 {
+			walMaxSizeMB = size
+		}
+	}
+	if envAge := os.Getenv("ENTITYDB_WAL_MAX_AGE_MIN"); envAge != "" {
+		if age, err := strconv.ParseInt(envAge, 10, 64); err == nil && age > 0 {
+			walMaxAgeMin = age
+		}
+	}
+	
+	repo.walRotationManager.Configure(walMaxSizeMB, walMaxAgeMin, walCheckMin)
+	
+	// Set rotation callbacks for proper checkpointing
+	repo.walRotationManager.SetCallbacks(
+		func() error {
+			// Pre-rotation: perform checkpoint
+			logger.Debug("WAL rotation pre-callback: performing checkpoint")
+			return repo.wal.LogCheckpoint()
+		},
+		func() error {
+			// Post-rotation: flush data to ensure persistence
+			logger.Debug("WAL rotation post-callback: flushing data")
+			return repo.writerManager.Flush()
+		},
+	)
+	
+	// Start WAL rotation manager
+	if err := repo.walRotationManager.Start(); err != nil {
+		logger.Warn("Failed to start WAL rotation manager: %v", err)
+		// Don't fail initialization - this is not critical
+	} else {
+		logger.Info("WAL rotation manager started (max: %dMB, age: %dm)", walMaxSizeMB, walMaxAgeMin)
+	}
+	
 	// Initialize circuit breaker for update operations
 	repo.updateCircuitBreaker = NewUpdateCircuitBreaker()
 	
@@ -934,6 +980,13 @@ func NewDatasetRepositoryWithConfig(cfg *config.Config) (*EntityRepository, erro
 // Close properly shuts down the repository and its resources
 func (r *EntityRepository) Close() error {
 	var errors []error
+	
+	// Stop WAL rotation manager if running
+	if r.walRotationManager != nil {
+		if err := r.walRotationManager.Stop(); err != nil {
+			errors = append(errors, fmt.Errorf("error stopping WAL rotation manager: %w", err))
+		}
+	}
 	
 	// Stop single writer queue if running
 	if r.useSingleWriter && r.writerQueue != nil {
