@@ -1098,9 +1098,16 @@ func (w *Writer) initializeWALSection() error {
 func (w *Writer) writeWALEntry(opType byte, entityID string, entity *models.Entity) error {
 	logger.TraceIf("wal", "Writing WAL entry: opType=%d, entityID=%s", opType, entityID)
 	
+	// SURGICAL FIX: Validate WALOffset before seeking to prevent "invalid argument" errors
+	if w.header.WALOffset == 0 || w.header.WALOffset > uint64(1<<31) { // Check for reasonable bounds
+		logger.Error("CORRUPTION DETECTED: Invalid WALOffset %d for entity %s", w.header.WALOffset, entityID)
+		return fmt.Errorf("corrupted header: invalid WALOffset %d", w.header.WALOffset)
+	}
+	
 	// Seek to WAL section
 	if _, err := w.file.Seek(int64(w.header.WALOffset), os.SEEK_SET); err != nil {
-		return err
+		logger.Error("CORRUPTION DETECTED: Seek failed to WALOffset %d: %v", w.header.WALOffset, err)
+		return fmt.Errorf("seek to WAL failed: %w", err)
 	}
 	
 	// Read current entry count
