@@ -148,6 +148,12 @@ func NewReader(filename string) (*Reader, error) {
 	
 	// Read tag dictionary
 	if tagDictOffset > 0 && tagDictSize > 0 {
+		// SURGICAL FIX: Validate TagDictOffset before seeking
+		if tagDictOffset > uint64(1<<31) {
+			logger.Error("CORRUPTION DETECTED: Invalid TagDictOffset %d", tagDictOffset)
+			return nil, fmt.Errorf("corrupted header: invalid TagDictOffset %d", tagDictOffset)
+		}
+		
 		logger.Trace("Reading tag dictionary from offset %d", tagDictOffset)
 		if _, err := file.Seek(int64(tagDictOffset), os.SEEK_SET); err != nil {
 			logger.Error("Failed to seek to tag dictionary: %v", err)
@@ -163,6 +169,12 @@ func NewReader(filename string) (*Reader, error) {
 	
 	// Read index
 	if entityIndexOffset > 0 {
+		// SURGICAL FIX: Validate EntityIndexOffset before seeking
+		if entityIndexOffset > uint64(1<<31) {
+			logger.Error("CORRUPTION DETECTED: Invalid EntityIndexOffset %d", entityIndexOffset)
+			return nil, fmt.Errorf("corrupted header: invalid EntityIndexOffset %d", entityIndexOffset)
+		}
+		
 		logger.Trace("Reading index from offset %d, expecting %d entries", 
 			entityIndexOffset, entityCount)
 		
