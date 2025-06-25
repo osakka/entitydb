@@ -1228,3 +1228,23 @@ func (w *Writer) writeWALEntry(opType byte, entityID string, entity *models.Enti
 	logger.TraceIf("wal", "WAL entry written: sequence=%d, size=%d bytes", w.walSequence, entryBuf.Len())
 	return nil
 }
+
+// RestoreHeaderSync restores HeaderSync from a snapshot to recover from checkpoint corruption
+// This is the critical recovery mechanism for checkpoint race conditions
+func (w *Writer) RestoreHeaderSync(snapshot *HeaderSnapshot) error {
+	if snapshot == nil {
+		return fmt.Errorf("cannot restore from nil snapshot")
+	}
+	
+	logger.Info("Restoring HeaderSync from snapshot: WALOffset=%d, EntityCount=%d", 
+		snapshot.Header.WALOffset, snapshot.EntityCount)
+	
+	// Restore the HeaderSync state
+	w.headerSync.RestoreFromSnapshot(snapshot)
+	
+	// Update local header copy
+	w.header = &snapshot.Header
+	
+	logger.Info("HeaderSync restoration completed successfully")
+	return nil
+}

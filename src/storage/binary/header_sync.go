@@ -90,3 +90,57 @@ func (hs *HeaderSync) UpdateOffsets(tagDictOffset, entityIndexOffset uint64) {
 	hs.header.TagDictOffset = tagDictOffset
 	hs.header.EntityIndexOffset = entityIndexOffset
 }
+
+// HeaderSnapshot represents a safe snapshot of HeaderSync state
+// for preservation during checkpoint operations
+type HeaderSnapshot struct {
+	Header      Header
+	WALSequence uint64
+	EntityCount uint64
+}
+
+// CreateSnapshot safely captures the current HeaderSync state
+// for preservation during checkpoint operations
+func (hs *HeaderSync) CreateSnapshot() *HeaderSnapshot {
+	hs.mu.RLock()
+	defer hs.mu.RUnlock()
+	
+	return &HeaderSnapshot{
+		Header:      hs.header,
+		WALSequence: hs.walSequence.Load(),
+		EntityCount: hs.entityCount.Load(),
+	}
+}
+
+// RestoreFromSnapshot safely restores HeaderSync state from a snapshot
+// Used to recover from checkpoint corruption
+func (hs *HeaderSync) RestoreFromSnapshot(snapshot *HeaderSnapshot) {
+	hs.mu.Lock()
+	defer hs.mu.Unlock()
+	
+	hs.header = snapshot.Header
+	hs.walSequence.Store(snapshot.WALSequence)
+	hs.entityCount.Store(snapshot.EntityCount)
+}
+
+// ValidateHeader checks if the header has valid values
+// Returns true if header is valid, false if corrupted
+func (hs *HeaderSync) ValidateHeader() bool {
+	hs.mu.RLock()
+	defer hs.mu.RUnlock()
+	
+	// Check critical fields for corruption
+	if hs.header.WALOffset == 0 || hs.header.WALOffset > uint64(1<<31) {
+		return false
+	}
+	
+	if hs.header.Magic != 0x46465545 { // "EUFF"
+		return false
+	}
+	
+	if hs.header.Version == 0 {
+		return false
+	}
+	
+	return true
+}

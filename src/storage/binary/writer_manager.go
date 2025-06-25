@@ -125,15 +125,21 @@ func (wm *WriterManager) Flush() error {
 	return nil
 }
 
-// Checkpoint performs a checkpoint operation
+// Checkpoint performs a checkpoint operation with HeaderSync protection
+// This implements a three-layer corruption prevention system
 func (wm *WriterManager) Checkpoint() error {
 	wm.mu.Lock()
 	defer wm.mu.Unlock()
 	
-	logger.Debug("Checkpoint called")
+	logger.Debug("Checkpoint called with HeaderSync protection")
 	
 	if wm.writer != nil {
-		logger.Debug("Writer exists, starting checkpoint process")
+		logger.Debug("Writer exists, starting protected checkpoint process")
+		
+		// LAYER 1: Preserve HeaderSync state before checkpoint
+		headerSnapshot := wm.writer.headerSync.CreateSnapshot()
+		logger.Debug("HeaderSync snapshot created: WALOffset=%d, EntityCount=%d", 
+			headerSnapshot.Header.WALOffset, headerSnapshot.EntityCount)
 		
 		// Force a flush
 		if err := wm.writer.file.Sync(); err != nil {
@@ -151,14 +157,30 @@ func (wm *WriterManager) Checkpoint() error {
 		logger.Debug("Writer closed, index should be written")
 		
 		// Reopen the writer
-		logger.Debug("Reopening writer")
+		logger.Debug("Reopening writer with validation")
 		writer, err := NewWriter(wm.dataFile, wm.config)
 		if err != nil {
 			logger.Error("Failed to reopen writer: %v", err)
 			return err
 		}
+		
+		// LAYER 2: Validate header integrity after reopen
+		if !writer.headerSync.ValidateHeader() {
+			logger.Warn("HeaderSync validation failed after reopen, corruption detected")
+			
+			// LAYER 3: Fallback recovery using preserved snapshot
+			logger.Info("Attempting HeaderSync recovery from snapshot")
+			if err := writer.RestoreHeaderSync(headerSnapshot); err != nil {
+				logger.Error("Failed to restore HeaderSync from snapshot: %v", err)
+				return fmt.Errorf("checkpoint recovery failed: %w", err)
+			}
+			logger.Info("HeaderSync successfully recovered from snapshot")
+		} else {
+			logger.Debug("HeaderSync validation passed after reopen")
+		}
+		
 		wm.writer = writer
-		logger.Debug("Writer reopened successfully")
+		logger.Debug("Writer reopened successfully with HeaderSync protection")
 	} else {
 		logger.Debug("No writer exists, skipping checkpoint")
 	}
