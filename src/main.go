@@ -521,7 +521,8 @@ func main() {
 	// FIXED: Metrics retention manager - now uses incremental Update() method
 	// The Update() method has been fixed to use incremental updates instead of rebuilding 
 	// the entire database file, eliminating the CPU spikes caused by metrics retention.
-	if cfg.MetricsRetentionRaw > 0 {
+	// INSPECTOR CLOUSEAU FIX: Only run retention manager if metrics are actually enabled
+	if cfg.MetricsRetentionRaw > 0 && (cfg.MetricsEnableRequestTracking || cfg.MetricsEnableStorageTracking) {
 		retentionManager := api.NewMetricsRetentionManager(
 			server.entityRepo,
 			cfg.MetricsRetentionRaw,

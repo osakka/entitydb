@@ -1502,6 +1502,8 @@ func (r *EntityRepository) updateIndexes(entity *models.Entity) {
 	
 	// Helper function to remove entity ID from tag index
 	removeEntityFromTag := func(tag, entityID string) {
+		// ENHANCED LOGGING: Track index cleanup for stale entry debugging
+		logger.Debug("ENTITY_LIFECYCLE: Removing entity %s from tag index for tag '%s'", entityID, tag)
 		// Use sharded index for better concurrency
 		r.shardedTagIndex.RemoveTag(tag, entityID)
 	}
@@ -1631,6 +1633,9 @@ func (r *EntityRepository) createInternal(entity *models.Entity) error {
 	// Note: Checksum generation disabled - was causing systematic validation failures
 	// without providing real security value. Can be re-implemented properly if needed.
 	logger.Trace("Entity prepared for storage: %s (%d bytes content)", entity.ID, len(entity.Content))
+	
+	// ENHANCED LOGGING: Track entity lifecycle for stale entry debugging
+	logger.Info("ENTITY_LIFECYCLE: Creating entity %s with %d tags [%v]", entity.ID, len(entity.Tags), entity.Tags)
 	
 	// Use batch writer if enabled for better throughput
 	if r.useBatchWrites && r.batchWriter != nil {
@@ -2204,6 +2209,9 @@ func (r *EntityRepository) GetBaseRepository() *EntityRepository {
 
 // Delete deletes an entity
 func (r *EntityRepository) Delete(id string) error {
+	// ENHANCED LOGGING: Track entity lifecycle for stale entry debugging
+	logger.Info("ENTITY_LIFECYCLE: Deleting entity %s", id)
+	
 	// In the unified format, we don't physically delete entities
 	// Instead, we mark them as purged and track in deletion index
 	
@@ -2249,15 +2257,17 @@ func (r *EntityRepository) Delete(id string) error {
 	r.cache.Clear() // Clear entire cache since we don't have per-entity removal
 	r.entityCache.Delete(id)
 	
-	// Remove from tag indexes
+	// Remove from tag indexes with enhanced logging
+	logger.Info("ENTITY_LIFECYCLE: Removing entity %s from %d tag indexes", id, len(entity.Tags))
 	for _, tag := range entity.Tags {
 		actualTag := tag
 		if parts := strings.SplitN(tag, "|", 2); len(parts) == 2 {
 			actualTag = parts[1]
 		}
 		
-		// Remove from sharded index
-		r.shardedTagIndex.RemoveTag(id, actualTag)
+		// Remove from sharded index - FIXED: correct parameter order
+		logger.Debug("ENTITY_LIFECYCLE: Removing entity %s from tag index for tag '%s'", id, actualTag)
+		r.shardedTagIndex.RemoveTag(actualTag, id)
 		
 		// Remove from tag variant cache
 		if r.tagVariantCache != nil {

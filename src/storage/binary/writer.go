@@ -803,26 +803,34 @@ func (w *Writer) Close() error {
 		}
 		writtenCount++
 	}
-	logger.TraceIf("storage", "Wrote %d index entries (unified header claims %d)", writtenCount, w.header.EntityCount)
+	// Get current entity count from HeaderSync for accurate comparison
+	currentEntityCount := w.headerSync.GetHeader().EntityCount
+	logger.TraceIf("storage", "Wrote %d index entries (HeaderSync claims %d)", writtenCount, currentEntityCount)
 	
-	// Verify index count matches unified header
-	if writtenCount != int(w.header.EntityCount) {
-		logger.Warn("Index entry count mismatch detected: wrote %d entries but unified header claims %d, correcting header", writtenCount, w.header.EntityCount)
-		// Update unified header to match actual count
-		w.header.EntityCount = uint64(writtenCount)
-		logger.Debug("Corrected unified header EntityCount to match actual index: %d", w.header.EntityCount)
+	// Verify index count matches HeaderSync
+	if writtenCount != int(currentEntityCount) {
+		logger.Warn("Index entry count mismatch detected: wrote %d entries but HeaderSync claims %d, correcting HeaderSync", writtenCount, currentEntityCount)
+		// Update HeaderSync to match actual count - this should not happen with proper HeaderSync usage
+		w.headerSync.UpdateHeader(func(h *Header) {
+			h.EntityCount = uint64(writtenCount)
+		})
+		logger.Debug("Corrected HeaderSync EntityCount to match actual index: %d", writtenCount)
 	} else {
-		logger.Debug("Index count verification passed: %d entries match unified header count", writtenCount)
+		logger.Debug("Index count verification passed: %d entries match HeaderSync count", writtenCount)
 	}
 	
-	// Update unified header
-	w.header.TagDictOffset = uint64(dictOffset)
-	w.header.TagDictSize = uint64(dictBuf.Len())
-	w.header.EntityIndexOffset = uint64(indexOffset)
-	w.header.EntityIndexSize = uint64(writtenCount * IndexEntrySize)
+	// Update unified header through HeaderSync for consistency
+	w.headerSync.UpdateHeader(func(h *Header) {
+		h.TagDictOffset = uint64(dictOffset)
+		h.TagDictSize = uint64(dictBuf.Len())
+		h.EntityIndexOffset = uint64(indexOffset)
+		h.EntityIndexSize = uint64(writtenCount * IndexEntrySize)
+	})
 	
+	// Log updated header values from HeaderSync
+	updatedHeader := w.headerSync.GetHeader()
 	logger.Debug("Updated unified header: TagDictOffset=%d, TagDictSize=%d, EntityIndexOffset=%d, EntityIndexSize=%d",
-		w.header.TagDictOffset, w.header.TagDictSize, w.header.EntityIndexOffset, w.header.EntityIndexSize)
+		updatedHeader.TagDictOffset, updatedHeader.TagDictSize, updatedHeader.EntityIndexOffset, updatedHeader.EntityIndexSize)
 	
 	// Rewrite header at beginning
 	_, err = w.file.Seek(0, os.SEEK_SET)
@@ -899,9 +907,14 @@ func (w *Writer) readExisting() error {
 	w.headerSync = NewHeaderSync(w.header)
 	logger.Debug("HeaderSync updated with loaded header: WALOffset=%d", w.header.WALOffset)
 	
-	// Read tag dictionary
-	logger.Debug("Reading tag dictionary from offset %d", w.header.TagDictOffset)
-	w.file.Seek(int64(w.header.TagDictOffset), os.SEEK_SET)
+	// Read tag dictionary using HeaderSync for corruption protection
+	tagDictOffset, err := w.headerSync.GetTagDictOffset()
+	if err != nil {
+		logger.Error("Failed to get safe TagDictOffset: %v", err)
+		return err
+	}
+	logger.Debug("Reading tag dictionary from validated offset %d", tagDictOffset)
+	w.file.Seek(int64(tagDictOffset), os.SEEK_SET)
 	if err := w.tagDict.Read(w.file); err != nil {
 		logger.Error("Failed to read tag dictionary: %v", err)
 		return err
@@ -1049,8 +1062,13 @@ func (w *Writer) readExistingUnified() error {
 	
 	// Read tag dictionary if present
 	if w.header.TagDictSize > 0 {
-		logger.Debug("Reading tag dictionary from offset %d", w.header.TagDictOffset)
-		if _, err := w.file.Seek(int64(w.header.TagDictOffset), os.SEEK_SET); err != nil {
+		tagDictOffset, err := w.headerSync.GetTagDictOffset()
+		if err != nil {
+			logger.Error("Failed to get safe TagDictOffset: %v", err)
+			return err
+		}
+		logger.Debug("Reading tag dictionary from validated offset %d", tagDictOffset)
+		if _, err := w.file.Seek(int64(tagDictOffset), os.SEEK_SET); err != nil {
 			return err
 		}
 		if err := w.tagDict.Read(w.file); err != nil {

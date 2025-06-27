@@ -82,6 +82,38 @@ func (hs *HeaderSync) GetWALOffset() (uint64, error) {
 	return offset, nil
 }
 
+// GetTagDictOffset safely returns the tag dictionary offset with validation
+func (hs *HeaderSync) GetTagDictOffset() (uint64, error) {
+	hs.mu.RLock()
+	defer hs.mu.RUnlock()
+	
+	offset := hs.header.TagDictOffset
+	
+	// Validate offset to prevent EOF errors
+	if offset > uint64(1<<31) {
+		logger.Error("CORRUPTION DETECTED: Invalid TagDictOffset %d", offset)
+		return 0, fmt.Errorf("corrupted header: invalid TagDictOffset %d", offset)
+	}
+	
+	return offset, nil
+}
+
+// GetEntityIndexOffset safely returns the entity index offset with validation
+func (hs *HeaderSync) GetEntityIndexOffset() (uint64, error) {
+	hs.mu.RLock()
+	defer hs.mu.RUnlock()
+	
+	offset := hs.header.EntityIndexOffset
+	
+	// Validate offset to prevent corruption
+	if offset > uint64(1<<31) {
+		logger.Error("CORRUPTION DETECTED: Invalid EntityIndexOffset %d", offset)
+		return 0, fmt.Errorf("corrupted header: invalid EntityIndexOffset %d", offset)
+	}
+	
+	return offset, nil
+}
+
 // UpdateOffsets safely updates file offsets
 func (hs *HeaderSync) UpdateOffsets(tagDictOffset, entityIndexOffset uint64) {
 	hs.mu.Lock()
@@ -131,14 +163,29 @@ func (hs *HeaderSync) ValidateHeader() bool {
 	
 	// Check critical fields for corruption
 	if hs.header.WALOffset == 0 || hs.header.WALOffset > uint64(1<<31) {
+		logger.Error("HeaderSync validation failed: Invalid WALOffset %d", hs.header.WALOffset)
+		return false
+	}
+	
+	// EXTENDED PROTECTION: Validate TagDictOffset for EOF error prevention
+	if hs.header.TagDictOffset > uint64(1<<31) {
+		logger.Error("HeaderSync validation failed: Invalid TagDictOffset %d", hs.header.TagDictOffset)
+		return false
+	}
+	
+	// EXTENDED PROTECTION: Validate EntityIndexOffset for corruption prevention
+	if hs.header.EntityIndexOffset > uint64(1<<31) {
+		logger.Error("HeaderSync validation failed: Invalid EntityIndexOffset %d", hs.header.EntityIndexOffset)
 		return false
 	}
 	
 	if hs.header.Magic != 0x46465545 { // "EUFF"
+		logger.Error("HeaderSync validation failed: Invalid magic number %x", hs.header.Magic)
 		return false
 	}
 	
 	if hs.header.Version == 0 {
+		logger.Error("HeaderSync validation failed: Invalid version %d", hs.header.Version)
 		return false
 	}
 	
