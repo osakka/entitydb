@@ -19,7 +19,7 @@ type HeaderSync struct {
 	
 	// Atomic counters for fast path
 	walSequence atomic.Uint64
-	entityCount atomic.Uint64
+	// entityCount removed - index is single source of truth
 }
 
 // NewHeaderSync creates a new synchronized header wrapper
@@ -28,7 +28,7 @@ func NewHeaderSync(h *Header) *HeaderSync {
 		header: *h, // Copy the header
 	}
 	hs.walSequence.Store(h.WALSequence)
-	hs.entityCount.Store(h.EntityCount)
+	// entityCount initialization removed - index is single source of truth
 	return hs
 }
 
@@ -40,7 +40,7 @@ func (hs *HeaderSync) GetHeader() Header {
 	// Update atomic counters
 	h := hs.header
 	h.WALSequence = hs.walSequence.Load()
-	h.EntityCount = hs.entityCount.Load()
+	// EntityCount comes from header directly - index is single source of truth
 	return h
 }
 
@@ -53,7 +53,7 @@ func (hs *HeaderSync) UpdateHeader(fn func(*Header)) {
 	
 	// Update atomic counters
 	hs.walSequence.Store(hs.header.WALSequence)
-	hs.entityCount.Store(hs.header.EntityCount)
+	// entityCount sync removed - index is single source of truth
 }
 
 // IncrementWALSequence atomically increments the WAL sequence
@@ -61,10 +61,7 @@ func (hs *HeaderSync) IncrementWALSequence() uint64 {
 	return hs.walSequence.Add(1)
 }
 
-// IncrementEntityCount atomically increments the entity count
-func (hs *HeaderSync) IncrementEntityCount() uint64 {
-	return hs.entityCount.Add(1)
-}
+// IncrementEntityCount removed - index is single source of truth for entity count
 
 // GetWALOffset safely returns the WAL offset with validation
 func (hs *HeaderSync) GetWALOffset() (uint64, error) {
@@ -140,7 +137,7 @@ func (hs *HeaderSync) CreateSnapshot() *HeaderSnapshot {
 	return &HeaderSnapshot{
 		Header:      hs.header,
 		WALSequence: hs.walSequence.Load(),
-		EntityCount: hs.entityCount.Load(),
+		EntityCount: hs.header.EntityCount, // Use header directly - index is source of truth
 	}
 }
 
@@ -152,7 +149,7 @@ func (hs *HeaderSync) RestoreFromSnapshot(snapshot *HeaderSnapshot) {
 	
 	hs.header = snapshot.Header
 	hs.walSequence.Store(snapshot.WALSequence)
-	hs.entityCount.Store(snapshot.EntityCount)
+	// EntityCount restored via header - index is source of truth
 }
 
 // ValidateHeader checks if the header has valid values

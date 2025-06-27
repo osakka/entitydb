@@ -626,13 +626,11 @@ func (w *Writer) WriteEntity(entity *models.Entity) error {
 		}
 	}
 	
-	// Update unified header
+	// Entity count tracking removed - index is single source of truth
 	if !isUpdate {
-		newCount := w.headerSync.IncrementEntityCount()
-		logger.TraceIf("storage", "New entity %s added, EntityCount updated to %d", entity.ID, newCount)
+		logger.TraceIf("storage", "New entity %s added to index", entity.ID)
 	} else {
-		count := w.headerSync.GetHeader().EntityCount
-		logger.TraceIf("storage", "Updated existing entity %s, EntityCount remains %d", entity.ID, count)
+		logger.TraceIf("storage", "Updated existing entity %s in index", entity.ID)
 	}
 	
 	// Update header fields safely
@@ -803,24 +801,13 @@ func (w *Writer) Close() error {
 		}
 		writtenCount++
 	}
-	// Get current entity count from HeaderSync for accurate comparison
-	currentEntityCount := w.headerSync.GetHeader().EntityCount
-	logger.TraceIf("storage", "Wrote %d index entries (HeaderSync claims %d)", writtenCount, currentEntityCount)
-	
-	// Verify index count matches HeaderSync
-	if writtenCount != int(currentEntityCount) {
-		logger.Warn("Index entry count mismatch detected: wrote %d entries but HeaderSync claims %d, correcting HeaderSync", writtenCount, currentEntityCount)
-		// Update HeaderSync to match actual count - this should not happen with proper HeaderSync usage
-		w.headerSync.UpdateHeader(func(h *Header) {
-			h.EntityCount = uint64(writtenCount)
-		})
-		logger.Debug("Corrected HeaderSync EntityCount to match actual index: %d", writtenCount)
-	} else {
-		logger.Debug("Index count verification passed: %d entries match HeaderSync count", writtenCount)
-	}
+	// Index is single source of truth for entity count - no verification needed
+	logger.TraceIf("storage", "Wrote %d index entries (index is authoritative source)", writtenCount)
 	
 	// Update unified header through HeaderSync for consistency
+	// Index is single source of truth for entity count
 	w.headerSync.UpdateHeader(func(h *Header) {
+		h.EntityCount = uint64(writtenCount)        // Derive from index
 		h.TagDictOffset = uint64(dictOffset)
 		h.TagDictSize = uint64(dictBuf.Len())
 		h.EntityIndexOffset = uint64(indexOffset)
@@ -829,8 +816,8 @@ func (w *Writer) Close() error {
 	
 	// Log updated header values from HeaderSync
 	updatedHeader := w.headerSync.GetHeader()
-	logger.Debug("Updated unified header: TagDictOffset=%d, TagDictSize=%d, EntityIndexOffset=%d, EntityIndexSize=%d",
-		updatedHeader.TagDictOffset, updatedHeader.TagDictSize, updatedHeader.EntityIndexOffset, updatedHeader.EntityIndexSize)
+	logger.Debug("Updated unified header: EntityCount=%d, TagDictOffset=%d, TagDictSize=%d, EntityIndexOffset=%d, EntityIndexSize=%d",
+		updatedHeader.EntityCount, updatedHeader.TagDictOffset, updatedHeader.TagDictSize, updatedHeader.EntityIndexOffset, updatedHeader.EntityIndexSize)
 	
 	// Rewrite header at beginning
 	_, err = w.file.Seek(0, os.SEEK_SET)
