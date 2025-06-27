@@ -207,7 +207,7 @@ type EntityRepository struct {
 	wal         *WAL
 	
 	// File handle management
-	readerPool    sync.Pool      // Pool of readers for concurrent access
+	readerPool    *ReaderPool    // Pool of readers with bounded FD management (max 8)
 	writerManager *WriterManager // Manages single writer instance
 	currentFile   *os.File       // Current file handle
 	
@@ -774,17 +774,13 @@ func NewEntityRepositoryWithConfig(cfg *config.Config) (*EntityRepository, error
 		repo.writerManager.ReleaseWriter()
 	}
 	
-	// Initialize reader pool with binary format readers
-	repo.readerPool = sync.Pool{
-		New: func() interface{} {
-			reader, err := NewReader(repo.getDataFile())
-			if err != nil {
-				logger.Error("Failed to create reader: %v", err)
-				return nil
-			}
-			return reader
-		},
+	// Initialize reader pool with bounded file descriptor management
+	// Limited to 8 readers max to prevent OS-level Seek() race conditions
+	readerPool, err := NewReaderPool(repo.getDataFile(), 2, 8)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create reader pool: %w", err)
 	}
+	repo.readerPool = readerPool
 	
 	// Initialize embedded WAL from unified database file  
 	wal, err := NewWAL(cfg.DatabaseFilename)
@@ -1109,6 +1105,13 @@ func (r *EntityRepository) Close() error {
 	if r.currentFile != nil {
 		if err := r.currentFile.Close(); err != nil {
 			errors = append(errors, fmt.Errorf("error closing data file: %w", err))
+		}
+	}
+	
+	// Close reader pool to prevent file descriptor leaks
+	if r.readerPool != nil {
+		if err := r.readerPool.Close(); err != nil {
+			errors = append(errors, fmt.Errorf("error closing reader pool: %w", err))
 		}
 	}
 	
@@ -1694,15 +1697,15 @@ func (r *EntityRepository) createInternal(entity *models.Entity) error {
 	r.cache.Clear()
 	
 	// Invalidate reader pool to force new readers to see the entity
-	r.readerPool = sync.Pool{
-		New: func() interface{} {
-			reader, err := NewReader(r.getDataFile())
-			if err != nil {
-				logger.Error("Failed to create reader: %v", err)
-				return nil
-			}
-			return reader
-		},
+	// Close old pool and create new bounded pool to prevent FD corruption
+	if r.readerPool != nil {
+		r.readerPool.Close()
+	}
+	refreshedPool, refreshErr := NewReaderPool(r.getDataFile(), 2, 8)
+	if refreshErr != nil {
+		logger.Error("Failed to recreate reader pool: %v", refreshErr)
+	} else {
+		r.readerPool = refreshedPool
 	}
 	
 	// Explicitly sync to disk to ensure persistence
@@ -1718,15 +1721,15 @@ func (r *EntityRepository) createInternal(entity *models.Entity) error {
 	}
 	
 	// After checkpoint, invalidate reader pool again to ensure readers see the updated index
-	r.readerPool = sync.Pool{
-		New: func() interface{} {
-			reader, err := NewReader(r.getDataFile())
-			if err != nil {
-				logger.Error("Failed to create reader: %v", err)
-				return nil
-			}
-			return reader
-		},
+	// Close old pool and create new bounded pool to prevent FD corruption
+	if r.readerPool != nil {
+		r.readerPool.Close()
+	}
+	refreshedPool, refreshErr := NewReaderPool(r.getDataFile(), 2, 8)
+	if refreshErr != nil {
+		logger.Error("Failed to recreate reader pool: %v", refreshErr)
+	} else {
+		r.readerPool = refreshedPool
 	}
 	
 	logger.Debug("Created entity: %s", entity.ID)
@@ -4369,5 +4372,6 @@ func (r *EntityRepository) RemoveDeletionEntry(entityID string) {
 	
 	logger.Debug("RemoveDeletionEntry: removed entry for entity %s", entityID)
 }
+
 
 
