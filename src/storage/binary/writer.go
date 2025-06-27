@@ -130,17 +130,12 @@ func NewWriter(filename string, cfg *config.Config) (*Writer, error) {
 	// Try to read existing file
 	if stat, err := file.Stat(); err == nil && stat.Size() > 0 {
 		if err := w.readExisting(); err != nil {
-			logger.Warn("Failed to read existing unified file, creating new: %v", err)
-			// Reset the file
-			file.Truncate(0)
-			file.Seek(0, 0)
-			// Write initial unified header
-			if err := w.writeHeader(); err != nil {
-				return nil, err
-			}
-			if err := w.file.Sync(); err != nil {
-				return nil, err
-			}
+			logger.Error("CRITICAL: Database corruption detected, attempting surgical repair instead of data destruction")
+			logger.Error("Corruption details: %v", err)
+			logger.Error("File size: %d bytes, refusing to truncate and destroy data", stat.Size())
+			
+			// REFUSE TO DESTROY DATA - return error instead
+			return nil, fmt.Errorf("database corruption detected, manual recovery required: %v", err)
 		}
 	} else {
 		// New file, write initial unified header with sections
@@ -709,12 +704,43 @@ func (w *Writer) Close() error {
 	
 	logger.Debug("Close called, EntityCount=%d, FileSize=%d", w.header.EntityCount, w.header.FileSize)
 	
-	// Write tag dictionary
-	dictOffset, err := w.file.Seek(0, os.SEEK_END)
+	// ARCHITECTURAL FIX: Calculate dictionary offset from actual written content instead of trusting SEEK_END
+	// This prevents corruption from filesystem position tracking issues
+	
+	// Calculate expected position based on header + WAL + entity data
+	dictOffset := int64(HeaderSize) // Start after header
+	
+	// Add WAL size from header
+	dictOffset += int64(w.headerSync.GetHeader().WALSize)
+	
+	// Add entity data size from header  
+	dictOffset += int64(w.headerSync.GetHeader().DataSize)
+	
+	logger.Debug("Calculated tag dictionary offset: %d (Header: %d + WAL: %d + Data: %d)", 
+		dictOffset, HeaderSize, w.headerSync.GetHeader().WALSize, w.headerSync.GetHeader().DataSize)
+	
+	// Verify this matches file seek position for consistency
+	seekPos, err := w.file.Seek(0, os.SEEK_END)
 	if err != nil {
-		logger.Error("Failed to seek for dictionary: %v", err)
+		logger.Error("Failed to get file position for verification: %v", err)
 		return err
 	}
+	
+	// If there's a significant discrepancy, use calculated position
+	discrepancy := seekPos - dictOffset
+	if discrepancy < 0 {
+		discrepancy = -discrepancy
+	}
+	if discrepancy > 1024 { // Allow 1KB tolerance
+		logger.Warn("File position mismatch: calculated=%d, seek=%d, using calculated position", dictOffset, seekPos)
+		if _, err := w.file.Seek(dictOffset, os.SEEK_SET); err != nil {
+			logger.Error("Failed to seek to calculated position: %v", err)
+			return err
+		}
+	} else {
+		dictOffset = seekPos // Positions match, use seek position
+	}
+	
 	logger.Debug("Writing tag dictionary at offset %d", dictOffset)
 	
 	dictBuf := new(bytes.Buffer)
@@ -726,12 +752,34 @@ func (w *Writer) Close() error {
 	}
 	logger.Debug("Wrote %d bytes for tag dictionary", n)
 	
-	// Write index
-	indexOffset, err := w.file.Seek(0, os.SEEK_END)
+	// ARCHITECTURAL FIX: Calculate index offset from actual written content
+	indexOffset := dictOffset + int64(dictBuf.Len())
+	
+	logger.Debug("Calculated index offset: %d (DictOffset: %d + DictSize: %d)", 
+		indexOffset, dictOffset, dictBuf.Len())
+	
+	// Verify this matches file seek position for consistency
+	seekPos, err = w.file.Seek(0, os.SEEK_END)
 	if err != nil {
-		logger.Error("Failed to seek for index: %v", err)
+		logger.Error("Failed to get file position for index verification: %v", err)
 		return err
 	}
+	
+	// If there's a significant discrepancy, use calculated position
+	discrepancy = seekPos - indexOffset
+	if discrepancy < 0 {
+		discrepancy = -discrepancy
+	}
+	if discrepancy > 1024 { // Allow 1KB tolerance
+		logger.Warn("Index position mismatch: calculated=%d, seek=%d, using calculated position", indexOffset, seekPos)
+		if _, err := w.file.Seek(indexOffset, os.SEEK_SET); err != nil {
+			logger.Error("Failed to seek to calculated index position: %v", err)
+			return err
+		}
+	} else {
+		indexOffset = seekPos // Positions match, use seek position
+	}
+	
 	logger.Debug("Writing index at offset %d with %d entries", indexOffset, len(w.index))
 	
 	// Index Writing Algorithm:

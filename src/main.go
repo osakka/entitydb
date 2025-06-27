@@ -140,6 +140,7 @@ type EntityDBServer struct {
 	userHandler      *api.UserHandler
 	authHandler      *api.AuthHandler
 	deletionHandler  *api.DeletionHandler
+	relationshipHandler *api.EntityRelationshipHandler
 	securityMiddleware *api.SecurityMiddleware
 	config           *config.Config
 }
@@ -365,6 +366,9 @@ func main() {
 	server.authHandler = api.NewAuthHandler(server.securityManager)
 	server.deletionHandler = api.NewDeletionHandler(entityRepo, server.deletionCollector, server.securityMiddleware)
 	
+	// Entity relationship handler for API-first modular architecture
+	server.relationshipHandler = api.NewEntityRelationshipHandler(entityRepo)
+	
 	// Migrate legacy user_ prefixed UUIDs to pure UUIDs (one-time migration - BEFORE entity initialization)
 	if err := MigrateLegacyUUIDs(entityRepo); err != nil {
 		logger.Warn("Legacy UUID migration failed (non-fatal): %v", err)
@@ -445,8 +449,11 @@ func main() {
 		w.Write([]byte(`{"status":"success","message":"Temporal tag index has been fixed"}`))
 	}).Methods("POST")
 	
-	// Entity relationships are now pure tag-based (e.g., "relates_to:entity_id" tags)
-	// No separate relationship endpoints needed - use entity tag operations instead
+	// Entity relationship discovery endpoints with RBAC - API-first modular architecture
+	apiRouter.HandleFunc("/entity-relationships/{id}/discover", server.securityMiddleware.RequirePermission("entity", "view")(server.relationshipHandler.DiscoverRelationships)).Methods("GET")
+	apiRouter.HandleFunc("/entity-relationships/{id}/network", server.securityMiddleware.RequirePermission("entity", "view")(server.relationshipHandler.GetEntityNetwork)).Methods("GET")
+	apiRouter.HandleFunc("/entity-relationships/{id}/network/{depth}", server.securityMiddleware.RequirePermission("entity", "view")(server.relationshipHandler.GetEntityNetwork)).Methods("GET")
+	apiRouter.HandleFunc("/entity-relationships/{id}/related", server.securityMiddleware.RequirePermission("entity", "view")(server.relationshipHandler.GetRelatedByTags)).Methods("GET")
 	
 	// Auth routes - New relationship-based security
 	apiRouter.HandleFunc("/auth/login", server.authHandler.Login).Methods("POST")

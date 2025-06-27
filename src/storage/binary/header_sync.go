@@ -85,10 +85,24 @@ func (hs *HeaderSync) GetTagDictOffset() (uint64, error) {
 	defer hs.mu.RUnlock()
 	
 	offset := hs.header.TagDictOffset
+	fileSize := hs.header.FileSize
 	
-	// Validate offset to prevent EOF errors
-	if offset > uint64(1<<31) {
-		logger.Error("CORRUPTION DETECTED: Invalid TagDictOffset %d", offset)
+	// Enhanced validation: Offset must be reasonable relative to file size
+	if offset == 0 {
+		logger.Error("CORRUPTION DETECTED: TagDictOffset cannot be zero")
+		return 0, fmt.Errorf("corrupted header: invalid TagDictOffset %d", offset)
+	}
+	
+	// Check against file size for sanity
+	if fileSize > 0 && offset >= fileSize {
+		logger.Error("CORRUPTION DETECTED: TagDictOffset %d exceeds file size %d", offset, fileSize)
+		return 0, fmt.Errorf("corrupted header: invalid TagDictOffset %d exceeds file size %d", offset, fileSize)
+	}
+	
+	// Prevent astronomical offsets (10GB limit for safety)
+	maxReasonableOffset := uint64(10 * 1024 * 1024 * 1024) // 10GB
+	if offset > maxReasonableOffset {
+		logger.Error("CORRUPTION DETECTED: TagDictOffset %d exceeds reasonable limit %d", offset, maxReasonableOffset)
 		return 0, fmt.Errorf("corrupted header: invalid TagDictOffset %d", offset)
 	}
 	
@@ -101,23 +115,72 @@ func (hs *HeaderSync) GetEntityIndexOffset() (uint64, error) {
 	defer hs.mu.RUnlock()
 	
 	offset := hs.header.EntityIndexOffset
+	fileSize := hs.header.FileSize
 	
-	// Validate offset to prevent corruption
-	if offset > uint64(1<<31) {
-		logger.Error("CORRUPTION DETECTED: Invalid EntityIndexOffset %d", offset)
+	// Enhanced validation: Offset must be reasonable relative to file size
+	if offset == 0 {
+		logger.Error("CORRUPTION DETECTED: EntityIndexOffset cannot be zero")
+		return 0, fmt.Errorf("corrupted header: invalid EntityIndexOffset %d", offset)
+	}
+	
+	// Check against file size for sanity
+	if fileSize > 0 && offset >= fileSize {
+		logger.Error("CORRUPTION DETECTED: EntityIndexOffset %d exceeds file size %d", offset, fileSize)
+		return 0, fmt.Errorf("corrupted header: invalid EntityIndexOffset %d exceeds file size %d", offset, fileSize)
+	}
+	
+	// Prevent astronomical offsets (10GB limit for safety)
+	maxReasonableOffset := uint64(10 * 1024 * 1024 * 1024) // 10GB
+	if offset > maxReasonableOffset {
+		logger.Error("CORRUPTION DETECTED: EntityIndexOffset %d exceeds reasonable limit %d", offset, maxReasonableOffset)
 		return 0, fmt.Errorf("corrupted header: invalid EntityIndexOffset %d", offset)
 	}
 	
 	return offset, nil
 }
 
-// UpdateOffsets safely updates file offsets
-func (hs *HeaderSync) UpdateOffsets(tagDictOffset, entityIndexOffset uint64) {
+// UpdateOffsets safely updates file offsets with corruption prevention
+func (hs *HeaderSync) UpdateOffsets(tagDictOffset, entityIndexOffset uint64) error {
 	hs.mu.Lock()
 	defer hs.mu.Unlock()
 	
+	fileSize := hs.header.FileSize
+	maxReasonableOffset := uint64(10 * 1024 * 1024 * 1024) // 10GB safety limit
+	
+	// Validate TagDictOffset before updating
+	if tagDictOffset == 0 {
+		logger.Error("CORRUPTION PREVENTION: Refusing to set TagDictOffset to zero")
+		return fmt.Errorf("invalid TagDictOffset: cannot be zero")
+	}
+	if fileSize > 0 && tagDictOffset >= fileSize {
+		logger.Error("CORRUPTION PREVENTION: TagDictOffset %d exceeds file size %d", tagDictOffset, fileSize)
+		return fmt.Errorf("invalid TagDictOffset %d: exceeds file size %d", tagDictOffset, fileSize)
+	}
+	if tagDictOffset > maxReasonableOffset {
+		logger.Error("CORRUPTION PREVENTION: TagDictOffset %d exceeds reasonable limit %d", tagDictOffset, maxReasonableOffset)
+		return fmt.Errorf("invalid TagDictOffset %d: exceeds reasonable limit", tagDictOffset)
+	}
+	
+	// Validate EntityIndexOffset before updating
+	if entityIndexOffset == 0 {
+		logger.Error("CORRUPTION PREVENTION: Refusing to set EntityIndexOffset to zero")
+		return fmt.Errorf("invalid EntityIndexOffset: cannot be zero")
+	}
+	if fileSize > 0 && entityIndexOffset >= fileSize {
+		logger.Error("CORRUPTION PREVENTION: EntityIndexOffset %d exceeds file size %d", entityIndexOffset, fileSize)
+		return fmt.Errorf("invalid EntityIndexOffset %d: exceeds file size %d", entityIndexOffset, fileSize)
+	}
+	if entityIndexOffset > maxReasonableOffset {
+		logger.Error("CORRUPTION PREVENTION: EntityIndexOffset %d exceeds reasonable limit %d", entityIndexOffset, maxReasonableOffset)
+		return fmt.Errorf("invalid EntityIndexOffset %d: exceeds reasonable limit", entityIndexOffset)
+	}
+	
+	// Only update if validation passes
 	hs.header.TagDictOffset = tagDictOffset
 	hs.header.EntityIndexOffset = entityIndexOffset
+	
+	logger.Trace("HeaderSync: Updated offsets - TagDict: %d, EntityIndex: %d", tagDictOffset, entityIndexOffset)
+	return nil
 }
 
 // HeaderSnapshot represents a safe snapshot of HeaderSync state
@@ -158,24 +221,7 @@ func (hs *HeaderSync) ValidateHeader() bool {
 	hs.mu.RLock()
 	defer hs.mu.RUnlock()
 	
-	// Check critical fields for corruption
-	if hs.header.WALOffset == 0 || hs.header.WALOffset > uint64(1<<31) {
-		logger.Error("HeaderSync validation failed: Invalid WALOffset %d", hs.header.WALOffset)
-		return false
-	}
-	
-	// EXTENDED PROTECTION: Validate TagDictOffset for EOF error prevention
-	if hs.header.TagDictOffset > uint64(1<<31) {
-		logger.Error("HeaderSync validation failed: Invalid TagDictOffset %d", hs.header.TagDictOffset)
-		return false
-	}
-	
-	// EXTENDED PROTECTION: Validate EntityIndexOffset for corruption prevention
-	if hs.header.EntityIndexOffset > uint64(1<<31) {
-		logger.Error("HeaderSync validation failed: Invalid EntityIndexOffset %d", hs.header.EntityIndexOffset)
-		return false
-	}
-	
+	// Check magic number and version first
 	if hs.header.Magic != 0x46465545 { // "EUFF"
 		logger.Error("HeaderSync validation failed: Invalid magic number %x", hs.header.Magic)
 		return false
@@ -183,6 +229,51 @@ func (hs *HeaderSync) ValidateHeader() bool {
 	
 	if hs.header.Version == 0 {
 		logger.Error("HeaderSync validation failed: Invalid version %d", hs.header.Version)
+		return false
+	}
+	
+	fileSize := hs.header.FileSize
+	maxReasonableOffset := uint64(10 * 1024 * 1024 * 1024) // 10GB safety limit
+	
+	// Enhanced WALOffset validation
+	if hs.header.WALOffset == 0 {
+		logger.Error("HeaderSync validation failed: WALOffset cannot be zero")
+		return false
+	}
+	if fileSize > 0 && hs.header.WALOffset >= fileSize {
+		logger.Error("HeaderSync validation failed: WALOffset %d exceeds file size %d", hs.header.WALOffset, fileSize)
+		return false
+	}
+	if hs.header.WALOffset > maxReasonableOffset {
+		logger.Error("HeaderSync validation failed: WALOffset %d exceeds reasonable limit", hs.header.WALOffset)
+		return false
+	}
+	
+	// Enhanced TagDictOffset validation
+	if hs.header.TagDictOffset == 0 {
+		logger.Error("HeaderSync validation failed: TagDictOffset cannot be zero")
+		return false
+	}
+	if fileSize > 0 && hs.header.TagDictOffset >= fileSize {
+		logger.Error("HeaderSync validation failed: TagDictOffset %d exceeds file size %d", hs.header.TagDictOffset, fileSize)
+		return false
+	}
+	if hs.header.TagDictOffset > maxReasonableOffset {
+		logger.Error("HeaderSync validation failed: TagDictOffset %d exceeds reasonable limit", hs.header.TagDictOffset)
+		return false
+	}
+	
+	// Enhanced EntityIndexOffset validation
+	if hs.header.EntityIndexOffset == 0 {
+		logger.Error("HeaderSync validation failed: EntityIndexOffset cannot be zero")
+		return false
+	}
+	if fileSize > 0 && hs.header.EntityIndexOffset >= fileSize {
+		logger.Error("HeaderSync validation failed: EntityIndexOffset %d exceeds file size %d", hs.header.EntityIndexOffset, fileSize)
+		return false
+	}
+	if hs.header.EntityIndexOffset > maxReasonableOffset {
+		logger.Error("HeaderSync validation failed: EntityIndexOffset %d exceeds reasonable limit", hs.header.EntityIndexOffset)
 		return false
 	}
 	
