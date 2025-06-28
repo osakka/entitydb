@@ -1,3 +1,32 @@
+// Package api provides HTTP routing and middleware infrastructure for EntityDB.
+//
+// The router package implements a flexible HTTP routing system with middleware
+// support for the EntityDB API server. It provides:
+//
+//   - Route registration and management with duplicate detection
+//   - Middleware chain processing for cross-cutting concerns
+//   - Static file serving capabilities  
+//   - Request context management and lifecycle
+//   - Error handling and logging integration
+//
+// Middleware Architecture:
+//   The router supports a middleware chain pattern where each middleware
+//   function can modify the request/response or add functionality such as:
+//   - Authentication and authorization (RBAC enforcement)
+//   - Request/response logging and metrics collection
+//   - Rate limiting and throttling
+//   - CORS headers and security policies
+//   - Request tracing and debugging
+//
+// Route Management:
+//   Routes are registered with automatic duplicate detection and can handle
+//   both API endpoints and static file serving. The router maintains internal
+//   maps to track registered paths and their associated handlers.
+//
+// Integration:
+//   This router integrates with EntityDB's logging system and provides
+//   structured request processing with proper error handling and context
+//   propagation throughout the request lifecycle.
 package api
 
 import (
@@ -21,7 +50,11 @@ type Router struct {
 type MiddlewareFunc func(http.HandlerFunc) http.HandlerFunc
 
 
-// NewRouter creates a new router
+// NewRouter creates a new router instance with initialized internal maps.
+//
+// The returned router is ready for middleware registration, route handling,
+// and static file serving. All internal maps are pre-allocated to avoid
+// initialization overhead during request processing.
 func NewRouter() *Router {
 	return &Router{
 		mux:             http.NewServeMux(),
@@ -32,12 +65,30 @@ func NewRouter() *Router {
 	}
 }
 
-// Use adds middleware to the router
+// Use adds middleware to the router's middleware chain.
+//
+// Middleware functions are executed in the order they are registered (FIFO).
+// Each middleware function receives the next handler in the chain and can:
+//   - Modify the request before passing to the next handler
+//   - Modify the response after the next handler returns
+//   - Short-circuit the chain by not calling the next handler
+//
+// Example:
+//   router.Use(loggingMiddleware)
+//   router.Use(authMiddleware)
+//   // Execution order: logging -> auth -> handler
 func (r *Router) Use(middleware MiddlewareFunc) {
 	r.middleware = append(r.middleware, middleware)
 }
 
-// applyMiddleware applies all middleware to a handler
+// applyMiddleware applies all registered middleware to a handler in FIFO order.
+//
+// The middleware chain is built by wrapping each middleware around the previous
+// result, starting from the final handler and working backwards through the
+// middleware slice. This ensures middleware executes in registration order.
+//
+// Performance: This is called once per route registration, not per request,
+// so the wrapping overhead is minimal.
 func (r *Router) applyMiddleware(handler http.HandlerFunc) http.HandlerFunc {
 	// Apply middleware in reverse order (so they execute in registration order)
 	for i := len(r.middleware) - 1; i >= 0; i-- {

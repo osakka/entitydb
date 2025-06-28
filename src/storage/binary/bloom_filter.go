@@ -1,3 +1,30 @@
+// Package binary provides bloom filter implementation for efficient tag existence testing.
+//
+// Bloom Filter Theory:
+//   A Bloom filter is a space-efficient probabilistic data structure that is used to test
+//   whether an element is a member of a set. False positive matches are possible, but false
+//   negatives are not – in other words, a query returns either "possibly in set" or
+//   "definitely not in set".
+//
+// Performance Characteristics:
+//   - Space complexity: O(m) where m is the number of bits
+//   - Time complexity: O(k) where k is the number of hash functions
+//   - Memory usage: ~1.44 bits per element for 1% false positive rate
+//   - Query speed: Extremely fast, typically <100ns per lookup
+//
+// Implementation Details:
+//   This implementation uses FNV-1a hash function with double hashing to generate
+//   k independent hash functions from two hash values. The bit array is implemented
+//   using uint64 slices for optimal memory alignment and cache performance.
+//
+// Thread Safety:
+//   The bloom filter is thread-safe using RWMutex, allowing concurrent reads while
+//   serializing writes. This is optimal for EntityDB's read-heavy tag lookup patterns.
+//
+// Usage in EntityDB:
+//   Bloom filters are used to quickly eliminate non-existent tags before performing
+//   expensive disk I/O operations, significantly improving query performance for
+//   sparse tag distributions.
 package binary
 
 import (
@@ -17,7 +44,20 @@ type BloomFilter struct {
 	mu       sync.RWMutex
 }
 
-// NewBloomFilter creates a new bloom filter
+// NewBloomFilter creates a new bloom filter with optimal parameters.
+//
+// Parameters:
+//   expectedItems: Estimated number of items to be inserted
+//   falsePositiveRate: Desired false positive probability (e.g., 0.01 for 1%)
+//
+// The constructor automatically calculates optimal values for:
+//   - m: Number of bits in the bit array
+//   - k: Number of hash functions to use
+//
+// Memory usage scales with expectedItems and decreases with higher falsePositiveRate.
+// Typical values: 0.01 (1%) for balanced performance, 0.001 (0.1%) for high accuracy.
+//
+// Performance: ~1.44 bits per item for 1% false positive rate.
 func NewBloomFilter(expectedItems uint, falsePositiveRate float64) *BloomFilter {
 	// Calculate optimal parameters
 	m := uint(math.Ceil(-float64(expectedItems) * math.Log(falsePositiveRate) / math.Pow(math.Log(2), 2)))
@@ -35,7 +75,16 @@ func NewBloomFilter(expectedItems uint, falsePositiveRate float64) *BloomFilter 
 	}
 }
 
-// Add adds an item to the bloom filter
+// Add inserts an item into the bloom filter.
+//
+// This operation sets k bits in the bit array based on k hash functions.
+// After adding an item, subsequent Contains() calls for the same item
+// will always return true (no false negatives).
+//
+// Thread safety: This method is thread-safe and can be called concurrently
+// with other Add() and Contains() operations.
+//
+// Performance: O(k) where k is the number of hash functions (typically 3-5).
 func (bf *BloomFilter) Add(item string) {
 	bf.mu.Lock()
 	defer bf.mu.Unlock()
