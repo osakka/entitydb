@@ -38,14 +38,37 @@ import (
 	"entitydb/logger"
 )
 
-// intersectTagQueries performs AND logic on multiple tag queries.
-// This fixes the critical multi-tenancy security vulnerability where multiple tag
-// parameters were being treated as OR instead of AND operations.
-// 
-// PERFORMANCE OPTIMIZATIONS:
-// - Smart ordering: processes smallest result sets first to minimize intersection work
-// - Early termination: stops immediately if any tag has no results
-// - Memory optimization: uses more efficient intersection for small result sets
+// intersectTagQueries performs AND logic on multiple tag queries with
+// performance optimizations to minimize computational complexity.
+//
+// Security Fix:
+//   Fixes critical multi-tenancy vulnerability where multiple tag parameters
+//   were using OR logic instead of AND logic, potentially exposing data
+//   across tenant boundaries.
+//
+// Performance Characteristics:
+//   - Best case: O(n) where n is size of smallest result set
+//   - Worst case: O(n*m) where n,m are sizes of largest sets
+//   - Average case: O(k*log(k)) where k is typical result set size
+//   - Memory usage: O(smallest_set) due to smart ordering
+//   - Early termination: O(1) when any tag has zero results
+//
+// Memory Optimization Strategy:
+//   1. Sort by result set size (smallest first)
+//   2. Start intersection with smallest set
+//   3. Each intersection reduces result size
+//   4. Memory requirement decreases with each step
+//   5. Maximum memory: size of largest individual result set
+//
+// Algorithm Complexity Analysis:
+//   - Tag lookup: O(1) average with sharded indexing
+//   - Sorting by size: O(t*log(t)) where t is number of tags
+//   - Intersection: O(sum of result sizes) with early termination
+//   - Overall: O(t*log(t) + min(result_sizes) * t)
+//
+// Security Note:
+//   Implements proper AND logic to prevent multi-tenancy vulnerabilities
+//   where OR logic could expose data across tenant boundaries.
 func (h *EntityHandler) intersectTagQueries(tags []string) ([]*models.Entity, error) {
 	if len(tags) == 0 {
 		return []*models.Entity{}, nil

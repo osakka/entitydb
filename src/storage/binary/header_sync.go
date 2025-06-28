@@ -93,8 +93,8 @@ func (hs *HeaderSync) GetTagDictOffset() (uint64, error) {
 		return 0, fmt.Errorf("corrupted header: invalid TagDictOffset %d", offset)
 	}
 	
-	// Check against file size for sanity
-	if fileSize > 0 && offset >= fileSize {
+	// Check against file size for sanity (allow equal to file size for end-of-file positions)
+	if fileSize > 0 && offset > fileSize {
 		logger.Error("CORRUPTION DETECTED: TagDictOffset %d exceeds file size %d", offset, fileSize)
 		return 0, fmt.Errorf("corrupted header: invalid TagDictOffset %d exceeds file size %d", offset, fileSize)
 	}
@@ -123,8 +123,8 @@ func (hs *HeaderSync) GetEntityIndexOffset() (uint64, error) {
 		return 0, fmt.Errorf("corrupted header: invalid EntityIndexOffset %d", offset)
 	}
 	
-	// Check against file size for sanity
-	if fileSize > 0 && offset >= fileSize {
+	// Check against file size for sanity (allow equal to file size for end-of-file positions)  
+	if fileSize > 0 && offset > fileSize {
 		logger.Error("CORRUPTION DETECTED: EntityIndexOffset %d exceeds file size %d", offset, fileSize)
 		return 0, fmt.Errorf("corrupted header: invalid EntityIndexOffset %d exceeds file size %d", offset, fileSize)
 	}
@@ -152,7 +152,7 @@ func (hs *HeaderSync) UpdateOffsets(tagDictOffset, entityIndexOffset uint64) err
 		logger.Error("CORRUPTION PREVENTION: Refusing to set TagDictOffset to zero")
 		return fmt.Errorf("invalid TagDictOffset: cannot be zero")
 	}
-	if fileSize > 0 && tagDictOffset >= fileSize {
+	if fileSize > 0 && tagDictOffset > fileSize {
 		logger.Error("CORRUPTION PREVENTION: TagDictOffset %d exceeds file size %d", tagDictOffset, fileSize)
 		return fmt.Errorf("invalid TagDictOffset %d: exceeds file size %d", tagDictOffset, fileSize)
 	}
@@ -166,7 +166,7 @@ func (hs *HeaderSync) UpdateOffsets(tagDictOffset, entityIndexOffset uint64) err
 		logger.Error("CORRUPTION PREVENTION: Refusing to set EntityIndexOffset to zero")
 		return fmt.Errorf("invalid EntityIndexOffset: cannot be zero")
 	}
-	if fileSize > 0 && entityIndexOffset >= fileSize {
+	if fileSize > 0 && entityIndexOffset > fileSize {
 		logger.Error("CORRUPTION PREVENTION: EntityIndexOffset %d exceeds file size %d", entityIndexOffset, fileSize)
 		return fmt.Errorf("invalid EntityIndexOffset %d: exceeds file size %d", entityIndexOffset, fileSize)
 	}
@@ -191,8 +191,27 @@ type HeaderSnapshot struct {
 	EntityCount uint64
 }
 
-// CreateSnapshot safely captures the current HeaderSync state
-// for preservation during checkpoint operations
+// CreateSnapshot safely captures the current HeaderSync state for preservation
+// during checkpoint operations.
+//
+// Concurrency Safety:
+//   - Uses RLock to prevent concurrent modifications during snapshot creation
+//   - Atomic load of WALSequence ensures consistent counter value
+//   - Header copy is safe as RLock prevents concurrent header updates
+//   - EntityCount read from header maintains single source of truth
+//
+// Race Condition Prevention:
+//   - Read lock held throughout entire snapshot creation
+//   - No partial state capture possible due to lock protection
+//   - Atomic operations ensure counter consistency
+//   - Snapshot represents consistent point-in-time state
+//
+// Usage Pattern:
+//   Used during checkpoint operations to preserve header state before
+//   potentially corrupting operations, allowing rollback on failure.
+//   Essential for maintaining data integrity during concurrent writes.
+//
+// Performance: O(1) operation with minimal lock contention
 func (hs *HeaderSync) CreateSnapshot() *HeaderSnapshot {
 	hs.mu.RLock()
 	defer hs.mu.RUnlock()
@@ -204,8 +223,28 @@ func (hs *HeaderSync) CreateSnapshot() *HeaderSnapshot {
 	}
 }
 
-// RestoreFromSnapshot safely restores HeaderSync state from a snapshot
-// Used to recover from checkpoint corruption
+// RestoreFromSnapshot safely restores HeaderSync state from a snapshot.
+// Used to recover from checkpoint corruption or validation failures.
+//
+// Concurrency Safety:
+//   - Uses exclusive Lock to prevent any concurrent access during restore
+//   - Atomic store of WALSequence ensures consistency across threads
+//   - Header assignment is atomic under lock protection
+//   - No readers can access partial state during restoration
+//
+// Recovery Guarantees:
+//   - Complete state restoration from known-good snapshot
+//   - Maintains data integrity by reverting to validated state
+//   - Atomic operation - either fully succeeds or leaves state unchanged
+//   - Preserves single source of truth for EntityCount via header
+//
+// Error Recovery Pattern:
+//   Typically called when:
+//   1. Header validation fails after checkpoint
+//   2. Corruption detected in header structure
+//   3. WAL replay fails and requires state reset
+//
+// Performance: O(1) operation but involves exclusive lock acquisition
 func (hs *HeaderSync) RestoreFromSnapshot(snapshot *HeaderSnapshot) {
 	hs.mu.Lock()
 	defer hs.mu.Unlock()
@@ -254,7 +293,7 @@ func (hs *HeaderSync) ValidateHeader() bool {
 		logger.Error("HeaderSync validation failed: TagDictOffset cannot be zero")
 		return false
 	}
-	if fileSize > 0 && hs.header.TagDictOffset >= fileSize {
+	if fileSize > 0 && hs.header.TagDictOffset > fileSize {
 		logger.Error("HeaderSync validation failed: TagDictOffset %d exceeds file size %d", hs.header.TagDictOffset, fileSize)
 		return false
 	}
@@ -268,7 +307,7 @@ func (hs *HeaderSync) ValidateHeader() bool {
 		logger.Error("HeaderSync validation failed: EntityIndexOffset cannot be zero")
 		return false
 	}
-	if fileSize > 0 && hs.header.EntityIndexOffset >= fileSize {
+	if fileSize > 0 && hs.header.EntityIndexOffset > fileSize {
 		logger.Error("HeaderSync validation failed: EntityIndexOffset %d exceeds file size %d", hs.header.EntityIndexOffset, fileSize)
 		return false
 	}
