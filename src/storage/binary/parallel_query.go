@@ -51,23 +51,16 @@ func NewParallelQueryProcessor(repo *EntityRepository) *ParallelQueryProcessor {
 func (wp *WorkerPool) worker(repo *EntityRepository) {
 	defer wp.wg.Done()
 	
-	// Create a dedicated reader for this worker
-	var reader interface{ 
-		GetEntity(string) (*models.Entity, error)
-		Close() error
-	}
-	
-	mmapReader, err := NewMMapReader(repo.getDataFile())
-	if err != nil {
-		// Fallback to regular reader
-		regularReader, _ := NewReader(repo.getDataFile())
-		reader = regularReader
-	} else {
-		reader = mmapReader
-	}
-	defer reader.Close()
+	// Use bounded reader pool to prevent file descriptor exhaustion
+	// This is critical for preventing OS-level Seek() race conditions
 	
 	for task := range wp.taskQueue {
+		// Get reader from bounded pool for each task to prevent FD exhaustion
+		reader, err := repo.readerPool.Get()
+		if err != nil {
+			continue // Skip this task if can't get reader
+		}
+		
 		for _, entityID := range task.EntityIDs {
 			entity, err := reader.GetEntity(entityID)
 			if err != nil {
@@ -78,6 +71,9 @@ func (wp *WorkerPool) worker(repo *EntityRepository) {
 				task.Result <- entity
 			}
 		}
+		
+		// Return reader to pool after processing this task
+		repo.readerPool.Put(reader)
 	}
 }
 
